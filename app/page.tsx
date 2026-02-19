@@ -12,11 +12,11 @@ export default function HomePage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Link className="rounded-md bg-cyan-600 px-4 py-2 font-medium text-white hover:bg-cyan-700" href="/dashboard">
-          Open dashboard
+        <Link className="rounded-md bg-cyan-600 px-4 py-2 font-medium text-white hover:bg-cyan-700" href="/auth/sign-in">
+          Sign in
         </Link>
-        <Link className="rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100" href="/coach">
-          Chat with AI coach (stub)
+        <Link className="rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100" href="/auth/sign-up">
+          Create account
         </Link>
       </div>
     </main>
