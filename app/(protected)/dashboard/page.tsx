@@ -9,7 +9,7 @@ type PlannedSession = {
   date: string;
   sport: string;
   type: string;
-  duration: number | null;
+  duration_minutes: number | null;
   notes: string | null;
   created_at: string;
 };
@@ -36,7 +36,7 @@ function isPlannedSessionTableMissing(error: { code?: string; message?: string }
     return true;
   }
 
-  return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
+  return /could not find the table 'public\.(planned_sessions|sessions)' in the schema cache/i.test(error.message ?? "");
 }
 
 function getMonday(date = new Date()) {
@@ -107,8 +107,8 @@ export default async function DashboardPage({
   const isCurrentWeek = weekStart === getMonday().toISOString().slice(0, 10);
 
   const { data: plannedData, error: plannedError } = await supabase
-    .from("planned_sessions")
-    .select("id,date,sport,type,duration,notes,created_at")
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes,notes,created_at")
     .gte("date", weekStart)
     .lt("date", weekEnd)
     .order("date", { ascending: true })
@@ -142,7 +142,7 @@ export default async function DashboardPage({
 
   const withStatus = plannedSessions.map((session) => ({
     ...session,
-    duration: session.duration ?? 0,
+    duration_minutes: session.duration_minutes ?? 0,
     status: getSessionStatus(session, completionLedger)
   }));
 
@@ -151,9 +151,9 @@ export default async function DashboardPage({
 
   const totals = withStatus.reduce(
     (acc, session) => {
-      acc.planned += session.duration;
+      acc.planned += session.duration_minutes;
       if (session.status === "completed") {
-        acc.completed += session.duration;
+        acc.completed += session.duration_minutes;
       }
       return acc;
     },
@@ -161,10 +161,10 @@ export default async function DashboardPage({
   );
 
   const progressBySport = sports.map((sport) => {
-    const planned = withStatus.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
+    const planned = withStatus.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration_minutes, 0);
     const completed = withStatus
       .filter((session) => session.sport === sport && session.status === "completed")
-      .reduce((sum, session) => sum + session.duration, 0);
+      .reduce((sum, session) => sum + session.duration_minutes, 0);
 
     return {
       sport,
@@ -176,23 +176,23 @@ export default async function DashboardPage({
 
   const keyTodaySession = [...todaySessions]
     .filter((session) => session.status === "planned")
-    .sort((a, b) => b.duration - a.duration)[0];
+    .sort((a, b) => b.duration_minutes - a.duration_minutes)[0];
 
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
   const focusSession = keyTodaySession ?? null;
   const focusText = focusSession
-    ? `Your key session is ${getDisciplineMeta(focusSession.sport).label.toLowerCase()} ${focusSession.type.toLowerCase()} (${focusSession.duration} min). Protect this slot and keep execution smooth over intensity spikes.`
+    ? `Your key session is ${getDisciplineMeta(focusSession.sport).label.toLowerCase()} ${focusSession.type.toLowerCase()} (${focusSession.duration_minutes} min). Protect this slot and keep execution smooth over intensity spikes.`
     : biggestGap && biggestGap.planned > 0
       ? `Biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label.toLowerCase()} (${biggestGap.completed}/${biggestGap.planned} min). Shifting one quality session into an open day will keep the week balanced.`
       : "Week just started. Lock in your first session today to establish rhythm and momentum.";
 
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
     const iso = addDays(weekStart, index);
-    const planned = withStatus.filter((session) => session.date === iso).reduce((sum, session) => sum + session.duration, 0);
+    const planned = withStatus.filter((session) => session.date === iso).reduce((sum, session) => sum + session.duration_minutes, 0);
     const completed = withStatus
       .filter((session) => session.date === iso && session.status === "completed")
-      .reduce((sum, session) => sum + session.duration, 0);
+      .reduce((sum, session) => sum + session.duration_minutes, 0);
 
     return {
       iso,
@@ -264,7 +264,7 @@ export default async function DashboardPage({
                           {discipline.label}
                         </span>
                         <p className="mt-1 text-sm font-medium">{session.type}</p>
-                        <p className="text-xs text-muted">{session.duration} min</p>
+                        <p className="text-xs text-muted">{session.duration_minutes} min</p>
                       </div>
                       <span
                         className={`rounded-full px-2 py-1 text-[11px] font-medium ${

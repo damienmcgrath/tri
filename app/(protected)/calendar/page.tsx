@@ -1,7 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { WeekCalendar } from "./week-calendar";
 
-type PlannedSession = {
+type Session = {
+  id: string;
+  date: string;
+  sport: string;
+  type: string;
+  duration_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+  status?: "planned" | "completed" | "skipped";
+};
+
+type LegacyPlannedSession = {
   id: string;
   date: string;
   sport: string;
@@ -33,7 +44,11 @@ function addDays(isoDate: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function getSessionStatus(session: PlannedSession, completionLedger: Record<string, number>) {
+function getSessionStatus(session: Pick<Session, "date" | "sport" | "notes" | "status">, completionLedger: Record<string, number>) {
+  if (session.status) {
+    return session.status;
+  }
+
   const isSkipped = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(session.notes ?? "");
   if (isSkipped) {
     return "skipped" as const;
@@ -74,13 +89,42 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     };
   });
 
-  const { data: plannedData, error: plannedError } = await supabase
-    .from("planned_sessions")
-    .select("id,date,sport,type,duration,notes,created_at")
+  const { data: sessionData, error: sessionError } = await supabase
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes,notes,created_at,status")
     .gte("date", weekStart)
     .lt("date", weekEnd)
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
+
+  let normalizedSessions = (sessionData ?? []) as Session[];
+
+  if (sessionError?.code === "PGRST205") {
+    const { data: plannedData, error: plannedError } = await supabase
+      .from("planned_sessions")
+      .select("id,date,sport,type,duration,notes,created_at")
+      .gte("date", weekStart)
+      .lt("date", weekEnd)
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (plannedError && plannedError.code !== "PGRST205") {
+      throw new Error(plannedError.message ?? "Failed to load calendar sessions.");
+    }
+
+    normalizedSessions = ((plannedData ?? []) as LegacyPlannedSession[]).map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      type: session.type,
+      duration_minutes: session.duration ?? 0,
+      notes: session.notes,
+      created_at: session.created_at,
+      status: undefined
+    }));
+  } else if (sessionError) {
+    throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
+  }
 
   const { data: completedData, error: completedError } = await supabase
     .from("completed_sessions")
@@ -88,27 +132,22 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     .gte("date", weekStart)
     .lt("date", weekEnd);
 
-  if (plannedError && plannedError.code !== "PGRST205") {
-    throw new Error(plannedError.message ?? "Failed to load calendar sessions.");
-  }
-
-  if (completedError) {
+  if (completedError && completedError.code !== "PGRST205") {
     throw new Error(completedError.message ?? "Failed to load completed sessions.");
   }
 
-  const plannedSessions = (plannedData ?? []) as PlannedSession[];
   const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, item) => {
     const key = `${item.date}:${item.sport}`;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
 
-  const sessions = plannedSessions.map((session) => ({
+  const sessions = normalizedSessions.map((session) => ({
     id: session.id,
     date: session.date,
     sport: session.sport,
     type: session.type,
-    duration: session.duration ?? 0,
+    duration: session.duration_minutes ?? 0,
     notes: session.notes,
     created_at: session.created_at,
     status: getSessionStatus(session, completionLedger)
