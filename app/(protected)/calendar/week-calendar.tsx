@@ -298,8 +298,12 @@ export function WeekCalendar({
                               onSkip={() => {
                                 startTransition(() => {
                                   void (async () => {
-                                    await markSkippedAction({ sessionId: session.id });
-                                    setToast("Session marked skipped");
+                                    try {
+                                      await markSkippedAction({ sessionId: session.id });
+                                      setToast("Session marked skipped");
+                                    } catch {
+                                      setToast("Could not mark session as missed");
+                                    }
                                     router.refresh();
                                   })();
                                 });
@@ -336,9 +340,13 @@ export function WeekCalendar({
           onSubmit={(payload) => {
             startTransition(() => {
               void (async () => {
-                await quickAddSessionAction(payload);
-                setToast("Session added");
-                setQuickAddDate(null);
+                try {
+                  await quickAddSessionAction(payload);
+                  setToast("Session added");
+                  setQuickAddDate(null);
+                } catch {
+                  setToast("Could not add session");
+                }
                 router.refresh();
               })();
             });
@@ -354,9 +362,13 @@ export function WeekCalendar({
           onMove={(newDate) => {
             startTransition(() => {
               void (async () => {
-                await moveSessionAction({ sessionId: moveSource.id, newDate });
-                setToast("Session moved");
-                setMoveSource(null);
+                try {
+                  await moveSessionAction({ sessionId: moveSource.id, newDate });
+                  setToast("Session moved");
+                  setMoveSource(null);
+                } catch {
+                  setToast("Could not move session");
+                }
                 router.refresh();
               })();
             });
@@ -372,9 +384,13 @@ export function WeekCalendar({
           onSwap={(targetSessionId) => {
             startTransition(() => {
               void (async () => {
-                await swapSessionDayAction({ sourceSessionId: swapSource.id, targetSessionId });
-                setToast("Sessions swapped");
-                setSwapSource(null);
+                try {
+                  await swapSessionDayAction({ sourceSessionId: swapSource.id, targetSessionId });
+                  setToast("Sessions swapped");
+                  setSwapSource(null);
+                } catch {
+                  setToast("Could not swap sessions");
+                }
                 router.refresh();
               })();
             });
@@ -465,6 +481,8 @@ function QuickAddModal({
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("45");
   const [notes, setNotes] = useState("");
+  const parsedDuration = Number(duration);
+  const isDurationValid = Number.isInteger(parsedDuration) && parsedDuration >= 1;
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-3">
@@ -479,14 +497,22 @@ function QuickAddModal({
             ))}
           </div>
           <input className="input-base" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" />
-          <input className="input-base" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Planned minutes" type="number" min={1} required />
+          <input className="input-base" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Planned minutes" type="number" min={1} step={1} required />
+          {!isDurationValid ? <p className="text-[11px] text-rose-300">Enter whole minutes (min 1).</p> : null}
           <input className="input-base" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Target / Notes (optional)" />
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
           <button
             className="btn-primary px-3 py-1.5 text-xs"
-            onClick={() => onSubmit({ date, sport, type: title, duration: Number(duration), notes })}
+            disabled={!isDurationValid}
+            onClick={() => {
+              if (!isDurationValid) {
+                return;
+              }
+
+              onSubmit({ date, sport, type: title, duration: parsedDuration, notes });
+            }}
           >
             Save
           </button>

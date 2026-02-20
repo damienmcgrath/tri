@@ -22,7 +22,7 @@ const quickAddSchema = z.object({
   date: z.string().date(),
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
   type: z.string().trim().max(120).optional(),
-  duration: z.number().int().min(1).max(480),
+  duration: z.coerce.number().int().min(1).max(480),
   notes: z.string().trim().max(1000).optional()
 });
 
@@ -158,8 +158,25 @@ export async function quickAddSessionAction(input: {
   const parsed = quickAddSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
 
+  const { data: plan, error: planError } = await supabase
+    .from("training_plans")
+    .select("id")
+    .eq("user_id", user.id)
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (planError) {
+    throw new Error(planError.message ?? "Could not load training plan.");
+  }
+
+  if (!plan) {
+    throw new Error("Create a plan first before adding sessions.");
+  }
+
   const { error } = await supabase.from("planned_sessions").insert({
     user_id: user.id,
+    plan_id: plan.id,
     date: parsed.date,
     sport: parsed.sport,
     type: parsed.type?.trim() || "Session",
