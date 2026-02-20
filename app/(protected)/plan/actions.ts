@@ -444,11 +444,10 @@ export async function createSessionAction(formData: FormData) {
     date: parsed.date,
     sport: parsed.sport,
     type: parsed.sessionType,
+    duration: parsed.durationMinutes,
+    session_type: parsed.sessionType,
     duration_minutes: parsed.durationMinutes,
-    notes: parsed.notes ?? null,
-    distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
-    distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
-    status: "planned"
+    notes: parsed.notes ?? null
   });
 
   if (error) {
@@ -486,6 +485,8 @@ export async function updateSessionAction(formData: FormData) {
       date: parsed.date,
       sport: parsed.sport,
       type: parsed.sessionType,
+      duration: parsed.durationMinutes,
+      session_type: parsed.sessionType,
       duration_minutes: parsed.durationMinutes,
       notes: parsed.notes ?? null,
       distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,

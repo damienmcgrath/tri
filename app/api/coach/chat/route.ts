@@ -26,6 +26,19 @@ function getDateDaysAgo(daysAgo: number) {
   return utc.toISOString().slice(0, 10);
 }
 
+
+function isPlannedSessionTableMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
+}
+
 function buildFallbackCoachResponse(input: { message: string; summary: ReturnType<typeof buildWorkoutSummary> }) {
   const intro = `You asked: "${input.message}".`;
   const overview = `In the recent window, you completed ${input.summary.completedMinutes} min out of ${input.summary.plannedMinutes} planned (${input.summary.completionPct}%).`;
@@ -176,7 +189,7 @@ export async function POST(request: Request) {
     .lte("date", today)
     .order("date", { ascending: false });
 
-  if (plannedError || completedError) {
+  if (completedError || (plannedError && !isPlannedSessionTableMissing(plannedError))) {
     return NextResponse.json(
       {
         error: plannedError?.message ?? completedError?.message ?? "Failed to load workout data."
@@ -186,7 +199,7 @@ export async function POST(request: Request) {
   }
 
   const summary = buildWorkoutSummary(
-    (plannedData ?? []) as PlannedSessionLite[],
+    ((plannedError ? [] : plannedData) ?? []) as PlannedSessionLite[],
     (completedData ?? []) as CompletedSessionLite[]
   );
 

@@ -237,10 +237,10 @@ export async function ingestTcxAction(_: IngestResult, formData: FormData): Prom
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/settings/integrations");
 
   return {
     status: "success",
     message: `Imported ${sessions.length} workout${sessions.length > 1 ? "s" : ""} from ${file.name}.`
   };
 }
-
