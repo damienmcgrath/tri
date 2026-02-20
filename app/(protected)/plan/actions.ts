@@ -103,6 +103,8 @@ export async function createSessionAction(formData: FormData) {
     sport: parsed.sport,
     type: parsed.sessionType,
     duration: parsed.durationMinutes,
+    session_type: parsed.sessionType,
+    duration_minutes: parsed.durationMinutes,
     notes: parsed.notes ?? null
   });
 
@@ -136,6 +138,8 @@ export async function updateSessionAction(formData: FormData) {
       sport: parsed.sport,
       type: parsed.sessionType,
       duration: parsed.durationMinutes,
+      session_type: parsed.sessionType,
+      duration_minutes: parsed.durationMinutes,
       notes: parsed.notes ?? null,
       user_id: user.id
     })
