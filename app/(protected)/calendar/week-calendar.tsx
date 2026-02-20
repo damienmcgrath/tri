@@ -18,7 +18,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { markSkippedAction, moveSessionAction, quickAddSessionAction, swapSessionDayAction } from "@/app/(protected)/calendar/actions";
+import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction, swapSessionDayAction } from "@/app/(protected)/calendar/actions";
 
 type SessionStatus = "planned" | "completed" | "skipped";
 type FilterStatus = "all" | SessionStatus;
@@ -238,7 +238,7 @@ export function WeekCalendar({
       </header>
 
       <article className="surface px-4 py-3">
-        <div className="grid gap-2 md:grid-cols-5">
+        <div className="grid gap-2 md:grid-cols-6">
           <div className="surface-subtle p-3 md:col-span-2">
             <p className="text-xs uppercase tracking-wide text-muted">Week volume</p>
             <p className="mt-1 text-lg font-semibold">Completed {totals.completed} / {totals.planned} min</p>
@@ -299,10 +299,15 @@ export function WeekCalendar({
                                 startTransition(() => {
                                   void (async () => {
                                     try {
-                                      await markSkippedAction({ sessionId: session.id });
-                                      setToast("Session marked skipped");
+                                      if (session.status === "skipped") {
+                                        await clearSkippedAction({ sessionId: session.id });
+                                        setToast("Skipped status removed");
+                                      } else {
+                                        await markSkippedAction({ sessionId: session.id });
+                                        setToast("Session marked skipped");
+                                      }
                                     } catch {
-                                      setToast("Could not mark session as missed");
+                                      setToast(session.status === "skipped" ? "Could not undo skipped status" : "Could not mark session as missed");
                                     }
                                     router.refresh();
                                   })();
@@ -439,26 +444,29 @@ function SortableSessionCard({
       style={style}
       className={`surface-subtle p-2 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-70" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-          <p className={`mt-1 text-xs font-medium ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
-          <p className="text-sm font-semibold">{session.duration} min</p>
-          {target ? <p className="text-[11px] text-muted">{target}</p> : null}
-        </div>
-        <div className="space-y-1 text-right">
-          <p className="text-[11px] text-cyan-100">{session.status === "planned" ? "Pending" : session.status === "completed" ? "✓ Done" : "Skipped"}</p>
-          <div className="flex flex-wrap justify-end gap-1 text-[10px]">
-            <button className="btn-secondary px-2 py-0.5" onClick={onMove} aria-label="Move session">
-              Move
-            </button>
-            <button className="btn-secondary px-2 py-0.5" onClick={onSwap} aria-label="Swap session day">
-              Swap
-            </button>
-            <button className="btn-secondary px-2 py-0.5" onClick={onSkip} aria-label="Mark session skipped">
-              Missed
-            </button>
+      <div className="space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
+            <p className={`mt-1 truncate text-sm font-medium ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
+            <p className="text-xl font-semibold leading-tight">{session.duration} min</p>
+            {target ? <p className="line-clamp-1 text-[11px] text-muted">{target}</p> : null}
           </div>
+          <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
+            {session.status === "planned" ? "Pending" : session.status === "completed" ? "✓ Done" : "Skipped"}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1 text-[10px]">
+          <button className="btn-secondary px-1.5 py-1" onClick={onMove} aria-label="Move session">
+            Move
+          </button>
+          <button className="btn-secondary px-1.5 py-1" onClick={onSwap} aria-label="Swap session day">
+            Swap
+          </button>
+          <button className="btn-secondary px-1.5 py-1" onClick={onSkip} aria-label={session.status === "skipped" ? "Undo skipped status" : "Mark session skipped"}>
+            {session.status === "skipped" ? "Undo" : "Missed"}
+          </button>
         </div>
       </div>
       <button className="mt-2 w-full rounded-lg border border-dashed border-[hsl(var(--border))] px-2 py-1 text-[10px] text-muted" {...attributes} {...listeners} aria-label={`Drag ${session.type}`}>

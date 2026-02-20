@@ -148,6 +148,44 @@ export async function markSkippedAction(input: { sessionId: string }) {
   revalidatePath("/dashboard");
 }
 
+
+export async function clearSkippedAction(input: { sessionId: string }) {
+  const parsed = markSkippedSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  const { data: session, error: sessionError } = await supabase
+    .from("planned_sessions")
+    .select("notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (sessionError) {
+    throw new Error(sessionError.message ?? "Could not update session.");
+  }
+
+  if (!session) {
+    throw new Error("Session not found.");
+  }
+
+  const nextNotes = (session.notes ?? "")
+    .replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "")
+    .trim();
+
+  const { error } = await supabase
+    .from("planned_sessions")
+    .update({ notes: nextNotes || null })
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message ?? "Could not clear skipped status.");
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+}
+
 export async function quickAddSessionAction(input: {
   date: string;
   sport: "swim" | "bike" | "run" | "strength" | "other";
