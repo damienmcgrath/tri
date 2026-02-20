@@ -97,7 +97,34 @@ After sign-in, test a simple query from a server component or API route with the
 - Rotate keys if they are ever exposed.
 - Keep `service_role` key out of client bundles and logs.
 
-## 9) Migration note
+## 9) Reliable CLI migration workflow (recommended)
 
-Run migrations directly in the Supabase Dashboard SQL Editor for this project.
+Use this sequence instead of a blind `db push`:
 
+```bash
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase migration list --linked
+npx supabase db push --linked --include-all
+npx supabase migration list --linked
+```
+
+Why this works better:
+- `--linked` ensures commands target the currently linked remote project.
+- `migration list` shows what Supabase thinks is applied remotely vs local files.
+- `--include-all` helps when remote migration history got out of sync.
+
+If you manually ran SQL in Supabase UI and need to reconcile migration history:
+
+```bash
+npx supabase migration repair --status applied 202602200100
+npx supabase migration repair --status applied 202602200101
+npx supabase migration list --linked
+```
+
+If a migration is marked applied but you need CLI to run it again, mark it reverted first:
+
+```bash
+npx supabase migration repair --status reverted <version>
+npx supabase db push --linked --include-all
+```
