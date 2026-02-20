@@ -1,5 +1,5 @@
 {
-  "name": "tri",
+  "name": "tricoach-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,25 +10,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.49.1",
-    "next": "^14.2.29",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zod": "^3.24.2"
+    "fast-xml-parser": "^4.5.3",
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/node": "^22.13.4",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
+    "@types/node": "^20.16.5",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.29",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3"
-  },
-  "engines": {
-    "node": ">=20.11.0"
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
   }
 }
