@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useEffect, useMemo, useState, useTransition } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -81,7 +81,7 @@ export function WeekCalendar({
   const [quickAddState, setQuickAddState] = useState<{ initialDate: string; allowDaySelection: boolean } | null>(null);
   const [swapSource, setSwapSource] = useState<CalendarSession | null>(null);
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; undoLabel?: string; onUndo?: () => void } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
@@ -89,6 +89,12 @@ export function WeekCalendar({
   useEffect(() => {
     setLocalSessions(sessions);
   }, [sessions]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 5200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const [orderByDay, setOrderByDay] = useState<Record<string, string[]>>(() =>
     weekDays.reduce<Record<string, string[]>>((acc, day) => {
@@ -200,14 +206,30 @@ export function WeekCalendar({
 
     startTransition(() => {
       void (async () => {
-      try {
-        await moveSessionAction({ sessionId: activeSession.id, newDate: targetDay });
-        setToast("Session moved");
-        router.refresh();
-      } catch {
-        setToast("Could not move session");
-        router.refresh();
-      }
+        try {
+          await moveSessionAction({ sessionId: activeSession.id, newDate: targetDay });
+          setToast({
+            message: "Session moved",
+            undoLabel: "Undo",
+            onUndo: () => {
+              startTransition(() => {
+                void (async () => {
+                  try {
+                    await moveSessionAction({ sessionId: activeSession.id, newDate: fromDay });
+                    setToast({ message: "Move undone" });
+                    router.refresh();
+                  } catch {
+                    setToast({ message: "Could not undo move" });
+                  }
+                })();
+              });
+            }
+          });
+          router.refresh();
+        } catch {
+          setToast({ message: "Could not move session" });
+          router.refresh();
+        }
       })();
     });
   }
@@ -247,7 +269,7 @@ export function WeekCalendar({
             {(["all", "swim", "bike", "run", "strength"] as const).map((item) => (
               <button
                 key={item}
-                className={`rounded-full border px-3 py-1 text-xs ${sportFilter === item ? "border-cyan-300 bg-cyan-500/15 text-cyan-100" : "border-[hsl(var(--border))] text-muted"}`}
+                className={`rounded-full border px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${sportFilter === item ? "border-cyan-300 bg-cyan-500/15 text-cyan-100" : "border-[hsl(var(--border))] text-muted"}`}
                 onClick={() => setSportFilter(item)}
               >
                 {item === "all" ? "All" : getDisciplineMeta(item).label}
@@ -277,8 +299,8 @@ export function WeekCalendar({
               <div key={item.sport} className="surface-subtle p-3">
                 <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</p>
                 <p className="mt-1 text-xs">{item.completed}/{item.planned} min</p>
-                <div className="mt-2 h-1.5 rounded-full bg-black/30">
-                  <div className="h-full rounded-full bg-cyan-300/80" style={{ width: `${ratio}%` }} />
+                <div className="mt-2 h-1.5 rounded-full bg-black/35">
+                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-blue-400/90 transition-[width]" style={{ width: `${ratio}%` }} />
                 </div>
               </div>
             );
@@ -297,12 +319,16 @@ export function WeekCalendar({
               .map((id) => sessionsById[id])
               .filter((s) => s?.status === "completed")
               .reduce((sum, s) => sum + (s?.duration ?? 0), 0);
+            const isToday = day.iso === todayIso;
 
             return (
               <DayDropZone key={day.iso} id={`day:${day.iso}`} isActive={activeId !== null}>
                 <section className="surface min-h-[260px] p-3">
-                  <div className={`border-b pb-2 ${day.iso === todayIso ? "border-cyan-300/70 shadow-[0_2px_0_0_rgba(34,211,238,0.45)]" : "border-[hsl(var(--border))]"}`}>
-                    <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
+                  <div className={`rounded-lg border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2 shadow-[inset_0_-2px_0_rgba(56,189,248,0.45)]" : "border-[hsl(var(--border))]"}`}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
+                      {isToday ? <span className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">Today</span> : null}
+                    </div>
                     <p className="text-sm font-semibold">{day.label}</p>
                     <p className="text-xs text-muted">{planned === 0 ? "Rest" : `${completed}/${planned} min`}</p>
                   </div>
@@ -352,21 +378,47 @@ export function WeekCalendar({
                                     try {
                                       if (wasSkipped) {
                                         await clearSkippedAction({ sessionId: session.id });
-                                        setToast("Skipped status removed");
+                                        setToast({
+                                          message: "Skipped status removed",
+                                          undoLabel: "Undo",
+                                          onUndo: () => {
+                                            startTransition(() => {
+                                              void (async () => {
+                                                try {
+                                                  await markSkippedAction({ sessionId: session.id });
+                                                  setToast({ message: "Re-marked skipped" });
+                                                  router.refresh();
+                                                } catch {
+                                                  setToast({ message: "Could not undo" });
+                                                }
+                                              })();
+                                            });
+                                          }
+                                        });
                                       } else {
                                         await markSkippedAction({ sessionId: session.id });
-                                        setToast("Session marked skipped");
+                                        setToast({
+                                          message: "Marked skipped",
+                                          undoLabel: "Undo",
+                                          onUndo: () => {
+                                            startTransition(() => {
+                                              void (async () => {
+                                                try {
+                                                  await clearSkippedAction({ sessionId: session.id });
+                                                  setToast({ message: "Skip undone" });
+                                                  router.refresh();
+                                                } catch {
+                                                  setToast({ message: "Could not undo" });
+                                                }
+                                              })();
+                                            });
+                                          }
+                                        });
                                       }
                                       router.refresh();
                                     } catch {
-                                      setLocalSessions((prev) =>
-                                        prev.map((item) =>
-                                          item.id === session.id
-                                            ? { ...item, status: session.status, notes: session.notes }
-                                            : item
-                                        )
-                                      );
-                                      setToast(wasSkipped ? "Could not undo skipped status" : "Could not mark session as missed");
+                                      setLocalSessions((prev) => prev.map((item) => (item.id === session.id ? { ...item, status: session.status, notes: session.notes } : item)));
+                                      setToast({ message: wasSkipped ? "Could not undo skipped status" : "Could not mark session as missed" });
                                     }
                                   })();
                                 });
@@ -386,7 +438,7 @@ export function WeekCalendar({
                     </button>
                   ) : ids.length > 2 && expandedDays[day.iso] ? (
                     <button className="mt-2 text-xs text-muted hover:text-cyan-200" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>
-                      Collapse
+                      Show less
                     </button>
                   ) : null}
                 </section>
@@ -395,6 +447,8 @@ export function WeekCalendar({
           })}
         </article>
       </DndContext>
+
+      {activeId ? <p className="text-[11px] text-cyan-200/85">Drag a session to another day to reschedule.</p> : null}
 
       {quickAddState ? (
         <QuickAddModal
@@ -426,7 +480,7 @@ export function WeekCalendar({
 
                 try {
                   await quickAddSessionAction(payload);
-                  setToast("Session added");
+                  setToast({ message: "Session added" });
                   router.refresh();
                 } catch {
                   setLocalSessions((prev) => prev.filter((session) => session.id !== optimisticId));
@@ -434,7 +488,7 @@ export function WeekCalendar({
                     ...prev,
                     [payload.date]: (prev[payload.date] ?? []).filter((id) => id !== optimisticId)
                   }));
-                  setToast("Could not add session");
+                  setToast({ message: "Could not add session" });
                 }
               })();
             });
@@ -448,14 +502,31 @@ export function WeekCalendar({
           days={weekDays}
           onClose={() => setMoveSource(null)}
           onMove={(newDate) => {
+            const prevDate = moveSource.date;
             startTransition(() => {
               void (async () => {
                 try {
                   await moveSessionAction({ sessionId: moveSource.id, newDate });
-                  setToast("Session moved");
+                  setToast({
+                    message: "Session moved",
+                    undoLabel: "Undo",
+                    onUndo: () => {
+                      startTransition(() => {
+                        void (async () => {
+                          try {
+                            await moveSessionAction({ sessionId: moveSource.id, newDate: prevDate });
+                            setToast({ message: "Move undone" });
+                            router.refresh();
+                          } catch {
+                            setToast({ message: "Could not undo move" });
+                          }
+                        })();
+                      });
+                    }
+                  });
                   setMoveSource(null);
                 } catch {
-                  setToast("Could not move session");
+                  setToast({ message: "Could not move session" });
                 }
                 router.refresh();
               })();
@@ -470,14 +541,31 @@ export function WeekCalendar({
           sessions={localSessions}
           onClose={() => setSwapSource(null)}
           onSwap={(targetSessionId) => {
+            const sourceSessionId = swapSource.id;
             startTransition(() => {
               void (async () => {
                 try {
-                  await swapSessionDayAction({ sourceSessionId: swapSource.id, targetSessionId });
-                  setToast("Sessions swapped");
+                  await swapSessionDayAction({ sourceSessionId, targetSessionId });
+                  setToast({
+                    message: "Sessions swapped",
+                    undoLabel: "Undo",
+                    onUndo: () => {
+                      startTransition(() => {
+                        void (async () => {
+                          try {
+                            await swapSessionDayAction({ sourceSessionId, targetSessionId });
+                            setToast({ message: "Swap undone" });
+                            router.refresh();
+                          } catch {
+                            setToast({ message: "Could not undo swap" });
+                          }
+                        })();
+                      });
+                    }
+                  });
                   setSwapSource(null);
                 } catch {
-                  setToast("Could not swap sessions");
+                  setToast({ message: "Could not swap sessions" });
                 }
                 router.refresh();
               })();
@@ -486,7 +574,23 @@ export function WeekCalendar({
         />
       ) : null}
 
-      {toast ? <p className="fixed bottom-4 right-4 rounded-xl border border-cyan-400/50 bg-slate-900/90 px-3 py-2 text-xs text-cyan-100">{toast}</p> : null}
+      {toast ? (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-cyan-400/45 bg-slate-950/95 px-3 py-2 text-xs text-cyan-100 shadow-lg shadow-black/50">
+          <span>{toast.message}</span>
+          {toast.onUndo ? (
+            <button
+              className="rounded-md border border-cyan-300/45 px-2 py-1 font-medium text-cyan-100 hover:bg-cyan-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+              onClick={() => {
+                const undo = toast.onUndo;
+                setToast(null);
+                if (undo) undo();
+              }}
+            >
+              {toast.undoLabel ?? "Undo"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {isPending ? <p className="text-xs text-muted">Saving changes…</p> : null}
     </section>
   );
@@ -525,48 +629,117 @@ function SortableSessionCard({
     <article
       ref={setNodeRef}
       style={style}
-      className={`surface-subtle p-2 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-70" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
+      className={`group relative surface-subtle p-2.5 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-80" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
+      {...attributes}
+      {...listeners}
     >
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-              <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
-                {session.status === "planned" ? "Pending" : session.status === "completed" ? "✓ Done" : "Skipped"}
-              </p>
-            </div>
-            <p className={`mt-1 truncate text-base font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
-            <p className="mt-1 text-3xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-lg font-medium text-muted">min</span></p>
-            {target ? <p className="mt-1 line-clamp-1 text-[11px] text-muted">{target}</p> : null}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
+            <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
+              {session.status === "planned" ? "Pending" : session.status === "completed" ? "Completed" : "Skipped"}
+            </p>
           </div>
-          <button
-            className="rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-[10px] text-muted hover:text-cyan-100"
-            {...attributes}
-            {...listeners}
-            aria-label={`Drag ${session.type}`}
-          >
-            Move ↕
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="pointer-events-none text-xs text-cyan-200/65 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden>
+              ⋮⋮
+            </span>
+            <SessionOverflowMenu sessionType={session.type} sessionStatus={session.status} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-          <button className="btn-secondary px-2 py-1" onClick={onMove} aria-label="Move session">
-            Move to…
-          </button>
-          <button className="btn-secondary px-2 py-1" onClick={onSwap} aria-label="Swap session day">
-            Swap
-          </button>
-        </div>
-        <button
-          className="btn-secondary w-full px-2 py-1 text-[11px]"
-          onClick={onSkip}
-          aria-label={session.status === "skipped" ? "Undo skipped status" : "Mark session skipped"}
-        >
-          {session.status === "skipped" ? "Undo skipped" : "Mark missed"}
-        </button>
+        <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
+        <p className="text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
+        {target ? <p className="line-clamp-1 text-[11px] text-muted">{target}</p> : null}
       </div>
     </article>
+  );
+}
+
+function SessionOverflowMenu({
+  sessionType,
+  sessionStatus,
+  onMove,
+  onSwap,
+  onSkip
+}: {
+  sessionType: string;
+  sessionStatus: SessionStatus;
+  onMove: () => void;
+  onSwap: () => void;
+  onSkip: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onWindowClick = (event: MouseEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setIsOpen(false);
+    };
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", onWindowClick);
+    window.addEventListener("keydown", onEscape);
+    return () => {
+      window.removeEventListener("mousedown", onWindowClick);
+      window.removeEventListener("keydown", onEscape);
+    };
+  }, [isOpen]);
+
+  const skipLabel = sessionStatus === "skipped" ? "Unskip" : "Mark skipped";
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-sm text-muted hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label={`Open actions for ${sessionType}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+      >
+        ⋯
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute right-0 top-8 z-30 min-w-[140px] rounded-lg border border-white/15 bg-slate-950/95 p-1 shadow-xl"
+          role="menu"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {[
+            { label: "Move", action: onMove },
+            { label: "Swap days", action: onSwap },
+            { label: skipLabel, action: onSkip }
+          ].map((item) => (
+            <button
+              key={item.label}
+              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+              role="menuitem"
+              onClick={() => {
+                item.action();
+                setIsOpen(false);
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
