@@ -144,41 +144,35 @@ export function CoachChat() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <section className="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur">
-        <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-900 via-cyan-900 to-slate-900 px-5 py-4 text-white">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-cyan-200">Coach Console</p>
-              <h2 className="text-lg font-semibold">Adaptive triathlon guidance</h2>
-            </div>
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className="rounded-lg border border-cyan-300/50 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-700/40"
-            >
-              New chat
-            </button>
-          </div>
+      <section className="surface overflow-hidden">
+        <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">Coach Console</p>
+          <h2 className="text-lg font-semibold">Adaptive triathlon guidance</h2>
         </div>
 
         <div className="max-h-[440px] space-y-3 overflow-y-auto p-5">
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm transition ${
                   message.role === "user"
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-700"
+                    ? "bg-cyan-600 text-white"
+                    : "border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
                 }`}
               >
                 {message.content}
               </div>
             </div>
           ))}
-          {isLoading ? <p className="text-sm text-slate-500">Coach is analyzing your training...</p> : null}
+          {isLoading ? (
+            <div className="space-y-2">
+              <div className="h-4 w-4/5 animate-pulse rounded bg-[hsl(var(--bg-card))]" />
+              <div className="h-4 w-2/3 animate-pulse rounded bg-[hsl(var(--bg-card))]" />
+            </div>
+          ) : null}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-slate-200 bg-white p-4">
+        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4">
           <label htmlFor="coach-input" className="sr-only">
             Ask your AI coach
           </label>
@@ -188,17 +182,13 @@ export function CoachChat() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder="Ask for workout analysis, weekly suggestions, or plan tweaks..."
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none ring-cyan-500 focus:ring"
+              className="input-base"
             />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-cyan-300"
-            >
+            <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">
               Send
             </button>
           </div>
-          {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+          {error ? <p className="mt-2 text-sm text-rose-400">{error}</p> : null}
         </form>
       </section>
 
@@ -211,12 +201,12 @@ export function CoachChat() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">Workout analysis snapshot</h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Dominant sport: <span className="font-medium capitalize text-slate-800">{summary?.dominantSport ?? "n/a"}</span>
+        <div className="surface p-5">
+          <h3 className="text-sm font-semibold">Workout analysis snapshot</h3>
+          <p className="mt-2 text-sm text-muted">
+            Dominant sport: <span className="font-medium capitalize">{summary?.dominantSport ?? "n/a"}</span>
           </p>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
             {(summary?.insights ?? ["Ask a question to generate personalized workout insights."]).map((insight) => (
               <li key={insight}>{insight}</li>
             ))}
