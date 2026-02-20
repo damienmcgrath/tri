@@ -97,14 +97,7 @@ After sign-in, test a simple query from a server component or API route with the
 - Rotate keys if they are ever exposed.
 - Keep `service_role` key out of client bundles and logs.
 
+## 9) Migration note
 
-## 9) Apply project migrations in order (recommended)
+Run migrations directly in the Supabase Dashboard SQL Editor for this project.
 
-Use the Supabase CLI from the repo root so migration order is handled automatically:
-
-```bash
-supabase start
-supabase db reset
-```
-
-This project includes a reconciliation migration that normalizes legacy schema differences for `planned_sessions` and `completed_sessions` and ensures `public.set_updated_at()` exists before dependent triggers are created.
