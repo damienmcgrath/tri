@@ -6,7 +6,7 @@ type CalendarSession = {
   date: string;
   sport: string;
   type: string;
-  duration: number | null;
+  duration_minutes: number | null;
 };
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
@@ -46,8 +46,8 @@ export default async function CalendarPage() {
   weekEndExclusive.setUTCDate(weekEndExclusive.getUTCDate() + 1);
 
   const { data, error } = await supabase
-    .from("planned_sessions")
-    .select("id,date,sport,type,duration")
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes")
     .gte("date", weekStart)
     .lt("date", weekEndExclusive.toISOString().slice(0, 10))
     .order("date", { ascending: true });
@@ -62,7 +62,7 @@ export default async function CalendarPage() {
     return acc;
   }, {});
 
-  const totalMinutes = sessions.reduce((sum, session) => sum + (session.duration ?? 0), 0);
+  const totalMinutes = sessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
 
   return (
     <section className="space-y-6">
@@ -115,7 +115,7 @@ export default async function CalendarPage() {
                           {discipline.label}
                         </span>
                         <p className="mt-1 text-xs font-medium">{session.type}</p>
-                        <p className="text-xs text-muted">{session.duration ?? 0} min</p>
+                        <p className="text-xs text-muted">{session.duration_minutes ?? 0} min</p>
                       </article>
                     );
                   })
