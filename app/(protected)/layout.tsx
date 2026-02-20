@@ -25,8 +25,7 @@ export default async function ProtectedLayout({
       <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
-            <p className="font-semibold">TriCoach AI</p>
+            <p className="text-lg uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
           </div>
           <nav className="flex flex-wrap gap-2">
             {navItems.map((item) => (
