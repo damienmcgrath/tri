@@ -52,11 +52,13 @@ alter table public.planned_sessions enable row level security;
 alter table public.completed_sessions enable row level security;
 alter table public.recovery_logs enable row level security;
 
+drop policy if exists "users manage own training_plans" on public.training_plans;
 create policy "users manage own training_plans"
   on public.training_plans
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "users manage own planned_sessions" on public.planned_sessions;
 create policy "users manage own planned_sessions"
   on public.planned_sessions
   using (
@@ -74,11 +76,13 @@ create policy "users manage own planned_sessions"
     )
   );
 
+drop policy if exists "users manage own completed_sessions" on public.completed_sessions;
 create policy "users manage own completed_sessions"
   on public.completed_sessions
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "users manage own recovery_logs" on public.recovery_logs;
 create policy "users manage own recovery_logs"
   on public.recovery_logs
   using (auth.uid() = user_id)
