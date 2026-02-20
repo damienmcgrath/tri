@@ -36,19 +36,23 @@ export default async function DashboardPage() {
 
   const { startDate, endDate } = getCurrentWeekRange();
 
-  const { data: plannedData } = await supabase
+  const { data: plannedData, error: plannedError } = await supabase
     .from("planned_sessions")
     .select("sport,duration")
     .gte("date", startDate)
     .lt("date", endDate)
     .order("date", { ascending: true });
 
-  const { data: completedData } = await supabase
+  const { data: completedData, error: completedError } = await supabase
     .from("completed_sessions")
     .select("sport,metrics")
     .gte("date", startDate)
     .lt("date", endDate)
     .order("date", { ascending: true });
+
+  if (plannedError || completedError) {
+    throw new Error(plannedError?.message ?? completedError?.message ?? "Failed to load dashboard data.");
+  }
 
   const plannedSessions = (plannedData ?? []) as PlannedSession[];
   const completedSessions = (completedData ?? []) as CompletedSession[];

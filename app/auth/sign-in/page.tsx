@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { SignInForm } from "./sign-in-form";
 
+
 export default function SignInPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">

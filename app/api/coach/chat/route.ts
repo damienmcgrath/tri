@@ -103,18 +103,30 @@ export async function POST(request: Request) {
   }
 
   const sinceDate = getDateDaysAgo(14);
+  const today = getDateDaysAgo(0);
 
-  const { data: plannedData } = await supabase
+  const { data: plannedData, error: plannedError } = await supabase
     .from("planned_sessions")
     .select("sport,duration")
     .gte("date", sinceDate)
+    .lte("date", today)
     .order("date", { ascending: false });
 
-  const { data: completedData } = await supabase
+  const { data: completedData, error: completedError } = await supabase
     .from("completed_sessions")
     .select("sport,metrics")
     .gte("date", sinceDate)
+    .lte("date", today)
     .order("date", { ascending: false });
+
+  if (plannedError || completedError) {
+    return NextResponse.json(
+      {
+        error: plannedError?.message ?? completedError?.message ?? "Failed to load workout data."
+      },
+      { status: 500 }
+    );
+  }
 
   const summary = buildWorkoutSummary(
     (plannedData ?? []) as PlannedSessionLite[],

@@ -5,8 +5,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 
 export function SignUpForm() {
-  const supabase = createClient();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -19,6 +17,7 @@ export function SignUpForm() {
     setError(null);
     setIsSubmitting(true);
 
+    const supabase = createClient();
     const { error: signUpError } = await supabase.auth.signUp({ email, password });
 
     if (signUpError) {

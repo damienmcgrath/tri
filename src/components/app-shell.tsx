@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type NavItem = {
   label: string;
   href: string;
@@ -18,13 +20,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <p className="mt-1 text-sm text-blue-100">Week 1 foundation build</p>
         <nav className="mt-6 space-y-2">
           {navItems.map((item) => (
-            <a
+            <Link
               className="block rounded-lg px-3 py-2 text-sm transition hover:bg-white/10"
               href={item.href}
               key={item.href}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
       </aside>

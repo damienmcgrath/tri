@@ -1,13 +1,24 @@
 import { z } from "zod";
 
+function optionalNonEmptyString() {
+  return z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  }, z.string().min(1).optional());
+}
+
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: z.string().min(1).optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
-  OPENAI_API_KEY: z.string().min(1).optional(),
-  WEATHER_API_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: optionalNonEmptyString(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalNonEmptyString(),
+  OPENAI_API_KEY: optionalNonEmptyString(),
+  WEATHER_API_KEY: optionalNonEmptyString(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional()
+  UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString()
 }).superRefine((data, ctx) => {
   if (!data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY && !data.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     ctx.addIssue({
