@@ -15,7 +15,8 @@ Create `.env.local` in the repo root and copy values from `.env.example`.
 Required to run app auth + data flows:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (preferred)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback)
 
 Optional for upcoming features:
 
@@ -190,6 +191,11 @@ The product is designed first for solo athletes who want expert-level coaching s
 - Cache repeated AI questions and Garmin-derived summaries.
 - Use on-demand data refresh over frequent polling where possible.
 - Keep Garmin raw files in low-cost object storage; normalize only required fields.
+
+---
+
+## 🚀 Supabase quick start
+Need a practical setup walkthrough after creating your account? See `SUPABASE_SETUP.md`.
 
 ---
 
