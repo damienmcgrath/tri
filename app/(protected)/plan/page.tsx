@@ -33,6 +33,19 @@ type Session = {
   status: "planned" | "completed" | "skipped";
 };
 
+
+function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
+}
+
 export default async function PlanPage({
   searchParams
 }: {
@@ -70,21 +83,56 @@ export default async function PlanPage({
         .order("week_index", { ascending: true })
     : { data: [] as TrainingWeek[], error: null };
 
-  if (weeksError) {
+  if (weeksError && !isMissingTableError(weeksError, "public.training_weeks")) {
     throw new Error(weeksError.message);
   }
 
-  const { data: sessionsData, error: sessionsError } = selectedPlan
-    ? await supabase
-        .from("sessions")
-        .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
-        .eq("plan_id", selectedPlan.id)
-        .order("date", { ascending: true })
-    : { data: [] as Session[], error: null };
+  let sessionsData: Session[] = [];
+  if (selectedPlan) {
+    const primary = await supabase
+      .from("sessions")
+      .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
+      .eq("plan_id", selectedPlan.id)
+      .order("date", { ascending: true });
 
-  if (sessionsError) {
-    throw new Error(sessionsError.message);
+    if (primary.error && isMissingTableError(primary.error, "public.sessions")) {
+      const legacy = await supabase
+        .from("planned_sessions")
+        .select("id,plan_id,date,sport,type,duration,notes")
+        .eq("plan_id", selectedPlan.id)
+        .order("date", { ascending: true });
+
+      if (legacy.error && !isMissingTableError(legacy.error, "public.planned_sessions")) {
+        throw new Error(legacy.error.message);
+      }
+
+      sessionsData = ((legacy.data ?? []) as Array<{
+        id: string;
+        plan_id: string;
+        date: string;
+        sport: string;
+        type: string;
+        duration: number;
+        notes: string | null;
+      }>).map((session) => ({
+        id: session.id,
+        plan_id: session.plan_id,
+        week_id: "",
+        date: session.date,
+        sport: session.sport,
+        type: session.type,
+        duration_minutes: session.duration,
+        notes: session.notes,
+        distance_value: null,
+        distance_unit: null,
+        status: "planned"
+      }));
+    } else if (primary.error) {
+      throw new Error(primary.error.message);
+    } else {
+      sessionsData = (primary.data ?? []) as Session[];
+    }
   }
 
-  return <PlanEditor plans={plans} weeks={(weeksData ?? []) as TrainingWeek[]} sessions={(sessionsData ?? []) as Session[]} selectedPlanId={selectedPlan?.id} />;
+  return <PlanEditor plans={plans} weeks={(weeksData ?? []) as TrainingWeek[]} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />;
 }

@@ -46,6 +46,19 @@ const deleteSessionSchema = z.object({
   sessionId: uuidSchema
 });
 
+
+function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
+}
+
 async function getAuthedClient() {
   const supabase = await createClient();
   const {
@@ -147,7 +160,7 @@ export async function createPlanAction(formData: FormData) {
     ignoreDuplicates: true
   });
 
-  if (weeksError) {
+  if (weeksError && !isMissingTableError(weeksError, "public.training_weeks")) {
     throw new Error(weeksError.message);
   }
 
@@ -346,7 +359,7 @@ export async function deleteWeekAction(formData: FormData) {
     .eq("plan_id", parsed.planId)
     .order("week_index", { ascending: true });
 
-  if (weeksError) {
+  if (weeksError && !isMissingTableError(weeksError, "public.training_weeks")) {
     throw new Error(weeksError.message);
   }
 
