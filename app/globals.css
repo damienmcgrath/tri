@@ -3,9 +3,118 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  --bg: 224 24% 8%;
+  --bg-elevated: 222 21% 12%;
+  --bg-card: 223 18% 15%;
+  --fg: 210 20% 96%;
+  --fg-muted: 215 14% 72%;
+  --border: 218 18% 25%;
+  --ring: 198 100% 62%;
+  --accent: 198 100% 58%;
+  --accent-soft: 204 70% 19%;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+@layer base {
+  body {
+    @apply antialiased;
+    background: hsl(var(--bg));
+    color: hsl(var(--fg));
+  }
+
+  * {
+    @apply border-transparent;
+  }
+
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen;
+    background: radial-gradient(circle at 20% -10%, hsl(198 96% 20% / 0.25), transparent 40%), hsl(var(--bg));
+  }
+
+  .surface {
+    background: hsl(var(--bg-elevated));
+    border: 1px solid hsl(var(--border));
+    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+  }
+
+  .surface-subtle {
+    background: hsl(var(--bg-card));
+    border: 1px solid hsl(var(--border));
+    @apply rounded-xl;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition duration-200;
+    background: linear-gradient(130deg, hsl(var(--accent)) 0%, hsl(212 100% 62%) 100%);
+  }
+
+  .btn-primary:hover {
+    @apply brightness-110;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition duration-200;
+    background: hsl(var(--bg-card));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--fg));
+  }
+
+  .input-base {
+    @apply w-full rounded-xl px-3 py-2 text-sm transition;
+    background: hsl(var(--bg-card));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--fg));
+  }
+
+  .label-base {
+    color: hsl(var(--fg-muted));
+    @apply block text-sm font-medium;
+  }
+
+  .text-muted {
+    color: hsl(var(--fg-muted));
+  }
+
+  .discipline-swim {
+    @apply border;
+    background: hsl(192 60% 18% / 0.5);
+    border-color: hsl(192 58% 42% / 0.7);
+    color: hsl(190 85% 78%);
+  }
+
+  .discipline-bike {
+    @apply border;
+    background: hsl(114 33% 16% / 0.5);
+    border-color: hsl(122 32% 38% / 0.7);
+    color: hsl(118 45% 78%);
+  }
+
+  .discipline-run {
+    @apply border;
+    background: hsl(13 42% 16% / 0.5);
+    border-color: hsl(14 50% 40% / 0.7);
+    color: hsl(19 75% 78%);
+  }
+
+  .discipline-strength {
+    @apply border;
+    background: hsl(262 34% 18% / 0.5);
+    border-color: hsl(258 32% 47% / 0.7);
+    color: hsl(258 78% 85%);
+  }
+
+  .discipline-other {
+    @apply border;
+    background: hsl(214 17% 21% / 0.6);
+    border-color: hsl(214 14% 45% / 0.7);
+    color: hsl(210 20% 85%);
+  }
 }
