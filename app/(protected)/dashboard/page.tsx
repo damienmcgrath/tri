@@ -43,6 +43,18 @@ function isPlannedSessionTableMissing(error: { code?: string; message?: string }
   return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
 }
 
+function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
+}
+
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
   const distanceFromMonday = day === 0 ? 6 : day - 1;
@@ -125,7 +137,11 @@ export default async function DashboardPage({
     .lt("date", weekEnd)
     .order("date", { ascending: true });
 
-  const { data: profileData } = await supabase.from("profiles").select("race_date,race_name").eq("id", user.id).maybeSingle();
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("race_date,race_name")
+    .eq("id", user.id)
+    .maybeSingle();
 
   if (completedError) {
     throw new Error(completedError.message ?? "Failed to load dashboard data.");
@@ -135,11 +151,16 @@ export default async function DashboardPage({
     throw new Error(plannedError.message ?? "Failed to load dashboard data.");
   }
 
+  if (profileError && !isMissingProfilesTable(profileError)) {
+    throw new Error(profileError.message ?? "Failed to load profile data.");
+  }
+
   const plannedSessions = ((plannedData ?? []) as PlannedSession[]).sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   const completedSessions = (completedData ?? []) as CompletedSession[];
   const profile = (profileData ?? null) as Profile | null;
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
 
   const completionLedger = completedSessions.reduce<Record<string, number>>((acc, session) => {
     const key = `${session.date}:${session.sport}`;
@@ -212,8 +233,9 @@ export default async function DashboardPage({
     };
   });
 
-  const raceDate = profile?.race_date;
-  const raceName = profile?.race_name?.trim() || "Target race";
+  const raceDate = profile?.race_date ?? (typeof metadata.race_date === "string" ? metadata.race_date : null);
+  const raceNameFromMetadata = typeof metadata.race_name === "string" ? metadata.race_name : null;
+  const raceName = profile?.race_name?.trim() || raceNameFromMetadata?.trim() || "Target race";
   const daysToRace = raceDate
     ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;

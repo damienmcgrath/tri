@@ -5,6 +5,18 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
+function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
+}
+
 const raceSettingsSchema = z.object({
   raceName: z.string().trim().max(120).optional(),
   raceDate: z.string().date().optional()
@@ -43,8 +55,23 @@ export async function updateRaceSettingsAction(formData: FormData) {
     { onConflict: "id" }
   );
 
-  if (error) {
+  if (error && !isMissingProfilesTable(error)) {
     throw new Error(error.message ?? "Could not save race settings.");
+  }
+
+  if (error && isMissingProfilesTable(error)) {
+    const currentMetadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const { error: updateMetadataError } = await supabase.auth.updateUser({
+      data: {
+        ...currentMetadata,
+        race_name: raceName,
+        race_date: raceDate
+      }
+    });
+
+    if (updateMetadataError) {
+      throw new Error(updateMetadataError.message ?? "Could not save race settings.");
+    }
   }
 
   revalidatePath("/dashboard");

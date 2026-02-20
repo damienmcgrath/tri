@@ -7,6 +7,18 @@ type Profile = {
   race_date: string | null;
 };
 
+function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
+}
+
 export default async function RaceSettingsPage() {
   const supabase = await createClient();
   const {
@@ -17,8 +29,16 @@ export default async function RaceSettingsPage() {
     return null;
   }
 
-  const { data } = await supabase.from("profiles").select("race_name,race_date").eq("id", user.id).maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("race_name,race_date").eq("id", user.id).maybeSingle();
+
+  if (error && !isMissingProfilesTable(error)) {
+    throw new Error(error.message ?? "Failed to load race settings.");
+  }
+
   const profile = (data ?? null) as Profile | null;
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const raceNameFromMetadata = typeof metadata.race_name === "string" ? metadata.race_name : "";
+  const raceDateFromMetadata = typeof metadata.race_date === "string" ? metadata.race_date : "";
 
   return (
     <section className="space-y-4">
@@ -34,14 +54,14 @@ export default async function RaceSettingsPage() {
             <label htmlFor="raceName" className="label-base">
               Race name
             </label>
-            <input id="raceName" name="raceName" defaultValue={profile?.race_name ?? ""} placeholder="Warsaw 70.3" className="input-base mt-1" />
+            <input id="raceName" name="raceName" defaultValue={profile?.race_name ?? raceNameFromMetadata} placeholder="Warsaw 70.3" className="input-base mt-1" />
           </div>
 
           <div>
             <label htmlFor="raceDate" className="label-base">
               Race date
             </label>
-            <input id="raceDate" name="raceDate" type="date" defaultValue={profile?.race_date ?? ""} className="input-base mt-1" />
+            <input id="raceDate" name="raceDate" type="date" defaultValue={profile?.race_date ?? raceDateFromMetadata} className="input-base mt-1" />
           </div>
 
           <div className="flex gap-2">
