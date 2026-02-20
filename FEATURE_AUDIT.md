@@ -29,8 +29,11 @@
 ## 2) Gaps: what still needs to be built next
 
 ### Highest-priority missing MVP features
-1. **Real Garmin Health API sync** (replace manual TCX upload as primary path).
-2. **AI Coach chat backend + UI flow** (currently scaffold text only).
+1. **AI Coach chat backend + UI flow** (currently scaffold text only).
+2. **Session matching + execution tracking** (planned-session ↔ completed-session status + workflow).
+
+### Deferred item (future sprint)
+- **Real Garmin Health API sync** remains important, but is intentionally deferred for now.
 
 ### Important secondary gaps
 - Session matching layer: explicit planned-session ↔ completed-session linkage and status (`completed`, `missed`, `partial`) beyond aggregate minutes.
@@ -41,45 +44,7 @@
 
 ## 3) Plan for the next 2 features
 
-## Feature 1: Garmin Health API Integration (production ingestion pipeline)
-
-### Objective
-Move from manual file upload to automated, reliable Garmin workout ingestion.
-
-### Scope (first deliverable)
-- OAuth/connect flow placeholder page updated to real Garmin link state.
-- Webhook/ingestion API endpoint(s) that accept Garmin payloads.
-- Normalization pipeline into `completed_sessions` schema.
-- Idempotent dedupe strategy that handles retries and duplicate webhook delivery.
-- Ingestion event logging + error classification.
-
-### Suggested implementation steps
-1. **Schema updates**
-   - Add `garmin_connections` (user_id, external_athlete_id, token metadata, status, last_sync_at).
-   - Add `completed_sessions.external_source` and `external_id` if needed for long-term source compatibility.
-2. **Auth/connect flow**
-   - Add `/settings/integrations` page with connect/disconnect action.
-   - Implement token exchange + secure storage (server-side only).
-3. **Webhook ingestion endpoint**
-   - Verify request signature.
-   - Parse payloads and push each event through normalize/upsert service.
-4. **Normalizer service**
-   - Map Garmin activity types to sports.
-   - Preserve raw payload reference in `ingestion_events` for replay/debug.
-5. **Backfill/sync job**
-   - Scheduled sync for missed webhook events and historical pull window.
-6. **Quality gates**
-   - Unit tests for mapper + dedupe.
-   - Integration test for endpoint idempotency.
-
-### Definition of done
-- User can connect Garmin once and receive new workouts automatically.
-- Duplicate deliveries do not create duplicate completed sessions.
-- Dashboard updates within one sync cycle without manual upload.
-
----
-
-## Feature 2: AI Coach v1 (chat + plan-adjustment suggestions)
+## Feature 1: AI Coach v1 (chat + plan-adjustment suggestions)
 
 ### Objective
 Ship a usable AI coaching assistant that can answer questions and suggest actionable plan changes.
@@ -115,8 +80,47 @@ Ship a usable AI coaching assistant that can answer questions and suggest action
 - User can receive suggested schedule adjustments without auto-applying unsafe edits.
 - Chat runs with predictable latency/cost and has basic observability.
 
-## 4) Recommended sequencing (next 2 sprints)
-- **Sprint A:** Ship Garmin Health API ingestion core + integration settings page.
-- **Sprint B:** Ship AI Coach v1 with context-aware responses and proposal-style plan adjustments.
+---
 
-This order is recommended because the AI feature quality depends heavily on trustworthy, recent workout data.
+## Feature 2: Session Matching + Recovery Insights v1
+
+### Objective
+Move from aggregate minute comparisons to actionable execution tracking and recovery-aware recommendations.
+
+### Scope (first deliverable)
+- Explicit planned-session ↔ completed-session linkage.
+- Session status model (`completed`, `missed`, `partial`) with simple matching heuristics.
+- Calendar interactions for status updates and quick rescheduling.
+- Lightweight daily recovery log (sleep/soreness/energy) and 7-day trend card.
+- Coach context hooks that include execution + recovery summary.
+
+### Suggested implementation steps
+1. **Schema updates**
+   - Add linkage table or nullable foreign keys for matched planned/completed sessions.
+   - Add `completion_status` and `completion_confidence` fields where appropriate.
+   - Add `recovery_logs` table (date, sleep_score, soreness_score, energy_score, notes).
+2. **Matching service**
+   - Implement deterministic heuristics (date window, sport type, duration tolerance).
+   - Add manual override endpoint/action to fix mismatches.
+3. **Calendar UX**
+   - Show planned/completed/partial/missed badges.
+   - Add one-click reschedule and mark-complete controls.
+4. **Recovery insights**
+   - Add daily recovery entry UI.
+   - Compute rolling trend and low-recovery flags.
+5. **Coach integration**
+   - Include weekly adherence + recovery summary in coach context payload.
+6. **Quality gates**
+   - Unit tests for matching heuristics.
+   - Integration tests for status transitions and manual override flows.
+
+### Definition of done
+- User can see which planned sessions were completed, missed, or partial.
+- User can correct mismatches and quickly reschedule missed sessions.
+- Recovery trends are visible and available to coach/context features.
+
+## 4) Recommended sequencing (next 2 sprints)
+- **Sprint A:** Ship AI Coach v1 with context-aware responses and proposal-style plan adjustments.
+- **Sprint B:** Ship Session Matching + Recovery Insights v1 to improve adherence visibility and recommendations.
+
+Garmin Health API integration is explicitly deferred to a later sprint while we prioritize coach usability and training execution clarity.
