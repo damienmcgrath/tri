@@ -222,17 +222,6 @@ export async function POST(request: Request) {
 
   const userMessage = body.message.trim();
 
-  const { error: insertUserMessageError } = await supabase.from("ai_messages").insert({
-    conversation_id: conversationId,
-    user_id: user.id,
-    role: "user",
-    content: userMessage
-  });
-
-  if (insertUserMessageError) {
-    return NextResponse.json({ error: insertUserMessageError.message }, { status: 500 });
-  }
-
   const { data: recentMessages, error: historyError } = await supabase
     .from("ai_messages")
     .select("role,content,created_at")
@@ -252,21 +241,29 @@ export async function POST(request: Request) {
 
   try {
     answer = apiKey
-      ? await getModelResponse({ message: userMessage, summary, history: orderedHistory, apiKey })
+      ? await getModelResponse({ message: userMessage, summary, history: [...orderedHistory, { role: "user", content: userMessage, created_at: new Date().toISOString() }], apiKey })
       : buildFallbackCoachResponse({ message: userMessage, summary });
   } catch {
     answer = buildFallbackCoachResponse({ message: userMessage, summary });
   }
 
-  const { error: insertAssistantMessageError } = await supabase.from("ai_messages").insert({
-    conversation_id: conversationId,
-    user_id: user.id,
-    role: "assistant",
-    content: answer
-  });
+  const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
+    {
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: "user",
+      content: userMessage
+    },
+    {
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: "assistant",
+      content: answer
+    }
+  ]);
 
-  if (insertAssistantMessageError) {
-    return NextResponse.json({ error: insertAssistantMessageError.message }, { status: 500 });
+  if (insertMessagesError) {
+    return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
   }
 
   await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);

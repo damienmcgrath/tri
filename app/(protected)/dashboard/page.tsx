@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { isValidIsoDate } from "@/lib/date/iso";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { markSkippedAction, moveSessionAction, swapSessionDayAction } from "./actions";
 import { TcxUploadForm } from "./tcx-upload-form";
@@ -24,8 +25,8 @@ type CompletedSession = {
 };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 function isPlannedSessionTableMissing(error: { code?: string; message?: string } | null) {
   if (!error) {
@@ -99,9 +100,7 @@ export default async function DashboardPage({
   }
 
   const requestedWeekStart = searchParams?.weekStart;
-  const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart)
-    ? requestedWeekStart
-    : getMonday().toISOString().slice(0, 10);
+  const weekStart = isValidIsoDate(requestedWeekStart) ? requestedWeekStart : getMonday().toISOString().slice(0, 10);
   const weekEnd = addDays(weekStart, 7);
   const todayIso = new Date().toISOString().slice(0, 10);
   const isCurrentWeek = weekStart === getMonday().toISOString().slice(0, 10);
@@ -296,7 +295,7 @@ export default async function DashboardPage({
 
                         <form action={swapSessionDayAction} className="flex gap-2">
                           <input type="hidden" name="sourceSessionId" value={session.id} />
-                          <select name="targetSessionId" defaultValue="" className="input-base py-1 text-xs" aria-label="Swap session day">
+                          <select name="targetSessionId" defaultValue="" required className="input-base py-1 text-xs" aria-label="Swap session day">
                             <option value="" disabled>
                               Swap with...
                             </option>

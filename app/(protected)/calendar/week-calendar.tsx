@@ -38,7 +38,7 @@ type CalendarSession = {
 type WeekDay = { iso: string; weekday: string; label: string };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" });
+const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
 
 function formatMinutes(value: number) {
   const minutes = Math.max(0, Math.round(value));
@@ -482,13 +482,14 @@ export function WeekCalendar({
                   await quickAddSessionAction(payload);
                   setToast({ message: "Session added" });
                   router.refresh();
-                } catch {
+                } catch (error) {
                   setLocalSessions((prev) => prev.filter((session) => session.id !== optimisticId));
                   setOrderByDay((prev) => ({
                     ...prev,
                     [payload.date]: (prev[payload.date] ?? []).filter((id) => id !== optimisticId)
                   }));
-                  setToast({ message: "Could not add session" });
+                  const message = error instanceof Error ? error.message : "Could not add session";
+                  setToast({ message });
                 }
               })();
             });

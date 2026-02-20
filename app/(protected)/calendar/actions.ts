@@ -208,13 +208,30 @@ export async function quickAddSessionAction(input: {
     throw new Error(planError.message ?? "Could not load training plan.");
   }
 
-  if (!plan) {
-    throw new Error("Create a plan first before adding sessions.");
+  let planId = plan?.id;
+
+  if (!planId) {
+    const { data: createdPlan, error: createPlanError } = await supabase
+      .from("training_plans")
+      .insert({
+        user_id: user.id,
+        name: "Quick Plan",
+        start_date: parsed.date,
+        duration_weeks: 12
+      })
+      .select("id")
+      .single();
+
+    if (createPlanError || !createdPlan) {
+      throw new Error(createPlanError?.message ?? "Could not create plan for new session.");
+    }
+
+    planId = createdPlan.id;
   }
 
   const { error } = await supabase.from("planned_sessions").insert({
     user_id: user.id,
-    plan_id: plan.id,
+    plan_id: planId,
     date: parsed.date,
     sport: parsed.sport,
     type: parsed.type?.trim() || "Session",
