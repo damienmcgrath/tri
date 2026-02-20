@@ -25,6 +25,19 @@ type Session = {
   notes: string | null;
 };
 
+
+function isPlannedSessionTableMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
+}
+
 function getWeekLabel(date: string) {
   const start = new Date(date);
   const day = start.getUTCDay();
@@ -75,7 +88,7 @@ export default async function PlanPage({
         .order("date", { ascending: true })
     : { data: [] as Session[], error: null };
 
-  if (sessionsError) {
+  if (sessionsError && !isPlannedSessionTableMissing(sessionsError)) {
     throw new Error(sessionsError.message);
   }
 
