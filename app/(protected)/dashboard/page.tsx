@@ -1,17 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { buildWorkoutSummary, CompletedSessionLite, PlannedSessionLite } from "@/lib/coach/workout-summary";
 import { TcxUploadForm } from "./tcx-upload-form";
 
-type PlannedSession = {
-  sport: "swim" | "bike" | "run" | "strength" | "other";
-  duration: number;
-};
-
-type CompletedSession = {
-  sport: "swim" | "bike" | "run" | "strength" | "other";
-  metrics: {
-    duration_s?: number;
-  };
-};
+type PlannedSession = PlannedSessionLite;
+type CompletedSession = CompletedSessionLite;
 
 const sports = ["swim", "bike", "run", "strength", "other"] as const;
 
@@ -80,25 +72,57 @@ export default async function DashboardPage() {
     };
   });
 
+  const workoutSummary = buildWorkoutSummary(plannedSessions, completedSessions);
+
   return (
     <section className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-slate-600">Weekly planned vs completed training plus TCX import for Garmin exports.</p>
+      <header className="rounded-2xl bg-gradient-to-r from-slate-950 via-cyan-900 to-slate-900 p-8 text-white shadow-xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Dashboard</p>
+        <h1 className="mt-2 text-3xl font-bold">Your weekly training command center</h1>
+        <p className="mt-2 text-sm text-slate-100">
+          Compare planned vs completed load, import workouts, and get coaching-ready analysis at a glance.
+        </p>
       </header>
 
-      <article className="rounded-lg border border-slate-200 bg-white p-4">
+      <article className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Planned</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{workoutSummary.plannedMinutes} min</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Completed</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{workoutSummary.completedMinutes} min</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Completion</p>
+          <p className="mt-1 text-2xl font-bold text-cyan-700">{workoutSummary.completionPct}%</p>
+        </div>
+      </article>
+
+      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">Workout analysis and summary</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Dominant sport this week: <span className="font-medium capitalize text-slate-900">{workoutSummary.dominantSport}</span>
+        </p>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+          {workoutSummary.insights.map((insight) => (
+            <li key={insight}>{insight}</li>
+          ))}
+        </ul>
+      </article>
+
+      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Import Garmin TCX</h2>
-        <p className="mb-3 text-sm text-slate-600">Temporary MVP bridge until Garmin Health API sync is wired.</p>
+        <p className="mb-3 text-sm text-slate-600">Temporary bridge while Garmin Health API access is unavailable.</p>
         <TcxUploadForm />
       </article>
 
-      <article className="rounded-lg border border-slate-200 bg-white p-4">
+      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">This Week by Sport</h2>
         <p className="mb-3 text-sm text-slate-600">Week starts Monday (UTC).</p>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {summary.map((item) => (
-            <div key={item.sport} className="rounded border border-slate-200 p-3">
+            <div key={item.sport} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-medium capitalize text-slate-700">{item.sport}</p>
               <p className="mt-2 text-sm text-slate-600">Planned: {item.plannedMin} min</p>
               <p className="text-sm text-slate-600">Completed: {item.completedMin} min</p>
