@@ -7,6 +7,18 @@ type CompletedSession = CompletedSessionLite;
 
 const sports = ["swim", "bike", "run", "strength", "other"] as const;
 
+function isPlannedSessionTableMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
+}
+
 function getCurrentWeekRange() {
   const now = new Date();
   const day = now.getUTCDay();
@@ -38,7 +50,7 @@ export default async function DashboardPage() {
 
   const { data: plannedData, error: plannedError } = await supabase
     .from("planned_sessions")
-    .select("sport,duration")
+    .select("*")
     .gte("date", startDate)
     .lt("date", endDate)
     .order("date", { ascending: true });
@@ -50,11 +62,23 @@ export default async function DashboardPage() {
     .lt("date", endDate)
     .order("date", { ascending: true });
 
-  if (plannedError || completedError) {
-    throw new Error(plannedError?.message ?? completedError?.message ?? "Failed to load dashboard data.");
+  if (completedError) {
+    throw new Error(completedError.message ?? "Failed to load dashboard data.");
   }
 
-  const plannedSessions = (plannedData ?? []) as PlannedSession[];
+  if (plannedError && !isPlannedSessionTableMissing(plannedError)) {
+    throw new Error(plannedError.message ?? "Failed to load dashboard data.");
+  }
+
+  const plannedSessions = (plannedData ?? []).map((session) => ({
+    sport: session.sport,
+    duration:
+      typeof session.duration === "number"
+        ? session.duration
+        : typeof session.duration_minutes === "number"
+          ? session.duration_minutes
+          : 0
+  })) as PlannedSession[];
   const completedSessions = (completedData ?? []) as CompletedSession[];
 
   const summary = sports.map((sport) => {
