@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +39,9 @@ export default async function ProtectedLayout({
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-3 text-right text-xs text-[hsl(var(--fg-muted))]">
-            <ThemeToggle />
-            <div>
-              <p className="font-medium text-[hsl(var(--fg))]">Signed in</p>
-              <p>{user?.email ?? "Unknown user"}</p>
-            </div>
+          <div className="text-right text-xs text-[hsl(var(--fg-muted))]">
+            <p className="font-medium text-[hsl(var(--fg))]">Signed in</p>
+            <p>{user?.email ?? "Unknown user"}</p>
           </div>
         </div>
       </header>

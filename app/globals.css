@@ -4,19 +4,6 @@
 
 :root {
   color-scheme: dark;
-  --bg: 222 33% 96%;
-  --bg-elevated: 0 0% 100%;
-  --bg-card: 220 23% 98%;
-  --fg: 224 41% 9%;
-  --fg-muted: 220 16% 35%;
-  --border: 220 22% 89%;
-  --ring: 198 96% 57%;
-  --accent: 198 100% 56%;
-  --accent-soft: 198 96% 92%;
-}
-
-.dark {
-  color-scheme: dark;
   --bg: 224 24% 8%;
   --bg-elevated: 222 21% 12%;
   --bg-card: 223 18% 15%;
