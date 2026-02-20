@@ -78,7 +78,7 @@ export function WeekCalendar({
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
-  const [quickAddDate, setQuickAddDate] = useState<string | null>(null);
+  const [quickAddState, setQuickAddState] = useState<{ initialDate: string; allowDaySelection: boolean } | null>(null);
   const [swapSource, setSwapSource] = useState<CalendarSession | null>(null);
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -226,7 +226,15 @@ export function WeekCalendar({
             <Link href={weekLink(prevWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Prev week</Link>
             <Link href="/calendar" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-cyan-400/60" : ""}`}>Current week</Link>
             <Link href={weekLink(nextWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Next week</Link>
-            <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => setQuickAddDate(todayIso)}>
+            <button
+              className="btn-primary px-3 py-1.5 text-xs"
+              onClick={() =>
+                setQuickAddState({
+                  initialDate: weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0].iso,
+                  allowDaySelection: true
+                })
+              }
+            >
               Add session
             </button>
             {raceCountdown !== null ? (
@@ -302,7 +310,7 @@ export function WeekCalendar({
                   <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                     <div className="mt-2 space-y-2">
                       {visibleIds.length === 0 ? (
-                        <button onClick={() => setQuickAddDate(day.iso)} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-cyan-400/50 hover:text-cyan-100">
+                        <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-cyan-400/50 hover:text-cyan-100">
                           + Add
                         </button>
                       ) : (
@@ -388,10 +396,12 @@ export function WeekCalendar({
         </article>
       </DndContext>
 
-      {quickAddDate ? (
+      {quickAddState ? (
         <QuickAddModal
-          date={quickAddDate}
-          onClose={() => setQuickAddDate(null)}
+          initialDate={quickAddState.initialDate}
+          allowDaySelection={quickAddState.allowDaySelection}
+          weekDays={weekDays}
+          onClose={() => setQuickAddState(null)}
           onSubmit={(payload) => {
             startTransition(() => {
               void (async () => {
@@ -412,7 +422,7 @@ export function WeekCalendar({
                   ...prev,
                   [payload.date]: [...(prev[payload.date] ?? []), optimisticId]
                 }));
-                setQuickAddDate(null);
+                setQuickAddState(null);
 
                 try {
                   await quickAddSessionAction(payload);
@@ -517,47 +527,63 @@ function SortableSessionCard({
       style={style}
       className={`surface-subtle p-2 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-70" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
     >
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-            <p className={`mt-1 truncate text-sm font-medium ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
-            <p className="text-xl font-semibold leading-tight">{session.duration} min</p>
-            {target ? <p className="line-clamp-1 text-[11px] text-muted">{target}</p> : null}
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
+              <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
+                {session.status === "planned" ? "Pending" : session.status === "completed" ? "✓ Done" : "Skipped"}
+              </p>
+            </div>
+            <p className={`mt-1 truncate text-base font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
+            <p className="mt-1 text-3xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-lg font-medium text-muted">min</span></p>
+            {target ? <p className="mt-1 line-clamp-1 text-[11px] text-muted">{target}</p> : null}
           </div>
-          <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
-            {session.status === "planned" ? "Pending" : session.status === "completed" ? "✓ Done" : "Skipped"}
-          </p>
+          <button
+            className="rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-[10px] text-muted hover:text-cyan-100"
+            {...attributes}
+            {...listeners}
+            aria-label={`Drag ${session.type}`}
+          >
+            Move ↕
+          </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-1 text-[10px]">
-          <button className="btn-secondary px-1.5 py-1" onClick={onMove} aria-label="Move session">
-            Move
+        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+          <button className="btn-secondary px-2 py-1" onClick={onMove} aria-label="Move session">
+            Move to…
           </button>
-          <button className="btn-secondary px-1.5 py-1" onClick={onSwap} aria-label="Swap session day">
+          <button className="btn-secondary px-2 py-1" onClick={onSwap} aria-label="Swap session day">
             Swap
           </button>
-          <button className="btn-secondary px-1.5 py-1" onClick={onSkip} aria-label={session.status === "skipped" ? "Undo skipped status" : "Mark session skipped"}>
-            {session.status === "skipped" ? "Undo" : "Missed"}
-          </button>
         </div>
+        <button
+          className="btn-secondary w-full px-2 py-1 text-[11px]"
+          onClick={onSkip}
+          aria-label={session.status === "skipped" ? "Undo skipped status" : "Mark session skipped"}
+        >
+          {session.status === "skipped" ? "Undo skipped" : "Mark missed"}
+        </button>
       </div>
-      <button className="mt-2 w-full rounded-lg border border-dashed border-[hsl(var(--border))] px-2 py-1 text-[10px] text-muted" {...attributes} {...listeners} aria-label={`Drag ${session.type}`}>
-        Drag to reschedule
-      </button>
     </article>
   );
 }
 
 function QuickAddModal({
-  date,
+  initialDate,
+  allowDaySelection,
+  weekDays,
   onClose,
   onSubmit
 }: {
-  date: string;
+  initialDate: string;
+  allowDaySelection: boolean;
+  weekDays: WeekDay[];
   onClose: () => void;
   onSubmit: (payload: { date: string; sport: "swim" | "bike" | "run" | "strength" | "other"; type?: string; duration: number; notes?: string }) => void;
 }) {
+  const [date, setDate] = useState(initialDate);
   const [sport, setSport] = useState<"swim" | "bike" | "run" | "strength" | "other">("run");
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("45");
@@ -570,6 +596,18 @@ function QuickAddModal({
       <div className="surface w-full max-w-md p-4">
         <h3 className="text-base font-semibold">Quick Add • {dayFormatter.format(new Date(`${date}T00:00:00.000Z`))}</h3>
         <div className="mt-3 space-y-3">
+          {allowDaySelection ? (
+            <label className="block">
+              <span className="label-base mb-1 text-xs">Day</span>
+              <select className="input-base" value={date} onChange={(event) => setDate(event.target.value)} aria-label="Select day for new session">
+                {weekDays.map((day) => (
+                  <option key={day.iso} value={day.iso}>
+                    {day.weekday} • {day.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {(["swim", "bike", "run", "strength"] as const).map((item) => (
               <button key={item} onClick={() => setSport(item)} className={`rounded-full px-3 py-1 text-xs ${sport === item ? getDisciplineMeta(item).className : "border border-[hsl(var(--border))] text-muted"}`}>
