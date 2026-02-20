@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
@@ -141,31 +142,38 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         <div className="mt-5 space-y-2">
           <h2 className="text-xs uppercase tracking-[0.2em] text-cyan-300">Plan selector</h2>
           {plans.length === 0 ? <p className="text-sm text-muted">No plans yet. Create your first plan.</p> : null}
-          {selectedPlan ? (
-            <form action={deletePlanAction} className="pb-1">
-              <input type="hidden" name="planId" value={selectedPlan.id} />
-              <button
-                className="btn-secondary w-full border-red-400/40 text-xs text-red-200 hover:border-red-300/50"
-                type="submit"
-                onClick={(event) => {
-                  if (!window.confirm(`Delete plan "${selectedPlan.name}" and all weeks/sessions?`)) {
-                    event.preventDefault();
-                  }
-                }}
-              >
-                Delete selected plan
-              </button>
-            </form>
-          ) : null}
           {plans.map((plan) => (
-            <a
+            <div
               key={plan.id}
-              href={`/plan?plan=${plan.id}`}
-              className={`block rounded-xl border px-3 py-2 ${selectedPlan?.id === plan.id ? "border-cyan-400/60 bg-cyan-500/10" : "border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"}`}
+              className={`flex items-start gap-2 rounded-xl border p-2 ${selectedPlan?.id === plan.id ? "border-cyan-400/60 bg-cyan-500/10" : "border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"}`}
             >
-              <p className="font-medium">{plan.name}</p>
-              <p className="text-xs text-muted">{plan.start_date} · {plan.duration_weeks} weeks</p>
-            </a>
+              <Link href={`/plan?plan=${plan.id}`} className="min-w-0 flex-1 rounded-lg px-1 py-0.5">
+                <p className="font-medium">{plan.name}</p>
+                <p className="text-xs text-muted">{plan.start_date} · {plan.duration_weeks} weeks</p>
+              </Link>
+              <form action={deletePlanAction}>
+                <input type="hidden" name="planId" value={plan.id} />
+                <button
+                  type="submit"
+                  aria-label={`Delete plan ${plan.name}`}
+                  title="Delete plan"
+                  className="rounded-md border border-red-400/30 p-1.5 text-red-200 transition-colors hover:border-red-300/60 hover:bg-red-500/10"
+                  onClick={(event) => {
+                    if (!window.confirm(`Delete plan "${plan.name}" and all weeks/sessions?`)) {
+                      event.preventDefault();
+                    }
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                    <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                </button>
+              </form>
+            </div>
           ))}
         </div>
 
