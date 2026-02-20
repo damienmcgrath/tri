@@ -1,5 +1,73 @@
 # TriCoach AI 2.0 — Product Requirements Document
 
+## Local development quickstart
+
+### 1) Install dependencies
+
+```bash
+npm ci
+```
+
+### 2) Configure environment variables
+
+Create `.env.local` in the repo root and copy values from `.env.example`.
+
+Required to run app auth + data flows:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (preferred)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback)
+
+Optional for upcoming features:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `WEATHER_API_KEY`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
+### 3) Run Supabase migrations
+
+Use either the Supabase dashboard SQL editor or the CLI against your project.
+
+If using CLI:
+
+```bash
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+This provisions `training_plans`, `planned_sessions`, `completed_sessions`, and `ingestion_events` with RLS policies used by the app.
+
+### 4) Enable Supabase email/password auth
+
+In your Supabase project:
+
+- Go to **Authentication → Providers → Email**
+- Enable email/password sign-in
+- (Optional) disable email confirmation during local development for faster onboarding
+
+### 5) Run checks
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+### 6) Start local app
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+### Notes
+
+- Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
+- Dashboard includes a TCX upload flow for importing Garmin-exported workouts as a temporary bridge until direct Garmin API sync.
+
 ## 📌 Overview
 TriCoach AI is a web-based training companion for amateur triathletes. It automates personalized training-plan management by integrating with Garmin Connect, analyzing workout data, and offering an AI coach for plan adaptation and guidance.
 
@@ -123,6 +191,11 @@ The product is designed first for solo athletes who want expert-level coaching s
 - Cache repeated AI questions and Garmin-derived summaries.
 - Use on-demand data refresh over frequent polling where possible.
 - Keep Garmin raw files in low-cost object storage; normalize only required fields.
+
+---
+
+## 🚀 Supabase quick start
+Need a practical setup walkthrough after creating your account? See `SUPABASE_SETUP.md`.
 
 ---
 
