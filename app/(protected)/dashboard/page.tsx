@@ -43,6 +43,18 @@ function isPlannedSessionTableMissing(error: { code?: string; message?: string }
   return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
 }
 
+function isPlannedSessionColumnMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703") {
+    return true;
+  }
+
+  return /column\s+planned_sessions\./i.test(error.message ?? "") && /does not exist/i.test(error.message ?? "");
+}
+
 function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
   if (!error) {
     return false;
@@ -130,6 +142,16 @@ export default async function DashboardPage({
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
 
+  const { data: legacyPlannedData, error: legacyPlannedError } = plannedError && isPlannedSessionColumnMissing(plannedError)
+    ? await supabase
+        .from("planned_sessions")
+        .select("id,date,sport,session_type,duration_minutes,notes,created_at")
+        .gte("date", weekStart)
+        .lt("date", weekEnd)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true })
+    : { data: null, error: null };
+
   const { data: completedData, error: completedError } = await supabase
     .from("completed_sessions")
     .select("date,sport,metrics")
@@ -147,15 +169,33 @@ export default async function DashboardPage({
     throw new Error(completedError.message ?? "Failed to load dashboard data.");
   }
 
-  if (plannedError && !isPlannedSessionTableMissing(plannedError)) {
+  if (plannedError && !isPlannedSessionTableMissing(plannedError) && !isPlannedSessionColumnMissing(plannedError)) {
     throw new Error(plannedError.message ?? "Failed to load dashboard data.");
+  }
+
+  if (legacyPlannedError) {
+    throw new Error(legacyPlannedError.message ?? "Failed to load dashboard data.");
   }
 
   if (profileError && !isMissingProfilesTable(profileError)) {
     throw new Error(profileError.message ?? "Failed to load profile data.");
   }
 
-  const plannedSessions = ((plannedData ?? []) as PlannedSession[]).sort(
+  const plannedSessions = ((plannedData ?? []) as PlannedSession[]).length > 0
+    ? ((plannedData ?? []) as PlannedSession[])
+    : ((legacyPlannedData ?? []) as Array<
+        Omit<PlannedSession, "type" | "duration"> & { session_type: string; duration_minutes: number | null }
+      >).map((session) => ({
+        id: session.id,
+        date: session.date,
+        sport: session.sport,
+        type: session.session_type,
+        duration: session.duration_minutes,
+        notes: session.notes,
+        created_at: session.created_at
+      }));
+
+  const sortedPlannedSessions = plannedSessions.sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   const completedSessions = (completedData ?? []) as CompletedSession[];
@@ -168,7 +208,7 @@ export default async function DashboardPage({
     return acc;
   }, {});
 
-  const withStatus = plannedSessions.map((session) => ({
+  const withStatus = sortedPlannedSessions.map((session) => ({
     ...session,
     duration: session.duration ?? 0,
     status: getSessionStatus(session, completionLedger)
