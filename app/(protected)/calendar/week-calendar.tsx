@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useMemo, useState, useTransition } from "react";
+import { ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -57,6 +57,10 @@ function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
 
+function clearSkippedTag(notes: string | null) {
+  return (notes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+}
+
 export function WeekCalendar({
   weekDays,
   sessions,
@@ -80,15 +84,29 @@ export function WeekCalendar({
   const [toast, setToast] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
+
+  useEffect(() => {
+    setLocalSessions(sessions);
+  }, [sessions]);
 
   const [orderByDay, setOrderByDay] = useState<Record<string, string[]>>(() =>
     weekDays.reduce<Record<string, string[]>>((acc, day) => {
-      acc[day.iso] = sessions.filter((s) => s.date === day.iso).map((s) => s.id);
+      acc[day.iso] = sessions.filter((session) => session.date === day.iso).map((session) => session.id);
       return acc;
     }, {})
   );
 
-  const sessionsById = useMemo(() => Object.fromEntries(sessions.map((session) => [session.id, session])), [sessions]);
+  useEffect(() => {
+    setOrderByDay(
+      weekDays.reduce<Record<string, string[]>>((acc, day) => {
+        acc[day.iso] = sessions.filter((session) => session.date === day.iso).map((session) => session.id);
+        return acc;
+      }, {})
+    );
+  }, [sessions, weekDays]);
+
+  const sessionsById = useMemo(() => Object.fromEntries(localSessions.map((session) => [session.id, session])), [localSessions]);
 
   const filteredIdsByDay = useMemo(() => {
     return weekDays.reduce<Record<string, string[]>>((acc, day) => {
@@ -105,21 +123,21 @@ export function WeekCalendar({
   }, [orderByDay, sessionsById, sportFilter, statusFilter, weekDays]);
 
   const totals = useMemo(() => {
-    const planned = sessions.reduce((sum, session) => sum + session.duration, 0);
-    const completed = sessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.duration, 0);
+    const planned = localSessions.reduce((sum, session) => sum + session.duration, 0);
+    const completed = localSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.duration, 0);
     return { planned, completed, remaining: Math.max(planned - completed, 0) };
-  }, [sessions]);
+  }, [localSessions]);
 
   const progressBySport = useMemo(
     () =>
       sports.map((sport) => {
-        const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
-        const completed = sessions
+        const planned = localSessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
+        const completed = localSessions
           .filter((session) => session.sport === sport && session.status === "completed")
           .reduce((sum, session) => sum + session.duration, 0);
         return { sport, planned, completed };
       }),
-    [sessions]
+    [localSessions]
   );
 
   const sensors = useSensors(
@@ -298,18 +316,50 @@ export function WeekCalendar({
                               onSkip={() => {
                                 startTransition(() => {
                                   void (async () => {
+                                    const wasSkipped = session.status === "skipped";
+
+                                    setLocalSessions((prev) =>
+                                      prev.map((item) => {
+                                        if (item.id !== session.id) {
+                                          return item;
+                                        }
+
+                                        if (wasSkipped) {
+                                          return {
+                                            ...item,
+                                            status: "planned",
+                                            notes: clearSkippedTag(item.notes) || null
+                                          };
+                                        }
+
+                                        const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
+                                        return {
+                                          ...item,
+                                          status: "skipped",
+                                          notes: item.notes ? `${item.notes}\n${skipTag}` : skipTag
+                                        };
+                                      })
+                                    );
+
                                     try {
-                                      if (session.status === "skipped") {
+                                      if (wasSkipped) {
                                         await clearSkippedAction({ sessionId: session.id });
                                         setToast("Skipped status removed");
                                       } else {
                                         await markSkippedAction({ sessionId: session.id });
                                         setToast("Session marked skipped");
                                       }
+                                      router.refresh();
                                     } catch {
-                                      setToast(session.status === "skipped" ? "Could not undo skipped status" : "Could not mark session as missed");
+                                      setLocalSessions((prev) =>
+                                        prev.map((item) =>
+                                          item.id === session.id
+                                            ? { ...item, status: session.status, notes: session.notes }
+                                            : item
+                                        )
+                                      );
+                                      setToast(wasSkipped ? "Could not undo skipped status" : "Could not mark session as missed");
                                     }
-                                    router.refresh();
                                   })();
                                 });
                               }}
@@ -345,14 +395,37 @@ export function WeekCalendar({
           onSubmit={(payload) => {
             startTransition(() => {
               void (async () => {
+                const optimisticId = `temp-${Date.now()}`;
+                const optimisticSession: CalendarSession = {
+                  id: optimisticId,
+                  date: payload.date,
+                  sport: payload.sport,
+                  type: payload.type?.trim() || "Session",
+                  duration: payload.duration,
+                  notes: payload.notes?.trim() || null,
+                  created_at: new Date().toISOString(),
+                  status: "planned"
+                };
+
+                setLocalSessions((prev) => [...prev, optimisticSession]);
+                setOrderByDay((prev) => ({
+                  ...prev,
+                  [payload.date]: [...(prev[payload.date] ?? []), optimisticId]
+                }));
+                setQuickAddDate(null);
+
                 try {
                   await quickAddSessionAction(payload);
                   setToast("Session added");
-                  setQuickAddDate(null);
+                  router.refresh();
                 } catch {
+                  setLocalSessions((prev) => prev.filter((session) => session.id !== optimisticId));
+                  setOrderByDay((prev) => ({
+                    ...prev,
+                    [payload.date]: (prev[payload.date] ?? []).filter((id) => id !== optimisticId)
+                  }));
                   setToast("Could not add session");
                 }
-                router.refresh();
               })();
             });
           }}
@@ -384,7 +457,7 @@ export function WeekCalendar({
       {swapSource ? (
         <SwapModal
           session={swapSource}
-          sessions={sessions}
+          sessions={localSessions}
           onClose={() => setSwapSource(null)}
           onSwap={(targetSessionId) => {
             startTransition(() => {
