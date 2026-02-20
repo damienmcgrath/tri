@@ -290,3 +290,9 @@ The product is designed first for solo athletes who want expert-level coaching s
 - Simple, intuitive UX for non-technical athletes.
 - Strong performance and reliable sync behavior.
 - Clear differentiation versus established training platforms.
+
+## TCX Import MVP (Temporary Garmin Bridge)
+- Upload Garmin `.tcx` exports from the Dashboard.
+- The app parses activities and stores normalized records in `completed_sessions`.
+- Imports are idempotent via `user_id + garmin_id` and logged in `ingestion_events`.
+- This path is intentionally adapter-based so Garmin Health API payloads can later map into the same normalized model.
