@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
   createPlanAction,
@@ -106,6 +106,18 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
   const activeSession = weekSessions.find((session) => session.id === activeSessionId);
 
+  useEffect(() => {
+    if (!planWeeks.length) {
+      setSelectedWeekId("");
+      return;
+    }
+
+    const hasSelectedWeek = planWeeks.some((week) => week.id === selectedWeekId);
+    if (!hasSelectedWeek) {
+      setSelectedWeekId(planWeeks[0].id);
+    }
+  }, [planWeeks, selectedWeekId]);
+
   return (
     <section className="grid gap-4 lg:grid-cols-[320px_1fr]">
       <aside className="surface p-4">
@@ -174,8 +186,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
       <main className="space-y-4">
         {!selectedPlan || !selectedWeek ? (
           <article className="surface p-8 text-center">
-            <h2 className="text-xl font-semibold">No plan selected</h2>
-            <p className="mt-2 text-sm text-muted">Create a plan in the sidebar to generate training weeks automatically.</p>
+            <h2 className="text-xl font-semibold">{selectedPlan ? "No weeks found" : "No plan selected"}</h2>
+            <p className="mt-2 text-sm text-muted">
+              {selectedPlan
+                ? "This plan has no week rows yet. Re-run migrations and create weeks, then refresh."
+                : "Create a plan in the sidebar to generate training weeks automatically."}
+            </p>
           </article>
         ) : (
           <>

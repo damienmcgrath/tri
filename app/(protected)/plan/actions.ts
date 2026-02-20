@@ -130,6 +130,27 @@ export async function createPlanAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  const startDate = new Date(`${plan.start_date}T00:00:00.000Z`);
+  const weeksPayload = Array.from({ length: Math.max(plan.duration_weeks, 1) }).map((_, index) => {
+    const weekStart = new Date(startDate);
+    weekStart.setUTCDate(startDate.getUTCDate() + index * 7);
+    return {
+      plan_id: plan.id,
+      week_index: index + 1,
+      week_start_date: weekStart.toISOString().slice(0, 10),
+      focus: "Build"
+    };
+  });
+
+  const { error: weeksError } = await supabase.from("training_weeks").upsert(weeksPayload, {
+    onConflict: "plan_id,week_index",
+    ignoreDuplicates: true
+  });
+
+  if (weeksError) {
+    throw new Error(weeksError.message);
+  }
+
   revalidatePath("/plan");
   redirect(`/plan?plan=${plan.id}`);
 }
