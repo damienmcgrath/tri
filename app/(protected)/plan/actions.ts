@@ -46,6 +46,10 @@ const deleteSessionSchema = z.object({
   sessionId: uuidSchema
 });
 
+const deletePlanSchema = z.object({
+  planId: uuidSchema
+});
+
 
 function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
   if (!error) {
@@ -166,6 +170,28 @@ export async function createPlanAction(formData: FormData) {
 
   revalidatePath("/plan");
   redirect(`/plan?plan=${plan.id}`);
+}
+
+export async function deletePlanAction(formData: FormData) {
+  const parsed = deletePlanSchema.parse({
+    planId: formData.get("planId")
+  });
+
+  const { supabase, user } = await getAuthedClient();
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+
+  const { error } = await supabase
+    .from("training_plans")
+    .delete()
+    .eq("id", parsed.planId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/plan");
+  redirect("/plan");
 }
 
 export async function updateWeekAction(formData: FormData) {

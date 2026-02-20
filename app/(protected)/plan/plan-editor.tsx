@@ -5,6 +5,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
   createPlanAction,
   createSessionAction,
+  deletePlanAction,
   deleteSessionAction,
   deleteWeekAction,
   duplicateWeekForwardAction,
@@ -140,6 +141,22 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         <div className="mt-5 space-y-2">
           <h2 className="text-xs uppercase tracking-[0.2em] text-cyan-300">Plan selector</h2>
           {plans.length === 0 ? <p className="text-sm text-muted">No plans yet. Create your first plan.</p> : null}
+          {selectedPlan ? (
+            <form action={deletePlanAction} className="pb-1">
+              <input type="hidden" name="planId" value={selectedPlan.id} />
+              <button
+                className="btn-secondary w-full border-red-400/40 text-xs text-red-200 hover:border-red-300/50"
+                type="submit"
+                onClick={(event) => {
+                  if (!window.confirm(`Delete plan "${selectedPlan.name}" and all weeks/sessions?`)) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                Delete selected plan
+              </button>
+            </form>
+          ) : null}
           {plans.map((plan) => (
             <a
               key={plan.id}
