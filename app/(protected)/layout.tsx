@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -21,24 +22,30 @@ export default async function ProtectedLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <p className="font-semibold text-slate-900">TriCoach AI</p>
-          <nav className="flex gap-2">
+    <div className="app-shell">
+      <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
+            <p className="font-semibold">TriCoach AI</p>
+          </div>
+          <nav className="flex flex-wrap gap-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--fg-muted))] transition hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
-          <div className="text-right text-xs text-slate-500">
-            <p className="font-medium text-slate-700">Signed in</p>
-            <p>{user?.email ?? "Unknown user"}</p>
+          <div className="flex items-center gap-3 text-right text-xs text-[hsl(var(--fg-muted))]">
+            <ThemeToggle />
+            <div>
+              <p className="font-medium text-[hsl(var(--fg))]">Signed in</p>
+              <p>{user?.email ?? "Unknown user"}</p>
+            </div>
           </div>
         </div>
       </header>
