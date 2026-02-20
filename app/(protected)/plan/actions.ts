@@ -42,6 +42,23 @@ async function getAuthedClient() {
   return { supabase, user };
 }
 
+async function assertPlanOwnership(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, planId: string) {
+  const { data: plan, error } = await supabase
+    .from("training_plans")
+    .select("id")
+    .eq("id", planId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Could not validate plan ownership: ${error.message}`);
+  }
+
+  if (!plan) {
+    throw new Error("Plan not found or not owned by current user.");
+  }
+}
+
 export async function createPlanAction(formData: FormData) {
   const parsed = createPlanSchema.parse({
     name: formData.get("name"),
@@ -77,6 +94,8 @@ export async function createSessionAction(formData: FormData) {
 
   const { supabase, user } = await getAuthedClient();
 
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+
   const { error } = await supabase.from("planned_sessions").insert({
     user_id: user.id,
     plan_id: parsed.planId,
@@ -106,6 +125,8 @@ export async function updateSessionAction(formData: FormData) {
   });
 
   const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
 
   const { error } = await supabase
     .from("planned_sessions")

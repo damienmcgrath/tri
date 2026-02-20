@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/plan", label: "Plan" },

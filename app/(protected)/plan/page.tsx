@@ -53,22 +53,30 @@ export default async function PlanPage({
     return null;
   }
 
-  const { data: plansData } = await supabase
+  const { data: plansData, error: plansError } = await supabase
     .from("training_plans")
     .select("id,name,start_date,duration_weeks")
     .order("start_date", { ascending: false });
+
+  if (plansError) {
+    throw new Error(plansError.message);
+  }
 
   const plans = (plansData ?? []) as Plan[];
 
   const selectedPlan = plans.find((plan: Plan) => plan.id === searchParams?.plan) ?? plans[0];
 
-  const { data: sessionsData } = selectedPlan
+  const { data: sessionsData, error: sessionsError } = selectedPlan
     ? await supabase
         .from("planned_sessions")
         .select("id,plan_id,date,sport,type,duration,notes")
         .eq("plan_id", selectedPlan.id)
         .order("date", { ascending: true })
-    : { data: [] as Session[] };
+    : { data: [] as Session[], error: null };
+
+  if (sessionsError) {
+    throw new Error(sessionsError.message);
+  }
 
   const sessions = (sessionsData ?? []) as Session[];
 

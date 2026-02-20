@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
 export function SignInForm() {
-  const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -20,6 +19,7 @@ export function SignInForm() {
     setError(null);
     setIsSubmitting(true);
 
+    const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError) {
