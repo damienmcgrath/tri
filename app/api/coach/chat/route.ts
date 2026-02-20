@@ -4,6 +4,19 @@ import { buildWorkoutSummary, CompletedSessionLite, PlannedSessionLite } from "@
 
 type ChatRequestBody = {
   message?: string;
+  conversationId?: string;
+};
+
+type ConversationRow = {
+  id: string;
+  title: string;
+  updated_at: string;
+};
+
+type ConversationMessageRow = {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
 };
 
 function getDateDaysAgo(daysAgo: number) {
@@ -33,25 +46,29 @@ function buildFallbackCoachResponse(input: { message: string; summary: ReturnTyp
 async function getModelResponse(params: {
   message: string;
   summary: ReturnType<typeof buildWorkoutSummary>;
+  history: ConversationMessageRow[];
   apiKey: string;
 }) {
-  const prompt = `You are TriCoach AI, a concise triathlon coach.
+  const systemPrompt = `You are TriCoach AI, a concise triathlon coach.
 
-User message: ${params.message}
+Rules:
+- Keep responses practical and actionable.
+- Avoid medical diagnosis.
+- Use supportive language.
+- If the user asks for schedule changes, suggest changes as proposals, not automatic directives.`;
 
-Recent workload summary:
+  const summaryContext = `Recent workload summary:
 - Planned minutes: ${params.summary.plannedMinutes}
 - Completed minutes: ${params.summary.completedMinutes}
 - Completion: ${params.summary.completionPct}%
 - Dominant sport: ${params.summary.dominantSport}
-- Insights: ${params.summary.insights.join(" | ")}
+- Insights: ${params.summary.insights.join(" | ")}`;
 
-Reply with:
-1) Brief assessment (2-3 sentences)
-2) Workout analysis and summary
-3) 3 practical recommendations for the next 7 days
-
-Avoid medical diagnosis.`;
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "system", content: summaryContext },
+    ...params.history.map((item) => ({ role: item.role, content: item.content }))
+  ];
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -62,16 +79,7 @@ Avoid medical diagnosis.`;
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.4,
-      messages: [
-        {
-          role: "system",
-          content: "You are a supportive endurance coach for amateur triathletes."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
+      messages
     })
   });
 
@@ -86,6 +94,54 @@ Avoid medical diagnosis.`;
   return data.choices?.[0]?.message?.content?.trim() ?? "I could not generate a response right now.";
 }
 
+async function getUserAndClient() {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  return { supabase, user };
+}
+
+export async function GET(request: Request) {
+  const { supabase, user } = await getUserAndClient();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const conversationId = url.searchParams.get("conversationId");
+
+  if (conversationId) {
+    const { data, error } = await supabase
+      .from("ai_messages")
+      .select("role,content,created_at")
+      .eq("user_id", user.id)
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ messages: (data ?? []) as ConversationMessageRow[] });
+  }
+
+  const { data, error } = await supabase
+    .from("ai_conversations")
+    .select("id,title,updated_at")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(12);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ conversations: (data ?? []) as ConversationRow[] });
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as ChatRequestBody;
 
@@ -93,10 +149,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter a longer message." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  if (body.message.length > 2000) {
+    return NextResponse.json({ error: "Please keep messages under 2000 characters." }, { status: 400 });
+  }
+
+  const { supabase, user } = await getUserAndClient();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -133,16 +190,86 @@ export async function POST(request: Request) {
     (completedData ?? []) as CompletedSessionLite[]
   );
 
+  let conversationId = body.conversationId;
+
+  if (conversationId) {
+    const { data: existingConversation, error: lookupError } = await supabase
+      .from("ai_conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (lookupError || !existingConversation) {
+      conversationId = undefined;
+    }
+  }
+
+  if (!conversationId) {
+    const title = body.message.trim().slice(0, 60);
+    const { data: createdConversation, error: conversationError } = await supabase
+      .from("ai_conversations")
+      .insert({ user_id: user.id, title })
+      .select("id")
+      .single();
+
+    if (conversationError || !createdConversation) {
+      return NextResponse.json({ error: conversationError?.message ?? "Failed to create conversation." }, { status: 500 });
+    }
+
+    conversationId = createdConversation.id;
+  }
+
+  const userMessage = body.message.trim();
+
+  const { error: insertUserMessageError } = await supabase.from("ai_messages").insert({
+    conversation_id: conversationId,
+    user_id: user.id,
+    role: "user",
+    content: userMessage
+  });
+
+  if (insertUserMessageError) {
+    return NextResponse.json({ error: insertUserMessageError.message }, { status: 500 });
+  }
+
+  const { data: recentMessages, error: historyError } = await supabase
+    .from("ai_messages")
+    .select("role,content,created_at")
+    .eq("user_id", user.id)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (historyError) {
+    return NextResponse.json({ error: historyError.message }, { status: 500 });
+  }
+
+  const orderedHistory = [...((recentMessages ?? []) as ConversationMessageRow[])].reverse();
   const apiKey = process.env.OPENAI_API_KEY;
 
-  try {
-    const answer = apiKey
-      ? await getModelResponse({ message: body.message.trim(), summary, apiKey })
-      : buildFallbackCoachResponse({ message: body.message.trim(), summary });
+  let answer = "";
 
-    return NextResponse.json({ answer, summary });
+  try {
+    answer = apiKey
+      ? await getModelResponse({ message: userMessage, summary, history: orderedHistory, apiKey })
+      : buildFallbackCoachResponse({ message: userMessage, summary });
   } catch {
-    const answer = buildFallbackCoachResponse({ message: body.message.trim(), summary });
-    return NextResponse.json({ answer, summary });
+    answer = buildFallbackCoachResponse({ message: userMessage, summary });
   }
+
+  const { error: insertAssistantMessageError } = await supabase.from("ai_messages").insert({
+    conversation_id: conversationId,
+    user_id: user.id,
+    role: "assistant",
+    content: answer
+  });
+
+  if (insertAssistantMessageError) {
+    return NextResponse.json({ error: insertAssistantMessageError.message }, { status: 500 });
+  }
+
+  await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+
+  return NextResponse.json({ answer, summary, conversationId });
 }

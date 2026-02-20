@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Message = {
   role: "user" | "assistant";
@@ -15,18 +15,26 @@ type CoachSummary = {
   insights: string[];
 };
 
+type Conversation = {
+  id: string;
+  title: string;
+  updated_at: string;
+};
+
+const defaultAssistantMessage = {
+  role: "assistant" as const,
+  content:
+    "Hey! I’m your AI coach. Ask me to review your recent training, suggest a week plan, or adapt sessions around your schedule."
+};
+
 export function CoachChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "Hey! I’m your AI coach. Ask me to review your recent training, suggest a week plan, or adapt sessions around your schedule."
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   const completionTone = useMemo(() => {
     if (!summary) {
@@ -43,6 +51,50 @@ export function CoachChat() {
 
     return "from-amber-500 to-orange-500";
   }, [summary]);
+
+  async function loadConversations() {
+    try {
+      const response = await fetch("/api/coach/chat", { method: "GET" });
+      const data = (await response.json()) as { conversations?: Conversation[]; error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to load conversations.");
+      }
+
+      setConversations(data.conversations ?? []);
+    } catch (conversationError) {
+      setError(conversationError instanceof Error ? conversationError.message : "Failed to load conversations.");
+    }
+  }
+
+  useEffect(() => {
+    void loadConversations();
+  }, []);
+
+  async function handleConversationClick(nextConversationId: string) {
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/coach/chat?conversationId=${nextConversationId}`, { method: "GET" });
+      const data = (await response.json()) as { messages?: Message[]; error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to load conversation.");
+      }
+
+      setConversationId(nextConversationId);
+      setMessages(data.messages?.length ? data.messages : [defaultAssistantMessage]);
+    } catch (conversationError) {
+      setError(conversationError instanceof Error ? conversationError.message : "Failed to load conversation.");
+    }
+  }
+
+  function handleNewChat() {
+    setConversationId(null);
+    setMessages([defaultAssistantMessage]);
+    setSummary(null);
+    setError(null);
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -62,17 +114,27 @@ export function CoachChat() {
       const response = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed })
+        body: JSON.stringify({ message: trimmed, conversationId })
       });
 
-      const data = (await response.json()) as { answer?: string; error?: string; summary?: CoachSummary };
+      const data = (await response.json()) as {
+        answer?: string;
+        error?: string;
+        summary?: CoachSummary;
+        conversationId?: string;
+      };
 
       if (!response.ok || !data.answer) {
         throw new Error(data.error ?? "Could not get a coaching response.");
       }
 
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
+      }
+
       setSummary(data.summary ?? null);
       setMessages((prev) => [...prev, { role: "assistant", content: data.answer! }]);
+      await loadConversations();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Something went wrong.");
     } finally {
@@ -148,6 +210,32 @@ export function CoachChat() {
             {(summary?.insights ?? ["Ask a question to generate personalized workout insights."]).map((insight) => (
               <li key={insight}>{insight}</li>
             ))}
+          </ul>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900">Recent conversations</h3>
+          <ul className="mt-3 space-y-2">
+            {conversations.length === 0 ? (
+              <li className="text-sm text-slate-500">No saved chats yet.</li>
+            ) : (
+              conversations.map((conversation) => (
+                <li key={conversation.id}>
+                  <button
+                    type="button"
+                    onClick={() => void handleConversationClick(conversation.id)}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                      conversationId === conversation.id
+                        ? "border-cyan-400 bg-cyan-50 text-cyan-900"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="truncate font-medium">{conversation.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{new Date(conversation.updated_at).toLocaleString()}</p>
+                  </button>
+                </li>
+              ))
+            )}
           </ul>
         </div>
       </aside>
