@@ -1,7 +1,12 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { ingestTcxAction, initialResult } from "./actions";
+import { ingestTcxAction, type IngestResult } from "./actions";
+
+const initialResult: IngestResult = {
+  status: "idle",
+  message: ""
+};
 
 function SubmitButton() {
   const { pending } = useFormStatus();

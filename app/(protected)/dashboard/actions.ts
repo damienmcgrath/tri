@@ -2,6 +2,7 @@
 
 import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { parseTcxToSessions } from "@/lib/workouts/tcx";
 
@@ -10,10 +11,19 @@ export type IngestResult = {
   message: string;
 };
 
-const initialResult: IngestResult = {
-  status: "idle",
-  message: ""
-};
+const moveSessionSchema = z.object({
+  sessionId: z.string().uuid(),
+  newDate: z.string().date()
+});
+
+const swapSessionSchema = z.object({
+  sourceSessionId: z.string().uuid(),
+  targetSessionId: z.string().uuid()
+});
+
+const markSkippedSchema = z.object({
+  sessionId: z.string().uuid()
+});
 
 async function getAuthedClient() {
   const supabase = await createClient();
@@ -26,6 +36,126 @@ async function getAuthedClient() {
   }
 
   return { supabase, user };
+}
+
+export async function moveSessionAction(formData: FormData) {
+  const parsed = moveSessionSchema.parse({
+    sessionId: formData.get("sessionId"),
+    newDate: formData.get("newDate")
+  });
+
+  const { supabase, user } = await getAuthedClient();
+
+  const { error } = await supabase
+    .from("planned_sessions")
+    .update({ date: parsed.newDate })
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message ?? "Could not move session.");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+}
+
+export async function swapSessionDayAction(formData: FormData) {
+  const parsed = swapSessionSchema.parse({
+    sourceSessionId: formData.get("sourceSessionId"),
+    targetSessionId: formData.get("targetSessionId")
+  });
+
+  if (parsed.sourceSessionId === parsed.targetSessionId) {
+    return;
+  }
+
+  const { supabase, user } = await getAuthedClient();
+
+  const { data: pair, error: pairError } = await supabase
+    .from("planned_sessions")
+    .select("id,date")
+    .in("id", [parsed.sourceSessionId, parsed.targetSessionId])
+    .eq("user_id", user.id);
+
+  if (pairError) {
+    throw new Error(pairError.message ?? "Could not load sessions for swap.");
+  }
+
+  if (!pair || pair.length !== 2) {
+    throw new Error("Could not find both sessions for swap.");
+  }
+
+  const source = pair.find((session) => session.id === parsed.sourceSessionId);
+  const target = pair.find((session) => session.id === parsed.targetSessionId);
+
+  if (!source || !target) {
+    throw new Error("Could not identify selected sessions.");
+  }
+
+  const { error: sourceUpdateError } = await supabase
+    .from("planned_sessions")
+    .update({ date: target.date })
+    .eq("id", source.id)
+    .eq("user_id", user.id);
+
+  if (sourceUpdateError) {
+    throw new Error(sourceUpdateError.message ?? "Could not swap sessions.");
+  }
+
+  const { error: targetUpdateError } = await supabase
+    .from("planned_sessions")
+    .update({ date: source.date })
+    .eq("id", target.id)
+    .eq("user_id", user.id);
+
+  if (targetUpdateError) {
+    throw new Error(targetUpdateError.message ?? "Could not swap sessions.");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+}
+
+export async function markSkippedAction(formData: FormData) {
+  const parsed = markSkippedSchema.parse({
+    sessionId: formData.get("sessionId")
+  });
+
+  const { supabase, user } = await getAuthedClient();
+
+  const { data: session, error: sessionError } = await supabase
+    .from("planned_sessions")
+    .select("notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (sessionError) {
+    throw new Error(sessionError.message ?? "Could not update session.");
+  }
+
+  if (!session) {
+    throw new Error("Session not found.");
+  }
+
+  const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
+  const currentNotes = session.notes ?? "";
+  const hasSkipTag = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(currentNotes);
+  const nextNotes = hasSkipTag ? currentNotes : `${currentNotes}\n${skipTag}`.trim();
+
+  const { error } = await supabase
+    .from("planned_sessions")
+    .update({ notes: nextNotes })
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message ?? "Could not mark session as skipped.");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
 }
 
 export async function ingestTcxAction(_: IngestResult, formData: FormData): Promise<IngestResult> {
@@ -114,4 +244,3 @@ export async function ingestTcxAction(_: IngestResult, formData: FormData): Prom
   };
 }
 
-export { initialResult };
