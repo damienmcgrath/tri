@@ -47,7 +47,7 @@ export async function moveSessionAction(formData: FormData) {
   const { supabase, user } = await getAuthedClient();
 
   const { error } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .update({ date: parsed.newDate })
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id);
@@ -73,7 +73,7 @@ export async function swapSessionDayAction(formData: FormData) {
   const { supabase, user } = await getAuthedClient();
 
   const { data: pair, error: pairError } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .select("id,date")
     .in("id", [parsed.sourceSessionId, parsed.targetSessionId])
     .eq("user_id", user.id);
@@ -94,7 +94,7 @@ export async function swapSessionDayAction(formData: FormData) {
   }
 
   const { error: sourceUpdateError } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .update({ date: target.date })
     .eq("id", source.id)
     .eq("user_id", user.id);
@@ -104,7 +104,7 @@ export async function swapSessionDayAction(formData: FormData) {
   }
 
   const { error: targetUpdateError } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .update({ date: source.date })
     .eq("id", target.id)
     .eq("user_id", user.id);
@@ -125,7 +125,7 @@ export async function markSkippedAction(formData: FormData) {
   const { supabase, user } = await getAuthedClient();
 
   const { data: session, error: sessionError } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .select("notes")
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id)
@@ -145,7 +145,7 @@ export async function markSkippedAction(formData: FormData) {
   const nextNotes = hasSkipTag ? currentNotes : `${currentNotes}\n${skipTag}`.trim();
 
   const { error } = await supabase
-    .from("planned_sessions")
+    .from("sessions")
     .update({ notes: nextNotes })
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id);

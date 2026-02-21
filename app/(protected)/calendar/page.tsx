@@ -1,130 +1,162 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { WeekCalendar } from "./week-calendar";
 
-type CalendarSession = {
+type Session = {
+  id: string;
+  date: string;
+  sport: string;
+  type: string;
+  duration_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+  status?: "planned" | "completed" | "skipped";
+};
+
+type LegacyPlannedSession = {
   id: string;
   date: string;
   sport: string;
   type: string;
   duration: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+type CompletedSession = {
+  date: string;
+  sport: string;
 };
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
-function getWeekDates() {
-  const now = new Date();
-  const day = now.getUTCDay();
+function getMonday(date = new Date()) {
+  const day = date.getUTCDay();
   const distanceFromMonday = day === 0 ? 6 : day - 1;
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  start.setUTCDate(start.getUTCDate() - distanceFromMonday);
-
-  return Array.from({ length: 7 }).map((_, index) => {
-    const date = new Date(start);
-    date.setUTCDate(start.getUTCDate() + index);
-    return {
-      iso: date.toISOString().slice(0, 10),
-      weekday: weekdayFormatter.format(date),
-      label: dayFormatter.format(date)
-    };
-  });
+  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  monday.setUTCDate(monday.getUTCDate() - distanceFromMonday);
+  return monday;
 }
 
-export default async function CalendarPage() {
+function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function getSessionStatus(session: Pick<Session, "date" | "sport" | "notes" | "status">, completionLedger: Record<string, number>) {
+  if (session.status) {
+    return session.status;
+  }
+
+  const isSkipped = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(session.notes ?? "");
+  if (isSkipped) {
+    return "skipped" as const;
+  }
+
+  const key = `${session.date}:${session.sport}`;
+  const completedCount = completionLedger[key] ?? 0;
+
+  if (completedCount > 0) {
+    completionLedger[key] = completedCount - 1;
+    return "completed" as const;
+  }
+
+  return "planned" as const;
+}
+
+export default async function CalendarPage({ searchParams }: { searchParams?: { weekStart?: string } }) {
   const supabase = await createClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  const weekDays = getWeekDates();
-  const weekStart = weekDays[0].iso;
-  const weekEndExclusive = new Date(`${weekDays[6].iso}T00:00:00.000Z`);
-  weekEndExclusive.setUTCDate(weekEndExclusive.getUTCDate() + 1);
+  const currentWeekStart = getMonday().toISOString().slice(0, 10);
+  const weekStart = searchParams?.weekStart && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.weekStart)
+    ? searchParams.weekStart
+    : currentWeekStart;
+  const weekEnd = addDays(weekStart, 7);
 
-  const { data, error } = await supabase
-    .from("planned_sessions")
-    .select("id,date,sport,type,duration")
+  const weekDays = Array.from({ length: 7 }).map((_, index) => {
+    const iso = addDays(weekStart, index);
+    const date = new Date(`${iso}T00:00:00.000Z`);
+    return {
+      iso,
+      weekday: weekdayFormatter.format(date),
+      label: dayFormatter.format(date)
+    };
+  });
+
+  const { data: sessionData, error: sessionError } = await supabase
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes,notes,created_at,status")
     .gte("date", weekStart)
-    .lt("date", weekEndExclusive.toISOString().slice(0, 10))
-    .order("date", { ascending: true });
+    .lt("date", weekEnd)
+    .order("date", { ascending: true })
+    .order("created_at", { ascending: true });
 
-  if (error && error.code !== "PGRST205") {
-    throw new Error(error.message ?? "Failed to load weekly sessions.");
+  let normalizedSessions = (sessionData ?? []) as Session[];
+
+  if (sessionError?.code === "PGRST205") {
+    const { data: plannedData, error: plannedError } = await supabase
+      .from("planned_sessions")
+      .select("id,date,sport,type,duration,notes,created_at")
+      .gte("date", weekStart)
+      .lt("date", weekEnd)
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (plannedError && plannedError.code !== "PGRST205") {
+      throw new Error(plannedError.message ?? "Failed to load calendar sessions.");
+    }
+
+    normalizedSessions = ((plannedData ?? []) as LegacyPlannedSession[]).map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      type: session.type,
+      duration_minutes: session.duration ?? 0,
+      notes: session.notes,
+      created_at: session.created_at,
+      status: undefined
+    }));
+  } else if (sessionError) {
+    throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
   }
 
-  const sessions = (data ?? []) as CalendarSession[];
-  const byDate = sessions.reduce<Record<string, CalendarSession[]>>((acc, session) => {
-    acc[session.date] = [...(acc[session.date] ?? []), session];
+  const { data: completedData, error: completedError } = await supabase
+    .from("completed_sessions")
+    .select("date,sport")
+    .gte("date", weekStart)
+    .lt("date", weekEnd);
+
+  if (completedError && completedError.code !== "PGRST205") {
+    throw new Error(completedError.message ?? "Failed to load completed sessions.");
+  }
+
+  const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, item) => {
+    const key = `${item.date}:${item.sport}`;
+    acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
 
-  const totalMinutes = sessions.reduce((sum, session) => sum + (session.duration ?? 0), 0);
+  const sessions = normalizedSessions.map((session) => ({
+    id: session.id,
+    date: session.date,
+    sport: session.sport,
+    type: session.type,
+    duration: session.duration_minutes ?? 0,
+    notes: session.notes,
+    created_at: session.created_at,
+    status: getSessionStatus(session, completionLedger)
+  }));
 
-  return (
-    <section className="space-y-6">
-      <header className="surface p-7">
-        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Weekly view (Mon–Sun)</p>
-        <h1 className="mt-2 text-3xl font-semibold">Command your training week</h1>
-        <p className="mt-2 text-sm text-muted">
-          Start with the narrative summary, then scan each day for discipline balance and load distribution.
-        </p>
-      </header>
+  const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
+  const raceCountdown = raceDate
+    ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
 
-      <article className="surface p-5">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="surface-subtle p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">Planned sessions</p>
-            <p className="mt-1 text-2xl font-semibold">{sessions.length}</p>
-          </div>
-          <div className="surface-subtle p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">Planned minutes</p>
-            <p className="mt-1 text-2xl font-semibold">{totalMinutes}</p>
-          </div>
-          <div className="surface-subtle p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">Week range</p>
-            <p className="mt-1 text-sm font-medium">
-              {weekDays[0].label} – {weekDays[6].label}
-            </p>
-          </div>
-        </div>
-      </article>
-
-      <article className="grid gap-4 lg:grid-cols-7">
-        {weekDays.map((day) => {
-          const daySessions = byDate[day.iso] ?? [];
-          return (
-            <section key={day.iso} className="surface p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
-              <p className="mt-1 text-sm font-semibold">{day.label}</p>
-
-              <div className="mt-3 space-y-2">
-                {daySessions.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-3 text-xs text-muted">
-                    No session scheduled. Add one in Plan to keep your week intentional.
-                  </p>
-                ) : (
-                  daySessions.map((session) => {
-                    const discipline = getDisciplineMeta(session.sport);
-                    return (
-                      <article key={session.id} className="surface-subtle p-2">
-                        <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${discipline.className}`}>
-                          {discipline.label}
-                        </span>
-                        <p className="mt-1 text-xs font-medium">{session.type}</p>
-                        <p className="text-xs text-muted">{session.duration ?? 0} min</p>
-                      </article>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-          );
-        })}
-      </article>
-    </section>
-  );
+  return <WeekCalendar weekDays={weekDays} sessions={sessions} weekStart={weekStart} isCurrentWeek={weekStart === currentWeekStart} raceCountdown={raceCountdown} />;
 }
