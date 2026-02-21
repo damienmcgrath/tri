@@ -194,11 +194,6 @@ The product is designed first for solo athletes who want expert-level coaching s
 
 ---
 
-## 🚀 Supabase quick start
-Need a practical setup walkthrough after creating your account? See `SUPABASE_SETUP.md`.
-
----
-
 ## 🛠️ Week 1 Build Checklist (start coding immediately)
 
 ### Day 1 — Project Scaffold
