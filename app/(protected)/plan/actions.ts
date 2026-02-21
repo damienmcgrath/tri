@@ -93,6 +93,20 @@ async function assertPlanOwnership(supabase: Awaited<ReturnType<typeof createCli
   }
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null, column: string) {
+  if (!error) {
+    return false;
+  }
+
+  const message = error.message ?? "";
+
+  if (error.code === "42703") {
+    return new RegExp(`\\b${column}\\b`, "i").test(message);
+  }
+
+  return /schema cache/i.test(message) && new RegExp(`['\"]${column}['\"]`, "i").test(message);
+}
+
 async function assertWeekOwnership(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -437,7 +451,7 @@ export async function createSessionAction(formData: FormData) {
   await assertPlanOwnership(supabase, user.id, parsed.planId);
   await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
 
-  const { error } = await supabase.from("sessions").insert({
+  const canonicalPayload = {
     user_id: user.id,
     plan_id: parsed.planId,
     week_id: parsed.weekId,
@@ -448,7 +462,31 @@ export async function createSessionAction(formData: FormData) {
     session_type: parsed.sessionType,
     duration_minutes: parsed.durationMinutes,
     notes: parsed.notes ?? null
+  };
+
+  const legacyPayload = {
+    user_id: user.id,
+    plan_id: parsed.planId,
+    date: parsed.date,
+    sport: parsed.sport,
+    session_type: parsed.sessionType,
+    duration_minutes: parsed.durationMinutes,
+    notes: parsed.notes ?? null
+  };
+
+  const { error: createError } = await supabase.from("planned_sessions").insert({
+    ...canonicalPayload,
+    ...legacyPayload
   });
+
+  const shouldRetryWithoutLegacy = isMissingColumnError(createError, "session_type") || isMissingColumnError(createError, "duration_minutes");
+  const shouldRetryWithoutCanonical = isMissingColumnError(createError, "type") || isMissingColumnError(createError, "duration");
+
+  const { error } = shouldRetryWithoutLegacy
+    ? await supabase.from("planned_sessions").insert(canonicalPayload)
+    : shouldRetryWithoutCanonical
+      ? await supabase.from("planned_sessions").insert(legacyPayload)
+      : { error: createError };
 
   if (error) {
     throw new Error(error.message);
@@ -477,24 +515,42 @@ export async function updateSessionAction(formData: FormData) {
   await assertPlanOwnership(supabase, user.id, parsed.planId);
   await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
 
-  const { error } = await supabase
-    .from("sessions")
+  const canonicalPayload = {
+    plan_id: parsed.planId,
+    date: parsed.date,
+    sport: parsed.sport,
+    type: parsed.sessionType,
+    duration: parsed.durationMinutes,
+    notes: parsed.notes ?? null,
+    user_id: user.id
+  };
+
+  const legacyPayload = {
+    plan_id: parsed.planId,
+    date: parsed.date,
+    sport: parsed.sport,
+    session_type: parsed.sessionType,
+    duration_minutes: parsed.durationMinutes,
+    notes: parsed.notes ?? null,
+    user_id: user.id
+  };
+
+  const { error: updateError } = await supabase
+    .from("planned_sessions")
     .update({
-      plan_id: parsed.planId,
-      week_id: parsed.weekId,
-      date: parsed.date,
-      sport: parsed.sport,
-      type: parsed.sessionType,
-      duration: parsed.durationMinutes,
-      session_type: parsed.sessionType,
-      duration_minutes: parsed.durationMinutes,
-      notes: parsed.notes ?? null,
-      distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
-      distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
-      status: parsed.status,
-      user_id: user.id
+      ...canonicalPayload,
+      ...legacyPayload
     })
     .eq("id", parsed.sessionId);
+
+  const shouldRetryWithoutLegacy = isMissingColumnError(updateError, "session_type") || isMissingColumnError(updateError, "duration_minutes");
+  const shouldRetryWithoutCanonical = isMissingColumnError(updateError, "type") || isMissingColumnError(updateError, "duration");
+
+  const { error } = shouldRetryWithoutLegacy
+    ? await supabase.from("planned_sessions").update(canonicalPayload).eq("id", parsed.sessionId)
+    : shouldRetryWithoutCanonical
+      ? await supabase.from("planned_sessions").update(legacyPayload).eq("id", parsed.sessionId)
+      : { error: updateError };
 
   if (error) {
     throw new Error(error.message);

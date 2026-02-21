@@ -67,6 +67,30 @@ function isMissingProfilesTable(error: { code?: string; message?: string } | nul
   return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
 }
 
+function isPlannedSessionColumnMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703") {
+    return true;
+  }
+
+  return /column\s+planned_sessions\./i.test(error.message ?? "") && /does not exist/i.test(error.message ?? "");
+}
+
+function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
+}
+
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
   const distanceFromMonday = day === 0 ? 6 : day - 1;
