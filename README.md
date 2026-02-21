@@ -66,7 +66,7 @@ Open `http://localhost:3000`.
 ### Notes
 
 - Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
-- Dashboard includes a TCX upload flow for importing Garmin-exported workouts as a temporary bridge until direct Garmin API sync.
+- Garmin manual TCX upload now lives under **Settings → Integrations** as a temporary bridge until direct Garmin API sync.
 
 ## 📌 Overview
 TriCoach AI is a web-based training companion for amateur triathletes. It automates personalized training-plan management by integrating with Garmin Connect, analyzing workout data, and offering an AI coach for plan adaptation and guidance.
