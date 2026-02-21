@@ -178,7 +178,11 @@ export async function createPlanAction(formData: FormData) {
     ignoreDuplicates: true
   });
 
-  if (weeksError && !isMissingTableError(weeksError, "public.training_weeks")) {
+  if (weeksError) {
+    if (isMissingTableError(weeksError, "public.training_weeks")) {
+      throw new Error("Could not create week rows because the training_weeks table is missing. Run latest Supabase migrations and try again.");
+    }
+
     throw new Error(weeksError.message);
   }
 

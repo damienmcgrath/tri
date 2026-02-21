@@ -33,6 +33,20 @@ type Session = {
   status: "planned" | "completed" | "skipped";
 };
 
+function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
+  const startDate = new Date(`${startDateIso}T00:00:00.000Z`);
+  return Array.from({ length: Math.max(durationWeeks, 1) }).map((_, index) => {
+    const weekStart = new Date(startDate);
+    weekStart.setUTCDate(startDate.getUTCDate() + index * 7);
+    return {
+      plan_id: planId,
+      week_index: index + 1,
+      week_start_date: weekStart.toISOString().slice(0, 10),
+      focus: "Build" as const
+    };
+  });
+}
+
 
 function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
   if (!error) {
@@ -75,7 +89,7 @@ export default async function PlanPage({
   const plans = (plansData ?? []) as Plan[];
   const selectedPlan = plans.find((plan) => plan.id === searchParams?.plan) ?? plans[0];
 
-  const { data: weeksData, error: weeksError } = selectedPlan
+  const { data: initialWeeksData, error: weeksError } = selectedPlan
     ? await supabase
         .from("training_weeks")
         .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
@@ -85,6 +99,32 @@ export default async function PlanPage({
 
   if (weeksError && !isMissingTableError(weeksError, "public.training_weeks")) {
     throw new Error(weeksError.message);
+  }
+
+  let weeksData = (initialWeeksData ?? []) as TrainingWeek[];
+
+  if (selectedPlan && !weeksError && weeksData.length === 0) {
+    const seedPayload = buildPlanWeeks(selectedPlan.start_date, selectedPlan.duration_weeks, selectedPlan.id);
+    const { error: seedWeeksError } = await supabase.from("training_weeks").upsert(seedPayload, {
+      onConflict: "plan_id,week_index",
+      ignoreDuplicates: true
+    });
+
+    if (seedWeeksError) {
+      throw new Error(seedWeeksError.message);
+    }
+
+    const { data: seededWeeksData, error: seededWeeksFetchError } = await supabase
+      .from("training_weeks")
+      .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+      .eq("plan_id", selectedPlan.id)
+      .order("week_index", { ascending: true });
+
+    if (seededWeeksFetchError) {
+      throw new Error(seededWeeksFetchError.message);
+    }
+
+    weeksData = (seededWeeksData ?? []) as TrainingWeek[];
   }
 
   let sessionsData: Session[] = [];
@@ -134,5 +174,5 @@ export default async function PlanPage({
     }
   }
 
-  return <PlanEditor plans={plans} weeks={(weeksData ?? []) as TrainingWeek[]} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />;
+  return <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />;
 }

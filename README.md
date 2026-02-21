@@ -39,6 +39,32 @@ supabase db push
 
 This provisions `training_plans`, `planned_sessions`, `completed_sessions`, and `ingestion_events` with RLS policies used by the app.
 
+
+If you see this error on `supabase db push`:
+
+```
+Remote migration versions not found in local migrations directory.
+```
+
+use this remote-only recovery flow (no local DB required):
+
+```bash
+# 1) Inspect mismatch
+supabase migration list
+
+# 2) Mark the missing remote version(s) as reverted in history
+# Replace <version> with the exact value from migration list
+supabase migration repair --status reverted <version>
+
+# 3) Pull current remote schema into a new local migration file
+supabase db pull
+
+# 4) Push local migrations again
+supabase db push
+```
+
+Tip: if your team already has the missing migration SQL in git, prefer pulling latest git changes first instead of repairing history.
+
 ### 4) Enable Supabase email/password auth
 
 In your Supabase project:

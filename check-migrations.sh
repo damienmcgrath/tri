@@ -25,5 +25,12 @@ else
 fi
 
 echo ""
+echo "If db push fails with 'Remote migration versions not found in local migrations directory':"
+echo "  1) supabase migration list"
+echo "  2) supabase migration repair --status reverted <missing_version>"
+echo "  3) supabase db pull"
+echo "  4) supabase db push"
+
+echo ""
 echo "Local migration files:"
 ls -1 supabase/migrations/ | sort
