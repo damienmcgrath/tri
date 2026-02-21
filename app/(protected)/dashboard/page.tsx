@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { markSkippedAction, moveSessionAction, swapSessionDayAction } from "./actions";
-import { TcxUploadForm } from "./tcx-upload-form";
 
 type PlannedSession = {
   id: string;
@@ -23,6 +22,11 @@ type CompletedSession = {
   };
 };
 
+type Profile = {
+  race_date: string | null;
+  race_name: string | null;
+};
+
 const sports = ["swim", "bike", "run", "strength"] as const;
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
@@ -37,6 +41,30 @@ function isPlannedSessionTableMissing(error: { code?: string; message?: string }
   }
 
   return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
+}
+
+function isPlannedSessionColumnMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703") {
+    return true;
+  }
+
+  return /column\s+planned_sessions\./i.test(error.message ?? "") && /does not exist/i.test(error.message ?? "");
+}
+
+function isProfilesTableMissing(error: { code?: string; message?: string } | null) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "PGRST205") {
+    return true;
+  }
+
+  return /could not find the table 'public\.profiles' in the schema cache/i.test(error.message ?? "");
 }
 
 function getMonday(date = new Date()) {
@@ -114,6 +142,16 @@ export default async function DashboardPage({
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
 
+  const { data: legacyPlannedData, error: legacyPlannedError } = plannedError && isPlannedSessionColumnMissing(plannedError)
+    ? await supabase
+        .from("planned_sessions")
+        .select("id,date,sport,session_type,duration_minutes,notes,created_at")
+        .gte("date", weekStart)
+        .lt("date", weekEnd)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true })
+    : { data: null, error: null };
+
   const { data: completedData, error: completedError } = await supabase
     .from("completed_sessions")
     .select("date,sport,metrics")
@@ -121,18 +159,48 @@ export default async function DashboardPage({
     .lt("date", weekEnd)
     .order("date", { ascending: true });
 
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("race_date,race_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
   if (completedError) {
     throw new Error(completedError.message ?? "Failed to load dashboard data.");
   }
 
-  if (plannedError && !isPlannedSessionTableMissing(plannedError)) {
+  if (plannedError && !isPlannedSessionTableMissing(plannedError) && !isPlannedSessionColumnMissing(plannedError)) {
     throw new Error(plannedError.message ?? "Failed to load dashboard data.");
   }
 
-  const plannedSessions = ((plannedData ?? []) as PlannedSession[]).sort(
+  if (legacyPlannedError) {
+    throw new Error(legacyPlannedError.message ?? "Failed to load dashboard data.");
+  }
+
+  if (profileError && !isProfilesTableMissing(profileError)) {
+    throw new Error(profileError.message ?? "Failed to load profile data.");
+  }
+
+  const plannedSessions = ((plannedData ?? []) as PlannedSession[]).length > 0
+    ? ((plannedData ?? []) as PlannedSession[])
+    : ((legacyPlannedData ?? []) as Array<
+        Omit<PlannedSession, "type" | "duration"> & { session_type: string; duration_minutes: number | null }
+      >).map((session) => ({
+        id: session.id,
+        date: session.date,
+        sport: session.sport,
+        type: session.session_type,
+        duration: session.duration_minutes,
+        notes: session.notes,
+        created_at: session.created_at
+      }));
+
+  const sortedPlannedSessions = plannedSessions.sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   const completedSessions = (completedData ?? []) as CompletedSession[];
+  const profile = (profileData ?? null) as Profile | null;
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
 
   const completionLedger = completedSessions.reduce<Record<string, number>>((acc, session) => {
     const key = `${session.date}:${session.sport}`;
@@ -140,13 +208,14 @@ export default async function DashboardPage({
     return acc;
   }, {});
 
-  const withStatus = plannedSessions.map((session) => ({
+  const withStatus = sortedPlannedSessions.map((session) => ({
     ...session,
     duration: session.duration ?? 0,
     status: getSessionStatus(session, completionLedger)
   }));
 
   const todaySessions = withStatus.filter((session) => session.date === todayIso);
+  const nextPendingTodaySession = todaySessions.find((session) => session.status === "planned") ?? null;
   const upcomingSession = withStatus.find((session) => session.status === "planned" && session.date >= todayIso);
 
   const totals = withStatus.reduce(
@@ -199,11 +268,14 @@ export default async function DashboardPage({
       weekday: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
       day: shortDateFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
       planned,
-      completed
+      completed,
+      isToday: iso === todayIso
     };
   });
 
-  const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
+  const raceDate = profile?.race_date ?? (typeof metadata.race_date === "string" ? metadata.race_date : null);
+  const raceNameFromMetadata = typeof metadata.race_name === "string" ? metadata.race_name : null;
+  const raceName = profile?.race_name?.trim() || raceNameFromMetadata?.trim() || "Target race";
   const daysToRace = raceDate
     ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
@@ -228,10 +300,10 @@ export default async function DashboardPage({
         <div className="flex items-center gap-2">
           {daysToRace !== null ? (
             <p className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-100">
-              Warsaw 70.3: {daysToRace} days
+              {raceName} • {daysToRace} days
             </p>
           ) : (
-            <Link href="/plan" className="text-xs text-cyan-300 underline-offset-2 hover:underline">
+            <Link href="/settings/race" className="text-xs text-cyan-300 underline-offset-2 hover:underline">
               Set race date
             </Link>
           )}
@@ -258,7 +330,7 @@ export default async function DashboardPage({
                 const discipline = getDisciplineMeta(session.sport);
                 return (
                   <li key={session.id} className="surface-subtle p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>
                           {discipline.label}
@@ -279,44 +351,41 @@ export default async function DashboardPage({
                       </span>
                     </div>
 
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-cyan-300">Actions</summary>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                        <form action={moveSessionAction} className="flex gap-2">
-                          <input type="hidden" name="sessionId" value={session.id} />
-                          <select name="newDate" defaultValue={session.date} className="input-base py-1 text-xs" aria-label="Move session day">
-                            {weekDays.map((day) => (
-                              <option key={day.iso} value={day.iso}>
-                                {day.weekday}
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <form action={moveSessionAction} className="flex gap-2">
+                        <input type="hidden" name="sessionId" value={session.id} />
+                        <select name="newDate" defaultValue={session.date} className="input-base py-1 text-xs" aria-label="Move session day">
+                          {weekDays.map((day) => (
+                            <option key={day.iso} value={day.iso}>
+                              {day.weekday}
+                            </option>
+                          ))}
+                        </select>
+                        <button className="btn-secondary px-2 py-1 text-xs">Move</button>
+                      </form>
+
+                      <form action={swapSessionDayAction} className="flex gap-2">
+                        <input type="hidden" name="sourceSessionId" value={session.id} />
+                        <select name="targetSessionId" defaultValue="" className="input-base py-1 text-xs" aria-label="Swap session day">
+                          <option value="" disabled>
+                            Swap with...
+                          </option>
+                          {withStatus
+                            .filter((candidate) => candidate.id !== session.id)
+                            .map((candidate) => (
+                              <option key={candidate.id} value={candidate.id}>
+                                {weekdayFormatter.format(new Date(`${candidate.date}T00:00:00.000Z`))} • {candidate.type}
                               </option>
                             ))}
-                          </select>
-                          <button className="btn-secondary px-2 py-1 text-xs">Move</button>
-                        </form>
+                        </select>
+                        <button className="btn-secondary px-2 py-1 text-xs">Swap</button>
+                      </form>
 
-                        <form action={swapSessionDayAction} className="flex gap-2">
-                          <input type="hidden" name="sourceSessionId" value={session.id} />
-                          <select name="targetSessionId" defaultValue="" className="input-base py-1 text-xs" aria-label="Swap session day">
-                            <option value="" disabled>
-                              Swap with...
-                            </option>
-                            {withStatus
-                              .filter((candidate) => candidate.id !== session.id)
-                              .map((candidate) => (
-                                <option key={candidate.id} value={candidate.id}>
-                                  {weekdayFormatter.format(new Date(`${candidate.date}T00:00:00.000Z`))} • {candidate.type}
-                                </option>
-                              ))}
-                          </select>
-                          <button className="btn-secondary px-2 py-1 text-xs">Swap day</button>
-                        </form>
-
-                        <form action={markSkippedAction}>
-                          <input type="hidden" name="sessionId" value={session.id} />
-                          <button className="btn-secondary px-2 py-1 text-xs">Mark skipped</button>
-                        </form>
-                      </div>
-                    </details>
+                      <form action={markSkippedAction}>
+                        <input type="hidden" name="sessionId" value={session.id} />
+                        <button className="btn-secondary w-full px-2 py-1 text-xs">Skip</button>
+                      </form>
+                    </div>
                   </li>
                 );
               })}
@@ -324,7 +393,7 @@ export default async function DashboardPage({
           )}
 
           <div className="mt-4">
-            {upcomingSession ? (
+            {nextPendingTodaySession || upcomingSession ? (
               <Link href="/calendar" className="btn-primary">
                 Open next session
               </Link>
@@ -438,7 +507,11 @@ export default async function DashboardPage({
           {weekDays.map((day) => {
             const pct = day.planned === 0 ? 0 : Math.min(100, Math.round((day.completed / day.planned) * 100));
             return (
-              <Link key={day.iso} href="/calendar" className="surface-subtle block p-2 text-center transition hover:border-cyan-400/40">
+              <Link
+                key={day.iso}
+                href="/calendar"
+                className={`surface-subtle block p-2 text-center transition hover:border-cyan-400/60 hover:bg-[hsl(var(--bg-card))] ${day.isToday ? "border-cyan-400/60 bg-cyan-500/10" : ""}`}
+              >
                 <p className="text-[10px] uppercase tracking-wide text-muted">{day.weekday}</p>
                 <p className="text-xs font-medium">{day.day}</p>
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-[hsl(var(--bg))]">
@@ -461,13 +534,6 @@ export default async function DashboardPage({
           </Link>
         </article>
       ) : null}
-
-      <details>
-        <summary className="cursor-pointer text-xs text-muted hover:text-cyan-200">Garmin TCX import</summary>
-        <div className="mt-2 surface p-4">
-          <TcxUploadForm />
-        </div>
-      </details>
     </section>
   );
 }
