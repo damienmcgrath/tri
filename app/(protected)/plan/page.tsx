@@ -26,7 +26,9 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  target: string | null;
   duration_minutes: number;
+  day_order: number | null;
   notes: string | null;
   distance_value: number | null;
   distance_unit: string | null;
@@ -58,6 +60,18 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   }
 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null, columnName: string) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703") {
+    return true;
+  }
+
+  return (error.message ?? "").toLowerCase().includes(columnName.toLowerCase());
 }
 
 export default async function PlanPage({
@@ -133,13 +147,28 @@ export default async function PlanPage({
 
   let sessionsData: Session[] = [];
   if (selectedPlan) {
-    const primary = await supabase
+    const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
+      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status")
       .eq("plan_id", selectedPlan.id)
-      .order("date", { ascending: true });
+      .order("date", { ascending: true })
+      .order("day_order", { ascending: true, nullsFirst: false });
 
-    if (primary.error && isMissingTableError(primary.error, "public.sessions")) {
+    let primaryData: unknown[] | null = primaryQuery.data as unknown[] | null;
+    let primaryError = primaryQuery.error;
+
+    if (primaryError && !isMissingTableError(primaryError, "public.sessions")) {
+      const fallbackQuery = await supabase
+        .from("sessions")
+        .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
+        .eq("plan_id", selectedPlan.id)
+        .order("date", { ascending: true });
+
+      primaryData = fallbackQuery.data as unknown[] | null;
+      primaryError = fallbackQuery.error;
+    }
+
+    if (primaryError && isMissingTableError(primaryError, "public.sessions")) {
       const legacy = await supabase
         .from("planned_sessions")
         .select("id,plan_id,date,sport,type,duration,notes")
@@ -166,15 +195,17 @@ export default async function PlanPage({
         sport: session.sport,
         type: session.type,
         duration_minutes: session.duration,
+        target: null,
+        day_order: null,
         notes: session.notes,
         distance_value: null,
         distance_unit: null,
         status: "planned"
       }));
-    } else if (primary.error) {
-      throw new Error(primary.error.message);
+    } else if (primaryError) {
+      throw new Error(primaryError.message);
     } else {
-      sessionsData = (primary.data ?? []) as Session[];
+      sessionsData = (primaryData ?? []) as Session[];
     }
   }
 
