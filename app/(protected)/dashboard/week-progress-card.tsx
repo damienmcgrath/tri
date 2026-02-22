@@ -33,7 +33,7 @@ export function WeekProgressCard({
   completedTotalMinutes,
   disciplines
 }: WeekProgressCardProps) {
-  const [showAll, setShowAll] = useState(false);
+  const [hideEmpty, setHideEmpty] = useState(true);
 
   const remainingMinutes = plannedTotalMinutes - completedTotalMinutes;
   const percentComplete = plannedTotalMinutes > 0 ? completedTotalMinutes / plannedTotalMinutes : 0;
@@ -60,9 +60,9 @@ export function WeekProgressCard({
     [disciplines]
   );
 
-  const visibleDisciplines = showAll ? disciplineRows : disciplineRows.filter((item) => item.plannedMinutes > 0);
+  const emptyCount = disciplineRows.filter((item) => item.plannedMinutes === 0).length;
+  const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.plannedMinutes > 0) : disciplineRows;
   const biggestGap = [...disciplineRows].sort((a, b) => b.discGapMinutes - a.discGapMinutes)[0];
-  const biggestOver = [...disciplineRows].sort((a, b) => b.discOverMinutes - a.discOverMinutes)[0];
 
   const chipLabel =
     remainingMinutes > 0 ? `${formatMinutes(remainingMinutes)} left` : remainingMinutes === 0 ? "On target" : `+${formatMinutes(Math.abs(remainingMinutes))} over`;
@@ -75,18 +75,18 @@ export function WeekProgressCard({
 
       <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
         <div
-          className="relative flex h-[84px] w-[84px] items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
+          className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
           aria-label={`Overall progress ${Math.round(completedTotalMinutes)} of ${Math.round(plannedTotalMinutes)} minutes, ${Math.round(percentCapped * 100)}%`}
           role="img"
         >
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: `conic-gradient(hsl(204 100% 60% / 0.92) ${percentCapped * 360}deg, hsl(var(--border)) 0deg)`
+              background: `conic-gradient(hsl(204 88% 62% / 0.62) ${percentCapped * 360}deg, hsl(var(--border) / 0.9) 0deg)`
             }}
           />
-          <div className="relative flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
-            <span className="text-xl font-semibold leading-none">{percentLabel}</span>
+          <div className="relative flex h-[62px] w-[62px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
+            <span className="text-lg font-semibold leading-none">{percentLabel}</span>
           </div>
         </div>
 
@@ -105,9 +105,16 @@ export function WeekProgressCard({
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">By discipline</p>
-          <button type="button" onClick={() => setShowAll((current) => !current)} className="text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
-            {showAll ? "Hide 0-min" : `Show all (${disciplineRows.length})`}
-          </button>
+          {emptyCount > 0 || !hideEmpty ? (
+            <button
+              type="button"
+              onClick={() => setHideEmpty((current) => !current)}
+              className="text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
+              aria-pressed={!hideEmpty}
+            >
+              {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
+            </button>
+          ) : null}
         </div>
 
         {visibleDisciplines.length === 0 ? (
@@ -115,22 +122,42 @@ export function WeekProgressCard({
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
-              const helper = item.discGapMinutes > 0 ? `Gap: ${formatMinutes(item.discGapMinutes)}` : item.discOverMinutes > 0 ? `Over: +${formatMinutes(item.discOverMinutes)}` : "On target";
+              const chipLabel = item.discGapMinutes > 0 ? `Gap ${formatMinutes(item.discGapMinutes)}` : item.discOverMinutes > 0 ? `+${formatMinutes(item.discOverMinutes)}` : null;
+              const overTailWidthPx = item.plannedMinutes > 0
+                ? Math.round(Math.min(24, Math.max(6, (item.discOverMinutes / item.plannedMinutes) * 120)))
+                : 0;
+              const barAriaLabel = item.discOverMinutes > 0
+                ? `${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, over ${Math.round(item.discOverMinutes)} minutes`
+                : `${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, gap ${Math.round(item.discGapMinutes)} minutes`;
 
               return (
                 <div key={item.key} className="rounded-lg px-2 py-1 transition hover:bg-[hsl(var(--bg-card))]">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
-                      <span className="font-medium">{item.label}</span>
+                      <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
-                    <span className="text-xs text-muted">{Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted">{Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min</span>
+                      {chipLabel ? (
+                        <span className="inline-flex h-5 items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2.5 text-xs font-medium text-muted">
+                          {chipLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={`${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, ${Math.round(item.discPercentCapped * 100)}%`} role="img">
+                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={barAriaLabel} role="img">
                     <div className="h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%`, backgroundColor: item.color }} />
-                    {item.discOverMinutes > 0 ? <div className="absolute right-0 top-0 h-full w-3 bg-[repeating-linear-gradient(135deg,transparent,transparent_2px,hsla(0,0%,100%,0.3)_2px,hsla(0,0%,100%,0.3)_4px)]" /> : null}
+                    {item.discOverMinutes > 0 ? (
+                      <div
+                        className="absolute right-0 top-0 h-full rounded-r"
+                        style={{
+                          width: `${overTailWidthPx}px`,
+                          background: `repeating-linear-gradient(45deg, color-mix(in oklab, ${item.color} 65%, transparent) 0 6px, color-mix(in oklab, ${item.color} 25%, transparent) 6px 12px)`
+                        }}
+                      />
+                    ) : null}
                   </div>
-                  <p className="mt-1 text-xs text-muted">{helper}</p>
                 </div>
               );
             })}
@@ -138,11 +165,11 @@ export function WeekProgressCard({
         )}
       </div>
 
-      <p className="mt-4 text-xs text-muted">
-        {biggestGap && biggestGap.discGapMinutes > 0 ? `Biggest gap: ${biggestGap.label} (${formatMinutes(biggestGap.discGapMinutes)})` : "Biggest gap: none"}
-        {" • "}
-        {biggestOver && biggestOver.discOverMinutes > 0 ? `Over: ${biggestOver.label} (+${formatMinutes(biggestOver.discOverMinutes)})` : "Over: none"}
-      </p>
+      <a href="#coach-focus" className="mt-4 inline-block text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
+        {biggestGap && biggestGap.discGapMinutes > 0
+          ? `Focus: ${biggestGap.label} +${formatMinutes(biggestGap.discGapMinutes)} (tap for why)`
+          : "Focus: On track (tap for details)"}
+      </a>
     </article>
   );
 }
