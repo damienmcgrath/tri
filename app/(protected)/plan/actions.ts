@@ -195,6 +195,41 @@ async function updateSessionWithCompat(
   }
 }
 
+async function insertSessionsBatchWithCompat(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payload: Array<Record<string, unknown>>
+) {
+  const { error: initialError } = await supabase.from("sessions").insert(payload);
+
+  if (!initialError) {
+    return;
+  }
+
+  const removeDayOrder = isMissingColumnError(initialError, "day_order");
+  const removeTarget = isMissingColumnError(initialError, "target");
+
+  if (!removeDayOrder && !removeTarget) {
+    throw new Error(initialError.message);
+  }
+
+  const fallbackPayload = payload.map((row) => {
+    const next = { ...row };
+    if (removeDayOrder) {
+      delete next.day_order;
+    }
+    if (removeTarget) {
+      delete next.target;
+    }
+    return next;
+  });
+
+  const { error: retryError } = await supabase.from("sessions").insert(fallbackPayload);
+
+  if (retryError) {
+    throw new Error(retryError.message);
+  }
+}
+
 async function assertWeekOwnership(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -455,11 +490,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
       };
     });
 
-    const { error: insertError } = await supabase.from("sessions").insert(payload);
-
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
+    await insertSessionsBatchWithCompat(supabase, payload);
   }
 
   revalidatePath("/plan");
