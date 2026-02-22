@@ -22,6 +22,12 @@ function fmtDuration(sec?: number) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
+function formatUploadDate(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
 export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[] }) {
   const [uploads] = useState(initialUploads);
   const [message, setMessage] = useState<string>("");
@@ -103,7 +109,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
               const linked = upload.status === "matched" || upload.session_activity_links.length > 0;
               return (
                 <tr key={upload.id} className="border-t border-white/10">
-                  <td className="py-2">{new Date(upload.created_at).toLocaleString()}</td>
+                  <td className="py-2">{formatUploadDate(upload.created_at)}</td>
                   <td>{activity?.sport_type ?? "—"}</td>
                   <td>{fmtDuration(activity?.duration_sec)}</td>
                   <td>{activity?.distance_m ? `${(Number(activity.distance_m) / 1000).toFixed(2)} km` : "—"}</td>
