@@ -153,6 +153,23 @@ export default async function DashboardPage({
   const linkedSessionIds = new Set(links.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
   const unassignedUploads = uploadedActivities.filter((item) => !linkedActivityIds.has(item.id));
 
+  const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
+  const linkedMinutesBySession = links.reduce<Map<string, number>>((acc, link) => {
+    if (!link.planned_session_id) return acc;
+    const minutes = durationByActivityId.get(link.completed_activity_id) ?? 0;
+    acc.set(link.planned_session_id, (acc.get(link.planned_session_id) ?? 0) + minutes);
+    return acc;
+  }, new Map());
+
+  const getCompletedMinutes = (session: Pick<Session, "id" | "duration_minutes" | "status">) => {
+    const linkedMinutes = linkedMinutesBySession.get(session.id);
+    if (typeof linkedMinutes === "number" && linkedMinutes > 0) {
+      return linkedMinutes;
+    }
+
+    return session.status === "completed" ? session.duration_minutes ?? 0 : 0;
+  };
+
   const sessions = ((sessionsData ?? []) as Session[]).map((session) => ({
     ...session,
     duration_minutes: session.duration_minutes ?? 0,
@@ -167,8 +184,7 @@ export default async function DashboardPage({
     const daySessions = sessions.filter((session) => session.date === iso);
     const planned = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const completed = daySessions
-      .filter((session) => session.status === "completed")
-      .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
 
     return {
       iso,
@@ -187,9 +203,7 @@ export default async function DashboardPage({
   const totals = sessions.reduce(
     (acc, session) => {
       acc.planned += session.duration_minutes ?? 0;
-      if (session.status === "completed") {
-        acc.completed += session.duration_minutes ?? 0;
-      }
+      acc.completed += getCompletedMinutes(session);
       return acc;
     },
     { planned: 0, completed: 0 }
@@ -201,8 +215,8 @@ export default async function DashboardPage({
   const progressBySport = sports.map((sport) => {
     const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const completed = sessions
-      .filter((session) => session.sport === sport && session.status === "completed")
-      .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+      .filter((session) => session.sport === sport)
+      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
 
     return {
       sport,

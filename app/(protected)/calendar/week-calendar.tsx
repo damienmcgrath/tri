@@ -85,6 +85,14 @@ function clearSkippedTag(notes: string | null) {
   return (notes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
 }
 
+function completedDuration(session: CalendarSession) {
+  if (session.status !== "completed") {
+    return 0;
+  }
+
+  return session.linkedStats?.durationMin ?? session.duration;
+}
+
 export function WeekCalendar({
   weekDays,
   sessions,
@@ -157,7 +165,7 @@ export function WeekCalendar({
 
   const totals = useMemo(() => {
     const planned = localSessions.reduce((sum, session) => sum + session.duration, 0);
-    const completed = localSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.duration, 0);
+    const completed = localSessions.reduce((sum, session) => sum + completedDuration(session), 0);
     return { planned, completed, remaining: Math.max(planned - completed, 0) };
   }, [localSessions]);
 
@@ -166,8 +174,8 @@ export function WeekCalendar({
       sports.map((sport) => {
         const planned = localSessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
         const completed = localSessions
-          .filter((session) => session.sport === sport && session.status === "completed")
-          .reduce((sum, session) => sum + session.duration, 0);
+          .filter((session) => session.sport === sport)
+          .reduce((sum, session) => sum + completedDuration(session), 0);
         return { sport, planned, completed };
       }),
     [localSessions]
