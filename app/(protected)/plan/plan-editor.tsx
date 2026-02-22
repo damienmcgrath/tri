@@ -61,13 +61,15 @@ type Session = {
   status: "planned" | "completed" | "skipped";
 };
 
-type PlanEditorProps = { plans: Plan[]; weeks: TrainingWeek[]; sessions: Session[]; selectedPlanId?: string };
+type PlanTemplate = { id: string; name: string; sport: "swim" | "bike" | "run" | "strength"; duration: number; type: string; target: string }
+
+type PlanEditorProps = { plans: Plan[]; weeks: TrainingWeek[]; sessions: Session[]; selectedPlanId?: string; customTemplates: PlanTemplate[] };
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 const longDateFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-const templates = [
+const defaultTemplates = [
   { label: "Easy Run 45", sport: "run", duration: 45, type: "Easy", target: "Z2" },
   { label: "Long Run 90", sport: "run", duration: 90, type: "Long", target: "Steady" },
   { label: "Z2 Ride 60", sport: "bike", duration: 60, type: "Endurance", target: "Z2" },
@@ -149,7 +151,7 @@ function SortableSessionCard({ session, onOpen }: { session: Session; onOpen: (i
   );
 }
 
-export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEditorProps) {
+export function PlanEditor({ plans, weeks, sessions, selectedPlanId, customTemplates }: PlanEditorProps) {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0];
   const planWeeks = weeks.filter((week) => week.plan_id === selectedPlan?.id).sort((a, b) => a.week_index - b.week_index);
   const [selectedWeekId, setSelectedWeekId] = useState(planWeeks[0]?.id ?? "");
@@ -160,6 +162,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
   const [isPending, startTransition] = useTransition();
   const [weekActionOpen, setWeekActionOpen] = useState(false);
   const [localSessions, setLocalSessions] = useState<Session[]>([]);
+
+  const templates = useMemo(() => [...defaultTemplates, ...customTemplates.map((template) => ({
+    label: template.name,
+    sport: template.sport,
+    duration: template.duration,
+    type: template.type,
+    target: template.target
+  }))], [customTemplates]);
 
   useEffect(() => {
     setLocalSessions(withNormalizedOrder(sessions.filter((session) => session.week_id === selectedWeek?.id)));

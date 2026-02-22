@@ -370,6 +370,7 @@ export async function createSessionTemplateAction(input: {
   }
 
   revalidatePath("/calendar");
+  revalidatePath("/plan");
 
   return {
     id: data.id,
@@ -411,6 +412,7 @@ export async function updateSessionTemplateAction(input: {
   }
 
   revalidatePath("/calendar");
+  revalidatePath("/plan");
 
   return {
     id: data.id,
@@ -437,4 +439,5 @@ export async function deleteSessionTemplateAction(input: { templateId: string })
   }
 
   revalidatePath("/calendar");
+  revalidatePath("/plan");
 }
