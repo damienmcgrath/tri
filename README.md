@@ -390,3 +390,17 @@ The product is designed first for solo athletes who want expert-level coaching s
 - The app parses activities and stores normalized records in `completed_sessions`.
 - Imports are idempotent via `user_id + garmin_id` and logged in `ingestion_events`.
 - This path is intentionally adapter-based so Garmin Health API payloads can later map into the same normalized model.
+
+## Garmin file uploads (.fit / .tcx)
+
+TriCoach AI supports manual Garmin activity uploads from **Settings → Integrations / Uploads**.
+
+- Supported formats: `.fit` (preferred) and `.tcx`.
+- Max upload size: **20MB**.
+- Upload deduping: file SHA256 hash is computed per user; duplicate files are ignored.
+- Parsing extracts: start/end UTC time, sport, duration, distance, avg HR, avg power (FIT when available), calories.
+- Auto-matching to planned sessions runs after parse:
+  - candidate window: approximately start time ± 6h / same day list
+  - score factors: time proximity, sport match, duration similarity, distance similarity
+  - auto-link rule: best score `>= 0.85` and at least `0.15` above second best
+- If ambiguous, activities remain **Unassigned** and can be manually attached.
