@@ -334,20 +334,34 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
       </main>
 
       {selectedWeek && quickAddDay ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/55 p-4"><div className="surface w-full max-w-xl p-5">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Quick Add Session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
-          <p className="mt-1 text-sm text-muted">Add to {longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
-          <form action={createSessionAction} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan?.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
-            <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
-            <fieldset><legend className="label-base mb-2">Discipline</legend><div className="grid grid-cols-5 gap-2">{sports.map((sport) => { const meta = getDisciplineMeta(sport); return <label key={sport} className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-xs ${meta.className}`}><input defaultChecked={sport === "run"} className="sr-only" type="radio" name="sport" value={sport} />{meta.label}</label>; })}</div></fieldset>
-            <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
-            <label className="label-base">Title / Type</label><input name="sessionType" className="input-base" placeholder="Easy, Long, Intervals" />
-            <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 3x10 @ FTP" />
-            <details className="surface-subtle p-3"><summary className="cursor-pointer text-sm text-cyan-200">Add distance (optional)</summary><div className="mt-2 grid grid-cols-2 gap-2"><div><label className="label-base">Distance value</label><input name="distanceValue" type="number" min={0.01} step="0.01" className="input-base" /></div><div><label className="label-base">Distance unit</label><select name="distanceUnit" className="input-base" defaultValue=""><option value="">Select unit</option><option value="m">m</option><option value="km">km</option><option value="mi">mi</option><option value="yd">yd</option></select></div></div></details>
-            <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
-            <button className="btn-primary w-full">Add session</button>
-          </form>
-        </div></div>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/55 p-2 sm:p-4">
+          <div className="surface flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col overflow-hidden p-4 sm:max-h-[calc(100dvh-2rem)] sm:p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Quick Add Session</h3>
+              <button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button>
+            </div>
+            <p className="mt-1 text-sm text-muted">Add to {longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
+            <form action={createSessionAction} className="mt-4 flex min-h-0 flex-1 flex-col">
+              <input type="hidden" name="planId" value={selectedPlan?.id} />
+              <input type="hidden" name="weekId" value={selectedWeek.id} />
+              <input type="hidden" name="date" value={quickAddDay} />
+
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
+                <fieldset><legend className="label-base mb-2">Discipline</legend><div className="grid grid-cols-5 gap-2">{sports.map((sport) => { const meta = getDisciplineMeta(sport); return <label key={sport} className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-xs ${meta.className}`}><input defaultChecked={sport === "run"} className="sr-only" type="radio" name="sport" value={sport} />{meta.label}</label>; })}</div></fieldset>
+                <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
+                <label className="label-base">Title / Type</label><input name="sessionType" className="input-base" placeholder="Easy, Long, Intervals" />
+                <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 3x10 @ FTP" />
+                <details className="surface-subtle p-3"><summary className="cursor-pointer text-sm text-cyan-200">Add distance (optional)</summary><div className="mt-2 grid grid-cols-2 gap-2"><div><label className="label-base">Distance value</label><input name="distanceValue" type="number" min={0.01} step="0.01" className="input-base" /></div><div><label className="label-base">Distance unit</label><select name="distanceUnit" className="input-base" defaultValue=""><option value="">Select unit</option><option value="m">m</option><option value="km">km</option><option value="mi">mi</option><option value="yd">yd</option></select></div></div></details>
+                <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
+              </div>
+
+              <div className="mt-3 border-t border-[hsl(var(--border))] pt-3">
+                <button className="btn-primary w-full">Add session</button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
 
       {activeSession && selectedWeek ? (
