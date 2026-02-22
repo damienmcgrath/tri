@@ -21,8 +21,7 @@ const weekSchema = z.object({
 const upsertWeekSchema = weekSchema.extend({
   focus: z.enum(["Build", "Recovery", "Taper", "Race", "Custom"]),
   notes: z.string().trim().max(2000).optional(),
-  targetMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(10080)]).optional(),
-  targetTss: z.union([z.literal(""), z.coerce.number().int().min(0).max(5000)]).optional()
+  targetMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(10080)]).optional()
 });
 
 const createSessionSchema = z.object({
@@ -336,7 +335,6 @@ export async function updateWeekAction(formData: FormData) {
     focus: formData.get("focus"),
     notes: formData.get("notes"),
     targetMinutes: formData.get("targetMinutes"),
-    targetTss: formData.get("targetTss")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -348,8 +346,7 @@ export async function updateWeekAction(formData: FormData) {
     .update({
       focus: parsed.focus,
       notes: parsed.notes ?? null,
-      target_minutes: parsed.targetMinutes === "" ? null : parsed.targetMinutes,
-      target_tss: parsed.targetTss === "" ? null : parsed.targetTss
+      target_minutes: parsed.targetMinutes === "" ? null : parsed.targetMinutes
     })
     .eq("id", parsed.weekId)
     .eq("plan_id", parsed.planId);

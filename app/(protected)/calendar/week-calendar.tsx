@@ -405,7 +405,7 @@ export function WeekCalendar({
       </article>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <article className="grid gap-3 xl:grid-cols-7">
+        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
           {weekDays.map((day) => {
             const ids = filteredIdsByDay[day.iso] ?? [];
             const visibleIds = expandedDays[day.iso] ? ids : ids.slice(0, 2);
@@ -419,8 +419,8 @@ export function WeekCalendar({
 
             return (
               <DayDropZone key={day.iso} id={`day:${day.iso}`} isActive={activeId !== null}>
-                <section className="surface min-h-[260px] p-3">
-                  <div className={`rounded-lg border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2 shadow-[inset_0_-2px_0_rgba(56,189,248,0.45)]" : "border-[hsl(var(--border))]"}`}>
+                <section className="surface min-h-[280px] p-3">
+                  <div className={`border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2" : "border-[hsl(var(--border))]"}`}>
                     <div className="flex items-center gap-2">
                       <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
                       {isToday ? <span className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">Today</span> : null}
@@ -692,13 +692,13 @@ function SortableSessionCard({
     <article
       ref={setNodeRef}
       style={style}
-      className={`group relative surface-subtle p-2.5 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-80" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
+      className={`group relative surface-subtle p-2.5 pr-8 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-80" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-            <p className="shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
+            <p className="rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
               {session.status === "planned" ? "Pending" : session.status === "completed" ? "Completed" : "Skipped"}
             </p>
           </div>
