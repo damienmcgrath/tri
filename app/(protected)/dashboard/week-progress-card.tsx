@@ -83,21 +83,25 @@ export function WeekProgressCard({
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]">
+        <div
+          className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
+          aria-label={`Overall progress ${Math.round(completedTotalMinutes)} of ${Math.round(plannedTotalMinutes)} minutes, ${Math.round(percentCapped * 100)}%`}
+          role="img"
+        >
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: `conic-gradient(hsl(var(--accent) / 0.35) ${percentCapped * 360}deg, hsl(var(--border)) 0deg)`
+              background: `conic-gradient(hsl(var(--accent) / 0.45) ${percentCapped * 360}deg, hsl(var(--border)) 0deg)`
             }}
           />
-          <div className="relative flex h-[54px] w-[54px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
-            <span className="text-sm font-semibold">{percentLabel}</span>
-            <span className="text-[10px] text-muted">complete</span>
+          <div className="relative flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
+            <span className="text-xl font-semibold leading-none">{percentLabel}</span>
+            <span className="mt-1 text-[10px] text-muted">complete</span>
           </div>
         </div>
 
         <div>
-          <p className="text-3xl font-bold leading-tight text-[hsl(var(--fg))]">{hasNoPlannedSessions ? "No planned sessions" : toHoursAndMinutes(completedTotalMinutes)}</p>
+          <p className="text-4xl font-bold leading-tight text-[hsl(var(--fg))]">{hasNoPlannedSessions ? "No planned sessions" : toHoursAndMinutes(completedTotalMinutes)}</p>
           <p className="text-sm text-muted">{hasNoPlannedSessions ? "Schedule sessions to start tracking progress." : `of ${toHoursAndMinutes(plannedTotalMinutes)} planned`}</p>
         </div>
 
@@ -107,16 +111,7 @@ export function WeekProgressCard({
         </span>
       </div>
 
-      <div className="mt-4">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs text-muted">Overall</span>
-          <span className="text-xs text-muted">{hasNoPlannedSessions ? "0 / 0 min" : `${Math.round(completedTotalMinutes)} / ${Math.round(plannedTotalMinutes)} min`}</span>
-        </div>
-        <div className="relative h-3 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={`Overall ${Math.round(completedTotalMinutes)} of ${Math.round(plannedTotalMinutes)} minutes, ${Math.round(percentCapped * 100)}%`} role="img">
-          <div className="h-full rounded-full bg-[hsl(var(--accent))] transition-[width]" style={{ width: `${percentCapped * 100}%` }} />
-          {overMinutes > 0 ? <div className="absolute right-0 top-0 h-full w-4 bg-[repeating-linear-gradient(135deg,transparent,transparent_3px,hsla(0,0%,100%,0.32)_3px,hsla(0,0%,100%,0.32)_6px)]" /> : null}
-        </div>
-      </div>
+      <p className="mt-3 text-xs text-muted">{Math.round(completedTotalMinutes)} / {Math.round(plannedTotalMinutes)} min overall</p>
 
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
@@ -142,9 +137,9 @@ export function WeekProgressCard({
                     </div>
                     <span className="text-xs text-muted">{Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min</span>
                   </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={`${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, ${Math.round(item.discPercentCapped * 100)}%`} role="img">
+                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={`${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, ${Math.round(item.discPercentCapped * 100)}%`} role="img">
                     <div className="h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%`, backgroundColor: item.color }} />
-                    {item.discOverMinutes > 0 ? <div className="float-right h-full w-3 bg-[repeating-linear-gradient(135deg,transparent,transparent_2px,hsla(0,0%,100%,0.3)_2px,hsla(0,0%,100%,0.3)_4px)]" /> : null}
+                    {item.discOverMinutes > 0 ? <div className="absolute right-0 top-0 h-full w-3 bg-[repeating-linear-gradient(135deg,transparent,transparent_2px,hsla(0,0%,100%,0.3)_2px,hsla(0,0%,100%,0.3)_4px)]" /> : null}
                   </div>
                   <p className="mt-1 text-xs text-muted">{helper}</p>
                 </div>
