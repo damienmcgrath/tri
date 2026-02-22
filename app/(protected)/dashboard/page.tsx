@@ -208,6 +208,8 @@ export default async function DashboardPage({
     },
     { planned: 0, completed: 0 }
   );
+  const completionPct = totals.planned === 0 ? 0 : Math.min(100, Math.round((totals.completed / totals.planned) * 100));
+  const remainingMinutes = Math.max(0, totals.planned - totals.completed);
 
 
   const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
@@ -224,7 +226,7 @@ export default async function DashboardPage({
       completed,
       pct: planned === 0 ? 0 : Math.min(100, Math.round((completed / planned) * 100))
     };
-  });
+  }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
   const keyTodaySession = [...todaySessions]
     .filter((session) => session.status === "planned")
@@ -325,12 +327,26 @@ export default async function DashboardPage({
                 <h2 className="text-xl font-semibold">Week Progress</h2>
                 <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-200">Minutes</span>
               </div>
-              <p className="mt-2 text-3xl font-semibold text-cyan-200">Completed {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
-              <p className="text-sm text-muted">
-                {totals.completed}/{totals.planned} min • Remaining {Math.max(0, totals.planned - totals.completed)} min
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-3xl font-semibold text-cyan-200">Completed {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
+                <span className="rounded-full border border-cyan-300/60 bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-100 tabular-nums">{completionPct}%</span>
+              </div>
+              <p className="mt-1 text-sm text-muted">
+                <span className="tabular-nums">{totals.completed}/{totals.planned} min</span>
+                <span className="px-1.5">•</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${remainingMinutes === 0 ? "border border-emerald-400/40 bg-emerald-500/15 text-emerald-200" : remainingMinutes <= 20 ? "border border-amber-400/40 bg-amber-500/15 text-amber-200" : "border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] text-muted"}`}>
+                  Remaining {remainingMinutes} min
+                </span>
               </p>
+              <div className="mt-3">
+                <div className="h-3 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]">
+                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-blue-400/90 transition-[width]" style={{ width: `${completionPct}%` }} />
+                </div>
+              </div>
 
-              <div className="mt-4 space-y-3">
+              <p className="mt-4 text-[11px] uppercase tracking-[0.12em] text-muted">By discipline</p>
+
+              <div className="mt-2 space-y-3">
                 {progressBySport.map((item) => {
                   const discipline = getDisciplineMeta(item.sport);
                   return (
