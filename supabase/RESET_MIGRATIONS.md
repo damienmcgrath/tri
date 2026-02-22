@@ -36,3 +36,14 @@ Ensure expected tables/columns exist (example):
 
 - This is destructive and intended only when you explicitly want a clean restart.
 - After this reset, all future changes should be added as new migrations on top of the baseline file.
+
+
+## If you still see "permission denied"
+
+After adding new grant migrations, run:
+
+```bash
+supabase db push
+```
+
+This applies privilege migrations (for example on `completed_sessions`) to remote DBs that were reset manually.
