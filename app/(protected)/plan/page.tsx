@@ -153,7 +153,7 @@ export default async function PlanPage({
     let primaryData: unknown[] | null = primaryQuery.data as unknown[] | null;
     let primaryError = primaryQuery.error;
 
-    if (primaryError && (isMissingColumnError(primaryError, "target") || isMissingColumnError(primaryError, "day_order"))) {
+    if (primaryError && !isMissingTableError(primaryError, "public.sessions")) {
       const fallbackQuery = await supabase
         .from("sessions")
         .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")

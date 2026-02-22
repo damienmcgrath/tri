@@ -143,14 +143,8 @@ async function insertSessionWithCompat(
   }
 
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
-
-  if (isMissingColumnError(initialError, "day_order")) {
-    delete withoutOptionalColumns.day_order;
-  }
-
-  if (isMissingColumnError(initialError, "target")) {
-    delete withoutOptionalColumns.target;
-  }
+  delete withoutOptionalColumns.day_order;
+  delete withoutOptionalColumns.target;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -175,14 +169,8 @@ async function updateSessionWithCompat(
   }
 
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
-
-  if (isMissingColumnError(initialError, "day_order")) {
-    delete withoutOptionalColumns.day_order;
-  }
-
-  if (isMissingColumnError(initialError, "target")) {
-    delete withoutOptionalColumns.target;
-  }
+  delete withoutOptionalColumns.day_order;
+  delete withoutOptionalColumns.target;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -205,21 +193,10 @@ async function insertSessionsBatchWithCompat(
     return;
   }
 
-  const removeDayOrder = isMissingColumnError(initialError, "day_order");
-  const removeTarget = isMissingColumnError(initialError, "target");
-
-  if (!removeDayOrder && !removeTarget) {
-    throw new Error(initialError.message);
-  }
-
   const fallbackPayload = payload.map((row) => {
     const next = { ...row };
-    if (removeDayOrder) {
-      delete next.day_order;
-    }
-    if (removeTarget) {
-      delete next.target;
-    }
+    delete next.day_order;
+    delete next.target;
     return next;
   });
 
