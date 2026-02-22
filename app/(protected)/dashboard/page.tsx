@@ -21,6 +21,13 @@ type CompletedSession = {
   sport: string;
 };
 
+type CompletedActivity = {
+  id: string;
+  sport_type: string;
+  start_time_utc: string;
+  duration_sec: number;
+};
+
 type Profile = {
   active_plan_id: string | null;
   race_date: string | null;
@@ -105,10 +112,17 @@ export default async function DashboardPage({
   const todayIso = new Date().toISOString().slice(0, 10);
   const isCurrentWeek = weekStart === currentWeekStart;
 
-  const [{ data: profileData }, { data: plansData }, { data: completedData }] = await Promise.all([
+  const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
     supabase.from("training_plans").select("id").order("start_date", { ascending: false }),
-    supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd)
+    supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
+    supabase
+      .from("completed_activities")
+      .select("id,sport_type,start_time_utc,duration_sec")
+      .eq("user_id", user.id)
+      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
+      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
+    supabase.from("session_activity_links").select("completed_activity_id").eq("user_id", user.id)
   ]);
 
   const profile = (profileData ?? null) as Profile | null;
@@ -132,6 +146,15 @@ export default async function DashboardPage({
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+
+  const uploadedActivities = (completedActivities ?? []) as CompletedActivity[];
+  uploadedActivities.forEach((activity) => {
+    const key = `${activity.start_time_utc.slice(0, 10)}:${activity.sport_type}`;
+    completionLedger[key] = (completionLedger[key] ?? 0) + 1;
+  });
+
+  const linkedActivityIds = new Set(((linksData ?? []) as Array<{ completed_activity_id: string }>).map((item) => item.completed_activity_id));
+  const unassignedUploads = uploadedActivities.filter((item) => !linkedActivityIds.has(item.id));
 
   const sessions = ((sessionsData ?? []) as Session[]).map((session) => ({
     ...session,
@@ -174,6 +197,9 @@ export default async function DashboardPage({
     },
     { planned: 0, completed: 0 }
   );
+
+
+  const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
   const progressBySport = sports.map((sport) => {
     const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
@@ -275,6 +301,14 @@ export default async function DashboardPage({
         </article>
       ) : (
         <>
+          {unassignedUploads.length > 0 ? (
+            <article className="surface border border-amber-400/30 bg-amber-500/10 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-amber-200">Garmin uploads</p>
+              <p className="mt-1 text-sm text-amber-100">{unassignedUploads.length} unassigned uploaded activit{unassignedUploads.length === 1 ? "y" : "ies"} this week ({unassignedMinutes} min).</p>
+              <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-cyan-200 underline">Attach uploads to planned sessions</Link>
+            </article>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
             <article className="surface p-4">
               <div className="mb-3 flex items-center justify-between">

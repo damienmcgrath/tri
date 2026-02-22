@@ -23,7 +23,7 @@ function fmtDuration(sec?: number) {
 }
 
 export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[] }) {
-  const [uploads, setUploads] = useState(initialUploads);
+  const [uploads] = useState(initialUploads);
   const [message, setMessage] = useState<string>("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [attachFor, setAttachFor] = useState<UploadRow | null>(null);
