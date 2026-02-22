@@ -29,7 +29,7 @@ function formatUploadDate(iso: string) {
 }
 
 export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[] }) {
-  const [uploads] = useState(initialUploads);
+  const [uploads, setUploads] = useState(initialUploads);
   const [message, setMessage] = useState<string>("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [attachFor, setAttachFor] = useState<UploadRow | null>(null);
@@ -61,6 +61,24 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
     }
     setMessage(payload.duplicate ? "Duplicate file already uploaded." : "Upload successful.");
     window.location.reload();
+  }
+
+  function deleteUpload(uploadId: string) {
+    startTransition(async () => {
+      const response = await fetch(`/api/uploads/activities/${uploadId}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setMessage(payload.error ?? "Could not delete upload");
+        return;
+      }
+
+      setUploads((current) => current.filter((item) => item.id !== uploadId));
+      setDetailId((current) => (current === uploadId ? null : current));
+      setAttachFor((current) => (current?.id === uploadId ? null : current));
+      setMessage("Upload deleted. Linked activity and completion state were removed.");
+      window.location.reload();
+    });
   }
 
   return (
@@ -119,6 +137,17 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                     {!linked && upload.status !== "error" ? (
                       <button className="text-cyan-300 underline" onClick={() => setAttachFor(upload)}>Attach to planned session</button>
                     ) : null}
+                    <button
+                      className="text-rose-300 underline"
+                      disabled={isPending}
+                      onClick={() => {
+                        if (window.confirm("Delete this upload and remove its linked activity from progress?")) {
+                          deleteUpload(upload.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               );
@@ -127,7 +156,22 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
         </table>
       </div>
 
-      {detail ? <div className="surface-subtle p-3 text-xs">{detail.filename} • {detail.file_type.toUpperCase()} • {detail.error_message ?? "No errors"}</div> : null}
+      {detail ? (
+        <div className="surface-subtle flex items-center justify-between gap-3 p-3 text-xs">
+          <span>{detail.filename} • {detail.file_type.toUpperCase()} • {detail.error_message ?? "No errors"}</span>
+          <button
+            className="text-rose-300 underline"
+            disabled={isPending}
+            onClick={() => {
+              if (window.confirm("Delete this upload and remove its linked activity from progress?")) {
+                deleteUpload(detail.id);
+              }
+            }}
+          >
+            Delete upload
+          </button>
+        </div>
+      ) : null}
 
       {attachFor ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 p-4">

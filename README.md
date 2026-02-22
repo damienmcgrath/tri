@@ -404,3 +404,4 @@ TriCoach AI supports manual Garmin activity uploads from **Settings → Integrat
   - score factors: time proximity, sport match, duration similarity, distance similarity
   - auto-link rule: best score `>= 0.85` and at least `0.15` above second best
 - If ambiguous, activities remain **Unassigned** and can be manually attached.
+- Uploads can be deleted from Integrations; deleting an upload removes its parsed activity and any links so plan/calendar progress reverts accordingly.
