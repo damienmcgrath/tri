@@ -393,7 +393,7 @@ export default async function DashboardPage({
             </article>
           </div>
 
-          <article className="surface p-4">
+          <article id="coach-focus" className="surface p-4 scroll-mt-24">
             <h2 className="text-lg font-semibold">Coach Focus — Today</h2>
             <p className="mt-2 text-sm">{focusText}</p>
             <div className="mt-3 flex flex-wrap gap-2">
