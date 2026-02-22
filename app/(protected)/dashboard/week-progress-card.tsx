@@ -95,13 +95,13 @@ export function WeekProgressCard({
             }}
           />
           <div className="relative flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
-            <span className="text-lg font-semibold leading-none">{percentLabel}</span>
+            <span className="text-xl font-semibold leading-none">{percentLabel}</span>
             
           </div>
         </div>
 
         <div>
-          <p className="text-4xl font-bold leading-tight text-[hsl(var(--fg))]">{hasNoPlannedSessions ? "No planned sessions" : toHoursAndMinutes(completedTotalMinutes)}</p>
+          <p className="text-3xl font-bold leading-tight text-[hsl(var(--fg))]">{hasNoPlannedSessions ? "No planned sessions" : toHoursAndMinutes(completedTotalMinutes)}</p>
           <p className="text-sm text-muted">{hasNoPlannedSessions ? "Schedule sessions to start tracking progress." : `of ${toHoursAndMinutes(plannedTotalMinutes)} planned`}</p>
         </div>
 
