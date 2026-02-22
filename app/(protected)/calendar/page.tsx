@@ -34,6 +34,16 @@ type CompletedItem = {
   linked_session_id?: string;
 };
 
+
+type SessionTemplate = {
+  id: string;
+  name: string;
+  sport: "swim" | "bike" | "run" | "strength";
+  type: string;
+  duration_minutes: number;
+  notes: string | null;
+};
+
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -131,7 +141,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
   }
 
-  const [{ data: legacyCompleted }, { data: activities }, { data: links }] = await Promise.all([
+  const [{ data: legacyCompleted }, { data: activities }, { data: links }, { data: templateData, error: templateError }] = await Promise.all([
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("completed_activities")
@@ -142,7 +152,12 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     supabase
       .from("session_activity_links")
       .select("planned_session_id,completed_activity_id")
+      .eq("user_id", user.id),
+    supabase
+      .from("session_templates")
+      .select("id,name,sport,type,duration_minutes,notes")
       .eq("user_id", user.id)
+      .order("name", { ascending: true })
   ]);
 
   const activityById = new Map<string, CompletedItem>();
@@ -209,6 +224,19 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     };
   });
 
+  if (templateError && templateError.code !== "PGRST205") {
+    throw new Error(templateError.message ?? "Failed to load session templates.");
+  }
+
+  const customTemplates = ((templateData ?? []) as SessionTemplate[]).map((template) => ({
+    id: template.id,
+    name: template.name,
+    sport: template.sport,
+    type: template.type,
+    duration: template.duration_minutes,
+    notes: template.notes ?? ""
+  }));
+
   const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
   const raceCountdown = raceDate
     ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -221,6 +249,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       weekStart={weekStart}
       isCurrentWeek={weekStart === currentWeekStart}
       raceCountdown={raceCountdown}
+      customTemplates={customTemplates}
     />
   );
 }
