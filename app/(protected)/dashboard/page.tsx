@@ -325,9 +325,9 @@ export default async function DashboardPage({
                 <h2 className="text-xl font-semibold">Week Progress</h2>
                 <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-200">Minutes</span>
               </div>
-              <p className="mt-2 text-3xl font-semibold text-cyan-200">Completed {totals.completed} / {totals.planned} min</p>
+              <p className="mt-2 text-3xl font-semibold text-cyan-200">Completed {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
               <p className="text-sm text-muted">
-                {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)} • Remaining {Math.max(0, totals.planned - totals.completed)} min
+                {totals.completed}/{totals.planned} min • Remaining {Math.max(0, totals.planned - totals.completed)} min
               </p>
 
               <div className="mt-4 space-y-3">
