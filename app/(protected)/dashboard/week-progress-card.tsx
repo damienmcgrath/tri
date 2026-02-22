@@ -27,6 +27,7 @@ function formatMinutes(minutes: number) {
   return `${Math.max(0, Math.round(minutes))}m`;
 }
 
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 export function WeekProgressCard({
   plannedTotalMinutes,
@@ -124,7 +125,7 @@ export function WeekProgressCard({
             {visibleDisciplines.map((item) => {
               const chipLabel = item.discGapMinutes > 0 ? `Gap ${formatMinutes(item.discGapMinutes)}` : item.discOverMinutes > 0 ? `+${formatMinutes(item.discOverMinutes)}` : null;
               const overTailWidthPx = item.plannedMinutes > 0
-                ? Math.round(Math.min(24, Math.max(6, (item.discOverMinutes / item.plannedMinutes) * 120)))
+                ? clamp(Math.round((item.discOverMinutes / item.plannedMinutes) * 120), 6, 24)
                 : 0;
               const barAriaLabel = item.discOverMinutes > 0
                 ? `${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, over ${Math.round(item.discOverMinutes)} minutes`
@@ -137,8 +138,10 @@ export function WeekProgressCard({
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
                       <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted">{Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min</span>
+                    <div className="ml-auto flex items-center justify-end gap-2">
+                      <div className="w-[96px] text-right text-xs text-muted tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min
+                      </div>
                       {chipLabel ? (
                         <span className="inline-flex h-5 items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2.5 text-xs font-medium text-muted">
                           {chipLabel}
@@ -150,10 +153,12 @@ export function WeekProgressCard({
                     <div className="h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%`, backgroundColor: item.color }} />
                     {item.discOverMinutes > 0 ? (
                       <div
-                        className="absolute right-0 top-0 h-full rounded-r"
+                        className="absolute inset-y-0 right-0 rounded-r-full"
                         style={{
                           width: `${overTailWidthPx}px`,
-                          background: `repeating-linear-gradient(45deg, color-mix(in oklab, ${item.color} 65%, transparent) 0 6px, color-mix(in oklab, ${item.color} 25%, transparent) 6px 12px)`
+                          backgroundColor: item.color,
+                          opacity: 0.6,
+                          backgroundImage: "repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 12px)"
                         }}
                       />
                     ) : null}
