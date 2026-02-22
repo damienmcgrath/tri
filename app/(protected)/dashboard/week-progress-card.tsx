@@ -84,17 +84,17 @@ export function WeekProgressCard({
 
       <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
         <div
-          className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
+          className="relative flex h-[84px] w-[84px] items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
           aria-label={`Overall progress ${Math.round(completedTotalMinutes)} of ${Math.round(plannedTotalMinutes)} minutes, ${Math.round(percentCapped * 100)}%`}
           role="img"
         >
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: `conic-gradient(hsl(var(--accent) / 0.45) ${percentCapped * 360}deg, hsl(var(--border)) 0deg)`
+              background: `conic-gradient(hsl(204 100% 60% / 0.92) ${percentCapped * 360}deg, hsl(var(--border)) 0deg)`
             }}
           />
-          <div className="relative flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
+          <div className="relative flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
             <span className="text-xl font-semibold leading-none">{percentLabel}</span>
             <span className="mt-1 text-[10px] text-muted">complete</span>
           </div>
