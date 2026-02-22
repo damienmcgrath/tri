@@ -61,12 +61,16 @@ export async function moveSessionAction(formData: FormData) {
 }
 
 export async function swapSessionDayAction(formData: FormData) {
-  const parsed = swapSessionSchema.parse({
+  const parsed = swapSessionSchema.safeParse({
     sourceSessionId: formData.get("sourceSessionId"),
     targetSessionId: formData.get("targetSessionId")
   });
 
-  if (parsed.sourceSessionId === parsed.targetSessionId) {
+  if (!parsed.success) {
+    return;
+  }
+
+  if (parsed.data.sourceSessionId === parsed.data.targetSessionId) {
     return;
   }
 
@@ -75,7 +79,7 @@ export async function swapSessionDayAction(formData: FormData) {
   const { data: pair, error: pairError } = await supabase
     .from("sessions")
     .select("id,date")
-    .in("id", [parsed.sourceSessionId, parsed.targetSessionId])
+    .in("id", [parsed.data.sourceSessionId, parsed.data.targetSessionId])
     .eq("user_id", user.id);
 
   if (pairError) {
@@ -86,8 +90,8 @@ export async function swapSessionDayAction(formData: FormData) {
     throw new Error("Could not find both sessions for swap.");
   }
 
-  const source = pair.find((session) => session.id === parsed.sourceSessionId);
-  const target = pair.find((session) => session.id === parsed.targetSessionId);
+  const source = pair.find((session) => session.id === parsed.data.sourceSessionId);
+  const target = pair.find((session) => session.id === parsed.data.targetSessionId);
 
   if (!source || !target) {
     throw new Error("Could not identify selected sessions.");

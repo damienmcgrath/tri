@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { isValidIsoDate } from "@/lib/date/iso";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { markSkippedAction, moveSessionAction } from "./actions";
 
@@ -31,8 +32,8 @@ type Plan = {
 };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();

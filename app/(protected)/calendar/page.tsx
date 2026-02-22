@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
 
 type Session = {
@@ -27,8 +28,8 @@ type CompletedSession = {
   sport: string;
 };
 
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
-const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
+const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
@@ -74,7 +75,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   if (!user) return null;
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
-  const weekStart = searchParams?.weekStart && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.weekStart)
+  const weekStart = isValidIsoDate(searchParams?.weekStart)
     ? searchParams.weekStart
     : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
