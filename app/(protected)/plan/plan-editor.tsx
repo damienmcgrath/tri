@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { ReactNode, useEffect, useMemo, useState, useTransition } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
   bulkReorderSessionsAction,
@@ -33,6 +33,7 @@ import {
   updateSessionAction,
   updateWeekAction
 } from "./actions";
+import { createSessionTemplateAction, deleteSessionTemplateAction, updateSessionTemplateAction } from "@/app/(protected)/calendar/actions";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 type TrainingWeek = {
@@ -61,7 +62,7 @@ type Session = {
   status: "planned" | "completed" | "skipped";
 };
 
-type PlanTemplate = { id: string; name: string; sport: "swim" | "bike" | "run" | "strength"; duration: number; type: string; target: string }
+type PlanTemplate = { id: string; name: string; sport: "swim" | "bike" | "run" | "strength"; duration: number; type: string; target: string };
 
 type PlanEditorProps = { plans: Plan[]; weeks: TrainingWeek[]; sessions: Session[]; selectedPlanId?: string; customTemplates: PlanTemplate[] };
 
@@ -70,13 +71,13 @@ const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", da
 const longDateFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
 
 const defaultTemplates = [
-  { label: "Easy Run 45", sport: "run", duration: 45, type: "Easy", target: "Z2" },
-  { label: "Long Run 90", sport: "run", duration: 90, type: "Long", target: "Steady" },
-  { label: "Z2 Ride 60", sport: "bike", duration: 60, type: "Endurance", target: "Z2" },
-  { label: "Long Ride 180", sport: "bike", duration: 180, type: "Long", target: "Z2 low" },
-  { label: "Endurance Swim 45", sport: "swim", duration: 45, type: "Endurance", target: "Aerobic" },
-  { label: "Strength 30", sport: "strength", duration: 30, type: "Strength", target: "Core + mobility" }
-];
+  { id: "easy-run-45", name: "Easy Run 45", sport: "run", duration: 45, type: "Easy", target: "Z2" },
+  { id: "long-run-90", name: "Long Run 90", sport: "run", duration: 90, type: "Long", target: "Steady" },
+  { id: "z2-ride-60", name: "Z2 Ride 60", sport: "bike", duration: 60, type: "Endurance", target: "Z2" },
+  { id: "long-ride-180", name: "Long Ride 180", sport: "bike", duration: 180, type: "Long", target: "Z2 low" },
+  { id: "endurance-swim-45", name: "Endurance Swim 45", sport: "swim", duration: 45, type: "Endurance", target: "Aerobic" },
+  { id: "strength-30", name: "Strength 30", sport: "strength", duration: 30, type: "Strength", target: "Core + mobility" }
+] as const;
 
 const sports = ["swim", "bike", "run", "strength", "other"] as const;
 
@@ -162,18 +163,23 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, customTempl
   const [isPending, startTransition] = useTransition();
   const [weekActionOpen, setWeekActionOpen] = useState(false);
   const [localSessions, setLocalSessions] = useState<Session[]>([]);
+  const [localCustomTemplates, setLocalCustomTemplates] = useState<PlanTemplate[]>(customTemplates);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("custom");
+  const [templateName, setTemplateName] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [isTemplatePending, startTemplateTransition] = useTransition();
+  const quickAddFormRef = useRef<HTMLFormElement | null>(null);
 
-  const templates = useMemo(() => [...defaultTemplates, ...customTemplates.map((template) => ({
-    label: template.name,
-    sport: template.sport,
-    duration: template.duration,
-    type: template.type,
-    target: template.target
-  }))], [customTemplates]);
+  const templates = useMemo(() => [...defaultTemplates, ...localCustomTemplates], [localCustomTemplates]);
 
   useEffect(() => {
     setLocalSessions(withNormalizedOrder(sessions.filter((session) => session.week_id === selectedWeek?.id)));
   }, [sessions, selectedWeek?.id]);
+
+  useEffect(() => {
+    setLocalCustomTemplates(customTemplates);
+  }, [customTemplates]);
 
   const weekSessions = useMemo(
     () => [...localSessions].sort((a, b) => a.date.localeCompare(b.date) || (a.day_order ?? 999) - (b.day_order ?? 999)),
@@ -210,6 +216,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, customTempl
     if (!planWeeks.length) return setSelectedWeekId("");
     if (!planWeeks.some((week) => week.id === selectedWeekId)) setSelectedWeekId(planWeeks[0].id);
   }, [planWeeks, selectedWeekId]);
+
+  useEffect(() => {
+    if (!quickAddDay) return;
+    setSelectedTemplateId("custom");
+    setTemplateName("");
+    setEditingTemplateId(null);
+    setTemplateError(null);
+  }, [quickAddDay]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -350,17 +364,100 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, customTempl
               <button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button>
             </div>
             <p className="mt-1 text-sm text-muted">Add to {longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
-            <form action={createSessionAction} className="mt-4 flex min-h-0 flex-1 flex-col">
+            <form ref={quickAddFormRef} action={createSessionAction} className="mt-4 flex min-h-0 flex-1 flex-col">
               <input type="hidden" name="planId" value={selectedPlan?.id} />
               <input type="hidden" name="weekId" value={selectedWeek.id} />
               <input type="hidden" name="date" value={quickAddDay} />
 
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
+                <label className="label-base">Template</label>
+                <select
+                  className="input-base"
+                  value={selectedTemplateId}
+                  onChange={(event) => {
+                    const nextTemplateId = event.target.value;
+                    setSelectedTemplateId(nextTemplateId);
+                    setTemplateError(null);
+                    if (nextTemplateId === "custom") {
+                      setTemplateName("");
+                      setEditingTemplateId(null);
+                      return;
+                    }
+                    const template = templates.find((item) => item.id === nextTemplateId);
+                    if (!template) return;
+                    const form = event.currentTarget.form;
+                    if (!form) return;
+                    (form.elements.namedItem("sport") as RadioNodeList).value = template.sport;
+                    (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(template.duration);
+                    (form.elements.namedItem("sessionType") as HTMLInputElement).value = template.type;
+                    (form.elements.namedItem("target") as HTMLInputElement).value = template.target;
+                    setTemplateName(template.name);
+                    const isDefaultTemplate = defaultTemplates.some((item) => item.id === template.id);
+                    setEditingTemplateId(isDefaultTemplate ? null : template.id);
+                  }}
+                >
+                  <option value="custom">Custom</option>
+                  {defaultTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                  {localCustomTemplates.length ? <optgroup label="Your templates">{localCustomTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</optgroup> : null}
+                </select>
+
                 <fieldset><legend className="label-base mb-2">Discipline</legend><div className="grid grid-cols-5 gap-2">{sports.map((sport) => { const meta = getDisciplineMeta(sport); return <label key={sport} className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-xs ${meta.className}`}><input defaultChecked={sport === "run"} className="sr-only" type="radio" name="sport" value={sport} />{meta.label}</label>; })}</div></fieldset>
                 <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
                 <label className="label-base">Title / Type</label><input name="sessionType" className="input-base" placeholder="Easy, Long, Intervals" />
                 <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 3x10 @ FTP" />
+
+                <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
+                  <p className="text-xs font-semibold">Manage custom templates</p>
+                  <p className="mt-1 text-[11px] text-muted">Create, edit, or delete templates available in Calendar and Plan.</p>
+                  <input className="input-base mt-2" value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="Template name" maxLength={80} />
+                  {templateError ? <p className="mt-2 text-[11px] text-rose-300">{templateError}</p> : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn-secondary px-2.5 py-1 text-xs"
+                      disabled={isTemplatePending}
+                      onClick={() => {
+                        const templateForm = quickAddFormRef.current;
+                        if (!templateForm) return;
+                        const sport = (templateForm.elements.namedItem("sport") as RadioNodeList).value as "swim" | "bike" | "run" | "strength" | "other";
+                        const durationRaw = (templateForm.elements.namedItem("durationMinutes") as HTMLInputElement).value;
+                        const sessionType = (templateForm.elements.namedItem("sessionType") as HTMLInputElement).value.trim();
+                        const target = (templateForm.elements.namedItem("target") as HTMLInputElement).value.trim();
+                        const duration = Number(durationRaw);
+                        if (!templateName.trim() || sport === "other" || !sessionType || !Number.isInteger(duration) || duration < 1) {
+                          setTemplateError("Template name, sport, title/type, and duration are required.");
+                          return;
+                        }
+                        setTemplateError(null);
+                        startTemplateTransition(() => {
+                          void (async () => {
+                            try {
+                              const payload = { name: templateName.trim(), sport, type: sessionType, duration, notes: target };
+                              const saved = editingTemplateId
+                                ? await updateSessionTemplateAction({ templateId: editingTemplateId, ...payload })
+                                : await createSessionTemplateAction(payload);
+                              const mapped = { id: saved.id, name: saved.name, sport: saved.sport, duration: saved.duration, type: saved.type, target: saved.notes };
+                              setLocalCustomTemplates((prev) => {
+                                const exists = prev.some((item) => item.id === mapped.id);
+                                const next = exists ? prev.map((item) => (item.id === mapped.id ? mapped : item)) : [...prev, mapped];
+                                return next.sort((a, b) => a.name.localeCompare(b.name));
+                              });
+                              setEditingTemplateId(saved.id);
+                              setSelectedTemplateId(saved.id);
+                            } catch (error) {
+                              setTemplateError(error instanceof Error ? error.message : "Could not save template.");
+                            }
+                          })();
+                        });
+                      }}
+                    >
+                      {editingTemplateId ? "Update template" : "Add template"}
+                    </button>
+                    {editingTemplateId ? <button type="button" className="btn-secondary px-2.5 py-1 text-xs" onClick={() => { setEditingTemplateId(null); setTemplateName(""); setSelectedTemplateId("custom"); setTemplateError(null); }}>Cancel edit</button> : null}
+                  </div>
+                  {localCustomTemplates.length ? <ul className="mt-3 space-y-1.5 text-xs">{localCustomTemplates.map((template) => <li key={template.id} className="flex items-center justify-between gap-2 rounded-md border border-[hsl(var(--border))] px-2 py-1.5"><span className="truncate">{template.name}</span><span className="flex items-center gap-1"><button type="button" className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => { setSelectedTemplateId(template.id); setTemplateName(template.name); setEditingTemplateId(template.id); setTemplateError(null); const form = quickAddFormRef.current; if (!form) return; (form.elements.namedItem("sport") as RadioNodeList).value = template.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(template.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = template.type; (form.elements.namedItem("target") as HTMLInputElement).value = template.target; }}>Edit</button><button type="button" className="btn-secondary px-2 py-0.5 text-[11px]" disabled={isTemplatePending} onClick={() => { setTemplateError(null); startTemplateTransition(() => { void (async () => { try { await deleteSessionTemplateAction({ templateId: template.id }); setLocalCustomTemplates((prev) => prev.filter((item) => item.id !== template.id)); if (selectedTemplateId === template.id) { setSelectedTemplateId("custom"); setTemplateName(""); setEditingTemplateId(null); } } catch (error) { setTemplateError(error instanceof Error ? error.message : "Could not delete template."); } })(); }); }}>Delete</button></span></li>)}</ul> : null}
+                </div>
+
                 <details className="surface-subtle p-3"><summary className="cursor-pointer text-sm text-cyan-200">Add distance (optional)</summary><div className="mt-2 grid grid-cols-2 gap-2"><div><label className="label-base">Distance value</label><input name="distanceValue" type="number" min={0.01} step="0.01" className="input-base" /></div><div><label className="label-base">Distance unit</label><select name="distanceUnit" className="input-base" defaultValue=""><option value="">Select unit</option><option value="m">m</option><option value="km">km</option><option value="mi">mi</option><option value="yd">yd</option></select></div></div></details>
                 <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
               </div>
