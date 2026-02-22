@@ -45,7 +45,7 @@ export default async function ProtectedLayout({
 
   return (
     <div className="app-shell">
-      <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
+      <header className="relative z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <p className="text-lg uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
           <nav className="flex flex-wrap gap-2">
@@ -72,7 +72,7 @@ export default async function ProtectedLayout({
               )}
             </summary>
 
-            <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3 shadow-2xl shadow-black/40">
+            <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3 shadow-2xl shadow-black/40">
               <div className="border-b border-[hsl(var(--border))] pb-3">
                 <p className="text-xs uppercase tracking-[0.15em] text-muted">Account</p>
                 <p className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">{displayName}</p>
