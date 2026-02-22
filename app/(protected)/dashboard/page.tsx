@@ -21,6 +21,13 @@ type CompletedSession = {
   sport: string;
 };
 
+type CompletedActivity = {
+  id: string;
+  sport_type: string;
+  start_time_utc: string;
+  duration_sec: number;
+};
+
 type Profile = {
   active_plan_id: string | null;
   race_date: string | null;
@@ -105,10 +112,17 @@ export default async function DashboardPage({
   const todayIso = new Date().toISOString().slice(0, 10);
   const isCurrentWeek = weekStart === currentWeekStart;
 
-  const [{ data: profileData }, { data: plansData }, { data: completedData }] = await Promise.all([
+  const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
     supabase.from("training_plans").select("id").order("start_date", { ascending: false }),
-    supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd)
+    supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
+    supabase
+      .from("completed_activities")
+      .select("id,sport_type,start_time_utc,duration_sec")
+      .eq("user_id", user.id)
+      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
+      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
+    supabase.from("session_activity_links").select("completed_activity_id,planned_session_id").eq("user_id", user.id)
   ]);
 
   const profile = (profileData ?? null) as Profile | null;
@@ -133,10 +147,33 @@ export default async function DashboardPage({
     return acc;
   }, {});
 
+  const uploadedActivities = (completedActivities ?? []) as CompletedActivity[];
+  const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null }>;
+  const linkedActivityIds = new Set(links.map((item) => item.completed_activity_id));
+  const linkedSessionIds = new Set(links.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
+  const unassignedUploads = uploadedActivities.filter((item) => !linkedActivityIds.has(item.id));
+
+  const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
+  const linkedMinutesBySession = links.reduce<Map<string, number>>((acc, link) => {
+    if (!link.planned_session_id) return acc;
+    const minutes = durationByActivityId.get(link.completed_activity_id) ?? 0;
+    acc.set(link.planned_session_id, (acc.get(link.planned_session_id) ?? 0) + minutes);
+    return acc;
+  }, new Map());
+
+  const getCompletedMinutes = (session: Pick<Session, "id" | "duration_minutes" | "status">) => {
+    const linkedMinutes = linkedMinutesBySession.get(session.id);
+    if (typeof linkedMinutes === "number" && linkedMinutes > 0) {
+      return linkedMinutes;
+    }
+
+    return session.status === "completed" ? session.duration_minutes ?? 0 : 0;
+  };
+
   const sessions = ((sessionsData ?? []) as Session[]).map((session) => ({
     ...session,
     duration_minutes: session.duration_minutes ?? 0,
-    status: getSessionStatus(session, completionLedger)
+    status: linkedSessionIds.has(session.id) ? ("completed" as const) : getSessionStatus(session, completionLedger)
   }));
 
   const hasActivePlan = Boolean(activePlanId);
@@ -147,8 +184,7 @@ export default async function DashboardPage({
     const daySessions = sessions.filter((session) => session.date === iso);
     const planned = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const completed = daySessions
-      .filter((session) => session.status === "completed")
-      .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
 
     return {
       iso,
@@ -167,19 +203,20 @@ export default async function DashboardPage({
   const totals = sessions.reduce(
     (acc, session) => {
       acc.planned += session.duration_minutes ?? 0;
-      if (session.status === "completed") {
-        acc.completed += session.duration_minutes ?? 0;
-      }
+      acc.completed += getCompletedMinutes(session);
       return acc;
     },
     { planned: 0, completed: 0 }
   );
 
+
+  const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
+
   const progressBySport = sports.map((sport) => {
     const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const completed = sessions
-      .filter((session) => session.sport === sport && session.status === "completed")
-      .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+      .filter((session) => session.sport === sport)
+      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
 
     return {
       sport,
@@ -275,6 +312,14 @@ export default async function DashboardPage({
         </article>
       ) : (
         <>
+          {unassignedUploads.length > 0 ? (
+            <article className="surface border border-amber-400/30 bg-amber-500/10 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-amber-200">Garmin uploads</p>
+              <p className="mt-1 text-sm text-amber-100">{unassignedUploads.length} unassigned uploaded activit{unassignedUploads.length === 1 ? "y" : "ies"} this week ({unassignedMinutes} min).</p>
+              <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-cyan-200 underline">Attach uploads to planned sessions</Link>
+            </article>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
             <article className="surface p-4">
               <div className="mb-3 flex items-center justify-between">

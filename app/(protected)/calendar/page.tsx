@@ -23,9 +23,15 @@ type LegacyPlannedSession = {
   created_at: string;
 };
 
-type CompletedSession = {
+type CompletedItem = {
+  id: string;
   date: string;
   sport: string;
+  duration_min: number;
+  distance_km: number | null;
+  avg_hr: number | null;
+  avg_power: number | null;
+  linked_session_id?: string;
 };
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
@@ -75,9 +81,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   if (!user) return null;
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
-  const weekStart = isValidIsoDate(searchParams?.weekStart)
-    ? searchParams.weekStart
-    : currentWeekStart;
+  const weekStart = isValidIsoDate(searchParams?.weekStart) ? searchParams.weekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
 
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
@@ -127,37 +131,96 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
   }
 
-  const { data: completedData, error: completedError } = await supabase
-    .from("completed_sessions")
-    .select("date,sport")
-    .gte("date", weekStart)
-    .lt("date", weekEnd);
+  const [{ data: legacyCompleted }, { data: activities }, { data: links }] = await Promise.all([
+    supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
+    supabase
+      .from("completed_activities")
+      .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
+      .eq("user_id", user.id)
+      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
+      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
+    supabase
+      .from("session_activity_links")
+      .select("planned_session_id,completed_activity_id")
+      .eq("user_id", user.id)
+  ]);
 
-  if (completedError && completedError.code !== "PGRST205") {
-    throw new Error(completedError.message ?? "Failed to load completed sessions.");
-  }
+  const activityById = new Map<string, CompletedItem>();
+  (activities ?? []).forEach((activity: any) => {
+    activityById.set(activity.id, {
+      id: activity.id,
+      date: String(activity.start_time_utc).slice(0, 10),
+      sport: activity.sport_type,
+      duration_min: Math.round(Number(activity.duration_sec ?? 0) / 60),
+      distance_km: activity.distance_m ? Number(activity.distance_m) / 1000 : null,
+      avg_hr: activity.avg_hr,
+      avg_power: activity.avg_power
+    });
+  });
 
-  const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, item) => {
+  const linkedBySession = new Map<string, CompletedItem[]>();
+  const linkedActivityIds = new Set<string>();
+  (links ?? []).forEach((link: any) => {
+    const activity = activityById.get(link.completed_activity_id);
+    if (!activity) return;
+    linkedActivityIds.add(activity.id);
+    const list = linkedBySession.get(link.planned_session_id) ?? [];
+    list.push({ ...activity, linked_session_id: link.planned_session_id });
+    linkedBySession.set(link.planned_session_id, list);
+  });
+
+  const unassignedByDate = new Map<string, number>();
+  [...activityById.values()]
+    .filter((item) => !linkedActivityIds.has(item.id))
+    .forEach((item) => {
+      unassignedByDate.set(item.date, (unassignedByDate.get(item.date) ?? 0) + 1);
+    });
+
+  const completionLedger = ((legacyCompleted ?? []) as Array<{ date: string; sport: string }>).reduce<Record<string, number>>((acc, item) => {
     const key = `${item.date}:${item.sport}`;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
 
-  const sessions = normalizedSessions.map((session) => ({
-    id: session.id,
-    date: session.date,
-    sport: session.sport,
-    type: session.type,
-    duration: session.duration_minutes ?? 0,
-    notes: session.notes,
-    created_at: session.created_at,
-    status: getSessionStatus(session, completionLedger)
-  }));
+
+  const sessions = normalizedSessions.map((session) => {
+    const linked = linkedBySession.get(session.id) ?? [];
+    const linkedStats = linked[0]
+      ? {
+          durationMin: linked.reduce((sum, item) => sum + item.duration_min, 0),
+          distanceKm: linked.reduce((sum, item) => sum + (item.distance_km ?? 0), 0),
+          avgHr: linked[0].avg_hr,
+          avgPower: linked[0].avg_power
+        }
+      : null;
+
+    return {
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      type: session.type,
+      duration: session.duration_minutes ?? 0,
+      notes: session.notes,
+      created_at: session.created_at,
+      status: linked.length > 0 ? ("completed" as const) : getSessionStatus(session, completionLedger),
+      linkedActivityCount: linked.length,
+      linkedStats,
+      unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0)
+    };
+  });
 
   const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
   const raceCountdown = raceDate
     ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
 
-  return <WeekCalendar weekDays={weekDays} sessions={sessions} weekStart={weekStart} isCurrentWeek={weekStart === currentWeekStart} raceCountdown={raceCountdown} />;
+  return (
+    <WeekCalendar
+      weekDays={weekDays}
+      sessions={sessions}
+      weekStart={weekStart}
+      isCurrentWeek={weekStart === currentWeekStart}
+      raceCountdown={raceCountdown}
+    />
+  );
 }

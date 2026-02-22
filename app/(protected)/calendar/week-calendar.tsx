@@ -40,6 +40,9 @@ type CalendarSession = {
   notes: string | null;
   created_at: string;
   status: SessionStatus;
+  linkedActivityCount?: number;
+  linkedStats?: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
+  unassignedSameDayCount?: number;
 };
 
 type WeekDay = { iso: string; weekday: string; label: string };
@@ -80,6 +83,14 @@ function isSkipped(notes: string | null) {
 
 function clearSkippedTag(notes: string | null) {
   return (notes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+}
+
+function completedDuration(session: CalendarSession) {
+  if (session.status !== "completed") {
+    return 0;
+  }
+
+  return session.linkedStats?.durationMin ?? session.duration;
 }
 
 export function WeekCalendar({
@@ -154,7 +165,7 @@ export function WeekCalendar({
 
   const totals = useMemo(() => {
     const planned = localSessions.reduce((sum, session) => sum + session.duration, 0);
-    const completed = localSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.duration, 0);
+    const completed = localSessions.reduce((sum, session) => sum + completedDuration(session), 0);
     return { planned, completed, remaining: Math.max(planned - completed, 0) };
   }, [localSessions]);
 
@@ -163,8 +174,8 @@ export function WeekCalendar({
       sports.map((sport) => {
         const planned = localSessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
         const completed = localSessions
-          .filter((session) => session.sport === sport && session.status === "completed")
-          .reduce((sum, session) => sum + session.duration, 0);
+          .filter((session) => session.sport === sport)
+          .reduce((sum, session) => sum + completedDuration(session), 0);
         return { sport, planned, completed };
       }),
     [localSessions]
@@ -699,6 +710,13 @@ function SortableSessionCard({
         <button type="button" onClick={onOpen} className="w-full text-left" aria-label={`Open details for ${title}`}>
           <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{title}</p>
           <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
+          {session.linkedActivityCount ? (
+            <p className="mt-1 text-xs text-emerald-300">
+              Completed ✓ {session.linkedStats?.durationMin ?? 0}m{session.linkedStats?.distanceKm ? ` · ${session.linkedStats.distanceKm.toFixed(1)} km` : ""}
+            </p>
+          ) : session.unassignedSameDayCount ? (
+            <p className="mt-1 text-xs text-amber-200">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
+          ) : null}
         </button>
       </div>
       <button
