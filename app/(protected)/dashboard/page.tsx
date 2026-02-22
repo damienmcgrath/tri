@@ -329,8 +329,6 @@ export default async function DashboardPage({
           <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
             <div className="lg:order-1">
               <WeekProgressCard
-                weekStartDate={weekStart}
-                weekEndDate={addDays(weekStart, 6)}
                 plannedTotalMinutes={totals.planned}
                 completedTotalMinutes={totals.completed}
                 disciplines={progressBySport.map((item) => ({

@@ -11,8 +11,6 @@ type Discipline = {
 };
 
 type WeekProgressCardProps = {
-  weekStartDate: string;
-  weekEndDate: string;
   plannedTotalMinutes: number;
   completedTotalMinutes: number;
   disciplines: Discipline[];
@@ -29,14 +27,8 @@ function formatMinutes(minutes: number) {
   return `${Math.max(0, Math.round(minutes))}m`;
 }
 
-function formatWeekRange(startIso: string, endIso: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-  return `${formatter.format(new Date(`${startIso}T00:00:00.000Z`))}–${formatter.format(new Date(`${endIso}T00:00:00.000Z`))}`;
-}
 
 export function WeekProgressCard({
-  weekStartDate,
-  weekEndDate,
   plannedTotalMinutes,
   completedTotalMinutes,
   disciplines
@@ -79,7 +71,6 @@ export function WeekProgressCard({
     <article className="surface p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Week Progress</h2>
-        <p className="text-xs text-muted">{formatWeekRange(weekStartDate, weekEndDate)}</p>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
@@ -96,7 +87,6 @@ export function WeekProgressCard({
           />
           <div className="relative flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
             <span className="text-xl font-semibold leading-none">{percentLabel}</span>
-            
           </div>
         </div>
 
@@ -111,7 +101,6 @@ export function WeekProgressCard({
         </span>
       </div>
 
-      <p className="mt-3 text-xs text-muted">{Math.round(completedTotalMinutes)} / {Math.round(plannedTotalMinutes)} min overall</p>
 
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
