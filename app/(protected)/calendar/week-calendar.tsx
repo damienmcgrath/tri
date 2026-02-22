@@ -420,7 +420,7 @@ export function WeekCalendar({
             return (
               <DayDropZone key={day.iso} id={`day:${day.iso}`} isActive={activeId !== null}>
                 <section className="surface min-h-[280px] p-3">
-                  <div className={`rounded-lg border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2" : "border-[hsl(var(--border))]"}`}>
+                  <div className={`border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2" : "border-[hsl(var(--border))]"}`}>
                     <div className="flex items-center gap-2">
                       <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
                       {isToday ? <span className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">Today</span> : null}
