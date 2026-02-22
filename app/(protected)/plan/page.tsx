@@ -26,7 +26,9 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  target: string | null;
   duration_minutes: number;
+  day_order: number | null;
   notes: string | null;
   distance_value: number | null;
   distance_unit: string | null;
@@ -58,6 +60,18 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   }
 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null, columnName: string) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703") {
+    return true;
+  }
+
+  return (error.message ?? "").toLowerCase().includes(columnName.toLowerCase());
 }
 
 export default async function PlanPage({
@@ -129,11 +143,20 @@ export default async function PlanPage({
 
   let sessionsData: Session[] = [];
   if (selectedPlan) {
-    const primary = await supabase
+    let primary = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
+      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status")
       .eq("plan_id", selectedPlan.id)
-      .order("date", { ascending: true });
+      .order("date", { ascending: true })
+      .order("day_order", { ascending: true, nullsFirst: false });
+
+    if (primary.error && (isMissingColumnError(primary.error, "target") || isMissingColumnError(primary.error, "day_order"))) {
+      primary = await supabase
+        .from("sessions")
+        .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
+        .eq("plan_id", selectedPlan.id)
+        .order("date", { ascending: true });
+    }
 
     if (primary.error && isMissingTableError(primary.error, "public.sessions")) {
       const legacy = await supabase
@@ -162,6 +185,8 @@ export default async function PlanPage({
         sport: session.sport,
         type: session.type,
         duration_minutes: session.duration,
+        target: null,
+        day_order: null,
         notes: session.notes,
         distance_value: null,
         distance_unit: null,

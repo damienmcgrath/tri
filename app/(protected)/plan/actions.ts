@@ -30,11 +30,13 @@ const createSessionSchema = z.object({
   weekId: uuidSchema,
   date: z.string().date(),
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
-  sessionType: z.string().trim().min(1, "Session type is required."),
+  sessionType: z.string().trim().max(100).optional(),
+  target: z.string().trim().max(200).optional(),
   durationMinutes: z.coerce.number().int().min(1).max(1440),
   notes: z.string().trim().max(1000).optional(),
   distanceValue: z.union([z.literal(""), z.coerce.number().positive()]).optional(),
-  distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional()
+  distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional(),
+  dayOrder: z.coerce.number().int().min(0).max(100).optional()
 });
 
 const updateSessionSchema = createSessionSchema.extend({
@@ -44,6 +46,28 @@ const updateSessionSchema = createSessionSchema.extend({
 
 const deleteSessionSchema = z.object({
   sessionId: uuidSchema
+});
+
+const reorderSessionSchema = z.object({
+  sessionId: uuidSchema,
+  planId: uuidSchema,
+  weekId: uuidSchema,
+  date: z.string().date(),
+  dayOrder: z.coerce.number().int().min(0).max(100)
+});
+
+
+
+const bulkReorderSessionSchema = z.object({
+  planId: uuidSchema,
+  weekId: uuidSchema,
+  updates: z.array(reorderSessionSchema).max(200)
+});
+
+const duplicateWeekSchema = weekSchema.extend({
+  destinationWeekId: uuidSchema,
+  copyMetadata: z.coerce.boolean().default(true),
+  copySessions: z.coerce.boolean().default(true)
 });
 
 const deletePlanSchema = z.object({
@@ -245,9 +269,12 @@ export async function updateWeekAction(formData: FormData) {
 }
 
 export async function duplicateWeekForwardAction(formData: FormData) {
-  const parsed = weekSchema.parse({
+  const parsed = duplicateWeekSchema.parse({
     weekId: formData.get("weekId"),
-    planId: formData.get("planId")
+    planId: formData.get("planId"),
+    destinationWeekId: formData.get("destinationWeekId"),
+    copyMetadata: formData.get("copyMetadata") ?? "true",
+    copySessions: formData.get("copySessions") ?? "true"
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -258,7 +285,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
     .from("training_weeks")
     .select("id,week_start_date")
     .eq("plan_id", parsed.planId)
-    .eq("week_index", sourceWeek.week_index + 1)
+    .eq("id", parsed.destinationWeekId)
     .maybeSingle();
 
   if (targetWeekError) {
@@ -266,31 +293,42 @@ export async function duplicateWeekForwardAction(formData: FormData) {
   }
 
   if (!targetWeek) {
-    throw new Error("No next week available to duplicate into.");
+    throw new Error("No destination week available to duplicate into.");
   }
 
-  const { error: weekUpdateError } = await supabase
-    .from("training_weeks")
-    .update({
-      focus: sourceWeek.focus,
-      notes: sourceWeek.notes,
-      target_minutes: sourceWeek.target_minutes,
-      target_tss: sourceWeek.target_tss
-    })
-    .eq("id", targetWeek.id);
+  if (targetWeek.id === sourceWeek.id) {
+    throw new Error("Destination week must be different from source week.");
+  }
 
-  if (weekUpdateError) {
-    throw new Error(weekUpdateError.message);
+  if (parsed.copyMetadata) {
+    const { error: weekUpdateError } = await supabase
+      .from("training_weeks")
+      .update({
+        focus: sourceWeek.focus,
+        notes: sourceWeek.notes,
+        target_minutes: sourceWeek.target_minutes,
+        target_tss: sourceWeek.target_tss
+      })
+      .eq("id", targetWeek.id);
+
+    if (weekUpdateError) {
+      throw new Error(weekUpdateError.message);
+    }
   }
 
   const { data: sourceSessions, error: sourceSessionsError } = await supabase
     .from("sessions")
-    .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,date")
+    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,date,day_order")
     .eq("week_id", sourceWeek.id)
     .order("date", { ascending: true });
 
   if (sourceSessionsError) {
     throw new Error(sourceSessionsError.message);
+  }
+
+  if (!parsed.copySessions) {
+    revalidatePath("/plan");
+    return;
   }
 
   const { error: deleteTargetError } = await supabase.from("sessions").delete().eq("week_id", targetWeek.id).eq("plan_id", parsed.planId);
@@ -316,7 +354,9 @@ export async function duplicateWeekForwardAction(formData: FormData) {
         date: targetDate.toISOString().slice(0, 10),
         sport: session.sport,
         type: session.type,
+        target: session.target,
         duration_minutes: session.duration_minutes,
+        day_order: session.day_order,
         notes: session.notes,
         distance_value: session.distance_value,
         distance_unit: session.distance_unit,
@@ -444,10 +484,12 @@ export async function createSessionAction(formData: FormData) {
     date: formData.get("date"),
     sport: formData.get("sport"),
     sessionType: formData.get("sessionType"),
+    target: formData.get("target"),
     durationMinutes: formData.get("durationMinutes"),
     notes: formData.get("notes"),
     distanceValue: formData.get("distanceValue"),
-    distanceUnit: formData.get("distanceUnit")
+    distanceUnit: formData.get("distanceUnit"),
+    dayOrder: formData.get("dayOrder")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -455,42 +497,33 @@ export async function createSessionAction(formData: FormData) {
   await assertPlanOwnership(supabase, user.id, parsed.planId);
   await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
 
+  const { data: daySessions, error: daySessionsError } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("week_id", parsed.weekId)
+    .eq("date", parsed.date);
+
+  if (daySessionsError && !isMissingTableError(daySessionsError, "public.sessions")) {
+    throw new Error(daySessionsError.message);
+  }
+
   const canonicalPayload = {
     user_id: user.id,
     plan_id: parsed.planId,
     week_id: parsed.weekId,
     date: parsed.date,
     sport: parsed.sport,
-    type: parsed.sessionType,
-    duration: parsed.durationMinutes,
-    session_type: parsed.sessionType,
+    type: parsed.sessionType || "Session",
+    target: parsed.target || null,
+    day_order: parsed.dayOrder ?? (daySessions?.length ?? 0),
     duration_minutes: parsed.durationMinutes,
-    notes: parsed.notes ?? null
+    notes: parsed.notes ?? null,
+    distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
+    distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
+    status: "planned"
   };
 
-  const legacyPayload = {
-    user_id: user.id,
-    plan_id: parsed.planId,
-    date: parsed.date,
-    sport: parsed.sport,
-    session_type: parsed.sessionType,
-    duration_minutes: parsed.durationMinutes,
-    notes: parsed.notes ?? null
-  };
-
-  const { error: createError } = await supabase.from("planned_sessions").insert({
-    ...canonicalPayload,
-    ...legacyPayload
-  });
-
-  const shouldRetryWithoutLegacy = isMissingColumnError(createError, "session_type") || isMissingColumnError(createError, "duration_minutes");
-  const shouldRetryWithoutCanonical = isMissingColumnError(createError, "type") || isMissingColumnError(createError, "duration");
-
-  const { error } = shouldRetryWithoutLegacy
-    ? await supabase.from("planned_sessions").insert(canonicalPayload)
-    : shouldRetryWithoutCanonical
-      ? await supabase.from("planned_sessions").insert(legacyPayload)
-      : { error: createError };
+  const { error } = await supabase.from("sessions").insert(canonicalPayload);
 
   if (error) {
     throw new Error(error.message);
@@ -507,6 +540,7 @@ export async function updateSessionAction(formData: FormData) {
     date: formData.get("date"),
     sport: formData.get("sport"),
     sessionType: formData.get("sessionType"),
+    target: formData.get("target"),
     durationMinutes: formData.get("durationMinutes"),
     notes: formData.get("notes"),
     distanceValue: formData.get("distanceValue"),
@@ -521,40 +555,40 @@ export async function updateSessionAction(formData: FormData) {
 
   const canonicalPayload = {
     plan_id: parsed.planId,
+    week_id: parsed.weekId,
     date: parsed.date,
     sport: parsed.sport,
-    type: parsed.sessionType,
-    duration: parsed.durationMinutes,
+    type: parsed.sessionType || "Session",
+    target: parsed.target || null,
     notes: parsed.notes ?? null,
-    user_id: user.id
-  };
-
-  const legacyPayload = {
-    plan_id: parsed.planId,
-    date: parsed.date,
-    sport: parsed.sport,
-    session_type: parsed.sessionType,
+    distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
+    distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
     duration_minutes: parsed.durationMinutes,
-    notes: parsed.notes ?? null,
+    status: parsed.status,
     user_id: user.id
   };
 
-  const { error: updateError } = await supabase
-    .from("planned_sessions")
-    .update({
-      ...canonicalPayload,
-      ...legacyPayload
-    })
-    .eq("id", parsed.sessionId);
+  const { error } = await supabase.from("sessions").update(canonicalPayload).eq("id", parsed.sessionId);
 
-  const shouldRetryWithoutLegacy = isMissingColumnError(updateError, "session_type") || isMissingColumnError(updateError, "duration_minutes");
-  const shouldRetryWithoutCanonical = isMissingColumnError(updateError, "type") || isMissingColumnError(updateError, "duration");
+  if (error) {
+    throw new Error(error.message);
+  }
 
-  const { error } = shouldRetryWithoutLegacy
-    ? await supabase.from("planned_sessions").update(canonicalPayload).eq("id", parsed.sessionId)
-    : shouldRetryWithoutCanonical
-      ? await supabase.from("planned_sessions").update(legacyPayload).eq("id", parsed.sessionId)
-      : { error: updateError };
+  revalidatePath("/plan");
+}
+
+export async function reorderSessionAction(input: z.infer<typeof reorderSessionSchema>) {
+  const parsed = reorderSessionSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
+
+  const { error } = await supabase
+    .from("sessions")
+    .update({ date: parsed.date, day_order: parsed.dayOrder, week_id: parsed.weekId })
+    .eq("id", parsed.sessionId)
+    .eq("plan_id", parsed.planId);
 
   if (error) {
     throw new Error(error.message);
@@ -574,6 +608,29 @@ export async function deleteSessionAction(formData: FormData) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  revalidatePath("/plan");
+}
+
+
+export async function bulkReorderSessionsAction(input: z.infer<typeof bulkReorderSessionSchema>) {
+  const parsed = bulkReorderSessionSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
+
+  for (const update of parsed.updates) {
+    const { error } = await supabase
+      .from("sessions")
+      .update({ date: update.date, day_order: update.dayOrder, week_id: update.weekId })
+      .eq("id", update.sessionId)
+      .eq("plan_id", parsed.planId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
   }
 
   revalidatePath("/plan");
