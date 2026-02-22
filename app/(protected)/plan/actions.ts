@@ -131,6 +131,70 @@ function isMissingColumnError(error: { code?: string; message?: string } | null,
   return /schema cache/i.test(message) && new RegExp(`['\"]${column}['\"]`, "i").test(message);
 }
 
+
+async function insertSessionWithCompat(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payload: Record<string, unknown>
+) {
+  const { error: initialError } = await supabase.from("sessions").insert(payload);
+
+  if (!initialError) {
+    return;
+  }
+
+  const withoutOptionalColumns: Record<string, unknown> = { ...payload };
+
+  if (isMissingColumnError(initialError, "day_order")) {
+    delete withoutOptionalColumns.day_order;
+  }
+
+  if (isMissingColumnError(initialError, "target")) {
+    delete withoutOptionalColumns.target;
+  }
+
+  if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
+    throw new Error(initialError.message);
+  }
+
+  const { error: retryError } = await supabase.from("sessions").insert(withoutOptionalColumns);
+
+  if (retryError) {
+    throw new Error(retryError.message);
+  }
+}
+
+async function updateSessionWithCompat(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  payload: Record<string, unknown>
+) {
+  const { error: initialError } = await supabase.from("sessions").update(payload).eq("id", sessionId);
+
+  if (!initialError) {
+    return;
+  }
+
+  const withoutOptionalColumns: Record<string, unknown> = { ...payload };
+
+  if (isMissingColumnError(initialError, "day_order")) {
+    delete withoutOptionalColumns.day_order;
+  }
+
+  if (isMissingColumnError(initialError, "target")) {
+    delete withoutOptionalColumns.target;
+  }
+
+  if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
+    throw new Error(initialError.message);
+  }
+
+  const { error: retryError } = await supabase.from("sessions").update(withoutOptionalColumns).eq("id", sessionId);
+
+  if (retryError) {
+    throw new Error(retryError.message);
+  }
+}
+
 async function assertWeekOwnership(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -316,15 +380,42 @@ export async function duplicateWeekForwardAction(formData: FormData) {
     }
   }
 
-  const { data: sourceSessions, error: sourceSessionsError } = await supabase
+  const sourceSessionsQuery = await supabase
     .from("sessions")
     .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,date,day_order")
     .eq("week_id", sourceWeek.id)
     .order("date", { ascending: true });
 
+  let sourceSessionsData: unknown[] | null = sourceSessionsQuery.data as unknown[] | null;
+  let sourceSessionsError = sourceSessionsQuery.error;
+
+  if (sourceSessionsError && (isMissingColumnError(sourceSessionsError, "target") || isMissingColumnError(sourceSessionsError, "day_order"))) {
+    const fallbackQuery = await supabase
+      .from("sessions")
+      .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,date")
+      .eq("week_id", sourceWeek.id)
+      .order("date", { ascending: true });
+
+    sourceSessionsData = fallbackQuery.data as unknown[] | null;
+    sourceSessionsError = fallbackQuery.error;
+  }
+
   if (sourceSessionsError) {
     throw new Error(sourceSessionsError.message);
   }
+
+  const sourceSessions = (sourceSessionsData ?? []) as Array<{
+    sport: string;
+    type: string;
+    target?: string | null;
+    duration_minutes: number;
+    notes: string | null;
+    distance_value: number | null;
+    distance_unit: string | null;
+    status: string;
+    date: string;
+    day_order?: number | null;
+  }>;
 
   if (!parsed.copySessions) {
     revalidatePath("/plan");
@@ -340,8 +431,8 @@ export async function duplicateWeekForwardAction(formData: FormData) {
   const targetStartDate = new Date(`${targetWeek.week_start_date}T00:00:00.000Z`);
   const sourceStartDate = new Date(`${sourceWeek.week_start_date}T00:00:00.000Z`);
 
-  if ((sourceSessions ?? []).length > 0) {
-    const payload = (sourceSessions ?? []).map((session) => {
+  if (sourceSessions.length > 0) {
+    const payload = sourceSessions.map((session) => {
       const sessionDate = new Date(`${session.date}T00:00:00.000Z`);
       const offsetDays = Math.round((sessionDate.getTime() - sourceStartDate.getTime()) / (1000 * 60 * 60 * 24));
       const targetDate = new Date(targetStartDate);
@@ -523,11 +614,7 @@ export async function createSessionAction(formData: FormData) {
     status: "planned"
   };
 
-  const { error } = await supabase.from("sessions").insert(canonicalPayload);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await insertSessionWithCompat(supabase, canonicalPayload);
 
   revalidatePath("/plan");
 }
@@ -568,11 +655,7 @@ export async function updateSessionAction(formData: FormData) {
     user_id: user.id
   };
 
-  const { error } = await supabase.from("sessions").update(canonicalPayload).eq("id", parsed.sessionId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await updateSessionWithCompat(supabase, parsed.sessionId, canonicalPayload);
 
   revalidatePath("/plan");
 }
@@ -590,7 +673,17 @@ export async function reorderSessionAction(input: z.infer<typeof reorderSessionS
     .eq("id", parsed.sessionId)
     .eq("plan_id", parsed.planId);
 
-  if (error) {
+  if (error && isMissingColumnError(error, "day_order")) {
+    const { error: retryError } = await supabase
+      .from("sessions")
+      .update({ date: parsed.date, week_id: parsed.weekId })
+      .eq("id", parsed.sessionId)
+      .eq("plan_id", parsed.planId);
+
+    if (retryError) {
+      throw new Error(retryError.message);
+    }
+  } else if (error) {
     throw new Error(error.message);
   }
 
@@ -628,7 +721,17 @@ export async function bulkReorderSessionsAction(input: z.infer<typeof bulkReorde
       .eq("id", update.sessionId)
       .eq("plan_id", parsed.planId);
 
-    if (error) {
+    if (error && isMissingColumnError(error, "day_order")) {
+      const { error: retryError } = await supabase
+        .from("sessions")
+        .update({ date: update.date, week_id: update.weekId })
+        .eq("id", update.sessionId)
+        .eq("plan_id", parsed.planId);
+
+      if (retryError) {
+        throw new Error(retryError.message);
+      }
+    } else if (error) {
       throw new Error(error.message);
     }
   }

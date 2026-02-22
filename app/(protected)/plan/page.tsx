@@ -143,22 +143,28 @@ export default async function PlanPage({
 
   let sessionsData: Session[] = [];
   if (selectedPlan) {
-    let primary = await supabase
+    const primaryQuery = await supabase
       .from("sessions")
       .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
 
-    if (primary.error && (isMissingColumnError(primary.error, "target") || isMissingColumnError(primary.error, "day_order"))) {
-      primary = await supabase
+    let primaryData: unknown[] | null = primaryQuery.data as unknown[] | null;
+    let primaryError = primaryQuery.error;
+
+    if (primaryError && (isMissingColumnError(primaryError, "target") || isMissingColumnError(primaryError, "day_order"))) {
+      const fallbackQuery = await supabase
         .from("sessions")
         .select("id,plan_id,week_id,date,sport,type,duration_minutes,notes,distance_value,distance_unit,status")
         .eq("plan_id", selectedPlan.id)
         .order("date", { ascending: true });
+
+      primaryData = fallbackQuery.data as unknown[] | null;
+      primaryError = fallbackQuery.error;
     }
 
-    if (primary.error && isMissingTableError(primary.error, "public.sessions")) {
+    if (primaryError && isMissingTableError(primaryError, "public.sessions")) {
       const legacy = await supabase
         .from("planned_sessions")
         .select("id,plan_id,date,sport,type,duration,notes")
@@ -192,10 +198,10 @@ export default async function PlanPage({
         distance_unit: null,
         status: "planned"
       }));
-    } else if (primary.error) {
-      throw new Error(primary.error.message);
+    } else if (primaryError) {
+      throw new Error(primaryError.message);
     } else {
-      sessionsData = (primary.data ?? []) as Session[];
+      sessionsData = (primaryData ?? []) as Session[];
     }
   }
 
