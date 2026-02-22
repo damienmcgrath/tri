@@ -39,6 +39,32 @@ supabase db push
 
 This provisions `training_plans`, `planned_sessions`, `completed_sessions`, and `ingestion_events` with RLS policies used by the app.
 
+
+If you see this error on `supabase db push`:
+
+```
+Remote migration versions not found in local migrations directory.
+```
+
+use this remote-only recovery flow (no local DB required):
+
+```bash
+# 1) Inspect mismatch
+supabase migration list
+
+# 2) Mark the missing remote version(s) as reverted in history
+# Replace <version> with the exact value from migration list
+supabase migration repair --status reverted <version>
+
+# 3) Pull current remote schema into a new local migration file
+supabase db pull
+
+# 4) Push local migrations again
+supabase db push
+```
+
+Tip: if your team already has the missing migration SQL in git, prefer pulling latest git changes first instead of repairing history.
+
 ### 4) Enable Supabase email/password auth
 
 In your Supabase project:
@@ -66,7 +92,7 @@ Open `http://localhost:3000`.
 ### Notes
 
 - Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
-- Dashboard includes a TCX upload flow for importing Garmin-exported workouts as a temporary bridge until direct Garmin API sync.
+- Garmin manual TCX upload now lives under **Settings → Integrations** as a temporary bridge until direct Garmin API sync.
 
 ## 📌 Overview
 TriCoach AI is a web-based training companion for amateur triathletes. It automates personalized training-plan management by integrating with Garmin Connect, analyzing workout data, and offering an AI coach for plan adaptation and guidance.
@@ -191,11 +217,6 @@ The product is designed first for solo athletes who want expert-level coaching s
 - Cache repeated AI questions and Garmin-derived summaries.
 - Use on-demand data refresh over frequent polling where possible.
 - Keep Garmin raw files in low-cost object storage; normalize only required fields.
-
----
-
-## 🚀 Supabase quick start
-Need a practical setup walkthrough after creating your account? See `SUPABASE_SETUP.md`.
 
 ---
 

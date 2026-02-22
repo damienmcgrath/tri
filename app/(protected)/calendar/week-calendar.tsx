@@ -18,7 +18,14 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction, swapSessionDayAction } from "@/app/(protected)/calendar/actions";
+import {
+  clearSkippedAction,
+  markSkippedAction,
+  moveSessionAction,
+  quickAddSessionAction,
+  swapSessionDayAction,
+  updateSessionAction
+} from "@/app/(protected)/calendar/actions";
 
 type SessionStatus = "planned" | "completed" | "skipped";
 type FilterStatus = "all" | SessionStatus;
@@ -53,6 +60,20 @@ function parseTarget(notes: string | null) {
   return firstLine.replace(/\[skipped\s\d{4}-\d{2}-\d{2}\]/i, "").trim();
 }
 
+function buildSessionTitle(session: CalendarSession) {
+  const type = session.type?.trim();
+  if (type && type.toLowerCase() !== "session") {
+    return type;
+  }
+
+  const target = parseTarget(session.notes);
+  if (target) {
+    return target;
+  }
+
+  return `${getDisciplineMeta(session.sport).label} session`;
+}
+
 function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
@@ -81,6 +102,8 @@ export function WeekCalendar({
   const [quickAddState, setQuickAddState] = useState<{ initialDate: string; allowDaySelection: boolean } | null>(null);
   const [swapSource, setSwapSource] = useState<CalendarSession | null>(null);
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
+  const [skipConfirmSession, setSkipConfirmSession] = useState<CalendarSession | null>(null);
   const [toast, setToast] = useState<{ message: string; undoLabel?: string; onUndo?: () => void } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -113,6 +136,7 @@ export function WeekCalendar({
   }, [sessions, weekDays]);
 
   const sessionsById = useMemo(() => Object.fromEntries(localSessions.map((session) => [session.id, session])), [localSessions]);
+  const detailSession = detailSessionId ? sessionsById[detailSessionId] ?? null : null;
 
   const filteredIdsByDay = useMemo(() => {
     return weekDays.reduce<Record<string, string[]>>((acc, day) => {
@@ -234,6 +258,67 @@ export function WeekCalendar({
     });
   }
 
+  function handleSkipSession(session: CalendarSession) {
+    startTransition(() => {
+      void (async () => {
+        const wasSkipped = session.status === "skipped";
+
+        setLocalSessions((prev) =>
+          prev.map((item) => {
+            if (item.id !== session.id) {
+              return item;
+            }
+
+            if (wasSkipped) {
+              return {
+                ...item,
+                status: "planned",
+                notes: clearSkippedTag(item.notes) || null
+              };
+            }
+
+            const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
+            return {
+              ...item,
+              status: "skipped",
+              notes: item.notes ? `${item.notes}\n${skipTag}` : skipTag
+            };
+          })
+        );
+
+        try {
+          if (wasSkipped) {
+            await clearSkippedAction({ sessionId: session.id });
+            setToast({ message: "Skipped status removed" });
+          } else {
+            await markSkippedAction({ sessionId: session.id });
+            setToast({
+              message: "Marked skipped",
+              undoLabel: "Undo",
+              onUndo: () => {
+                startTransition(() => {
+                  void (async () => {
+                    try {
+                      await clearSkippedAction({ sessionId: session.id });
+                      setToast({ message: "Skip undone" });
+                      router.refresh();
+                    } catch {
+                      setToast({ message: "Could not undo" });
+                    }
+                  })();
+                });
+              }
+            });
+          }
+          router.refresh();
+        } catch {
+          setLocalSessions((prev) => prev.map((item) => (item.id === session.id ? { ...item, status: session.status, notes: session.notes } : item)));
+          setToast({ message: wasSkipped ? "Could not undo skipped status" : "Could not mark session as skipped" });
+        }
+      })();
+    });
+  }
+
   return (
     <section className="space-y-3">
       <header className="surface sticky top-2 z-20 space-y-3 px-4 py-3 backdrop-blur">
@@ -330,7 +415,7 @@ export function WeekCalendar({
                       {isToday ? <span className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">Today</span> : null}
                     </div>
                     <p className="text-sm font-semibold">{day.label}</p>
-                    <p className="text-xs text-muted">{planned === 0 ? "Rest" : `${completed}/${planned} min`}</p>
+                    <p className="text-xs text-muted">{planned === 0 ? "rest" : `${completed}/${planned} min`}</p>
                   </div>
 
                   <SortableContext items={ids} strategy={verticalListSortingStrategy}>
@@ -347,84 +432,16 @@ export function WeekCalendar({
                             <SortableSessionCard
                               key={session.id}
                               session={session}
-                              onSkip={() => {
-                                startTransition(() => {
-                                  void (async () => {
-                                    const wasSkipped = session.status === "skipped";
-
-                                    setLocalSessions((prev) =>
-                                      prev.map((item) => {
-                                        if (item.id !== session.id) {
-                                          return item;
-                                        }
-
-                                        if (wasSkipped) {
-                                          return {
-                                            ...item,
-                                            status: "planned",
-                                            notes: clearSkippedTag(item.notes) || null
-                                          };
-                                        }
-
-                                        const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
-                                        return {
-                                          ...item,
-                                          status: "skipped",
-                                          notes: item.notes ? `${item.notes}\n${skipTag}` : skipTag
-                                        };
-                                      })
-                                    );
-
-                                    try {
-                                      if (wasSkipped) {
-                                        await clearSkippedAction({ sessionId: session.id });
-                                        setToast({
-                                          message: "Skipped status removed",
-                                          undoLabel: "Undo",
-                                          onUndo: () => {
-                                            startTransition(() => {
-                                              void (async () => {
-                                                try {
-                                                  await markSkippedAction({ sessionId: session.id });
-                                                  setToast({ message: "Re-marked skipped" });
-                                                  router.refresh();
-                                                } catch {
-                                                  setToast({ message: "Could not undo" });
-                                                }
-                                              })();
-                                            });
-                                          }
-                                        });
-                                      } else {
-                                        await markSkippedAction({ sessionId: session.id });
-                                        setToast({
-                                          message: "Marked skipped",
-                                          undoLabel: "Undo",
-                                          onUndo: () => {
-                                            startTransition(() => {
-                                              void (async () => {
-                                                try {
-                                                  await clearSkippedAction({ sessionId: session.id });
-                                                  setToast({ message: "Skip undone" });
-                                                  router.refresh();
-                                                } catch {
-                                                  setToast({ message: "Could not undo" });
-                                                }
-                                              })();
-                                            });
-                                          }
-                                        });
-                                      }
-                                      router.refresh();
-                                    } catch {
-                                      setLocalSessions((prev) => prev.map((item) => (item.id === session.id ? { ...item, status: session.status, notes: session.notes } : item)));
-                                      setToast({ message: wasSkipped ? "Could not undo skipped status" : "Could not mark session as missed" });
-                                    }
-                                  })();
-                                });
-                              }}
+                              onOpen={() => setDetailSessionId(session.id)}
                               onMove={() => setMoveSource(session)}
                               onSwap={() => setSwapSource(session)}
+                              onSkip={() => {
+                                if (session.status === "skipped") {
+                                  handleSkipSession(session);
+                                } else {
+                                  setSkipConfirmSession(session);
+                                }
+                              }}
                             />
                           );
                         })
@@ -575,8 +592,43 @@ export function WeekCalendar({
         />
       ) : null}
 
+      {skipConfirmSession ? (
+        <SkipConfirmModal
+          session={skipConfirmSession}
+          onCancel={() => setSkipConfirmSession(null)}
+          onConfirm={() => {
+            handleSkipSession(skipConfirmSession);
+            setSkipConfirmSession(null);
+          }}
+        />
+      ) : null}
+
+      {detailSession ? (
+        <SessionDetailDrawer
+          session={detailSession}
+          onClose={() => setDetailSessionId(null)}
+          onSave={(payload) => {
+            const previous = detailSession;
+            setLocalSessions((prev) => prev.map((item) => (item.id === detailSession.id ? { ...item, ...payload, notes: payload.notes || null } : item)));
+            startTransition(() => {
+              void (async () => {
+                try {
+                  await updateSessionAction({ sessionId: detailSession.id, ...payload });
+                  setToast({ message: "Session updated" });
+                  setDetailSessionId(null);
+                  router.refresh();
+                } catch {
+                  setLocalSessions((prev) => prev.map((item) => (item.id === previous.id ? previous : item)));
+                  setToast({ message: "Could not update session" });
+                }
+              })();
+            });
+          }}
+        />
+      ) : null}
+
       {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-cyan-400/45 bg-slate-950/95 px-3 py-2 text-xs text-cyan-100 shadow-lg shadow-black/50">
+        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-cyan-400/45 bg-slate-950/95 px-3 py-2 text-xs text-cyan-100 shadow-lg shadow-black/50 sm:left-auto sm:right-6 sm:translate-x-0">
           <span>{toast.message}</span>
           {toast.onUndo ? (
             <button
@@ -599,20 +651,19 @@ export function WeekCalendar({
 
 function DayDropZone({ children, id, isActive }: { children: ReactNode; id: string; isActive: boolean }) {
   const { isOver, setNodeRef } = useDroppable({ id });
-  return (
-    <div ref={setNodeRef} className={`${isOver ? "rounded-2xl ring-1 ring-cyan-300/70" : ""} ${isActive ? "transition" : ""}`}>
-      {children}
-    </div>
-  );
+  const highlight = isActive && isOver;
+  return <div ref={setNodeRef} className={highlight ? "rounded-2xl ring-1 ring-cyan-300/70" : ""}>{children}</div>;
 }
 
 function SortableSessionCard({
   session,
+  onOpen,
   onSkip,
   onMove,
   onSwap
 }: {
   session: CalendarSession;
+  onOpen: () => void;
   onSkip: () => void;
   onMove: () => void;
   onSwap: () => void;
@@ -623,16 +674,14 @@ function SortableSessionCard({
     transition
   };
   const discipline = getDisciplineMeta(session.sport);
-  const target = parseTarget(session.notes);
   const skipped = session.status === "skipped" || isSkipped(session.notes);
+  const title = buildSessionTitle(session);
 
   return (
     <article
       ref={setNodeRef}
       style={style}
       className={`group relative surface-subtle p-2.5 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-80" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
-      {...attributes}
-      {...listeners}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
@@ -643,30 +692,39 @@ function SortableSessionCard({
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="pointer-events-none text-xs text-cyan-200/65 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden>
-              ⋮⋮
-            </span>
-            <SessionOverflowMenu sessionType={session.type} sessionStatus={session.status} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
+            <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
           </div>
         </div>
 
-        <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{session.type}</p>
-        <p className="text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
-        {target ? <p className="line-clamp-1 text-[11px] text-muted">{target}</p> : null}
+        <button type="button" onClick={onOpen} className="w-full text-left" aria-label={`Open details for ${title}`}>
+          <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{title}</p>
+          <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
+        </button>
       </div>
+      <button
+        type="button"
+        className="absolute right-2 bottom-2 rounded p-1 text-cyan-200/65 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        aria-label={`Drag ${title}`}
+        {...attributes}
+        {...listeners}
+      >
+        ⋮⋮
+      </button>
     </article>
   );
 }
 
 function SessionOverflowMenu({
-  sessionType,
+  sessionTitle,
   sessionStatus,
+  onOpen,
   onMove,
   onSwap,
   onSkip
 }: {
-  sessionType: string;
+  sessionTitle: string;
   sessionStatus: SessionStatus;
+  onOpen: () => void;
   onMove: () => void;
   onSwap: () => void;
   onSkip: () => void;
@@ -696,7 +754,7 @@ function SessionOverflowMenu({
     };
   }, [isOpen]);
 
-  const skipLabel = sessionStatus === "skipped" ? "Unskip" : "Mark skipped";
+  const skipLabel = sessionStatus === "skipped" ? "Clear skipped" : "Mark skipped";
 
   return (
     <div className="relative" ref={menuRef}>
@@ -705,7 +763,7 @@ function SessionOverflowMenu({
         className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-sm text-muted hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-label={`Open actions for ${sessionType}`}
+        aria-label={`Open actions for ${sessionTitle}`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
@@ -717,11 +775,12 @@ function SessionOverflowMenu({
 
       {isOpen ? (
         <div
-          className="absolute right-0 top-8 z-30 min-w-[140px] rounded-lg border border-white/15 bg-slate-950/95 p-1 shadow-xl"
+          className="absolute right-0 top-8 z-30 min-w-[160px] rounded-lg border border-white/15 bg-slate-950/95 p-1 shadow-xl"
           role="menu"
           onPointerDown={(event) => event.stopPropagation()}
         >
           {[
+            { label: "Open details", action: onOpen },
             { label: "Move", action: onMove },
             { label: "Swap days", action: onSwap },
             { label: skipLabel, action: onSkip }
@@ -740,6 +799,83 @@ function SessionOverflowMenu({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SessionDetailDrawer({
+  session,
+  onClose,
+  onSave
+}: {
+  session: CalendarSession;
+  onClose: () => void;
+  onSave: (payload: { type: string; duration: number; notes: string; status: SessionStatus }) => void;
+}) {
+  const [type, setType] = useState(session.type);
+  const [duration, setDuration] = useState(String(session.duration));
+  const [notes, setNotes] = useState(session.notes ?? "");
+  const [status, setStatus] = useState<SessionStatus>(session.status);
+  const parsedDuration = Number(duration);
+  const isDurationValid = Number.isInteger(parsedDuration) && parsedDuration >= 1 && parsedDuration <= 480;
+
+  useEffect(() => {
+    setType(session.type);
+    setDuration(String(session.duration));
+    setNotes(session.notes ?? "");
+    setStatus(session.status);
+  }, [session]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/45" onClick={onClose}>
+      <aside className="surface h-full w-full max-w-md p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">Session details</h3>
+          <button className="btn-secondary px-2 py-1 text-xs" onClick={onClose}>Close</button>
+        </div>
+        <p className="mt-1 text-xs text-muted">{buildSessionTitle(session)} • {dayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="label-base mb-1 text-xs">Title</span>
+            <input className="input-base" value={type} onChange={(e) => setType(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="label-base mb-1 text-xs">Duration (min)</span>
+            <input className="input-base" value={duration} type="number" min={1} max={480} onChange={(e) => setDuration(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="label-base mb-1 text-xs">Status</span>
+            <select className="input-base" value={status} onChange={(event) => setStatus(event.target.value as SessionStatus)}>
+              <option value="planned">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="skipped">Skipped</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="label-base mb-1 text-xs">Target / Notes</span>
+            <textarea className="input-base min-h-[110px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
+          <button className="btn-primary px-3 py-1.5 text-xs" disabled={!isDurationValid} onClick={() => isDurationValid && onSave({ type, duration: parsedDuration, notes, status })}>Save</button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function SkipConfirmModal({ session, onCancel, onConfirm }: { session: CalendarSession; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/65 p-3" onClick={onCancel}>
+      <div className="surface w-full max-w-sm p-4" onClick={(event) => event.stopPropagation()}>
+        <h3 className="text-base font-semibold">Mark as skipped?</h3>
+        <p className="mt-2 text-xs text-muted">{buildSessionTitle(session)}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary px-3 py-1.5 text-xs" onClick={onConfirm}>Mark skipped</button>
+        </div>
+      </div>
     </div>
   );
 }
