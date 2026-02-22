@@ -47,14 +47,20 @@ export async function DELETE(_: Request, { params }: { params: { uploadId: strin
     return NextResponse.json({ error: activityDeleteError.message }, { status: 400 });
   }
 
-  const { error: uploadDeleteError } = await supabase
+  const { data: deletedUpload, error: uploadDeleteError } = await supabase
     .from("activity_uploads")
     .delete()
     .eq("id", params.uploadId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
 
   if (uploadDeleteError) {
     return NextResponse.json({ error: uploadDeleteError.message }, { status: 400 });
+  }
+
+  if (!deletedUpload) {
+    return NextResponse.json({ error: "Delete blocked by permissions. Apply latest DB migrations." }, { status: 403 });
   }
 
   return NextResponse.json({ ok: true });
