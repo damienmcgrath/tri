@@ -143,9 +143,8 @@ function SortableSessionCard({ session, onOpen }: { session: Session; onOpen: (i
           ⋮⋮
         </span>
       </div>
-      <p className="mt-1 text-xs font-semibold">{session.type || "Session"}</p>
-      {session.target ? <p className="text-[11px] text-cyan-200">{session.target}</p> : null}
-      <p className="text-xs text-muted">{session.duration_minutes} min</p>
+      <p className="mt-1 line-clamp-2 text-xs font-semibold">{session.type || "Session"}</p>
+      <p className="mt-1 text-xs text-muted">{session.duration_minutes} min</p>
     </button>
   );
 }
@@ -282,8 +281,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
                   <input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} />
                   <label className="label-base" htmlFor="focus">Week focus</label><select id="focus" name="focus" defaultValue={selectedWeek.focus} className="input-base"><option>Build</option><option>Recovery</option><option>Taper</option><option>Race</option><option>Custom</option></select>
                   <label className="label-base" htmlFor="notes">Coach notes</label><textarea id="notes" name="notes" defaultValue={selectedWeek.notes ?? ""} className="input-base min-h-24" />
-                  <div className="grid grid-cols-2 gap-3"><div><label className="label-base" htmlFor="targetMinutes">Target (goal) minutes</label><input id="targetMinutes" name="targetMinutes" type="number" min={0} defaultValue={selectedWeek.target_minutes ?? ""} className="input-base" /></div><div><label className="label-base" htmlFor="targetTss">Target (goal) TSS</label><input id="targetTss" name="targetTss" type="number" min={0} defaultValue={selectedWeek.target_tss ?? ""} className="input-base" /></div></div>
-                  <button className="btn-primary">Save week metadata</button>
+                  <div><label className="label-base" htmlFor="targetMinutes">Target (goal) minutes</label><input id="targetMinutes" name="targetMinutes" type="number" min={0} defaultValue={selectedWeek.target_minutes ?? ""} className="input-base" /></div>
+                  <button className="btn-primary">Save</button>
                 </form>
                 <div className="space-y-3">
                   <div className="surface-subtle p-3"><p className="text-xs uppercase tracking-wide text-muted">Planned (from sessions)</p><p className="mt-1 text-2xl font-semibold">{totalMinutes}</p><p className="text-xs text-muted">Δ vs target: {minuteDelta > 0 ? "+" : ""}{minuteDelta} min</p></div>
@@ -306,13 +305,13 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
             <article className="surface p-5">
               <h3 className="text-lg font-semibold">Week schedule (Mon–Sun)</h3>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                <div className="mt-3 grid gap-3 xl:grid-cols-7">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                   {weekDays.map((day) => {
                     const isExpanded = expandedDays[day.iso] ?? false;
                     const visible = isExpanded ? day.sessions : day.sessions.slice(0, 2);
                     const hiddenCount = Math.max(day.sessions.length - visible.length, 0);
                     return (
-                      <section key={day.iso} className="surface-subtle p-3" id={`day-${day.iso}`}>
+                      <section key={day.iso} className="surface-subtle min-h-[220px] p-3" id={`day-${day.iso}`}>
                         <p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p><p className="mt-1 text-xs text-muted">{day.totalMinutes} min</p>
                         <SortableContext items={day.sessions.map((session) => `session-${session.id}`)} strategy={rectSortingStrategy}>
                           <DayDropZone iso={day.iso}><div className="mt-3 space-y-2" data-day={day.iso}>

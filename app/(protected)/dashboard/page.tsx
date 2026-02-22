@@ -295,7 +295,6 @@ export default async function DashboardPage({
           ) : (
             <Link href="/settings/race" className="btn-secondary px-3 py-1.5 text-xs">Set race date</Link>
           )}
-          <Link href="/plan" className="btn-primary px-3 py-1.5 text-xs">+ Add</Link>
           <Link href="/coach" className="btn-primary px-3 py-1.5 text-xs">Ask tri.ai</Link>
         </div>
       </header>
@@ -320,8 +319,36 @@ export default async function DashboardPage({
             </article>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <article className="surface p-4">
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
+            <article className="surface p-4 lg:order-1">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Week Progress</h2>
+                <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-200">Minutes</span>
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-cyan-200">Completed {totals.completed} / {totals.planned} min</p>
+              <p className="text-sm text-muted">
+                {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)} • Remaining {Math.max(0, totals.planned - totals.completed)} min
+              </p>
+
+              <div className="mt-4 space-y-3">
+                {progressBySport.map((item) => {
+                  const discipline = getDisciplineMeta(item.sport);
+                  return (
+                    <div key={item.sport}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${discipline.className}`}>{discipline.label}</span>
+                        <span className="text-muted">{item.completed}/{item.planned} min</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]">
+                        <div className={`${discipline.className} h-full`} style={{ width: `${item.pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="surface p-4 lg:order-2">
               <div className="mb-3 flex items-center justify-between">
                 <h1 className="text-xl font-semibold">Today + Next up</h1>
                 <p className="text-xs text-muted">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
@@ -369,37 +396,6 @@ export default async function DashboardPage({
                   Open next session
                 </Link>
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log done</Link>
-              </div>
-            </article>
-
-            <article className="surface p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Week Progress</h2>
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">Minutes</span>
-                  <span title="Coming soon" className="cursor-not-allowed rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-muted">Load (TSS)</span>
-                </div>
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-cyan-200">Completed {totals.completed} / {totals.planned} min</p>
-              <p className="text-sm text-muted">
-                {toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)} • Remaining {Math.max(0, totals.planned - totals.completed)} min
-              </p>
-
-              <div className="mt-4 space-y-3">
-                {progressBySport.map((item) => {
-                  const discipline = getDisciplineMeta(item.sport);
-                  return (
-                    <div key={item.sport}>
-                      <div className="mb-1 flex items-center justify-between text-xs">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${discipline.className}`}>{discipline.label}</span>
-                        <span className="text-muted">{item.completed}/{item.planned} min</span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]">
-                        <div className={`${discipline.className} h-full`} style={{ width: `${item.pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             </article>
           </div>
