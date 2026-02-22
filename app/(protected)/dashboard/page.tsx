@@ -210,6 +210,19 @@ export default async function DashboardPage({
   );
   const completionPct = totals.planned === 0 ? 0 : Math.min(100, Math.round((totals.completed / totals.planned) * 100));
   const remainingMinutes = Math.max(0, totals.planned - totals.completed);
+  const todayIndex = weekDays.findIndex((day) => day.iso === todayIso);
+  const elapsedDays = todayIndex === -1 ? (todayIso < weekStart ? 0 : 7) : todayIndex + 1;
+  const expectedByNowMinutes = elapsedDays === 0 ? 0 : Math.round((totals.planned * elapsedDays) / 7);
+  const expectedPctByNow = elapsedDays === 0 || totals.planned === 0 ? 0 : Math.min(100, Math.round((expectedByNowMinutes / totals.planned) * 100));
+  const paceDeltaMinutes = totals.completed - expectedByNowMinutes;
+  const daysLeftIncludingToday = todayIndex === -1 ? (todayIso < weekStart ? 7 : 0) : 7 - todayIndex;
+  const minutesPerDayNeeded = daysLeftIncludingToday > 0 ? Math.ceil(remainingMinutes / daysLeftIncludingToday) : 0;
+  const paceTone = paceDeltaMinutes >= 0 ? "text-emerald-200 border-emerald-400/40 bg-emerald-500/15" : "text-amber-200 border-amber-400/40 bg-amber-500/15";
+  const paceLabel = elapsedDays === 0
+    ? "Week not started"
+    : paceDeltaMinutes >= 0
+      ? `Ahead by ${paceDeltaMinutes} min`
+      : `Behind by ${Math.abs(paceDeltaMinutes)} min`;
 
 
   const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
@@ -339,8 +352,26 @@ export default async function DashboardPage({
                 </span>
               </p>
               <div className="mt-3">
-                <div className="h-3 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]">
+                <div className="relative h-3 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]">
                   <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-blue-400/90 transition-[width]" style={{ width: `${completionPct}%` }} />
+                  {isCurrentWeek && expectedPctByNow > 0 && expectedPctByNow < 100 ? (
+                    <div className="absolute inset-y-0 w-px bg-white/65" style={{ left: `${expectedPctByNow}%` }} aria-hidden="true" />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="surface-subtle rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-muted">Finish line</p>
+                  <p className="mt-0.5 text-sm font-medium text-cyan-100 tabular-nums">{remainingMinutes} min left</p>
+                </div>
+                <div className="surface-subtle rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-muted">Daily target</p>
+                  <p className="mt-0.5 text-sm font-medium text-cyan-100 tabular-nums">{minutesPerDayNeeded} min/day</p>
+                </div>
+                <div className={`rounded-lg border px-2.5 py-2 ${paceTone}`}>
+                  <p className="text-[10px] uppercase tracking-wide">Pace check</p>
+                  <p className="mt-0.5 text-sm font-medium tabular-nums">{paceLabel}</p>
                 </div>
               </div>
 
