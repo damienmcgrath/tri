@@ -96,7 +96,7 @@ export function WeekProgressCard({
           />
           <div className="relative flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
             <span className="text-lg font-semibold leading-none">{percentLabel}</span>
-            <span className="mt-1 text-[10px] text-muted">complete</span>
+            
           </div>
         </div>
 
