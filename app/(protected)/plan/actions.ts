@@ -186,7 +186,10 @@ export async function createPlanAction(formData: FormData) {
     throw new Error(weeksError.message);
   }
 
+  await supabase.from("profiles").upsert({ id: user.id, active_plan_id: plan.id }, { onConflict: "id" });
+
   revalidatePath("/plan");
+  revalidatePath("/dashboard");
   redirect(`/plan?plan=${plan.id}`);
 }
 
@@ -208,7 +211,21 @@ export async function deletePlanAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  const { data: currentProfile } = await supabase.from("profiles").select("active_plan_id").eq("id", user.id).maybeSingle();
+  if (currentProfile?.active_plan_id === parsed.planId) {
+    const { data: fallbackPlan } = await supabase
+      .from("training_plans")
+      .select("id")
+      .eq("user_id", user.id)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    await supabase.from("profiles").upsert({ id: user.id, active_plan_id: fallbackPlan?.id ?? null }, { onConflict: "id" });
+  }
+
   revalidatePath("/plan");
+  revalidatePath("/dashboard");
   redirect("/plan");
 }
 

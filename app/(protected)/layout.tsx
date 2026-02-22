@@ -47,9 +47,7 @@ export default async function ProtectedLayout({
     <div className="app-shell">
       <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div>
-            <p className="text-lg uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
-          </div>
+          <p className="text-lg uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
           <nav className="flex flex-wrap gap-2">
             {navItems.map((item) => (
               <Link
@@ -61,8 +59,9 @@ export default async function ProtectedLayout({
               </Link>
             ))}
           </nav>
+
           <details className="group relative">
-            <summary className="list-none cursor-pointer rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-0.5 transition hover:border-cyan-400/50">
+            <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-0.5 transition hover:border-cyan-400/50">
               {profile?.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={profile.avatar_url} alt="User avatar" className="h-9 w-9 rounded-full object-cover" />
@@ -75,11 +74,15 @@ export default async function ProtectedLayout({
 
             <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3 shadow-2xl shadow-black/40">
               <div className="border-b border-[hsl(var(--border))] pb-3">
-                <p className="text-sm font-semibold text-[hsl(var(--fg))]">{displayName}</p>
+                <p className="text-xs uppercase tracking-[0.15em] text-muted">Account</p>
+                <p className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">{displayName}</p>
                 <p className="text-xs text-muted">{email}</p>
               </div>
 
               <div className="mt-3 space-y-1">
+                <Link href="/settings" className="block rounded-lg px-2 py-1.5 text-sm text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]">
+                  Account
+                </Link>
                 <Link href="/settings/race" className="block rounded-lg px-2 py-1.5 text-sm text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]">
                   Race settings
                 </Link>

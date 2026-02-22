@@ -89,6 +89,10 @@ export default async function PlanPage({
   const plans = (plansData ?? []) as Plan[];
   const selectedPlan = plans.find((plan) => plan.id === searchParams?.plan) ?? plans[0];
 
+  if (selectedPlan) {
+    await supabase.from("profiles").upsert({ id: user.id, active_plan_id: selectedPlan.id }, { onConflict: "id" });
+  }
+
   const { data: initialWeeksData, error: weeksError } = selectedPlan
     ? await supabase
         .from("training_weeks")
