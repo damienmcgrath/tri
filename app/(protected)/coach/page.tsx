@@ -13,6 +13,13 @@ export default function CoachPage() {
         ]}
       />
 
+      <div className="surface-subtle flex flex-wrap items-center gap-2 px-4 py-3 text-xs">
+        <span className="font-semibold uppercase tracking-[0.14em] text-muted">Context strip</span>
+        <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Week goal: keep key sessions on plan</span>
+        <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Fatigue: balanced</span>
+        <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Confidence: building</span>
+      </div>
+
       <CoachChat />
     </section>
   );

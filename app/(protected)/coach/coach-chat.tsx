@@ -184,6 +184,19 @@ export function CoachChat() {
     ];
   }, [summary]);
 
+  const contextStrip = useMemo(() => {
+    const planned = summary?.plannedMinutes ?? 0;
+    const completed = summary?.completedMinutes ?? 0;
+    const remaining = Math.max(planned - completed, 0);
+    const completionPct = summary?.completionPct ?? 0;
+
+    return {
+      weekGoal: planned > 0 ? `Close ${remaining} remaining minutes without sacrificing quality sessions.` : "Log your first completed session to establish this week goal.",
+      fatigueState: completionPct >= 85 ? "Controlled" : completionPct >= 65 ? "Balanced" : "Accumulating",
+      confidence: confidenceSignal.label
+    };
+  }, [summary, confidenceSignal.label]);
+
   async function loadConversations() {
     try {
       const response = await fetch("/api/coach/chat", { method: "GET" });
@@ -277,21 +290,28 @@ export function CoachChat() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
       <section className="space-y-4">
+        <div className="surface-subtle flex flex-wrap items-center gap-2 px-4 py-3 text-xs">
+          <span className="font-semibold uppercase tracking-[0.14em] text-muted">Live context</span>
+          <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Week goal: {contextStrip.weekGoal}</span>
+          <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Fatigue: {contextStrip.fatigueState}</span>
+          <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">Confidence: {contextStrip.confidence}</span>
+        </div>
         <div className="surface p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">This Week Decision Board</p>
-              <h3 className="mt-1 text-base font-semibold">Generated from completion signals and current load</h3>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">Weekly coaching takeaway</p>
+              <h3 className="mt-1 text-lg font-semibold">{decisionCards[0]?.recommendation}</h3>
+              <p className="mt-2 text-sm text-muted">{decisionCards[0]?.detail}</p>
             </div>
             <span className={`signal-chip ${urgencySignal.tone}`}>Urgency: {urgencySignal.label}</span>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {decisionCards.map((card) => (
-              <article key={card.id} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-4">
-                <p className="text-xs uppercase tracking-wide text-tertiary">{card.title}</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {decisionCards.slice(1).map((card) => (
+              <article key={card.id} className="surface-subtle p-4">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{card.title}</p>
                 <p className="mt-2 text-sm font-semibold text-[hsl(var(--text-primary))]">{card.recommendation}</p>
                 <p className="mt-2 text-sm text-muted">{card.detail}</p>
-                <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="mt-4 flex items-center justify-between gap-2">
                   <span className={`signal-chip ${card.tone}`}>{card.tone.replace("signal-", "")}</span>
                   <a href={card.actionHref} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] underline-offset-2 hover:underline">
                     {card.actionLabel}

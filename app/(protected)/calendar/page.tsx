@@ -210,6 +210,14 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     };
   });
 
+
+  const completedCount = sessions.filter((session) => session.status === "completed").length;
+  const pendingCount = sessions.filter((session) => session.status === "planned").length;
+  const skippedCount = sessions.filter((session) => session.status === "skipped").length;
+  const unmatchedUploads = [...unassignedByDate.values()].reduce((sum, count) => sum + count, 0);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
+
   const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
   const raceCountdown = raceDate
     ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -225,6 +233,56 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
           { href: "/dashboard", label: "View dashboard", variant: "secondary" }
         ]}
       />
+
+      <div className="priority-layout">
+        <article className="priority-card-primary">
+          <p className="priority-kicker">Today&apos;s priority session</p>
+          <h2 className="priority-title">Execute your next key workout.</h2>
+          <p className="priority-subtitle">Keep focus on one clear session, then tidy the rest of the day.</p>
+          <p className="mt-3 text-sm text-muted">
+            {nextTodaySession
+              ? `Next up: ${nextTodaySession.type} (${nextTodaySession.duration} min).`
+              : "No planned session today. Pull one forward to keep confidence high."}
+          </p>
+        </article>
+
+        <article className="priority-card-secondary">
+          <p className="priority-kicker">On track this week</p>
+          <h2 className="priority-title">Monitor execution confidence daily.</h2>
+          <p className="priority-subtitle">Use completion and pending counts to prevent last-minute backlog.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Completed</p>
+              <p className="mt-1 text-lg font-semibold">{completedCount}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Planned</p>
+              <p className="mt-1 text-lg font-semibold">{pendingCount}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Skipped</p>
+              <p className="mt-1 text-lg font-semibold">{skippedCount}</p>
+            </div>
+          </div>
+        </article>
+
+        <article className="priority-card-secondary">
+          <p className="priority-kicker">Supporting analytics</p>
+          <h2 className="priority-title">Resolve upload and scheduling drift.</h2>
+          <p className="priority-subtitle">Catch unmatched activities early so your plan and execution stay aligned.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Unmatched uploads</p>
+              <p className="mt-1 text-lg font-semibold">{unmatchedUploads}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Current week view</p>
+              <p className="mt-1 text-sm font-semibold">{weekStart === currentWeekStart ? "Current" : "Historical / Future"}</p>
+            </div>
+          </div>
+        </article>
+      </div>
+
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}

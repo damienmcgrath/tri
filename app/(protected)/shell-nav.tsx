@@ -23,7 +23,7 @@ export function ShellNavRail() {
             href={item.href}
             className={`block rounded-xl px-3 py-2 text-sm transition ${
               active
-                ? "bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-400/30"
+                ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))] ring-1 ring-[hsl(var(--accent-performance)/0.45)]"
                 : "text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
             }`}
           >
@@ -47,7 +47,7 @@ export function MobileBottomTabs() {
             <Link
               key={item.href}
               href={item.href}
-              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-cyan-500/15 text-cyan-100" : "text-muted"}`}
+              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))]" : "text-muted"}`}
             >
               {item.label}
             </Link>

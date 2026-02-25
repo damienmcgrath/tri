@@ -3,28 +3,35 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  --surface-0: 224 24% 8%;
-  --surface-1: 222 21% 12%;
-  --surface-2: 223 18% 15%;
-  --text-primary: 210 20% 96%;
-  --text-secondary: 215 14% 72%;
+  color-scheme: light;
+  /* Core semantic surfaces: warm neutral base with gentle elevation for cards and shells. */
+  --surface: 38 24% 97%;
+  --surface-elevated: 34 18% 93%;
+  --surface-soft: 34 17% 90%;
+
+  /* Typography semantics: high-contrast reading text and supportive secondary copy. */
+  --text-primary: 225 24% 16%;
+  --text-secondary: 220 12% 38%;
   --text-tertiary: 215 10% 56%;
+
+  /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
+  --accent-performance: 196 92% 28%;
+  --accent-recovery: 156 60% 30%;
 
   --signal-ready: 151 62% 51%;
   --signal-load: 38 92% 56%;
   --signal-risk: 8 86% 62%;
-  --signal-recovery: 198 95% 63%;
+  --signal-recovery: var(--accent-recovery);
 
-  --ai-accent-core: 198 100% 58%;
-  --ai-accent-glow: 204 70% 19%;
+  --ai-accent-core: var(--accent-performance);
+  --ai-accent-glow: 192 52% 78%;
 
-  --bg: var(--surface-0);
-  --bg-elevated: var(--surface-1);
-  --bg-card: var(--surface-2);
+  --bg: var(--surface);
+  --bg-elevated: var(--surface-elevated);
+  --bg-card: var(--surface-soft);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 218 18% 25%;
+  --border: 220 14% 78%;
   --ring: var(--ai-accent-core);
   --accent: var(--ai-accent-core);
   --accent-soft: var(--ai-accent-glow);
@@ -33,6 +40,22 @@
   --motion-standard: 240ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
   --motion-ambient-duration: 22s;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface: 224 24% 8%;
+    --surface-elevated: 222 21% 12%;
+    --surface-soft: 223 18% 15%;
+    --text-primary: 210 20% 96%;
+    --text-secondary: 215 14% 72%;
+    --text-tertiary: 215 10% 56%;
+    --accent-performance: 195 100% 66%;
+    --accent-recovery: 166 70% 60%;
+    --ai-accent-glow: 204 70% 19%;
+    --border: 218 18% 25%;
+  }
 }
 
 @layer base {
@@ -77,11 +100,29 @@
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 24% 18%, hsl(var(--ai-accent-core) / 0.055), transparent 46%),
-      radial-gradient(circle at 70% 76%, hsl(var(--signal-recovery) / 0.035), transparent 48%),
-      radial-gradient(circle at 52% 44%, hsl(var(--surface-2) / 0.26), transparent 68%);
+      radial-gradient(circle at 26% 20%, hsl(var(--accent-performance) / 0.11), transparent 44%),
+      radial-gradient(circle at 72% 78%, hsl(var(--accent-recovery) / 0.09), transparent 48%),
+      linear-gradient(165deg, hsl(var(--bg)) 12%, hsl(var(--bg-elevated)) 88%);
     animation: ambient-gradient-drift var(--motion-ambient-duration) ease-in-out infinite alternate;
     transform-origin: center;
+  }
+
+  .app-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    background-image:
+      repeating-linear-gradient(
+        112deg,
+        hsl(var(--text-primary) / 0.018) 0,
+        hsl(var(--text-primary) / 0.018) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    mix-blend-mode: multiply;
   }
 
   .app-shell > * {
@@ -104,7 +145,7 @@
   }
 
   .surface:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.26);
+    border-color: hsl(var(--ai-accent-core) / 0.38);
   }
 
   .surface-subtle {
@@ -113,9 +154,52 @@
     @apply rounded-xl;
   }
 
+  .priority-layout {
+    @apply grid gap-4;
+  }
+
+  .priority-card-primary {
+    @apply surface p-6 md:p-7;
+    border-color: hsl(var(--accent-performance) / 0.45);
+    background:
+      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
+      hsl(var(--bg-elevated));
+    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+  }
+
+  .priority-card-secondary {
+    @apply surface p-5;
+  }
+
+  .priority-card-supporting {
+    @apply surface-subtle p-4;
+  }
+
+  .priority-title {
+    @apply text-lg font-semibold text-[hsl(var(--fg))];
+  }
+
+  .priority-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .priority-kicker {
+    @apply text-[11px] uppercase tracking-[0.14em] text-accent;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    background: linear-gradient(130deg, hsl(var(--accent)) 0%, hsl(212 100% 62%) 100%);
+    border: 1px solid hsl(var(--accent-performance) / 0.65);
+    background:
+      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
+      repeating-linear-gradient(
+        115deg,
+        hsl(0 0% 100% / 0.16) 0,
+        hsl(0 0% 100% / 0.16) 1px,
+        transparent 1px,
+        transparent 5px
+      );
+    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
   }
 
   .btn-primary:hover {
@@ -154,7 +238,7 @@
   }
 
   .input-base:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.3);
+    border-color: hsl(var(--ai-accent-core) / 0.45);
   }
 
   .input-base:focus-visible,
@@ -176,6 +260,57 @@
 
   .text-tertiary {
     color: hsl(var(--text-tertiary));
+  }
+
+
+  .text-accent {
+    color: hsl(var(--accent-performance));
+  }
+
+  .pill-accent {
+    border-color: hsl(var(--accent-performance) / 0.5);
+    background: hsl(var(--accent-performance) / 0.14);
+    color: hsl(var(--accent-performance));
+  }
+
+  .pill-accent-soft {
+    border-color: hsl(var(--accent-performance) / 0.35);
+    background: hsl(var(--accent-performance) / 0.08);
+    color: hsl(var(--accent-performance));
+  }
+
+  /* Motif: restrained "lab diagram" linework reserved for hero/header surfaces only. */
+  .motif-lab {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .motif-lab::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(100deg, hsl(var(--accent-performance) / 0.2) 0 2px, transparent 2px 100%),
+      linear-gradient(160deg, hsl(var(--accent-recovery) / 0.18) 0 2px, transparent 2px 100%);
+    background-size:
+      140% 1px,
+      100% 1px;
+    background-repeat: no-repeat;
+    background-position:
+      0 14%,
+      100% 86%;
+  }
+
+  .motif-lab::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 8% 17%, hsl(var(--accent-performance) / 0.24) 0 2px, transparent 2px),
+      radial-gradient(circle at 92% 83%, hsl(var(--accent-recovery) / 0.22) 0 2px, transparent 2px);
+    background-repeat: no-repeat;
   }
 
   .signal-chip {
@@ -244,7 +379,7 @@
   }
 
   .progress-track {
-    background: hsl(var(--surface-2));
+    background: hsl(var(--surface-soft));
   }
 
   .progress-fill-recovery {
