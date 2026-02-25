@@ -15,8 +15,8 @@
   --text-tertiary: 215 10% 56%;
 
   /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
-  --accent-performance: 192 88% 33%;
-  --accent-recovery: 152 56% 34%;
+  --accent-performance: 196 92% 28%;
+  --accent-recovery: 156 60% 30%;
 
   --signal-ready: 151 62% 51%;
   --signal-load: 38 92% 56%;
@@ -51,8 +51,8 @@
     --text-primary: 210 20% 96%;
     --text-secondary: 215 14% 72%;
     --text-tertiary: 215 10% 56%;
-    --accent-performance: 196 98% 60%;
-    --accent-recovery: 166 64% 56%;
+    --accent-performance: 195 100% 66%;
+    --accent-recovery: 166 70% 60%;
     --ai-accent-glow: 204 70% 19%;
     --border: 218 18% 25%;
   }
@@ -100,8 +100,8 @@
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 26% 20%, hsl(var(--accent-performance) / 0.06), transparent 44%),
-      radial-gradient(circle at 72% 78%, hsl(var(--accent-recovery) / 0.05), transparent 48%),
+      radial-gradient(circle at 26% 20%, hsl(var(--accent-performance) / 0.11), transparent 44%),
+      radial-gradient(circle at 72% 78%, hsl(var(--accent-recovery) / 0.09), transparent 48%),
       linear-gradient(165deg, hsl(var(--bg)) 12%, hsl(var(--bg-elevated)) 88%);
     animation: ambient-gradient-drift var(--motion-ambient-duration) ease-in-out infinite alternate;
     transform-origin: center;
@@ -158,15 +158,15 @@
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
     border: 1px solid hsl(var(--accent-performance) / 0.65);
     background:
-      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.9) 100%),
+      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
       repeating-linear-gradient(
         115deg,
-        hsl(0 0% 100% / 0.1) 0,
-        hsl(0 0% 100% / 0.1) 1px,
+        hsl(0 0% 100% / 0.16) 0,
+        hsl(0 0% 100% / 0.16) 1px,
         transparent 1px,
         transparent 5px
       );
-    box-shadow: 0 9px 22px -14px hsl(var(--accent-performance) / 0.82);
+    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
   }
 
   .btn-primary:hover {
@@ -227,6 +227,23 @@
 
   .text-tertiary {
     color: hsl(var(--text-tertiary));
+  }
+
+
+  .text-accent {
+    color: hsl(var(--accent-performance));
+  }
+
+  .pill-accent {
+    border-color: hsl(var(--accent-performance) / 0.5);
+    background: hsl(var(--accent-performance) / 0.14);
+    color: hsl(var(--accent-performance));
+  }
+
+  .pill-accent-soft {
+    border-color: hsl(var(--accent-performance) / 0.35);
+    background: hsl(var(--accent-performance) / 0.08);
+    color: hsl(var(--accent-performance));
   }
 
   /* Motif: restrained "lab diagram" linework reserved for hero/header surfaces only. */

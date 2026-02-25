@@ -109,7 +109,7 @@ export default async function ProtectedLayout({
     <div className="app-shell">
       <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur">
         <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent">tri.ai</p>
           <div className="flex items-center gap-2">
             <span className={`signal-chip ${readinessClass}`}>Readiness: {readiness}</span>
             <span className="signal-chip signal-recovery">
@@ -125,7 +125,7 @@ export default async function ProtectedLayout({
         <aside className="hidden lg:block">
           <div className="surface sticky top-5 space-y-5 p-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Primary nav</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-accent">Primary nav</p>
               <div className="mt-2">
                 <ShellNavRail />
               </div>
@@ -144,7 +144,7 @@ export default async function ProtectedLayout({
               ) : (
                 <p className="mt-2 text-sm text-muted">Create or activate a plan to see week context.</p>
               )}
-              <Link href="/plan" className="mt-3 inline-flex text-xs text-cyan-200 underline">Manage plan</Link>
+              <Link href="/plan" className="mt-3 inline-flex text-xs text-accent underline">Manage plan</Link>
             </div>
           </div>
         </aside>

@@ -268,7 +268,7 @@ export default async function DashboardPage({
             <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
           </div>
           {daysToRace !== null ? (
-            <p className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-100">
+            <p className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">
               {raceName} • {daysToRace} days
             </p>
           ) : (
@@ -279,7 +279,7 @@ export default async function DashboardPage({
         </header>
 
         <article className="surface p-6">
-          <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Get started</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-accent">Get started</p>
           <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
           <p className="mt-2 text-sm text-muted">
             Create a plan to unlock Today, Week Progress, and Coach Focus. Connect Garmin to reconcile completed work against scheduled sessions.
@@ -309,13 +309,13 @@ export default async function DashboardPage({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
           <Link href={`/dashboard?weekStart=${addDays(weekStart, -7)}`} className="btn-secondary px-3 py-1.5 text-xs">Prev</Link>
-          <Link href="/dashboard" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-cyan-400/50" : ""}`}>Current</Link>
+          <Link href="/dashboard" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
           <Link href={`/dashboard?weekStart=${addDays(weekStart, 7)}`} className="btn-secondary px-3 py-1.5 text-xs">Next</Link>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {daysToRace !== null ? (
-            <p className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-100">
+            <p className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">
               {raceName} • {daysToRace} days
             </p>
           ) : (
@@ -341,7 +341,7 @@ export default async function DashboardPage({
             <article className="surface border border-amber-400/30 bg-amber-500/10 p-4">
               <p className="text-xs uppercase tracking-[0.12em] text-amber-200">Garmin uploads</p>
               <p className="mt-1 text-sm text-amber-100">{unassignedUploads.length} unassigned uploaded activit{unassignedUploads.length === 1 ? "y" : "ies"} this week ({unassignedMinutes} min).</p>
-              <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-cyan-200 underline">Attach uploads to planned sessions</Link>
+              <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-accent underline">Attach uploads to planned sessions</Link>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 {unassignedUploads.slice(0, 3).map((item) => (
                   <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-amber-200/30 px-2 py-1 text-amber-100">
@@ -452,10 +452,10 @@ export default async function DashboardPage({
             </div>
 
             <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-cyan-300">Why?</summary>
+              <summary className="cursor-pointer text-xs text-accent">Why?</summary>
               <div className="mt-2 surface-subtle p-3 text-sm text-muted">
                 <p>Insight is generated from today&apos;s highest-load pending session or the largest weekly gap between planned and completed minutes.</p>
-                <Link href="/calendar" className="mt-2 inline-block text-xs text-cyan-300 underline-offset-2 hover:underline">View details</Link>
+                <Link href="/calendar" className="mt-2 inline-block text-xs text-accent underline-offset-2 hover:underline">View details</Link>
               </div>
             </details>
           </article>
@@ -467,7 +467,7 @@ export default async function DashboardPage({
                 <Link
                   key={day.iso}
                   href={`/calendar?date=${day.iso}`}
-                  className={`surface-subtle block p-2 text-center transition hover:border-cyan-400/60 ${day.isToday ? "border-cyan-400/60 bg-cyan-500/10" : ""}`}
+                  className={`surface-subtle block p-2 text-center transition hover:border-[hsl(var(--accent-performance)/0.55)] ${day.isToday ? "border-[hsl(var(--accent-performance)/0.6)] bg-[hsl(var(--accent-performance)/0.12)]" : ""}`}
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted">{day.weekday}</p>
                   <p className="text-xs font-medium">{day.day}</p>
