@@ -18,8 +18,10 @@ type DecisionCard = {
 };
 
 type StructuredCoachResponse = {
-  recommendation: string;
-  why: string;
+  summaryBlock: string;
+  reasoning: string;
+  actionOptions: string[];
+  cautionNote: string | null;
   confidence: string;
   actionLabel: string;
   actionHref: string;
@@ -47,13 +49,23 @@ const defaultAssistantMessage = {
 
 function parseStructuredResponse(content: string, summary: CoachSummary | null): StructuredCoachResponse {
   const lines = content.split("\n").map((line) => line.trim());
+  const summaryLine = lines.find((line) => line.toLowerCase().startsWith("summary:"));
+  const reasoningLine = lines.find((line) => line.toLowerCase().startsWith("reasoning:"));
   const recommendationLine = lines.find((line) => line.toLowerCase().startsWith("recommendation:"));
   const whyLine = lines.find((line) => line.toLowerCase().startsWith("why:"));
   const confidenceLine = lines.find((line) => line.toLowerCase().startsWith("confidence:"));
   const actionLine = lines.find((line) => line.toLowerCase().startsWith("action:"));
+  const actionOptionsLine = lines.find(
+    (line) => line.toLowerCase().startsWith("action options:") || line.toLowerCase().startsWith("options:") || line.toLowerCase().startsWith("actions:")
+  );
+  const cautionLine = lines.find((line) => line.toLowerCase().startsWith("caution:") || line.toLowerCase().startsWith("note:"));
 
-  const recommendation = recommendationLine?.split(":").slice(1).join(":").trim() || "Keep your plan adaptive this week.";
-  const why =
+  const summaryBlock =
+    summaryLine?.split(":").slice(1).join(":").trim() ||
+    recommendationLine?.split(":").slice(1).join(":").trim() ||
+    "Keep your plan adaptive this week.";
+  const reasoning =
+    reasoningLine?.split(":").slice(1).join(":").trim() ||
     whyLine?.split(":").slice(1).join(":").trim() ||
     (summary
       ? `${summary.completedMinutes} of ${summary.plannedMinutes} planned minutes are complete.`
@@ -64,11 +76,66 @@ function parseStructuredResponse(content: string, summary: CoachSummary | null):
 
   const actionText = actionLine?.split(":").slice(1).join(":").trim().toLowerCase();
 
+  const actionOptions = actionOptionsLine
+    ?.split(":")
+    .slice(1)
+    .join(":")
+    .split(/[|;,]/)
+    .map((option) => option.trim())
+    .filter(Boolean);
+
+  const defaultActionOptions = summary
+    ? ["Adjust remaining weekly minutes", "Protect key intensity days", "Shift optional recovery if needed"]
+    : ["Ask for this week adjustment", "Get recovery-first recommendation", "Review taper options for events"];
+
+  const cautionNote = cautionLine?.split(":").slice(1).join(":").trim() || null;
+
   if (actionText?.includes("calendar")) {
-    return { recommendation, why, confidence, actionLabel: "Open calendar actions", actionHref: "/calendar" };
+    return {
+      summaryBlock,
+      reasoning,
+      actionOptions: actionOptions?.length ? actionOptions : defaultActionOptions,
+      cautionNote,
+      confidence,
+      actionLabel: "Open calendar actions",
+      actionHref: "/calendar"
+    };
   }
 
-  return { recommendation, why, confidence, actionLabel: "Apply in weekly plan", actionHref: "/plan" };
+  return {
+    summaryBlock,
+    reasoning,
+    actionOptions: actionOptions?.length ? actionOptions : defaultActionOptions,
+    cautionNote,
+    confidence,
+    actionLabel: "Apply in weekly plan",
+    actionHref: "/plan"
+  };
+}
+
+function formatRecencyLabel(updatedAt?: string): string {
+  if (!updatedAt) {
+    return "No recent sync";
+  }
+
+  const diffMs = Date.now() - new Date(updatedAt).getTime();
+  const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
+
+  if (diffMinutes < 1) {
+    return "Synced just now";
+  }
+
+  if (diffMinutes < 60) {
+    return `Synced ${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `Synced ${diffHours}h ago`;
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return `Synced ${diffDays}d ago`;
 }
 
 export function CoachChat() {
@@ -197,6 +264,13 @@ export function CoachChat() {
     };
   }, [summary, confidenceSignal.label]);
 
+  const dataRecency = useMemo(() => {
+    const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
+    return formatRecencyLabel(activeConversation?.updated_at ?? conversations[0]?.updated_at);
+  }, [conversationId, conversations]);
+
+  const quickPrompts = ["Adjust this week", "Missed workout recovery", "Race taper advice"];
+
   async function loadConversations() {
     try {
       const response = await fetch("/api/coach/chat", { method: "GET" });
@@ -324,8 +398,19 @@ export function CoachChat() {
 
         <div className="surface overflow-hidden">
         <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-5 py-4">
-          <p className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">Coach Console</p>
-          <h2 className="text-lg font-semibold">Operational coaching console</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">Coach Console</p>
+              <h2 className="text-lg font-semibold">Operational coaching console</h2>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-1">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `hsl(var(--${confidenceSignal.tone}))` }} />
+                {confidenceSignal.label}
+              </span>
+              <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-1">{dataRecency}</span>
+            </div>
+          </div>
         </div>
 
         <div className="max-h-[460px] space-y-3 overflow-y-auto p-5">
@@ -350,12 +435,27 @@ export function CoachChat() {
 
                       return (
                         <div className="space-y-2 text-xs">
-                          <p>
-                            <span className="font-semibold text-[hsl(var(--text-primary))]">Recommendation:</span> {structured.recommendation}
-                          </p>
-                          <p>
-                            <span className="font-semibold text-[hsl(var(--text-primary))]">Why:</span> {structured.why}
-                          </p>
+                          <div>
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Summary</p>
+                            <p className="mt-1 text-sm text-[hsl(var(--text-primary))]">{structured.summaryBlock}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Reasoning</p>
+                            <p className="mt-1 text-sm text-muted">{structured.reasoning}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Action options</p>
+                            <ul className="mt-1 list-disc space-y-1 pl-4 text-sm text-muted">
+                              {structured.actionOptions.map((option) => (
+                                <li key={option}>{option}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          {structured.cautionNote ? (
+                            <div className="rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.12)] px-2 py-1 text-[11px] text-[hsl(var(--text-primary))]">
+                              <span className="font-semibold uppercase tracking-[0.14em]">Caution:</span> {structured.cautionNote}
+                            </div>
+                          ) : null}
                           <p>
                             <span className="font-semibold text-[hsl(var(--text-primary))]">Confidence:</span> {structured.confidence}
                           </p>
@@ -386,6 +486,18 @@ export function CoachChat() {
           <label htmlFor="coach-input" className="sr-only">
             Ask your AI coach
           </label>
+          <div className="mb-3 flex flex-wrap gap-2">
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => setInput(prompt)}
+                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1 text-xs font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             <input
               id="coach-input"
@@ -434,9 +546,10 @@ export function CoachChat() {
           </ul>
         </div>
 
-        <div className="surface border-dashed p-5">
-          <h3 className="text-sm font-semibold text-[hsl(var(--text-secondary))]">Conversation history</h3>
-          <ul className="mt-3 space-y-2">
+        <div className="surface p-5">
+          <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Recent conversations</h3>
+          <p className="mt-1 text-xs text-tertiary">Jump back into saved coaching threads.</p>
+          <ul className="mt-4 space-y-2.5">
             {conversations.length === 0 ? (
               <li className="text-sm text-muted">No saved chats yet.</li>
             ) : (
@@ -445,10 +558,10 @@ export function CoachChat() {
                   <button
                     type="button"
                     onClick={() => void handleConversationClick(conversation.id)}
-                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm transition ${
                       conversationId === conversation.id
                         ? "border-[hsl(var(--ai-accent-core)/0.35)] bg-[hsl(var(--ai-accent-core)/0.1)] text-[hsl(var(--text-primary))]"
-                        : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2)/0.7)] text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-1))]"
+                        : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-1))]"
                     }`}
                   >
                     <p className="truncate font-medium">{conversation.title}</p>
