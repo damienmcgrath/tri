@@ -689,12 +689,14 @@ function SortableSessionCard({
   const title = buildSessionTitle(session);
   const statusTone =
     session.status === "completed" ? "calendar-status-completed" : session.status === "skipped" ? "calendar-status-skipped" : "calendar-status-planned";
+  const statusMotion =
+    session.status === "completed" ? "status-card-completed" : session.status === "skipped" ? "status-card-skipped" : "status-card-planned";
 
   return (
     <article
       ref={setNodeRef}
       style={style}
-      className={`group relative surface-subtle p-2.5 pr-8 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${session.status === "completed" ? "opacity-80" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
+      className={`group relative surface-subtle status-card-transition ${statusMotion} p-2.5 pr-8 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
