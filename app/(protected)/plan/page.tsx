@@ -211,7 +211,7 @@ export default async function PlanPage({
   }
 
   return (
-    <section className="space-y-4">
+    <section className="plan-editor-motion-lock space-y-4">
       <PageHeader
         title="Plan"
         objective="Shape your training blocks, tune week intent, and publish sessions that keep race-day goals realistic."
