@@ -27,3 +27,12 @@ test("pickAutoMatch accepts strong clear winner", () => {
   ]);
   assert.equal(result?.candidateId, "a");
 });
+
+test("score candidate tolerates missing distance", () => {
+  const score = scoreCandidate(
+    { sportType: "strength", startTimeUtc: "2026-02-22T10:00:00.000Z", durationSec: 2700 },
+    { id: "s1", sport: "strength", startTimeUtc: "2026-02-22T10:05:00.000Z", targetDurationSec: 3000 }
+  );
+
+  assert.ok(score.confidence > 0.7);
+});
