@@ -42,7 +42,7 @@ type Conversation = {
 const defaultAssistantMessage = {
   role: "assistant" as const,
   content:
-    "Hey! I’m your AI coach. Ask me to review your recent training, suggest a week plan, or adapt sessions around your schedule."
+    "Performance briefing ready. Ask for load adjustments, session prioritization, or schedule changes based on your latest training data."
 };
 
 function parseStructuredResponse(content: string, summary: CoachSummary | null): StructuredCoachResponse {
@@ -280,8 +280,8 @@ export function CoachChat() {
         <div className="surface p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">This Week Decisions</p>
-              <h3 className="mt-1 text-base font-semibold">Pre-populated from your completion context</h3>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">This Week Decision Board</p>
+              <h3 className="mt-1 text-base font-semibold">Generated from completion signals and current load</h3>
             </div>
             <span className={`signal-chip ${urgencySignal.tone}`}>Urgency: {urgencySignal.label}</span>
           </div>
@@ -305,7 +305,7 @@ export function CoachChat() {
         <div className="surface overflow-hidden">
         <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-5 py-4">
           <p className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">Coach Console</p>
-          <h2 className="text-lg font-semibold">Chat module: adaptive triathlon guidance</h2>
+          <h2 className="text-lg font-semibold">Operational coaching console</h2>
         </div>
 
         <div className="max-h-[460px] space-y-3 overflow-y-auto p-5">
@@ -371,7 +371,7 @@ export function CoachChat() {
               id="coach-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask for workout analysis, weekly suggestions, or plan tweaks..."
+              placeholder="Ask for load analysis, risk checks, or session-level changes..."
               className="input-base"
             />
             <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">
@@ -403,7 +403,7 @@ export function CoachChat() {
         </div>
 
         <div className="surface p-5">
-          <h3 className="text-sm font-semibold">Workout analysis snapshot</h3>
+          <h3 className="text-sm font-semibold">Performance snapshot</h3>
           <p className="mt-2 text-sm text-muted">
             Dominant sport: <span className="font-medium capitalize">{summary?.dominantSport ?? "n/a"}</span>
           </p>
