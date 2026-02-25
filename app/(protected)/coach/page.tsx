@@ -6,7 +6,7 @@ export default function CoachPage() {
     <section className="space-y-4">
       <PageHeader
         title="Coach"
-        objective="Get concise guidance from your recent plan and workout data so your next session is clear and actionable."
+        objective="Get concise, evidence-linked guidance from your plan and workout data so your next decision is clear and actionable."
         actions={[
           { href: "/dashboard", label: "Review dashboard" },
           { href: "/calendar", label: "Open calendar", variant: "secondary" }

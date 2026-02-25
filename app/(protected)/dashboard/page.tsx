@@ -244,7 +244,7 @@ export default async function DashboardPage({
     ? `Prioritize ${getDisciplineMeta(keyTodaySession.sport).label.toLowerCase()} ${keyTodaySession.type.toLowerCase()} (${keyTodaySession.duration_minutes} min) today.`
     : biggestGap && biggestGap.planned > 0
       ? `Your biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label} (${biggestGap.completed}/${biggestGap.planned} min).`
-      : "Start the week by locking one short session today to build momentum.";
+      : "Start with one short session today to establish execution rhythm.";
 
   const raceName = profile?.race_name?.trim() || "Target race";
   const daysToRace = profile?.race_date
@@ -256,7 +256,7 @@ export default async function DashboardPage({
       <section className="space-y-4">
         <PageHeader
           title="Dashboard"
-          objective="Orient your week at a glance, spot what is at risk, and choose the highest-impact next session."
+          objective="Orient the week at a glance, identify risk early, and execute the highest-impact next session."
           actions={[
             { href: "/plan", label: "Create a plan" },
             { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
@@ -282,7 +282,7 @@ export default async function DashboardPage({
           <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Get started</p>
           <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
           <p className="mt-2 text-sm text-muted">
-            Create a plan to unlock Today, Week Progress, and Coach Focus. You can also connect Garmin to backfill completed sessions.
+            Create a plan to unlock Today, Week Progress, and Coach Focus. Connect Garmin to reconcile completed work against scheduled sessions.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href="/plan" className="btn-primary">Create a plan</Link>
@@ -298,7 +298,7 @@ export default async function DashboardPage({
     <section className="space-y-4">
       <PageHeader
         title="Dashboard"
-        objective="Stay oriented on this training week, keep completion momentum, and surface where coaching attention is needed."
+        objective="Stay oriented on this training week, maintain completion discipline, and surface where coaching attention is needed."
         actions={[
           { href: "/calendar", label: "Open calendar" },
           { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
@@ -454,7 +454,7 @@ export default async function DashboardPage({
             <details className="mt-3">
               <summary className="cursor-pointer text-xs text-cyan-300">Why?</summary>
               <div className="mt-2 surface-subtle p-3 text-sm text-muted">
-                <p>Insight uses today&apos;s longest pending session or the largest weekly discipline gap in planned vs completed minutes.</p>
+                <p>Insight is generated from today&apos;s highest-load pending session or the largest weekly gap between planned and completed minutes.</p>
                 <Link href="/calendar" className="mt-2 inline-block text-xs text-cyan-300 underline-offset-2 hover:underline">View details</Link>
               </div>
             </details>
