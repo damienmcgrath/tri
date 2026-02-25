@@ -5,26 +5,26 @@
 :root {
   color-scheme: light;
   /* Core semantic surfaces: warm neutral base with gentle elevation for cards and shells. */
-  --surface: 196 22% 96%;
+  --surface: 200 20% 96%;
   --surface-elevated: 0 0% 100%;
-  --surface-soft: 196 26% 97%;
+  --surface-soft: 200 33% 98%;
   --surface-1: var(--surface-elevated);
-  --surface-2: 196 20% 94%;
+  --surface-2: 197 56% 94%;
 
   /* Typography semantics: high-contrast reading text and supportive secondary copy. */
-  --text-primary: 225 24% 16%;
-  --text-secondary: 216 14% 35%;
-  --text-tertiary: 215 12% 48%;
+  --text-primary: 215 28% 17%;
+  --text-secondary: 216 13% 43%;
+  --text-tertiary: 213 15% 58%;
 
   /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
-  --accent-performance: 196 92% 28%;
-  --accent-recovery: 156 60% 30%;
+  --accent-performance: 195 83% 35%;
+  --accent-recovery: 193 39% 46%;
 
-  --signal-ready: 147 47% 36%;
-  --signal-load: 35 74% 47%;
-  --signal-risk: 3 67% 58%;
-  --signal-recovery: 193 39% 46%;
-  --signal-neutral: 215 17% 56%;
+  --signal-ready: 146 50% 36%;
+  --signal-load: 36 78% 48%;
+  --signal-risk: 2 63% 59%;
+  --signal-recovery: 200 36% 47%;
+  --signal-neutral: 215 19% 63%;
 
   --ai-accent-core: var(--accent-performance);
   --ai-accent-glow: 192 52% 78%;
@@ -34,7 +34,7 @@
   --bg-card: var(--surface-soft);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 213 21% 82%;
+  --border: 207 24% 87%;
   --ring: var(--ai-accent-core);
   --accent: var(--ai-accent-core);
   --accent-soft: var(--ai-accent-glow);
@@ -203,6 +203,15 @@
 
   .priority-card-secondary {
     @apply surface p-5;
+  }
+
+  .priority-card-emphasis {
+    @apply surface p-5 md:p-6;
+    border-color: hsl(var(--accent-performance) / 0.4);
+    background:
+      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
+      hsl(var(--bg-elevated));
+    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
   }
 
   .priority-card-supporting {
@@ -384,6 +393,10 @@
 
   .status-chip {
     @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium;
+  }
+
+  .status-chip-compact {
+    @apply gap-0 px-1.5;
   }
 
   .status-chip-planned {
