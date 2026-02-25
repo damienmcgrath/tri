@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
+import { PageHeader } from "../page-header";
 import { WeekCalendar } from "./week-calendar";
 
 type Session = {
@@ -215,12 +216,22 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     : null;
 
   return (
-    <WeekCalendar
-      weekDays={weekDays}
-      sessions={sessions}
-      weekStart={weekStart}
-      isCurrentWeek={weekStart === currentWeekStart}
-      raceCountdown={raceCountdown}
-    />
+    <section className="space-y-4">
+      <PageHeader
+        title="Calendar"
+        objective="Execute each day with confidence by dragging, logging, and resolving conflicts before they become missed work."
+        actions={[
+          { href: "/plan", label: "Edit plan" },
+          { href: "/dashboard", label: "View dashboard", variant: "secondary" }
+        ]}
+      />
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        weekStart={weekStart}
+        isCurrentWeek={weekStart === currentWeekStart}
+        raceCountdown={raceCountdown}
+      />
+    </section>
   );
 }

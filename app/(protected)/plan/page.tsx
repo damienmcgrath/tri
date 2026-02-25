@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "../page-header";
 import { PlanEditor } from "./plan-editor";
 
 type Plan = {
@@ -209,5 +210,17 @@ export default async function PlanPage({
     }
   }
 
-  return <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />;
+  return (
+    <section className="space-y-4">
+      <PageHeader
+        title="Plan"
+        objective="Shape your training blocks, tune week intent, and publish sessions that keep race-day goals realistic."
+        actions={[
+          { href: "/calendar", label: "Review week" },
+          { href: "/dashboard", label: "Back to dashboard", variant: "secondary" }
+        ]}
+      />
+      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
+    </section>
+  );
 }
