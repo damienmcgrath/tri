@@ -246,6 +246,11 @@ export default async function DashboardPage({
       ? `Your biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label} (${biggestGap.completed}/${biggestGap.planned} min).`
       : "Start with one short session today to establish execution rhythm.";
 
+  const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
+  const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
+  const fatigueState = completionPct >= 85 ? "Controlled" : completionPct >= 60 ? "Balanced" : "Accumulating";
+  const confidenceLabel = completionPct >= 85 ? "High" : completionPct >= 60 ? "Building" : "Low";
+
   const raceName = profile?.race_name?.trim() || "Target race";
   const daysToRace = profile?.race_date
     ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -325,29 +330,60 @@ export default async function DashboardPage({
         </div>
       </header>
 
-      {hasActivePlan && !hasWeekSessions ? (
+      <div className="space-y-4">
         <article className="priority-card-primary">
-          <p className="priority-kicker">Today&apos;s priority session</p>
-          <h1 className="priority-title">Set one key workout and execute it.</h1>
-          <p className="priority-subtitle">Add sessions for this week so your next best workout is always clear.</p>
+          <p className="priority-kicker">Weekly coaching takeaway</p>
+          <h1 className="priority-title">{hasWeekSessions ? focusText : "Set one key workout and execute it."}</h1>
+          <p className="priority-subtitle">
+            {hasWeekSessions
+              ? `You have ${remainingMinutes} minutes left this week. Keep execution tight and protect recovery.`
+              : "Add sessions for this week so your next best workout is always clear."}
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/plan" className="btn-primary">Add session</Link>
-            <Link href="/plan" className="btn-secondary">Duplicate last week</Link>
-            <Link href="/plan" className="btn-secondary">Go to plan</Link>
+            {hasWeekSessions ? (
+              <>
+                <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
+                  Open next session
+                </Link>
+                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log completed work</Link>
+              </>
+            ) : (
+              <>
+                <Link href="/plan" className="btn-primary">Add session</Link>
+                <Link href="/plan" className="btn-secondary">Duplicate last week</Link>
+              </>
+            )}
           </div>
         </article>
-      ) : (
-        <div className="priority-layout">
-          <article className="priority-card-primary">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="priority-kicker">Today&apos;s priority session</p>
-                <h1 className="priority-title">Lock in your next workout now.</h1>
-                <p className="priority-subtitle">Focus on the highest-impact session first, then clear supporting work.</p>
-              </div>
-              <p className="text-xs text-muted">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
-            </div>
 
+        <div className="grid gap-3 md:grid-cols-4">
+          <article className="surface-subtle p-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Completion pace</p>
+            <p className="mt-1 text-2xl font-semibold">{completionPct}%</p>
+            <p className="mt-1 text-xs text-muted">{totals.completed}/{totals.planned} min</p>
+          </article>
+          <article className="surface-subtle p-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Remaining load</p>
+            <p className="mt-1 text-2xl font-semibold">{toHoursAndMinutes(remainingMinutes)}</p>
+            <p className="mt-1 text-xs text-muted">left in this week</p>
+          </article>
+          <article className="surface-subtle p-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Fatigue state</p>
+            <p className="mt-1 text-xl font-semibold">{fatigueState}</p>
+            <p className="mt-1 text-xs text-muted">based on completion pressure</p>
+          </article>
+          <article className="surface-subtle p-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Confidence signal</p>
+            <p className="mt-1 text-xl font-semibold">{confidenceLabel}</p>
+            <p className="mt-1 text-xs text-muted">coach readiness estimate</p>
+          </article>
+        </div>
+
+        <div className="priority-layout">
+          <article className="priority-card-secondary">
+            <p className="priority-kicker">Today&apos;s sessions</p>
+            <h2 className="priority-title">Execute high-impact work first.</h2>
+            <p className="priority-subtitle">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
             {todaySessions.length === 0 ? (
               <p className="surface-subtle mt-4 p-3 text-sm text-muted">No sessions for today. Pull one workout forward to keep momentum.</p>
             ) : (
@@ -358,9 +394,7 @@ export default async function DashboardPage({
                     <li key={session.id} className="surface-subtle p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>
-                            {discipline.label}
-                          </span>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>{discipline.label}</span>
                           <p className="mt-1 text-sm font-medium">{session.type}</p>
                           <p className="text-xs text-muted">{session.duration_minutes} min</p>
                         </div>
@@ -392,13 +426,6 @@ export default async function DashboardPage({
                 })}
               </ul>
             )}
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
-                Open next session
-              </Link>
-              <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log completed work</Link>
-            </div>
           </article>
 
           <article className="priority-card-secondary">
@@ -509,7 +536,7 @@ export default async function DashboardPage({
             </div>
           </article>
         </div>
-      )}
+      </div>
     </section>
   );
 }
