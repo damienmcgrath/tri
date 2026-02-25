@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -137,10 +138,7 @@ export async function markSkippedAction(input: { sessionId: string }) {
     throw new Error("Session not found.");
   }
 
-  const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
-  const currentNotes = session.notes ?? "";
-  const hasSkipTag = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(currentNotes);
-  const nextNotes = hasSkipTag ? currentNotes : `${currentNotes}\n${skipTag}`.trim();
+  const nextNotes = appendSkipTag(session.notes, new Date());
 
   const { error } = await supabase
     .from("planned_sessions")
@@ -176,13 +174,11 @@ export async function clearSkippedAction(input: { sessionId: string }) {
     throw new Error("Session not found.");
   }
 
-  const nextNotes = (session.notes ?? "")
-    .replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "")
-    .trim();
+  const nextNotes = clearSkipTag(session.notes);
 
   const { error } = await supabase
     .from("planned_sessions")
-    .update({ notes: nextNotes || null })
+    .update({ notes: nextNotes })
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id);
 
@@ -206,18 +202,13 @@ export async function updateSessionAction(input: {
   const { supabase, user } = await getAuthedClient();
 
   let nextNotes = parsed.notes?.trim() || null;
-  const skipTagMatcher = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i;
 
   const { error: sessionTableError } = await supabase
     .from("sessions")
     .update({
       type: parsed.type || "Session",
       duration_minutes: parsed.duration,
-      notes: parsed.status === "skipped" && !skipTagMatcher.test(nextNotes ?? "")
-        ? `${nextNotes ? `${nextNotes}\n` : ""}[Skipped ${new Date().toISOString().slice(0, 10)}]`
-        : parsed.status !== "skipped"
-          ? (nextNotes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim() || null
-          : nextNotes,
+      notes: syncSkipTagForStatus(nextNotes, parsed.status, new Date()),
       status: parsed.status
     })
     .eq("id", parsed.sessionId)
@@ -233,13 +224,7 @@ export async function updateSessionAction(input: {
     throw new Error(sessionTableError.message ?? "Could not update session.");
   }
 
-  const hasSkipTag = skipTagMatcher.test(nextNotes ?? "");
-  if (parsed.status === "skipped" && !hasSkipTag) {
-    const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
-    nextNotes = nextNotes ? `${nextNotes}\n${skipTag}` : skipTag;
-  } else if (parsed.status !== "skipped") {
-    nextNotes = (nextNotes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim() || null;
-  }
+  nextNotes = syncSkipTagForStatus(nextNotes, parsed.status, new Date());
 
   const { error: plannedError } = await supabase
     .from("planned_sessions")
