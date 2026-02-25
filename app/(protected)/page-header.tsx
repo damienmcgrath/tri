@@ -11,7 +11,7 @@ export function PageHeader({ title, objective, actions = [] }: { title: string; 
     <header className="surface motif-lab p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[hsl(var(--accent-performance))]">{title}</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[hsl(var(--accent-performance))] drop-shadow-[0_1px_0_hsl(0_0%_100%_/_0.3)]">{title}</p>
           <p className="mt-2 max-w-3xl text-sm text-muted">{objective}</p>
         </div>
 

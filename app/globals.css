@@ -14,9 +14,9 @@
   --text-secondary: 220 12% 38%;
   --text-tertiary: 215 10% 56%;
 
-  /* Domain accents: performance for training momentum, recovery for rest/readiness cues. */
-  --accent-performance: 190 80% 42%;
-  --accent-recovery: 148 52% 42%;
+  /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
+  --accent-performance: 192 88% 33%;
+  --accent-recovery: 152 56% 34%;
 
   --signal-ready: 151 62% 51%;
   --signal-load: 38 92% 56%;
@@ -24,7 +24,7 @@
   --signal-recovery: var(--accent-recovery);
 
   --ai-accent-core: var(--accent-performance);
-  --ai-accent-glow: 190 56% 85%;
+  --ai-accent-glow: 192 52% 78%;
 
   --bg: var(--surface);
   --bg-elevated: var(--surface-elevated);
@@ -51,8 +51,8 @@
     --text-primary: 210 20% 96%;
     --text-secondary: 215 14% 72%;
     --text-tertiary: 215 10% 56%;
-    --accent-performance: 198 100% 58%;
-    --accent-recovery: 198 95% 63%;
+    --accent-performance: 196 98% 60%;
+    --accent-recovery: 166 64% 56%;
     --ai-accent-glow: 204 70% 19%;
     --border: 218 18% 25%;
   }
@@ -145,7 +145,7 @@
   }
 
   .surface:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.26);
+    border-color: hsl(var(--ai-accent-core) / 0.38);
   }
 
   .surface-subtle {
@@ -166,7 +166,7 @@
         transparent 1px,
         transparent 5px
       );
-    box-shadow: 0 8px 18px -12px hsl(var(--accent-performance) / 0.75);
+    box-shadow: 0 9px 22px -14px hsl(var(--accent-performance) / 0.82);
   }
 
   .btn-primary:hover {
@@ -205,7 +205,7 @@
   }
 
   .input-base:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.3);
+    border-color: hsl(var(--ai-accent-core) / 0.45);
   }
 
   .input-base:focus-visible,
@@ -241,8 +241,8 @@
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(100deg, hsl(var(--accent-performance) / 0.14) 0 2px, transparent 2px 100%),
-      linear-gradient(160deg, hsl(var(--accent-recovery) / 0.12) 0 2px, transparent 2px 100%);
+      linear-gradient(100deg, hsl(var(--accent-performance) / 0.2) 0 2px, transparent 2px 100%),
+      linear-gradient(160deg, hsl(var(--accent-recovery) / 0.18) 0 2px, transparent 2px 100%);
     background-size:
       140% 1px,
       100% 1px;
@@ -258,8 +258,8 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 8% 17%, hsl(var(--accent-performance) / 0.18) 0 2px, transparent 2px),
-      radial-gradient(circle at 92% 83%, hsl(var(--accent-recovery) / 0.16) 0 2px, transparent 2px);
+      radial-gradient(circle at 8% 17%, hsl(var(--accent-performance) / 0.24) 0 2px, transparent 2px),
+      radial-gradient(circle at 92% 83%, hsl(var(--accent-recovery) / 0.22) 0 2px, transparent 2px);
     background-repeat: no-repeat;
   }
 
