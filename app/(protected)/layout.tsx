@@ -2,27 +2,48 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "./actions";
 import { AccountMenu } from "./account-menu";
+import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
 
 export const dynamic = "force-dynamic";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/plan", label: "Plan" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/coach", label: "AI Coach" }
-];
 
 type Profile = {
   display_name: string | null;
   avatar_url: string | null;
+  active_plan_id: string | null;
+  race_date: string | null;
+  race_name: string | null;
+};
+
+type Session = {
+  duration_minutes: number | null;
+  status: "planned" | "completed" | "skipped";
+};
+
+type TrainingWeek = {
+  week_index: number;
+  focus: "Build" | "Recovery" | "Taper" | "Race" | "Custom";
+  week_start_date: string;
+  target_minutes: number | null;
 };
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).slice(0, 2);
-  if (parts.length === 0) {
-    return "A";
-  }
+  if (parts.length === 0) return "A";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function getMonday(date = new Date()) {
+  const day = date.getUTCDay();
+  const distanceFromMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  monday.setUTCDate(monday.getUTCDate() - distanceFromMonday);
+  return monday;
+}
+
+function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export default async function ProtectedLayout({
@@ -36,7 +57,7 @@ export default async function ProtectedLayout({
   } = await supabase.auth.getUser();
 
   const { data: profileData } = user
-    ? await supabase.from("profiles").select("display_name,avatar_url").eq("id", user.id).maybeSingle()
+    ? await supabase.from("profiles").select("display_name,avatar_url,active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle()
     : { data: null };
 
   const profile = (profileData ?? null) as Profile | null;
@@ -44,27 +65,94 @@ export default async function ProtectedLayout({
   const email = user?.email ?? "Unknown user";
   const initials = getInitials(displayName);
 
+  const currentWeekStart = getMonday().toISOString().slice(0, 10);
+  const currentWeekEnd = addDays(currentWeekStart, 7);
+
+  const activePlanId = profile?.active_plan_id ?? null;
+
+  const [{ data: weekData }, { data: sessionsData }] = activePlanId
+    ? await Promise.all([
+        supabase
+          .from("training_weeks")
+          .select("week_index,focus,week_start_date,target_minutes")
+          .eq("plan_id", activePlanId)
+          .lte("week_start_date", currentWeekStart)
+          .order("week_start_date", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("sessions")
+          .select("duration_minutes,status")
+          .eq("plan_id", activePlanId)
+          .gte("date", currentWeekStart)
+          .lt("date", currentWeekEnd)
+      ])
+    : [{ data: null }, { data: [] }];
+
+  const weekContext = (weekData ?? null) as TrainingWeek | null;
+  const sessions = (sessionsData ?? []) as Session[];
+
+  const plannedMinutes = sessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const completedMinutes = sessions
+    .filter((session) => session.status === "completed")
+    .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const completionRate = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0;
+
+  const readiness = completionRate >= 70 ? "Ready" : completionRate >= 40 ? "Building" : "Needs focus";
+  const readinessClass = completionRate >= 70 ? "signal-ready" : completionRate >= 40 ? "signal-load" : "signal-risk";
+
+  const daysToRace = profile?.race_date
+    ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+
   return (
     <div className="app-shell">
-      <header className="relative z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <p className="text-lg uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
-          <nav className="flex flex-wrap gap-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--fg-muted))] transition hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
+      <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">tri.ai</p>
+          <div className="flex items-center gap-2">
+            <span className={`signal-chip ${readinessClass}`}>Readiness: {readiness}</span>
+            <span className="signal-chip signal-recovery">
+              Race: {daysToRace !== null ? `${daysToRace}d` : "set date"}
+            </span>
+            <span className="signal-chip signal-load">Week: {completionRate}% complete</span>
+          </div>
           <AccountMenu avatarUrl={profile?.avatar_url ?? null} initials={initials} displayName={displayName} email={email} signOutAction={signOutAction} />
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl px-6 py-8">{children}</main>
+      </div>
+
+      <div className="mx-auto grid w-full max-w-[1200px] gap-4 px-4 pb-24 pt-5 md:px-6 lg:grid-cols-[260px_1fr] lg:pb-8">
+        <aside className="hidden lg:block">
+          <div className="surface sticky top-5 space-y-5 p-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Primary nav</p>
+              <div className="mt-2">
+                <ShellNavRail />
+              </div>
+            </div>
+
+            <div className="surface-subtle p-3">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted">Training week</p>
+              {weekContext ? (
+                <>
+                  <p className="mt-2 text-sm font-semibold">Week {weekContext.week_index} · {weekContext.focus}</p>
+                  <p className="mt-1 text-xs text-muted">Starts {weekContext.week_start_date}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    Target: {weekContext.target_minutes ? `${weekContext.target_minutes} min` : "not set"}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-muted">Create or activate a plan to see week context.</p>
+              )}
+              <Link href="/plan" className="mt-3 inline-flex text-xs text-cyan-200 underline">Manage plan</Link>
+            </div>
+          </div>
+        </aside>
+
+        <main className="min-w-0 space-y-4">{children}</main>
+      </div>
+
+      <MobileBottomTabs />
     </div>
   );
 }

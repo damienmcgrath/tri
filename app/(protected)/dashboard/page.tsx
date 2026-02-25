@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { PageHeader } from "../page-header";
 import { markSkippedAction, moveSessionAction } from "./actions";
 import { WeekProgressCard } from "./week-progress-card";
 
@@ -253,6 +254,15 @@ export default async function DashboardPage({
   if (!hasActivePlan && !hasAnyPlan) {
     return (
       <section className="space-y-4">
+        <PageHeader
+          title="Dashboard"
+          objective="Orient your week at a glance, spot what is at risk, and choose the highest-impact next session."
+          actions={[
+            { href: "/plan", label: "Create a plan" },
+            { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
+          ]}
+        />
+
         <header className="surface sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
@@ -286,6 +296,15 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
+      <PageHeader
+        title="Dashboard"
+        objective="Stay oriented on this training week, keep completion momentum, and surface where coaching attention is needed."
+        actions={[
+          { href: "/calendar", label: "Open calendar" },
+          { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
+        ]}
+      />
+
       <header className="surface sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
