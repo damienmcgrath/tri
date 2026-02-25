@@ -336,14 +336,14 @@ export function WeekCalendar({
       <header className="surface sticky top-2 z-20 space-y-3 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}</p>
             <p className="text-sm font-semibold">
               {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href={weekLink(prevWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Prev week</Link>
-            <Link href="/calendar" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-cyan-400/60" : ""}`}>Current week</Link>
+            <Link href="/calendar" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-[hsl(var(--accent-performance)/0.45)]" : ""}`}>Current week</Link>
             <Link href={weekLink(nextWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Next week</Link>
             <button
               className="btn-primary px-3 py-1.5 text-xs"
@@ -357,7 +357,7 @@ export function WeekCalendar({
               Add session
             </button>
             {raceCountdown !== null ? (
-              <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-100">Race in {raceCountdown}d</span>
+              <span className="rounded-full border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.12)] px-3 py-1 text-xs font-medium text-accent">Race in {raceCountdown}d</span>
             ) : null}
           </div>
         </div>
@@ -366,7 +366,7 @@ export function WeekCalendar({
             {(["all", "swim", "bike", "run", "strength"] as const).map((item) => (
               <button
                 key={item}
-                className={`rounded-full border px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${sportFilter === item ? "border-cyan-300 bg-cyan-500/15 text-cyan-100" : "border-[hsl(var(--border))] text-muted"}`}
+                className={`rounded-full border px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)] ${sportFilter === item ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.12)] text-accent" : "border-[hsl(var(--border))] text-muted"}`}
                 onClick={() => setSportFilter(item)}
               >
                 {item === "all" ? "All" : getDisciplineMeta(item).label}
@@ -396,8 +396,8 @@ export function WeekCalendar({
               <div key={item.sport} className="surface-subtle p-3">
                 <p title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></p>
                 <p className="mt-1 text-xs">{item.completed}/{item.planned} min</p>
-                <div className="mt-2 h-1.5 rounded-full bg-black/35">
-                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-blue-400/90 transition-[width]" style={{ width: `${ratio}%` }} />
+                <div className="mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-2))]">
+                  <div className="h-full rounded-full bg-[hsl(var(--accent-performance))] transition-[width]" style={{ width: `${ratio}%` }} />
                 </div>
               </div>
             );
@@ -421,10 +421,10 @@ export function WeekCalendar({
             return (
               <DayDropZone key={day.iso} id={`day:${day.iso}`} isActive={activeId !== null}>
                 <section className="surface min-h-[280px] p-3">
-                  <div className={`border-b pb-2 ${isToday ? "border-cyan-300/80 bg-cyan-500/8 px-2" : "border-[hsl(var(--border))]"}`}>
+                  <div className={`border-b pb-2 ${isToday ? "border-[hsl(var(--accent-performance)/0.5)] bg-[hsl(var(--accent-performance)/0.08)] px-2" : "border-[hsl(var(--border))]"}`}>
                     <div className="flex items-center gap-2">
                       <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
-                      {isToday ? <span className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">Today</span> : null}
+                      {isToday ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] bg-[hsl(var(--accent-performance)/0.12)] px-1.5 py-0.5 text-[10px] font-medium text-accent">Today</span> : null}
                     </div>
                     <p className="text-sm font-semibold">{day.label}</p>
                     <p className="text-xs text-muted">{planned === 0 ? "rest" : `${completed}/${planned} min`}</p>
@@ -433,7 +433,7 @@ export function WeekCalendar({
                   <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                     <div className="mt-2 space-y-2">
                       {visibleIds.length === 0 ? (
-                        <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-cyan-400/50 hover:text-cyan-100">
+                        <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
                           + Add
                         </button>
                       ) : (
@@ -462,11 +462,11 @@ export function WeekCalendar({
                   </SortableContext>
 
                   {hiddenCount > 0 ? (
-                    <button className="mt-2 text-xs text-cyan-200 hover:underline" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>
+                    <button className="mt-2 text-xs text-accent hover:underline" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>
                       +{hiddenCount} more
                     </button>
                   ) : ids.length > 2 && expandedDays[day.iso] ? (
-                    <button className="mt-2 text-xs text-muted hover:text-cyan-200" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>
+                    <button className="mt-2 text-xs text-muted hover:text-accent" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>
                       Show less
                     </button>
                   ) : null}
@@ -477,7 +477,7 @@ export function WeekCalendar({
         </article>
       </DndContext>
 
-      {activeId ? <p className="text-[11px] text-cyan-200/85">Drag a session to another day to reschedule.</p> : null}
+      {activeId ? <p className="text-[11px] text-accent/80">Drag a session to another day to reschedule.</p> : null}
 
       {quickAddState ? (
         <QuickAddModal
@@ -640,11 +640,11 @@ export function WeekCalendar({
       ) : null}
 
       {toast ? (
-        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-cyan-400/45 bg-slate-950/95 px-3 py-2 text-xs text-cyan-100 shadow-lg shadow-black/50 sm:left-auto sm:right-6 sm:translate-x-0">
+        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--bg-elevated))] px-3 py-2 text-xs text-[hsl(var(--text-primary))] shadow-lg sm:left-auto sm:right-6 sm:translate-x-0">
           <span>{toast.message}</span>
           {toast.onUndo ? (
             <button
-              className="rounded-md border border-cyan-300/45 px-2 py-1 font-medium text-cyan-100 hover:bg-cyan-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+              className="rounded-md border border-[hsl(var(--accent-performance)/0.45)] px-2 py-1 font-medium text-accent hover:bg-[hsl(var(--accent-performance)/0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
               onClick={() => {
                 const undo = toast.onUndo;
                 setToast(null);
@@ -664,7 +664,7 @@ export function WeekCalendar({
 function DayDropZone({ children, id, isActive }: { children: ReactNode; id: string; isActive: boolean }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   const highlight = isActive && isOver;
-  return <div ref={setNodeRef} className={highlight ? "rounded-2xl ring-1 ring-cyan-300/70" : ""}>{children}</div>;
+  return <div ref={setNodeRef} className={highlight ? "rounded-2xl ring-1 ring-[hsl(var(--accent-performance)/0.5)]" : ""}>{children}</div>;
 }
 
 function SortableSessionCard({
@@ -696,7 +696,7 @@ function SortableSessionCard({
     <article
       ref={setNodeRef}
       style={style}
-      className={`group relative surface-subtle status-card-transition ${statusMotion} p-2.5 pr-8 focus-within:ring-1 focus-within:ring-cyan-300/70 ${isDragging ? "opacity-60" : ""} ${skipped ? "bg-slate-900/70" : ""}`}
+      className={`group relative surface-subtle status-card-transition ${statusMotion} p-2.5 pr-8 focus-within:ring-1 focus-within:ring-[hsl(var(--accent-performance)/0.5)] ${isDragging ? "opacity-60" : ""} `}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
@@ -723,7 +723,7 @@ function SortableSessionCard({
       </div>
       <button
         type="button"
-        className="absolute right-2 bottom-2 rounded p-1 text-cyan-200/65 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        className="absolute right-2 bottom-2 rounded p-1 text-accent/70 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
         aria-label={`Drag ${title}`}
         {...attributes}
         {...listeners}
@@ -780,7 +780,7 @@ function SessionOverflowMenu({
     <div className="relative" ref={menuRef}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-sm text-muted hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-sm text-muted hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={`Open actions for ${sessionTitle}`}
@@ -795,7 +795,7 @@ function SessionOverflowMenu({
 
       {isOpen ? (
         <div
-          className="absolute right-0 top-8 z-30 min-w-[160px] rounded-lg border border-white/15 bg-slate-950/95 p-1 shadow-xl"
+          className="absolute right-0 top-8 z-30 min-w-[160px] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-1 shadow-xl"
           role="menu"
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -807,7 +807,7 @@ function SessionOverflowMenu({
           ].map((item) => (
             <button
               key={item.label}
-              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--bg-card))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
               role="menuitem"
               onClick={() => {
                 item.action();

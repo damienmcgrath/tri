@@ -226,12 +226,12 @@ export default async function DashboardPage({
       label: getDisciplineMeta(sport).label,
       color:
         sport === "swim"
-          ? "hsl(190 85% 78%)"
+          ? "#56B6D9"
           : sport === "bike"
-            ? "hsl(118 45% 78%)"
+            ? "#6BAA75"
             : sport === "run"
-              ? "hsl(19 75% 78%)"
-              : "hsl(258 78% 85%)"
+              ? "#C48772"
+              : "#9A86C8"
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
@@ -251,6 +251,10 @@ export default async function DashboardPage({
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
   const fatigueState = completionPct >= 85 ? "Controlled" : completionPct >= 60 ? "Balanced" : "Accumulating";
   const confidenceLabel = completionPct >= 85 ? "High" : completionPct >= 60 ? "Building" : "Low";
+  const completionTrend = completionPct >= 80 ? "↑" : completionPct >= 50 ? "→" : "↓";
+  const loadTrend = remainingMinutes <= 120 ? "↓" : remainingMinutes <= 300 ? "→" : "↑";
+  const fatigueTrend = completionPct >= 85 ? "↓" : completionPct >= 60 ? "→" : "↑";
+  const confidenceTrend = completionPct >= 85 ? "↑" : completionPct >= 60 ? "→" : "↓";
 
   const raceName = profile?.race_name?.trim() || "Target race";
   const daysToRace = profile?.race_date
@@ -360,22 +364,22 @@ export default async function DashboardPage({
         <div className="grid gap-3 md:grid-cols-4">
           <article className="surface-subtle p-4">
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Completion pace</p>
-            <p className="mt-1 text-2xl font-semibold">{completionPct}%</p>
-            <p className="mt-1 text-xs text-muted">{totals.completed}/{totals.planned} min</p>
+            <p className="mt-1 text-2xl font-semibold">{completionPct}% <span className="text-base text-accent">{completionTrend}</span></p>
+            <p className="mt-1 text-xs text-muted">{totals.completed}/{totals.planned} min · vs target</p>
           </article>
           <article className="surface-subtle p-4">
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Remaining load</p>
-            <p className="mt-1 text-2xl font-semibold">{toHoursAndMinutes(remainingMinutes)}</p>
+            <p className="mt-1 text-2xl font-semibold">{toHoursAndMinutes(remainingMinutes)} <span className="text-base text-accent">{loadTrend}</span></p>
             <p className="mt-1 text-xs text-muted">left in this week</p>
           </article>
           <article className="surface-subtle p-4">
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Fatigue state</p>
-            <p className="mt-1 text-xl font-semibold">{fatigueState}</p>
+            <p className="mt-1 text-xl font-semibold">{fatigueState} <span className="text-sm text-accent">{fatigueTrend}</span></p>
             <p className="mt-1 text-xs text-muted">based on completion pressure</p>
           </article>
           <article className="surface-subtle p-4">
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Confidence signal</p>
-            <p className="mt-1 text-xl font-semibold">{confidenceLabel}</p>
+            <p className="mt-1 text-xl font-semibold">{confidenceLabel} <span className="text-sm text-accent">{confidenceTrend}</span></p>
             <p className="mt-1 text-xs text-muted">coach readiness estimate</p>
           </article>
         </div>
@@ -438,7 +442,7 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article className="priority-card-secondary scroll-mt-24" id="coach-focus">
+          <article className="priority-card-supporting scroll-mt-24" id="coach-focus">
             <p className="priority-kicker">Coach focus</p>
             <h2 className="priority-title">Keep today&apos;s decision simple.</h2>
             <p className="priority-subtitle">{focusText}</p>
@@ -464,7 +468,7 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article className="priority-card-secondary">
+          <article className="priority-card-supporting">
             <p className="priority-kicker">Supporting analytics</p>
             <h2 className="priority-title">Review sport load and upload gaps.</h2>
             <p className="priority-subtitle">Use supporting signals to adjust volume and keep your data aligned.</p>

@@ -12,7 +12,7 @@ type DecisionCard = {
   title: string;
   recommendation: string;
   detail: string;
-  tone: "signal-ready" | "signal-recovery" | "signal-load" | "signal-risk";
+  tone: "signal-ready" | "signal-recovery" | "signal-load" | "signal-risk" | "signal-neutral";
   actionLabel: string;
   actionHref: string;
 };
@@ -165,7 +165,7 @@ export function CoachChat() {
 
   const confidenceSignal = useMemo(() => {
     if (!summary) {
-      return { label: "No data", tone: "signal-recovery" };
+      return { label: "No data", tone: "signal-neutral" };
     }
 
     if (summary.completionPct >= 90) {
@@ -181,7 +181,7 @@ export function CoachChat() {
 
   const urgencySignal = useMemo(() => {
     if (!summary) {
-      return { label: "Awaiting recommendation", tone: "signal-recovery" };
+      return { label: "Awaiting recommendation", tone: "signal-neutral" };
     }
 
     if (summary.completionPct >= 85) {
@@ -435,16 +435,16 @@ export function CoachChat() {
 
                       return (
                         <div className="space-y-2 text-xs">
-                          <div>
-                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Summary</p>
+                          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2.5 py-2">
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">◉ Summary</p>
                             <p className="mt-1 text-sm text-[hsl(var(--text-primary))]">{structured.summaryBlock}</p>
                           </div>
-                          <div>
-                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Reasoning</p>
+                          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2.5 py-2">
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">▦ Reasoning</p>
                             <p className="mt-1 text-sm text-muted">{structured.reasoning}</p>
                           </div>
-                          <div>
-                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">Action options</p>
+                          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2.5 py-2">
+                            <p className="font-semibold uppercase tracking-[0.14em] text-tertiary">▲ Action options</p>
                             <ul className="mt-1 list-disc space-y-1 pl-4 text-sm text-muted">
                               {structured.actionOptions.map((option) => (
                                 <li key={option}>{option}</li>
@@ -515,11 +515,11 @@ export function CoachChat() {
         </div>
       </section>
 
-      <aside className="space-y-3 opacity-80">
-        <div className={`rounded-2xl bg-gradient-to-r ${completionTone} p-5 text-white shadow-xl`}>
-          <p className="text-xs uppercase tracking-wide text-white/90">Recent completion</p>
+      <aside className="space-y-3">
+        <div className={`rounded-2xl border border-[hsl(var(--border))] bg-gradient-to-r ${completionTone} p-5 text-[hsl(var(--text-primary))] shadow-sm`}>
+          <p className="text-xs uppercase tracking-wide text-tertiary">Recent completion</p>
           <p className="mt-2 text-3xl font-bold">{summary?.completionPct ?? 0}%</p>
-          <p className="mt-1 text-sm text-white/90">
+          <p className="mt-1 text-sm text-muted">
             {summary?.completedMinutes ?? 0} min done / {summary?.plannedMinutes ?? 0} min planned
           </p>
         </div>
@@ -531,6 +531,12 @@ export function CoachChat() {
           <div className="mt-3 flex flex-wrap gap-2">
             <span className={`signal-chip ${confidenceSignal.tone}`}>Coach confidence: {confidenceSignal.label}</span>
             <span className={`signal-chip ${urgencySignal.tone}`}>Recommendation urgency: {urgencySignal.label}</span>
+          </div>
+          <div className="mt-3">
+            <p className="text-xs text-tertiary">Confidence meter</p>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[hsl(var(--surface-2))]">
+              <div className="h-full rounded-full bg-[hsl(var(--ai-accent-core))]" style={{ width: `${Math.max(8, summary?.completionPct ?? 0)}%` }} />
+            </div>
           </div>
         </div>
 
