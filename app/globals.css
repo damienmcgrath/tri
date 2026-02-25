@@ -4,15 +4,30 @@
 
 :root {
   color-scheme: dark;
-  --bg: 224 24% 8%;
-  --bg-elevated: 222 21% 12%;
-  --bg-card: 223 18% 15%;
-  --fg: 210 20% 96%;
-  --fg-muted: 215 14% 72%;
+  --surface-0: 224 24% 8%;
+  --surface-1: 222 21% 12%;
+  --surface-2: 223 18% 15%;
+  --text-primary: 210 20% 96%;
+  --text-secondary: 215 14% 72%;
+  --text-tertiary: 215 10% 56%;
+
+  --signal-ready: 151 62% 51%;
+  --signal-load: 38 92% 56%;
+  --signal-risk: 8 86% 62%;
+  --signal-recovery: 198 95% 63%;
+
+  --ai-accent-core: 198 100% 58%;
+  --ai-accent-glow: 204 70% 19%;
+
+  --bg: var(--surface-0);
+  --bg-elevated: var(--surface-1);
+  --bg-card: var(--surface-2);
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
   --border: 218 18% 25%;
-  --ring: 198 100% 62%;
-  --accent: 198 100% 58%;
-  --accent-soft: 204 70% 19%;
+  --ring: var(--ai-accent-core);
+  --accent: var(--ai-accent-core);
+  --accent-soft: var(--ai-accent-glow);
 }
 
 @layer base {
@@ -81,6 +96,62 @@
 
   .text-muted {
     color: hsl(var(--fg-muted));
+  }
+
+  .text-tertiary {
+    color: hsl(var(--text-tertiary));
+  }
+
+  .signal-chip {
+    @apply rounded-full border px-2 py-0.5 text-[11px] font-medium;
+  }
+
+  .signal-ready {
+    border-color: hsl(var(--signal-ready) / 0.45);
+    background: hsl(var(--signal-ready) / 0.16);
+    color: hsl(var(--signal-ready));
+  }
+
+  .signal-load {
+    border-color: hsl(var(--signal-load) / 0.45);
+    background: hsl(var(--signal-load) / 0.16);
+    color: hsl(var(--signal-load));
+  }
+
+  .signal-risk {
+    border-color: hsl(var(--signal-risk) / 0.45);
+    background: hsl(var(--signal-risk) / 0.16);
+    color: hsl(var(--signal-risk));
+  }
+
+  .signal-recovery {
+    border-color: hsl(var(--signal-recovery) / 0.45);
+    background: hsl(var(--signal-recovery) / 0.16);
+    color: hsl(var(--signal-recovery));
+  }
+
+  .calendar-status-planned {
+    @apply signal-chip signal-load;
+  }
+
+  .calendar-status-completed {
+    @apply signal-chip signal-ready;
+  }
+
+  .calendar-status-skipped {
+    @apply signal-chip signal-risk;
+  }
+
+  .progress-track {
+    background: hsl(var(--surface-2));
+  }
+
+  .progress-fill-recovery {
+    background: linear-gradient(90deg, hsl(var(--signal-recovery)), hsl(var(--signal-ready)));
+  }
+
+  .progress-fill-load {
+    background: linear-gradient(90deg, hsl(var(--signal-load) / 0.85), hsl(var(--signal-load)));
   }
 
   .discipline-swim {

@@ -687,6 +687,8 @@ function SortableSessionCard({
   const discipline = getDisciplineMeta(session.sport);
   const skipped = session.status === "skipped" || isSkipped(session.notes);
   const title = buildSessionTitle(session);
+  const statusTone =
+    session.status === "completed" ? "calendar-status-completed" : session.status === "skipped" ? "calendar-status-skipped" : "calendar-status-planned";
 
   return (
     <article
@@ -698,7 +700,7 @@ function SortableSessionCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-            <p className="rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] text-cyan-100">
+            <p className={statusTone}>
               {session.status === "planned" ? "Pending" : session.status === "completed" ? "Completed" : "Skipped"}
             </p>
           </div>
@@ -711,11 +713,11 @@ function SortableSessionCard({
           <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{title}</p>
           <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
           {session.linkedActivityCount ? (
-            <p className="mt-1 text-xs text-emerald-300">
+            <p className="mt-1 text-xs text-[hsl(var(--signal-ready))]">
               Completed ✓ {session.linkedStats?.durationMin ?? 0}m{session.linkedStats?.distanceKm ? ` · ${session.linkedStats.distanceKm.toFixed(1)} km` : ""}
             </p>
           ) : session.unassignedSameDayCount ? (
-            <p className="mt-1 text-xs text-amber-200">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
+            <p className="mt-1 text-xs text-[hsl(var(--signal-load))]">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
           ) : null}
         </button>
       </div>
