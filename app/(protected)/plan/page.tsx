@@ -35,6 +35,15 @@ type Session = {
   status: "planned" | "completed" | "skipped";
 };
 
+type SessionTemplate = {
+  id: string;
+  name: string;
+  sport: "swim" | "bike" | "run" | "strength";
+  type: string;
+  duration_minutes: number;
+  notes: string | null;
+};
+
 function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
   const startDate = new Date(`${startDateIso}T00:00:00.000Z`);
   return Array.from({ length: Math.max(durationWeeks, 1) }).map((_, index) => {
@@ -209,5 +218,26 @@ export default async function PlanPage({
     }
   }
 
-  return <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />;
+
+  const { data: templateData, error: templateError } = await supabase
+    .from("session_templates")
+    .select("id,name,sport,type,duration_minutes,notes")
+    .eq("user_id", user.id)
+    .order("name", { ascending: true });
+
+  if (templateError && !isMissingTableError(templateError, "public.session_templates")) {
+    throw new Error(templateError.message);
+  }
+
+  const customTemplates = ((templateData ?? []) as SessionTemplate[]).map((template) => ({
+    id: template.id,
+    name: template.name,
+    sport: template.sport,
+    duration: template.duration_minutes,
+    type: template.type,
+    target: template.notes ?? ""
+  }));
+
+
+  return <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} customTemplates={customTemplates} />;
 }

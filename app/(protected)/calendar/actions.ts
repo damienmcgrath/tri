@@ -34,6 +34,25 @@ const quickAddSchema = z.object({
   notes: z.string().trim().max(1000).optional()
 });
 
+
+const templateBaseSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  sport: z.enum(["swim", "bike", "run", "strength"]),
+  type: z.string().trim().min(1).max(120),
+  duration: z.coerce.number().int().min(1).max(480),
+  notes: z.string().trim().max(1000).optional()
+});
+
+const createTemplateSchema = templateBaseSchema;
+
+const updateTemplateSchema = templateBaseSchema.extend({
+  templateId: z.string().uuid()
+});
+
+const deleteTemplateSchema = z.object({
+  templateId: z.string().uuid()
+});
+
 async function getAuthedClient() {
   const supabase = await createClient();
   const {
@@ -318,4 +337,107 @@ export async function quickAddSessionAction(input: {
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+}
+
+
+export async function createSessionTemplateAction(input: {
+  name: string;
+  sport: "swim" | "bike" | "run" | "strength";
+  type: string;
+  duration: number;
+  notes?: string;
+}) {
+  const parsed = createTemplateSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  const payload = {
+    user_id: user.id,
+    name: parsed.name,
+    sport: parsed.sport,
+    type: parsed.type,
+    duration_minutes: parsed.duration,
+    notes: parsed.notes?.trim() || null
+  };
+
+  const { data, error } = await supabase
+    .from("session_templates")
+    .insert(payload)
+    .select("id,name,sport,type,duration_minutes,notes")
+    .single();
+
+  if (error) {
+    throw new Error(error.message ?? "Could not create template.");
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath("/plan");
+
+  return {
+    id: data.id,
+    name: data.name,
+    sport: data.sport,
+    type: data.type,
+    duration: data.duration_minutes,
+    notes: data.notes ?? ""
+  };
+}
+
+export async function updateSessionTemplateAction(input: {
+  templateId: string;
+  name: string;
+  sport: "swim" | "bike" | "run" | "strength";
+  type: string;
+  duration: number;
+  notes?: string;
+}) {
+  const parsed = updateTemplateSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  const { data, error } = await supabase
+    .from("session_templates")
+    .update({
+      name: parsed.name,
+      sport: parsed.sport,
+      type: parsed.type,
+      duration_minutes: parsed.duration,
+      notes: parsed.notes?.trim() || null
+    })
+    .eq("id", parsed.templateId)
+    .eq("user_id", user.id)
+    .select("id,name,sport,type,duration_minutes,notes")
+    .single();
+
+  if (error) {
+    throw new Error(error.message ?? "Could not update template.");
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath("/plan");
+
+  return {
+    id: data.id,
+    name: data.name,
+    sport: data.sport,
+    type: data.type,
+    duration: data.duration_minutes,
+    notes: data.notes ?? ""
+  };
+}
+
+export async function deleteSessionTemplateAction(input: { templateId: string }) {
+  const parsed = deleteTemplateSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  const { error } = await supabase
+    .from("session_templates")
+    .delete()
+    .eq("id", parsed.templateId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message ?? "Could not delete template.");
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath("/plan");
 }

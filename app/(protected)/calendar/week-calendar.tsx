@@ -20,11 +20,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
   clearSkippedAction,
+  createSessionTemplateAction,
+  deleteSessionTemplateAction,
   markSkippedAction,
   moveSessionAction,
   quickAddSessionAction,
   swapSessionDayAction,
-  updateSessionAction
+  updateSessionAction,
+  updateSessionTemplateAction
 } from "@/app/(protected)/calendar/actions";
 
 type SessionStatus = "planned" | "completed" | "skipped";
@@ -46,6 +49,8 @@ type CalendarSession = {
 };
 
 type WeekDay = { iso: string; weekday: string; label: string };
+
+type CustomTemplate = { id: string; name: string; sport: "swim" | "bike" | "run" | "strength"; type: string; duration: number; notes: string };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
@@ -98,13 +103,15 @@ export function WeekCalendar({
   sessions,
   weekStart,
   isCurrentWeek,
-  raceCountdown
+  raceCountdown,
+  customTemplates
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
   weekStart: string;
   isCurrentWeek: boolean;
   raceCountdown: number | null;
+  customTemplates: CustomTemplate[];
 }) {
   const router = useRouter();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
@@ -119,10 +126,15 @@ export function WeekCalendar({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
+  const [localCustomTemplates, setLocalCustomTemplates] = useState<CustomTemplate[]>(customTemplates);
 
   useEffect(() => {
     setLocalSessions(sessions);
   }, [sessions]);
+
+  useEffect(() => {
+    setLocalCustomTemplates(customTemplates);
+  }, [customTemplates]);
 
   useEffect(() => {
     if (!toast) return;
@@ -484,6 +496,21 @@ export function WeekCalendar({
           allowDaySelection={quickAddState.allowDaySelection}
           weekDays={weekDays}
           onClose={() => setQuickAddState(null)}
+          customTemplates={localCustomTemplates}
+          onCreateTemplate={async (payload) => {
+            const created = await createSessionTemplateAction(payload);
+            setLocalCustomTemplates((prev) => [...prev.filter((item) => item.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)));
+            return created;
+          }}
+          onUpdateTemplate={async (payload) => {
+            const updated = await updateSessionTemplateAction(payload);
+            setLocalCustomTemplates((prev) => prev.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => a.name.localeCompare(b.name)));
+            return updated;
+          }}
+          onDeleteTemplate={async (templateId) => {
+            await deleteSessionTemplateAction({ templateId });
+            setLocalCustomTemplates((prev) => prev.filter((item) => item.id !== templateId));
+          }}
           onSubmit={(payload) => {
             startTransition(() => {
               void (async () => {
@@ -903,21 +930,62 @@ function QuickAddModal({
   allowDaySelection,
   weekDays,
   onClose,
-  onSubmit
+  onSubmit,
+  customTemplates,
+  onCreateTemplate,
+  onUpdateTemplate,
+  onDeleteTemplate
 }: {
   initialDate: string;
   allowDaySelection: boolean;
   weekDays: WeekDay[];
   onClose: () => void;
   onSubmit: (payload: { date: string; sport: "swim" | "bike" | "run" | "strength" | "other"; type?: string; duration: number; notes?: string }) => void;
+  customTemplates: CustomTemplate[];
+  onCreateTemplate: (payload: { name: string; sport: "swim" | "bike" | "run" | "strength"; type: string; duration: number; notes?: string }) => Promise<CustomTemplate>;
+  onUpdateTemplate: (payload: { templateId: string; name: string; sport: "swim" | "bike" | "run" | "strength"; type: string; duration: number; notes?: string }) => Promise<CustomTemplate>;
+  onDeleteTemplate: (templateId: string) => Promise<void>;
 }) {
+  const builtInTemplates: CustomTemplate[] = [
+    { id: "easy-run-45", name: "Easy Run 45", sport: "run", duration: 45, type: "Easy", notes: "Z2" },
+    { id: "long-run-90", name: "Long Run 90", sport: "run", duration: 90, type: "Long", notes: "Steady" },
+    { id: "z2-ride-60", name: "Z2 Ride 60", sport: "bike", duration: 60, type: "Endurance", notes: "Z2" },
+    { id: "long-ride-180", name: "Long Ride 180", sport: "bike", duration: 180, type: "Long", notes: "Z2 low" },
+    { id: "endurance-swim-45", name: "Endurance Swim 45", sport: "swim", duration: 45, type: "Endurance", notes: "Aerobic" },
+    { id: "strength-30", name: "Strength 30", sport: "strength", duration: 30, type: "Strength", notes: "Core + mobility" }
+  ];
+
   const [date, setDate] = useState(initialDate);
   const [sport, setSport] = useState<"swim" | "bike" | "run" | "strength" | "other">("run");
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("45");
   const [notes, setNotes] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("custom");
+  const [templateName, setTemplateName] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [isTemplatePending, startTemplateTransition] = useTransition();
   const parsedDuration = Number(duration);
   const isDurationValid = Number.isInteger(parsedDuration) && parsedDuration >= 1;
+  const canSaveTemplate = sport !== "other" && title.trim().length > 0 && isDurationValid;
+
+  function applyTemplate(template: CustomTemplate | null) {
+    if (!template) return;
+    setSport(template.sport);
+    setTitle(template.type);
+    setDuration(String(template.duration));
+    setNotes(template.notes);
+    setTemplateName(template.name);
+    const isBuiltIn = builtInTemplates.some((item) => item.id === template.id);
+    setEditingTemplateId(isBuiltIn ? null : template.id);
+  }
+
+  function resetTemplateEditor() {
+    setTemplateName("");
+    setEditingTemplateId(null);
+  }
+
+  const allTemplates = [...builtInTemplates, ...customTemplates];
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-3">
@@ -943,10 +1011,133 @@ function QuickAddModal({
               </button>
             ))}
           </div>
+          <label className="block">
+            <span className="label-base mb-1 text-xs">Template</span>
+            <select
+              className="input-base"
+              value={selectedTemplateId}
+              onChange={(event) => {
+                const nextTemplateId = event.target.value;
+                setSelectedTemplateId(nextTemplateId);
+                setTemplateError(null);
+                if (nextTemplateId === "custom") {
+                  resetTemplateEditor();
+                  return;
+                }
+                applyTemplate(allTemplates.find((item) => item.id === nextTemplateId) ?? null);
+              }}
+              aria-label="Select quick add template"
+            >
+              <option value="custom">Custom</option>
+              {builtInTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+              {customTemplates.length ? <optgroup label="Your templates">{customTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</optgroup> : null}
+            </select>
+          </label>
           <input className="input-base" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" />
           <input className="input-base" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Planned minutes" type="number" min={1} step={1} required />
           {!isDurationValid ? <p className="text-[11px] text-rose-300">Enter whole minutes (min 1).</p> : null}
           <input className="input-base" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Target / Notes (optional)" />
+          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
+            <p className="text-xs font-semibold">Custom templates</p>
+            <p className="mt-1 text-[11px] text-muted">Save the current fields as reusable templates for your account.</p>
+            <input
+              className="input-base mt-2"
+              value={templateName}
+              onChange={(event) => setTemplateName(event.target.value)}
+              placeholder="Template name"
+              maxLength={80}
+            />
+            {templateError ? <p className="mt-2 text-[11px] text-rose-300">{templateError}</p> : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="btn-secondary px-2.5 py-1 text-xs"
+                disabled={!canSaveTemplate || !templateName.trim() || isTemplatePending}
+                onClick={() => {
+                  if (!canSaveTemplate || !templateName.trim()) return;
+                  setTemplateError(null);
+                  startTemplateTransition(() => {
+                    void (async () => {
+                      try {
+                        const payload = {
+                          name: templateName.trim(),
+                          sport,
+                          type: title.trim(),
+                          duration: parsedDuration,
+                          notes: notes.trim()
+                        };
+                        const savedTemplate = editingTemplateId
+                          ? await onUpdateTemplate({ templateId: editingTemplateId, ...payload })
+                          : await onCreateTemplate(payload);
+                        setSelectedTemplateId(savedTemplate.id);
+                        setEditingTemplateId(savedTemplate.id);
+                      } catch (error) {
+                        setTemplateError(error instanceof Error ? error.message : "Could not save template.");
+                      }
+                    })();
+                  });
+                }}
+              >
+                {editingTemplateId ? "Update template" : "Add template"}
+              </button>
+              {editingTemplateId ? (
+                <button
+                  className="btn-secondary px-2.5 py-1 text-xs"
+                  onClick={() => {
+                    resetTemplateEditor();
+                    setSelectedTemplateId("custom");
+                    setTemplateError(null);
+                  }}
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
+            {customTemplates.length ? (
+              <ul className="mt-3 space-y-1.5 text-xs">
+                {customTemplates.map((template) => (
+                  <li key={template.id} className="flex items-center justify-between gap-2 rounded-md border border-[hsl(var(--border))] px-2 py-1.5">
+                    <span className="truncate">{template.name}</span>
+                    <span className="flex items-center gap-1">
+                      <button
+                        className="btn-secondary px-2 py-0.5 text-[11px]"
+                        onClick={() => {
+                          setSelectedTemplateId(template.id);
+                          setTemplateError(null);
+                          applyTemplate(template);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn-secondary px-2 py-0.5 text-[11px]"
+                        disabled={isTemplatePending}
+                        onClick={() => {
+                          setTemplateError(null);
+                          startTemplateTransition(() => {
+                            void (async () => {
+                              try {
+                                await onDeleteTemplate(template.id);
+                                if (selectedTemplateId === template.id) {
+                                  setSelectedTemplateId("custom");
+                                  resetTemplateEditor();
+                                }
+                              } catch (error) {
+                                setTemplateError(error instanceof Error ? error.message : "Could not delete template.");
+                              }
+                            })();
+                          });
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
