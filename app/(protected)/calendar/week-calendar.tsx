@@ -99,13 +99,11 @@ export function WeekCalendar({
   sessions,
   weekStart,
   isCurrentWeek,
-  raceCountdown
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
   weekStart: string;
   isCurrentWeek: boolean;
-  raceCountdown: number | null;
 }) {
   const router = useRouter();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
@@ -357,9 +355,6 @@ export function WeekCalendar({
             >
               Add session
             </button>
-            {raceCountdown !== null ? (
-              <span className="rounded-full border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.12)] px-3 py-1 text-xs font-medium text-accent">Race in {raceCountdown}d</span>
-            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -383,8 +378,8 @@ export function WeekCalendar({
         </div>
       </header>
 
-      <article className="surface px-4 py-3">
-        <div className="grid gap-2 md:grid-cols-6">
+      <article className="surface sticky top-[74px] z-10 px-3 py-2">
+        <div className="grid gap-2 lg:grid-cols-6">
           <div className="surface-subtle p-3 md:col-span-2">
             <p className="text-xs uppercase tracking-wide text-muted">Week volume</p>
             <p className="mt-1 text-lg font-semibold">Completed {totals.completed} / {totals.planned} min</p>
@@ -409,7 +404,7 @@ export function WeekCalendar({
       </article>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7 min-[1024px]:overflow-x-auto">
           {weekDays.map((day) => {
             const ids = filteredIdsByDay[day.iso] ?? [];
             const visibleIds = expandedDays[day.iso] ? ids : ids.slice(0, 2);

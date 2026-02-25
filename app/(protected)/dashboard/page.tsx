@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { isValidIsoDate } from "@/lib/date/iso";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
-import { PageHeader } from "../page-header";
 import { markSkippedAction, moveSessionAction } from "./actions";
 import { WeekProgressCard } from "./week-progress-card";
+import { StatusStrip } from "../status-strip";
+import { DetailsAccordion } from "../details-accordion";
 
 type Session = {
   id: string;
@@ -66,13 +66,6 @@ function toHoursAndMinutes(minutes: number) {
   return `${hours}h ${mins}m`;
 }
 
-function formatWeekRange(startIso: string) {
-  const start = new Date(`${startIso}T00:00:00.000Z`);
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
-  return `${shortDateFormatter.format(start)}–${shortDateFormatter.format(end)}`;
-}
-
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
   if (session.status === "completed" || session.status === "skipped") {
     return session.status;
@@ -115,7 +108,6 @@ export default async function DashboardPage({
   const previousWeekStart = addDays(weekStart, -7);
   const previousWeekEnd = weekStart;
   const todayIso = new Date().toISOString().slice(0, 10);
-  const isCurrentWeek = weekStart === currentWeekStart;
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -246,10 +238,10 @@ export default async function DashboardPage({
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
+
   const keyTodaySession = [...todaySessions]
     .filter((session) => session.status === "planned")
     .sort((a, b) => (b.duration_minutes ?? 0) - (a.duration_minutes ?? 0))[0];
-
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
   const focusText = keyTodaySession
@@ -283,38 +275,10 @@ export default async function DashboardPage({
   const fatigueTrend = completionPct >= 85 ? "↓" : completionPct >= 60 ? "→" : "↑";
   const confidenceTrend = completionDelta > 2 ? "↑" : completionDelta < -2 ? "↓" : "→";
 
-  const raceName = profile?.race_name?.trim() || "Target race";
-  const daysToRace = profile?.race_date
-    ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
       <section className="space-y-4">
-        <PageHeader
-          title="Dashboard"
-          objective="Orient the week at a glance, identify risk early, and execute the highest-impact next session."
-          actions={[
-            { href: "/plan", label: "Create a plan" },
-            { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
-          ]}
-        />
-
-        <header className="surface sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
-          </div>
-          {daysToRace !== null ? (
-            <p className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">
-              {raceName} • {daysToRace} days
-            </p>
-          ) : (
-            <Link href="/settings/race" className="btn-primary px-3 py-1.5 text-xs">
-              Set race date
-            </Link>
-          )}
-        </header>
-
         <article className="surface p-6">
           <p className="text-xs uppercase tracking-[0.16em] text-accent">Get started</p>
           <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
@@ -333,35 +297,6 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
-      <PageHeader
-        title="Dashboard"
-        objective="Stay oriented on this training week, maintain completion discipline, and surface where coaching attention is needed."
-        actions={[
-          { href: "/calendar", label: "Open calendar" },
-          { href: "/coach", label: "Ask tri.ai", variant: "secondary" }
-        ]}
-      />
-
-      <header className="surface sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-semibold">WEEK: {formatWeekRange(weekStart)}</span>
-          <Link href={`/dashboard?weekStart=${addDays(weekStart, -7)}`} className="btn-secondary px-3 py-1.5 text-xs">Prev</Link>
-          <Link href="/dashboard" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
-          <Link href={`/dashboard?weekStart=${addDays(weekStart, 7)}`} className="btn-secondary px-3 py-1.5 text-xs">Next</Link>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {daysToRace !== null ? (
-            <p className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">
-              {raceName} • {daysToRace} days
-            </p>
-          ) : (
-            <Link href="/settings/race" className="btn-secondary px-3 py-1.5 text-xs">Set race date</Link>
-          )}
-          <Link href="/coach" className="btn-primary px-3 py-1.5 text-xs">Ask tri.ai</Link>
-        </div>
-      </header>
-
       <div className="space-y-4">
         <article className="priority-card-primary">
           <p className="priority-kicker">Weekly coaching takeaway</p>
@@ -388,28 +323,14 @@ export default async function DashboardPage({
           </div>
         </article>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <article className="surface-subtle p-4">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Completion pace</p>
-            <p className="mt-1 text-2xl font-semibold">{completionPct}% <span className="text-base text-accent">{completionTrend}</span></p>
-            <p className="mt-1 text-xs text-muted">{completionDelta >= 0 ? `+${completionDelta}` : completionDelta} pts vs last week</p>
-          </article>
-          <article className="surface-subtle p-4">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Remaining load</p>
-            <p className="mt-1 text-2xl font-semibold">{toHoursAndMinutes(remainingMinutes)} <span className="text-base text-accent">{loadTrend}</span></p>
-            <p className="mt-1 text-xs text-muted">{remainingMinutesDelta >= 0 ? `+${remainingMinutesDelta}` : remainingMinutesDelta} min vs last week</p>
-          </article>
-          <article className="surface-subtle p-4">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Fatigue state</p>
-            <p className="mt-1 text-xl font-semibold">{fatigueState} <span className="text-sm text-accent">{fatigueTrend}</span></p>
-            <p className="mt-1 text-xs text-muted">threshold-adjusted vs last week</p>
-          </article>
-          <article className="surface-subtle p-4">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Confidence signal</p>
-            <p className="mt-1 text-xl font-semibold">{confidenceLabel} <span className="text-sm text-accent">{confidenceTrend}</span></p>
-            <p className="mt-1 text-xs text-muted">trajectory vs last week</p>
-          </article>
-        </div>
+        <StatusStrip
+          items={[
+            { label: "Completion", value: `${completionPct}%`, hint: `${completionTrend} ${completionDelta >= 0 ? `+${completionDelta}` : completionDelta} pts` },
+            { label: "Remaining", value: toHoursAndMinutes(remainingMinutes), hint: `${loadTrend} ${remainingMinutesDelta >= 0 ? `+${remainingMinutesDelta}` : remainingMinutesDelta} min` },
+            { label: "Fatigue", value: fatigueState, hint: fatigueTrend },
+            { label: "Confidence", value: confidenceLabel, hint: confidenceTrend }
+          ]}
+        />
 
         <div className="priority-layout">
           <article className="priority-card-emphasis">
@@ -469,37 +390,8 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article className="priority-card-supporting scroll-mt-24" id="coach-focus">
-            <p className="priority-kicker">Coach focus</p>
-            <h2 className="priority-title">Keep today&apos;s decision simple.</h2>
-            <p className="priority-subtitle">{focusText}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {keyTodaySession ? (
-                <>
-                  <form action={moveSessionAction} className="flex items-center gap-2">
-                    <input type="hidden" name="sessionId" value={keyTodaySession.id} />
-                    <select name="newDate" defaultValue={keyTodaySession.date} className="input-base py-1 text-xs" aria-label="Move session day">
-                      {weekDays.map((day) => (
-                        <option key={day.iso} value={day.iso}>{day.weekday}</option>
-                      ))}
-                    </select>
-                    <button className="btn-secondary px-3 py-1.5 text-xs">Move session</button>
-                  </form>
-                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Swap days</Link>
-                  <form action={markSkippedAction}>
-                    <input type="hidden" name="sessionId" value={keyTodaySession.id} />
-                    <button className="btn-secondary px-3 py-1.5 text-xs">Mark skipped</button>
-                  </form>
-                </>
-              ) : null}
-            </div>
-          </article>
-
-          <article className="priority-card-supporting">
-            <p className="priority-kicker">Supporting analytics</p>
-            <h2 className="priority-title">Review sport load and upload gaps.</h2>
-            <p className="priority-subtitle">Use supporting signals to adjust volume and keep your data aligned.</p>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <DetailsAccordion title="Details">
+            <div className="grid gap-3 lg:grid-cols-2">
               <div className="priority-card-supporting">
                 <h3 className="text-sm font-semibold">Sport breakdown</h3>
                 <ul className="mt-2 space-y-2">
@@ -533,16 +425,16 @@ export default async function DashboardPage({
                 )}
               </div>
             </div>
-          </article>
+          </DetailsAccordion>
 
-          <article className="surface p-3">
+          <article className="surface-subtle p-3">
             <h2 className="mb-2 text-sm font-semibold text-muted">Week at a glance</h2>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 overflow-x-auto">
               {weekDays.map((day) => (
                 <Link
                   key={day.iso}
                   href={`/calendar?date=${day.iso}`}
-                  className={`surface-subtle block p-2 text-center transition hover:border-[hsl(var(--accent-performance)/0.55)] ${day.isToday ? "border-[hsl(var(--accent-performance)/0.6)] bg-[hsl(var(--accent-performance)/0.12)]" : ""}`}
+                  className={`block min-w-[96px] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2 text-center transition hover:border-[hsl(var(--accent-performance)/0.55)] ${day.isToday ? "border-[hsl(var(--accent-performance)/0.6)] bg-[hsl(var(--accent-performance)/0.12)]" : ""}`}
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted">{day.weekday}</p>
                   <p className="text-xs font-medium">{day.day}</p>

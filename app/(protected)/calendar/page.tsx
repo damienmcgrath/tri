@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
-import { PageHeader } from "../page-header";
 import { WeekCalendar } from "./week-calendar";
 
 type Session = {
@@ -218,77 +217,28 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
 
-  const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
-  const raceCountdown = raceDate
-    ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
 
   return (
     <section className="space-y-4">
-      <PageHeader
-        title="Calendar"
-        objective="Execute each day with confidence by dragging, logging, and resolving conflicts before they become missed work."
-        actions={[
-          { href: "/plan", label: "Edit plan" },
-          { href: "/dashboard", label: "View dashboard", variant: "secondary" }
-        ]}
-      />
-
-      <div className="priority-layout">
-        <article className="priority-card-primary">
-          <p className="priority-kicker">Today&apos;s priority session</p>
-          <h2 className="priority-title">Execute your next key workout.</h2>
-          <p className="priority-subtitle">Keep focus on one clear session, then tidy the rest of the day.</p>
-          <p className="mt-3 text-sm text-muted">
-            {nextTodaySession
-              ? `Next up: ${nextTodaySession.type} (${nextTodaySession.duration} min).`
-              : "No planned session today. Pull one forward to keep confidence high."}
-          </p>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">On track this week</p>
-          <h2 className="priority-title">Monitor execution confidence daily.</h2>
-          <p className="priority-subtitle">Use completion and pending counts to prevent last-minute backlog.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Completed</p>
-              <p className="mt-1 text-lg font-semibold">{completedCount}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Planned</p>
-              <p className="mt-1 text-lg font-semibold">{pendingCount}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Skipped</p>
-              <p className="mt-1 text-lg font-semibold">{skippedCount}</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">Supporting analytics</p>
-          <h2 className="priority-title">Resolve upload and scheduling drift.</h2>
-          <p className="priority-subtitle">Catch unmatched activities early so your plan and execution stay aligned.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Unmatched uploads</p>
-              <p className="mt-1 text-lg font-semibold">{unmatchedUploads}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Current week view</p>
-              <p className="mt-1 text-sm font-semibold">{weekStart === currentWeekStart ? "Current" : "Historical / Future"}</p>
-            </div>
-          </div>
-        </article>
-      </div>
+      <article className="surface p-4">
+        <p className="text-xs uppercase tracking-[0.14em] text-accent">Execution header</p>
+        <h2 className="mt-1 text-lg font-semibold">{nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}</h2>
+        <p className="mt-1 text-sm text-muted">
+          {unmatchedUploads > 0 ? `${unmatchedUploads} uploads need matching. Resolve drift before week end.` : "Your uploads and schedule are aligned."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={unmatchedUploads > 0 ? "/settings/integrations" : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">{unmatchedUploads > 0 ? "Resolve drift" : "Add session"}</a>
+          <span className="signal-chip signal-ready">Completed {completedCount}</span>
+          <span className="signal-chip signal-load">Planned {pendingCount}</span>
+          <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
+        </div>
+      </article>
 
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
         weekStart={weekStart}
         isCurrentWeek={weekStart === currentWeekStart}
-        raceCountdown={raceCountdown}
       />
     </section>
   );
