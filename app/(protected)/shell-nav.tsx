@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/plan", label: "Plan" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/coach", label: "Coach" }
+  { href: "/dashboard", label: "Dashboard", semanticLabel: "Overview" },
+  { href: "/plan", label: "Plan", semanticLabel: "Design" },
+  { href: "/calendar", label: "Calendar", semanticLabel: "Execution" },
+  { href: "/coach", label: "Coach", semanticLabel: "Adaptation" }
 ];
 
 export function ShellNavRail() {
@@ -21,13 +21,15 @@ export function ShellNavRail() {
           <Link
             key={item.href}
             href={item.href}
+            title={`${item.label} · ${item.semanticLabel}`}
             className={`block rounded-xl px-3 py-2 text-sm transition ${
               active
                 ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))] ring-1 ring-[hsl(var(--accent-performance)/0.45)]"
                 : "text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
             }`}
           >
-            {item.label}
+            <span className="block font-medium">{item.label}</span>
+            <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">{item.semanticLabel}</span>
           </Link>
         );
       })}
@@ -47,9 +49,11 @@ export function MobileBottomTabs() {
             <Link
               key={item.href}
               href={item.href}
+              title={`${item.label} · ${item.semanticLabel}`}
               className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))]" : "text-muted"}`}
             >
-              {item.label}
+              <span className="block">{item.label}</span>
+              <span className="block text-[10px] uppercase tracking-[0.12em]">{item.semanticLabel}</span>
             </Link>
           );
         })}

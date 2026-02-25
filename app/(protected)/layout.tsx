@@ -15,6 +15,9 @@ type Profile = {
 };
 
 type Session = {
+  date: string;
+  sport: string;
+  type: string | null;
   duration_minutes: number | null;
   status: "planned" | "completed" | "skipped";
 };
@@ -67,10 +70,11 @@ export default async function ProtectedLayout({
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const currentWeekEnd = addDays(currentWeekStart, 7);
+  const previousWeekStart = addDays(currentWeekStart, -7);
 
   const activePlanId = profile?.active_plan_id ?? null;
 
-  const [{ data: weekData }, { data: sessionsData }] = activePlanId
+  const [{ data: weekData }, { data: sessionsData }, { data: previousWeekSessionsData }] = activePlanId
     ? await Promise.all([
         supabase
           .from("training_weeks")
@@ -82,21 +86,37 @@ export default async function ProtectedLayout({
           .maybeSingle(),
         supabase
           .from("sessions")
-          .select("duration_minutes,status")
+          .select("date,sport,type,duration_minutes,status")
           .eq("plan_id", activePlanId)
           .gte("date", currentWeekStart)
-          .lt("date", currentWeekEnd)
+          .lt("date", currentWeekEnd),
+        supabase
+          .from("sessions")
+          .select("duration_minutes,status")
+          .eq("plan_id", activePlanId)
+          .gte("date", previousWeekStart)
+          .lt("date", currentWeekStart)
       ])
-    : [{ data: null }, { data: [] }];
+    : [{ data: null }, { data: [] }, { data: [] }];
 
   const weekContext = (weekData ?? null) as TrainingWeek | null;
   const sessions = (sessionsData ?? []) as Session[];
+  const previousWeekSessions = (previousWeekSessionsData ?? []) as Array<Pick<Session, "duration_minutes" | "status">>;
 
   const plannedMinutes = sessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
   const completedMinutes = sessions
     .filter((session) => session.status === "completed")
     .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
   const completionRate = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0;
+  const previousWeekPlannedMinutes = previousWeekSessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const previousWeekCompletedMinutes = previousWeekSessions
+    .filter((session) => session.status === "completed")
+    .reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const previousCompletionRate = previousWeekPlannedMinutes > 0 ? Math.round((previousWeekCompletedMinutes / previousWeekPlannedMinutes) * 100) : 0;
+  const completionDelta = completionRate - previousCompletionRate;
+
+  const trendDirection = completionDelta >= 8 ? "improving" : completionDelta <= -8 ? "declining" : "stable";
+  const trendLabel = trendDirection === "improving" ? "Improving" : trendDirection === "declining" ? "Declining" : "Stable";
 
   const readiness = completionRate >= 70 ? "Ready" : completionRate >= 40 ? "Building" : "Needs focus";
   const readinessClass = completionRate >= 70 ? "signal-ready" : completionRate >= 40 ? "signal-load" : "signal-risk";
@@ -105,9 +125,18 @@ export default async function ProtectedLayout({
     ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const nextKeySession = sessions
+    .filter((session) => session.status === "planned" && session.date >= todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+
+  const nextKeySessionLabel = nextKeySession
+    ? `${nextKeySession.sport}${nextKeySession.type ? ` · ${nextKeySession.type}` : ""} · ${nextKeySession.duration_minutes ?? 0} min`
+    : "No planned key session";
+
   return (
     <div className="app-shell">
-      <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur">
+      <div className={`shell-header border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur shell-header--${trendDirection}`}>
         <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
           <p className="text-sm uppercase tracking-[0.2em] text-accent">tri.ai</p>
           <div className="flex items-center gap-2">
@@ -119,6 +148,20 @@ export default async function ProtectedLayout({
           </div>
           <AccountMenu avatarUrl={profile?.avatar_url ?? null} initials={initials} displayName={displayName} email={email} signOutAction={signOutAction} />
         </div>
+
+        <div className="mx-auto w-full max-w-[1200px] px-4 pb-3 md:px-6 lg:hidden">
+          <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))/0.9] px-3 py-1 text-xs text-muted">
+            <span className="font-semibold text-[hsl(var(--fg))]">{completionRate}% complete</span>
+            <span>·</span>
+            <span className="truncate">{nextKeySession ? `Next ${nextKeySession.sport}` : "No next key session"}</span>
+            {daysToRace !== null ? (
+              <>
+                <span>·</span>
+                <span>Race {daysToRace}d</span>
+              </>
+            ) : null}
+          </p>
+        </div>
       </div>
 
       <div className="mx-auto grid w-full max-w-[1200px] gap-4 px-4 pb-24 pt-5 md:px-6 lg:grid-cols-[260px_1fr] lg:pb-8">
@@ -128,6 +171,19 @@ export default async function ProtectedLayout({
               <p className="text-xs uppercase tracking-[0.16em] text-accent">Primary nav</p>
               <div className="mt-2">
                 <ShellNavRail />
+              </div>
+
+              <div className="surface-subtle mt-3 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted">Weekly progress</p>
+                  <span className={`signal-chip ${readinessClass}`}>{trendLabel}</span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[hsl(var(--bg-elevated))]">
+                  <div className="h-full rounded-full bg-[hsl(var(--accent-performance))]" style={{ width: `${completionRate}%` }} />
+                </div>
+                <p className="mt-2 text-sm font-semibold">{completionRate}% completion</p>
+                <p className="mt-1 text-xs text-muted">Next key: {nextKeySessionLabel}</p>
+                {daysToRace !== null ? <p className="mt-1 text-xs text-muted">Race countdown: {daysToRace} days</p> : null}
               </div>
             </div>
 
