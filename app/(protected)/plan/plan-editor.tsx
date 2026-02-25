@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { SessionStatusChip } from "@/lib/ui/status-chip";
 import {
   bulkReorderSessionsAction,
   createPlanAction,
@@ -132,7 +133,7 @@ function SortableSessionCard({ session, onOpen }: { session: Session; onOpen: (i
       className={`group w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2 text-left ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="flex items-center justify-between">
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${meta.className}`}>{meta.label}</span>
+        <span title={`${meta.label} · ${meta.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${meta.className} ${meta.textureClassName}`}><span aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></span>
         <span
           {...attributes}
           {...listeners}
@@ -142,6 +143,9 @@ function SortableSessionCard({ session, onOpen }: { session: Session; onOpen: (i
         >
           ⋮⋮
         </span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <SessionStatusChip status={session.status} />
       </div>
       <p className="mt-1 line-clamp-2 text-xs font-semibold">{session.type || "Session"}</p>
       <p className="mt-1 text-xs text-muted">{session.duration_minutes} min</p>
@@ -347,7 +351,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
-                <fieldset><legend className="label-base mb-2">Discipline</legend><div className="grid grid-cols-5 gap-2">{sports.map((sport) => { const meta = getDisciplineMeta(sport); return <label key={sport} className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-xs ${meta.className}`}><input defaultChecked={sport === "run"} className="sr-only" type="radio" name="sport" value={sport} />{meta.label}</label>; })}</div></fieldset>
+                <fieldset><legend className="label-base mb-2">Discipline</legend><div className="grid grid-cols-5 gap-2">{sports.map((sport) => { const meta = getDisciplineMeta(sport); return <label key={sport} className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-xs ${meta.className} ${meta.textureClassName}`}><input defaultChecked={sport === "run"} className="sr-only" type="radio" name="sport" value={sport} /><span className="inline-flex items-center gap-1" title={`${meta.label} · ${meta.shape}`}><span aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></span></label>; })}</div></fieldset>
                 <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
                 <label className="label-base">Title / Type</label><input name="sessionType" className="input-base" placeholder="Easy, Long, Intervals" />
                 <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 3x10 @ FTP" />
