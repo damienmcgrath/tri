@@ -12,13 +12,21 @@ export function getSessionStatusMeta(status: SessionStatus) {
   return statusMeta[status];
 }
 
-export function SessionStatusChip({ status, className = "" }: { status: SessionStatus; className?: string }) {
+export function SessionStatusChip({
+  status,
+  className = "",
+  compact = false
+}: {
+  status: SessionStatus;
+  className?: string;
+  compact?: boolean;
+}) {
   const meta = getSessionStatusMeta(status);
 
   return (
-    <span className={`status-chip ${meta.className} ${className}`.trim()}>
+    <span className={`status-chip ${meta.className} ${compact ? "status-chip-compact" : ""} ${className}`.trim()} aria-label={meta.label}>
       <span aria-hidden="true">{meta.icon}</span>
-      <span>{meta.label}</span>
+      {compact ? null : <span>{meta.label}</span>}
     </span>
   );
 }

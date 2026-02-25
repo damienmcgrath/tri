@@ -113,7 +113,7 @@ function withNormalizedOrder(items: Session[]) {
 function DayDropZone({ iso, children }: { iso: string; children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${iso}` });
   return (
-    <div ref={setNodeRef} className={isOver ? "rounded-lg ring-1 ring-cyan-300/60" : ""}>
+    <div ref={setNodeRef} className={isOver ? "rounded-lg ring-1 ring-[hsl(var(--accent-performance)/0.45)]" : ""}>
       {children}
     </div>
   );
@@ -257,22 +257,54 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
       <aside className="surface p-4">
         <h1 className="text-xl font-semibold">Plan Builder</h1>
         <p className="mt-1 text-sm text-muted">Plan → Training Weeks → Sessions</p>
-        <form action={createPlanAction} className="mt-4 space-y-2">
-          <label className="label-base" htmlFor="plan-name">Plan name</label><input id="plan-name" name="name" required className="input-base" />
-          <label className="label-base" htmlFor="plan-start">Start Monday</label><input id="plan-start" name="startDate" type="date" required className="input-base" />
-          <label className="label-base" htmlFor="plan-duration">Duration (weeks)</label><input id="plan-duration" name="durationWeeks" type="number" min={1} max={52} defaultValue={12} required className="input-base" />
-          <button className="btn-primary w-full">Create plan with weeks</button>
-        </form>
-        <div className="mt-5 space-y-2">
-          {plans.map((plan) => (
-            <div key={plan.id} className={`flex items-start gap-2 rounded-xl border p-2 ${selectedPlan?.id === plan.id ? "border-cyan-400/60 bg-cyan-500/10" : "border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"}`}>
-              <Link href={`/plan?plan=${plan.id}`} className="min-w-0 flex-1 rounded-lg px-1 py-0.5"><p className="font-medium">{plan.name}</p></Link>
-              <form action={deletePlanAction} onSubmit={(event) => { if (!window.confirm(`Delete plan "${plan.name}" and all weeks/sessions?`)) event.preventDefault(); }}>
-                <input type="hidden" name="planId" value={plan.id} /><button className="btn-secondary px-2 py-1 text-xs">Delete</button>
-              </form>
+        <form action={createPlanAction} className="mt-4 space-y-4">
+          <section className="surface-subtle p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Plan</p>
+            <label className="label-base mt-2" htmlFor="plan-name">Plan name</label>
+            <input id="plan-name" name="name" required className="input-base" />
+          </section>
+
+          <section className="surface-subtle p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Dates</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <div>
+                <label className="label-base" htmlFor="plan-start">Start Monday</label>
+                <input id="plan-start" name="startDate" type="date" required className="input-base" />
+              </div>
+              <div>
+                <label className="label-base" htmlFor="plan-duration">Duration (weeks)</label>
+                <input id="plan-duration" name="durationWeeks" type="number" min={1} max={52} defaultValue={12} required className="input-base" />
+              </div>
             </div>
-          ))}
-        </div>
+          </section>
+
+          <section className="surface-subtle p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Actions</p>
+            <p className="mt-1 text-xs text-muted">Set plan parameters first, then create training weeks.</p>
+            <button className="btn-primary mt-3 w-full">Create plan with weeks</button>
+          </section>
+        </form>
+
+        <details className="mt-4 surface-subtle p-3">
+          <summary className="cursor-pointer text-sm font-medium">Existing plans ({plans.length})</summary>
+          <div className="mt-3 space-y-2">
+            {plans.map((plan) => (
+              <div
+                key={plan.id}
+                className={`flex items-start gap-2 rounded-xl border p-2 ${
+                  selectedPlan?.id === plan.id
+                    ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.1)]"
+                    : "border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))]"
+                }`}
+              >
+                <Link href={`/plan?plan=${plan.id}`} className="min-w-0 flex-1 rounded-lg px-1 py-0.5"><p className="font-medium">{plan.name}</p></Link>
+                <form action={deletePlanAction} onSubmit={(event) => { if (!window.confirm(`Delete plan "${plan.name}" and all weeks/sessions?`)) event.preventDefault(); }}>
+                  <input type="hidden" name="planId" value={plan.id} /><button className="btn-secondary px-2 py-1 text-xs">Delete</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </details>
       </aside>
 
       <main className="space-y-4">
@@ -283,14 +315,25 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
               <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
                 <form action={updateWeekAction} className="space-y-3">
                   <input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} />
-                  <label className="label-base" htmlFor="focus">Week focus</label><select id="focus" name="focus" defaultValue={selectedWeek.focus} className="input-base"><option>Build</option><option>Recovery</option><option>Taper</option><option>Race</option><option>Custom</option></select>
-                  <label className="label-base" htmlFor="notes">Coach notes</label><textarea id="notes" name="notes" defaultValue={selectedWeek.notes ?? ""} className="input-base min-h-24" />
-                  <div><label className="label-base" htmlFor="targetMinutes">Target (goal) minutes</label><input id="targetMinutes" name="targetMinutes" type="number" min={0} defaultValue={selectedWeek.target_minutes ?? ""} className="input-base" /></div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="label-base" htmlFor="focus">Week focus</label>
+                      <select id="focus" name="focus" defaultValue={selectedWeek.focus} className="input-base"><option>Build</option><option>Recovery</option><option>Taper</option><option>Race</option><option>Custom</option></select>
+                    </div>
+                    <div>
+                      <label className="label-base" htmlFor="targetMinutes">Target (goal) minutes</label>
+                      <input id="targetMinutes" name="targetMinutes" type="number" min={0} defaultValue={selectedWeek.target_minutes ?? ""} className="input-base" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label-base" htmlFor="notes">Coach notes</label>
+                    <textarea id="notes" name="notes" defaultValue={selectedWeek.notes ?? ""} className="input-base min-h-20" />
+                  </div>
                   <button className="btn-primary">Save</button>
                 </form>
                 <div className="space-y-3">
                   <div className="surface-subtle p-3"><p className="text-xs uppercase tracking-wide text-muted">Planned (from sessions)</p><p className="mt-1 text-2xl font-semibold">{totalMinutes}</p><p className="text-xs text-muted">Δ vs target: {minuteDelta > 0 ? "+" : ""}{minuteDelta} min</p></div>
-                  <div className="surface-subtle p-3"><p className="text-xs uppercase tracking-wide text-muted">Discipline breakdown</p><div className="mt-2 space-y-2">{disciplineTotals.map((item) => { const meta = getDisciplineMeta(item.sport); const pct = Math.round((item.minutes / maxDisciplineMinutes) * 100); return <div key={item.sport}><p className="text-xs">{meta.label} · {item.minutes} min</p><div className="mt-1 h-1.5 rounded-full bg-[hsl(var(--bg-card))]"><div className="h-full rounded-full bg-cyan-400/80" style={{ width: `${pct}%` }} /></div></div>; })}</div></div>
+                  <div className="surface-subtle p-3"><p className="text-xs uppercase tracking-wide text-muted">Discipline breakdown</p><div className="mt-2 space-y-2">{disciplineTotals.map((item) => { const meta = getDisciplineMeta(item.sport); const pct = Math.round((item.minutes / maxDisciplineMinutes) * 100); return <div key={item.sport}><div className="flex items-center justify-between"><p className="text-xs">{meta.label}</p><p className="text-xs text-muted">{item.minutes} min</p></div><div className="mt-1 h-1.5 rounded-full bg-[hsl(var(--surface-2))]"><div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: item.sport === "swim" ? "#56B6D9" : item.sport === "bike" ? "#6BAA75" : item.sport === "run" ? "#C48772" : item.sport === "strength" ? "#9A86C8" : "hsl(var(--signal-neutral))" }} /></div></div>; })}</div></div>
                   <div className="surface-subtle p-3">
                     <div className="flex items-center justify-between"><p className="text-xs uppercase tracking-wide text-muted">Week actions</p><button type="button" onClick={() => setWeekActionOpen((v) => !v)} aria-expanded={weekActionOpen} className="btn-secondary px-3 py-1 text-xs">⋯</button></div>
                     {weekActionOpen ? (
@@ -320,16 +363,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
                         <SortableContext items={day.sessions.map((session) => `session-${session.id}`)} strategy={rectSortingStrategy}>
                           <DayDropZone iso={day.iso}><div className="mt-3 space-y-2" data-day={day.iso}>
                             {visible.map((session) => <SortableSessionCard key={session.id} session={session} onOpen={setActiveSessionId} />)}
-                            {hiddenCount > 0 ? <button type="button" className="w-full text-xs text-cyan-200" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>+{hiddenCount} more</button> : null}
+                            {hiddenCount > 0 ? <button type="button" className="w-full text-xs text-accent" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>+{hiddenCount} more</button> : null}
                             {day.sessions.length > 2 && isExpanded ? <button type="button" className="w-full text-xs text-muted" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>Collapse</button> : null}
-                            <button type="button" onClick={() => setQuickAddDay(day.iso)} className="w-full rounded-lg border border-dashed border-cyan-400/40 px-2 py-1 text-xs text-cyan-200">+ Add</button>
+                            <button type="button" onClick={() => setQuickAddDay(day.iso)} className="w-full rounded-lg border border-dashed border-[hsl(var(--accent-performance)/0.45)] px-2 py-1 text-xs text-accent">+ Add</button>
                           </div></DayDropZone>
                         </SortableContext>
                       </section>
                     );
                   })}
                 </div>
-                <DragOverlay>{isPending ? <div className="rounded-xl border border-cyan-400/40 bg-[hsl(var(--bg-card))] px-3 py-2 text-xs">Updating…</div> : null}</DragOverlay>
+                <DragOverlay>{isPending ? <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--bg-card))] px-3 py-2 text-xs">Updating…</div> : null}</DragOverlay>
               </DndContext>
             </article>
           </>
@@ -355,7 +398,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
                 <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
                 <label className="label-base">Title / Type</label><input name="sessionType" className="input-base" placeholder="Easy, Long, Intervals" />
                 <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 3x10 @ FTP" />
-                <details className="surface-subtle p-3"><summary className="cursor-pointer text-sm text-cyan-200">Add distance (optional)</summary><div className="mt-2 grid grid-cols-2 gap-2"><div><label className="label-base">Distance value</label><input name="distanceValue" type="number" min={0.01} step="0.01" className="input-base" /></div><div><label className="label-base">Distance unit</label><select name="distanceUnit" className="input-base" defaultValue=""><option value="">Select unit</option><option value="m">m</option><option value="km">km</option><option value="mi">mi</option><option value="yd">yd</option></select></div></div></details>
+                <details className="surface-subtle p-3"><summary className="cursor-pointer text-sm text-accent">Add distance (optional)</summary><div className="mt-2 grid grid-cols-2 gap-2"><div><label className="label-base">Distance value</label><input name="distanceValue" type="number" min={0.01} step="0.01" className="input-base" /></div><div><label className="label-base">Distance unit</label><select name="distanceUnit" className="input-base" defaultValue=""><option value="">Select unit</option><option value="m">m</option><option value="km">km</option><option value="mi">mi</option><option value="yd">yd</option></select></div></div></details>
                 <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
               </div>
 

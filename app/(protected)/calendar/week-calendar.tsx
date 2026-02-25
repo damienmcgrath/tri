@@ -181,6 +181,7 @@ export function WeekCalendar({
       }),
     [localSessions]
   );
+  const maxSportMinutes = Math.max(...progressBySport.map((item) => item.planned), 1);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -332,7 +333,7 @@ export function WeekCalendar({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <header className="surface sticky top-2 z-20 space-y-3 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -391,13 +392,15 @@ export function WeekCalendar({
           </div>
           {progressBySport.map((item) => {
             const discipline = getDisciplineMeta(item.sport);
-            const ratio = item.planned ? Math.min(100, (item.completed / item.planned) * 100) : 0;
+            const targetRatio = Math.min(100, (item.planned / maxSportMinutes) * 100);
+            const completedRatio = Math.min(100, (item.completed / maxSportMinutes) * 100);
             return (
               <div key={item.sport} className="surface-subtle p-3">
                 <p title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></p>
                 <p className="mt-1 text-xs">{item.completed}/{item.planned} min</p>
-                <div className="mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-2))]">
-                  <div className="h-full rounded-full bg-[hsl(var(--accent-performance))] transition-[width]" style={{ width: `${ratio}%` }} />
+                <div className="relative mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-2))]">
+                  <div className="h-full rounded-full bg-[hsl(var(--accent-performance))] transition-[width]" style={{ width: `${completedRatio}%` }} />
+                  <span className="absolute -top-0.5 h-2.5 w-px bg-[hsl(var(--text-tertiary))]" style={{ left: `${targetRatio}%` }} aria-hidden="true" />
                 </div>
               </div>
             );
@@ -702,7 +705,7 @@ function SortableSessionCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
-            <SessionStatusChip status={session.status} />
+            <SessionStatusChip status={session.status} compact />
           </div>
           <div className="flex items-center gap-1.5">
             <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />

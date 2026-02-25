@@ -533,7 +533,10 @@ export function CoachChat() {
             <span className={`signal-chip ${urgencySignal.tone}`}>Recommendation urgency: {urgencySignal.label}</span>
           </div>
           <div className="mt-3">
-            <p className="text-xs text-tertiary">Confidence meter</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-tertiary">Confidence meter</p>
+              <p className="text-xs font-medium text-[hsl(var(--text-secondary))]">{(summary?.completionPct ?? 0) >= 75 ? "High" : (summary?.completionPct ?? 0) >= 45 ? "Medium" : "Low"}</p>
+            </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[hsl(var(--surface-2))]">
               <div className="h-full rounded-full bg-[hsl(var(--ai-accent-core))]" style={{ width: `${Math.max(8, summary?.completionPct ?? 0)}%` }} />
             </div>
