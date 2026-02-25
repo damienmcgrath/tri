@@ -134,6 +134,34 @@
     animation: none;
   }
 
+
+  .shell-header {
+    @apply relative overflow-hidden;
+  }
+
+  .shell-header::before {
+    content: "";
+    position: absolute;
+    inset: -40% -15% auto;
+    height: 210%;
+    pointer-events: none;
+    background: radial-gradient(circle at top right, hsl(var(--accent-performance) / 0.14), transparent 56%);
+    opacity: 0.3;
+    transform-origin: top right;
+  }
+
+  .shell-header--improving::before {
+    animation: progress-motif-up 16s ease-in-out infinite alternate;
+  }
+
+  .shell-header--stable::before {
+    animation: progress-motif-stable 22s ease-in-out infinite;
+  }
+
+  .shell-header--declining::before {
+    animation: progress-motif-down 18s ease-in-out infinite alternate;
+  }
+
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
@@ -454,6 +482,41 @@
   .discipline-strength,
   .discipline-other {
     background-blend-mode: soft-light;
+  }
+}
+
+
+@keyframes progress-motif-up {
+  0% {
+    opacity: 0.2;
+    transform: translate3d(-1%, 1.5%, 0) scale(0.98) rotate(-1deg);
+  }
+  100% {
+    opacity: 0.36;
+    transform: translate3d(2%, -2%, 0) scale(1.04) rotate(1deg);
+  }
+}
+
+@keyframes progress-motif-stable {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translate3d(0.8%, -0.4%, 0) scale(1.01);
+  }
+}
+
+@keyframes progress-motif-down {
+  0% {
+    opacity: 0.32;
+    transform: translate3d(2%, -1%, 0) scale(1.02) rotate(0.8deg);
+  }
+  100% {
+    opacity: 0.18;
+    transform: translate3d(-1%, 2%, 0) scale(0.97) rotate(-1.2deg);
   }
 }
 
