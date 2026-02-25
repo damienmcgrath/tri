@@ -5,23 +5,26 @@
 :root {
   color-scheme: light;
   /* Core semantic surfaces: warm neutral base with gentle elevation for cards and shells. */
-  --surface: 38 24% 97%;
-  --surface-elevated: 34 18% 93%;
-  --surface-soft: 34 17% 90%;
+  --surface: 196 22% 96%;
+  --surface-elevated: 0 0% 100%;
+  --surface-soft: 196 26% 97%;
+  --surface-1: var(--surface-elevated);
+  --surface-2: 196 20% 94%;
 
   /* Typography semantics: high-contrast reading text and supportive secondary copy. */
   --text-primary: 225 24% 16%;
-  --text-secondary: 220 12% 38%;
-  --text-tertiary: 215 10% 56%;
+  --text-secondary: 216 14% 35%;
+  --text-tertiary: 215 12% 48%;
 
   /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
   --accent-performance: 196 92% 28%;
   --accent-recovery: 156 60% 30%;
 
-  --signal-ready: 151 62% 51%;
-  --signal-load: 38 92% 56%;
-  --signal-risk: 8 86% 62%;
-  --signal-recovery: var(--accent-recovery);
+  --signal-ready: 147 47% 36%;
+  --signal-load: 35 74% 47%;
+  --signal-risk: 3 67% 58%;
+  --signal-recovery: 193 39% 46%;
+  --signal-neutral: 215 17% 56%;
 
   --ai-accent-core: var(--accent-performance);
   --ai-accent-glow: 192 52% 78%;
@@ -31,7 +34,7 @@
   --bg-card: var(--surface-soft);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 220 14% 78%;
+  --border: 213 21% 82%;
   --ring: var(--ai-accent-core);
   --accent: var(--ai-accent-core);
   --accent-soft: var(--ai-accent-glow);
@@ -48,6 +51,8 @@
     --surface: 224 24% 8%;
     --surface-elevated: 222 21% 12%;
     --surface-soft: 223 18% 15%;
+    --surface-1: var(--surface-elevated);
+    --surface-2: 223 16% 18%;
     --text-primary: 210 20% 96%;
     --text-secondary: 215 14% 72%;
     --text-tertiary: 215 10% 56%;
@@ -55,6 +60,7 @@
     --accent-recovery: 166 70% 60%;
     --ai-accent-glow: 204 70% 19%;
     --border: 218 18% 25%;
+    --signal-neutral: 216 12% 70%;
   }
 }
 
@@ -197,6 +203,15 @@
 
   .priority-card-secondary {
     @apply surface p-5;
+  }
+
+  .priority-card-emphasis {
+    @apply surface p-5 md:p-6;
+    border-color: hsl(var(--accent-performance) / 0.4);
+    background:
+      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
+      hsl(var(--bg-elevated));
+    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
   }
 
   .priority-card-supporting {
@@ -369,14 +384,21 @@
     color: hsl(var(--signal-recovery));
   }
 
+
+  .signal-neutral {
+    border-color: hsl(var(--signal-neutral) / 0.45);
+    background: hsl(var(--signal-neutral) / 0.12);
+    color: hsl(var(--signal-neutral));
+  }
+
   .status-chip {
     @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium;
   }
 
   .status-chip-planned {
-    border-color: hsl(var(--signal-load) / 0.35);
-    background: hsl(var(--signal-load) / 0.14);
-    color: hsl(var(--signal-load));
+    border-color: hsl(var(--signal-neutral) / 0.4);
+    background: hsl(var(--signal-neutral) / 0.12);
+    color: hsl(var(--signal-neutral));
   }
 
   .status-chip-completed {
@@ -443,37 +465,37 @@
 
   .discipline-swim {
     @apply border;
-    background: hsl(192 60% 18% / 0.5);
-    border-color: hsl(192 58% 42% / 0.7);
-    color: hsl(190 85% 78%);
+    background: hsl(193 67% 61% / 0.2);
+    border-color: hsl(193 60% 56% / 0.55);
+    color: hsl(197 58% 37%);
   }
 
   .discipline-bike {
     @apply border;
-    background: hsl(114 33% 16% / 0.5);
-    border-color: hsl(122 32% 38% / 0.7);
-    color: hsl(118 45% 78%);
+    background: hsl(133 36% 56% / 0.2);
+    border-color: hsl(133 30% 48% / 0.55);
+    color: hsl(136 30% 33%);
   }
 
   .discipline-run {
     @apply border;
-    background: hsl(13 42% 16% / 0.5);
-    border-color: hsl(14 50% 40% / 0.7);
-    color: hsl(19 75% 78%);
+    background: hsl(18 44% 62% / 0.2);
+    border-color: hsl(18 37% 57% / 0.55);
+    color: hsl(18 31% 37%);
   }
 
   .discipline-strength {
     @apply border;
-    background: hsl(262 34% 18% / 0.5);
-    border-color: hsl(258 32% 47% / 0.7);
-    color: hsl(258 78% 85%);
+    background: hsl(258 50% 72% / 0.22);
+    border-color: hsl(258 40% 64% / 0.55);
+    color: hsl(256 28% 42%);
   }
 
   .discipline-other {
     @apply border;
-    background: hsl(214 17% 21% / 0.6);
-    border-color: hsl(214 14% 45% / 0.7);
-    color: hsl(210 20% 85%);
+    background: hsl(213 20% 60% / 0.18);
+    border-color: hsl(213 17% 56% / 0.5);
+    color: hsl(215 20% 35%);
   }
 
   .discipline-swim,
