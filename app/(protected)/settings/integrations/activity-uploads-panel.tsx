@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
 type UploadRow = {
@@ -133,7 +134,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                   <td>{activity?.distance_m ? `${(Number(activity.distance_m) / 1000).toFixed(2)} km` : "—"}</td>
                   <td>{upload.status === "error" ? "Error" : linked ? "Linked" : "Unassigned"}</td>
                   <td className="space-x-2 text-xs">
-                    <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>
+                    {activity?.id ? <Link className="text-cyan-300 underline" href={`/activities/${activity.id}`}>View activity</Link> : <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>}
                     {!linked && upload.status !== "error" ? (
                       <button className="text-cyan-300 underline" onClick={() => setAttachFor(upload)}>Attach to planned session</button>
                     ) : null}

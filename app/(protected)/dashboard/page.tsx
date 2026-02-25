@@ -323,6 +323,13 @@ export default async function DashboardPage({
               <p className="text-xs uppercase tracking-[0.12em] text-amber-200">Garmin uploads</p>
               <p className="mt-1 text-sm text-amber-100">{unassignedUploads.length} unassigned uploaded activit{unassignedUploads.length === 1 ? "y" : "ies"} this week ({unassignedMinutes} min).</p>
               <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-cyan-200 underline">Attach uploads to planned sessions</Link>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {unassignedUploads.slice(0, 3).map((item) => (
+                  <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-amber-200/30 px-2 py-1 text-amber-100">
+                    View {item.sport_type}
+                  </Link>
+                ))}
+              </div>
             </article>
           ) : null}
 

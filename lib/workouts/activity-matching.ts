@@ -10,7 +10,7 @@ export type MatchInput = {
   sportType: string;
   startTimeUtc: string;
   durationSec: number;
-  distanceM: number;
+  distanceM?: number | null;
 };
 
 export type ScoredCandidate = {
@@ -35,7 +35,7 @@ export function scoreCandidate(activity: MatchInput, candidate: MatchingCandidat
     ? Math.abs(activity.durationSec - candidate.targetDurationSec) / candidate.targetDurationSec
     : null;
   const distanceDelta = candidate.targetDistanceM && candidate.targetDistanceM > 0
-    ? Math.abs(activity.distanceM - candidate.targetDistanceM) / candidate.targetDistanceM
+    ? Math.abs((activity.distanceM ?? 0) - candidate.targetDistanceM) / candidate.targetDistanceM
     : null;
 
   const durationScore = durationDelta === null ? 0.5 : clamp(1 - durationDelta);
