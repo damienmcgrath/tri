@@ -364,7 +364,15 @@ export default async function DashboardPage({
                             <p className="text-xs text-muted">{session.duration_minutes} min</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-1 text-[11px] font-medium capitalize text-muted">
+                            <span
+                              className={`capitalize ${
+                                session.status === "completed"
+                                  ? "calendar-status-completed"
+                                  : session.status === "skipped"
+                                    ? "calendar-status-skipped"
+                                    : "calendar-status-planned"
+                              }`}
+                            >
                               {session.status}
                             </span>
                             <details className="relative">

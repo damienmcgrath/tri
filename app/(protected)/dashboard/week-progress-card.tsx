@@ -83,10 +83,10 @@ export function WeekProgressCard({
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: `conic-gradient(hsl(204 88% 62% / 0.62) ${percentCapped * 360}deg, hsl(var(--border) / 0.9) 0deg)`
+              background: `conic-gradient(hsl(var(--signal-recovery) / 0.72) ${percentCapped * 360}deg, hsl(var(--surface-2)) 0deg)`
             }}
           />
-          <div className="relative flex h-[62px] w-[62px] flex-col items-center justify-center rounded-full bg-[hsl(var(--bg-elevated))] text-center">
+          <div className="relative flex h-[62px] w-[62px] flex-col items-center justify-center rounded-full bg-[hsl(var(--surface-1))] text-center">
             <span className="text-lg font-semibold leading-none">{percentLabel}</span>
           </div>
         </div>
@@ -96,8 +96,8 @@ export function WeekProgressCard({
           <p className="text-sm text-muted">{hasNoPlannedSessions ? "Schedule sessions to start tracking progress." : `of ${toHoursAndMinutes(plannedTotalMinutes)} planned`}</p>
         </div>
 
-        <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "border-amber-400/40 bg-amber-500/10" : "border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"}`}>
-          {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-amber-300" /> : null}
+        <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
+          {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
           <span>{chipLabel}</span>
         </span>
       </div>
@@ -143,21 +143,20 @@ export function WeekProgressCard({
                         {Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min
                       </div>
                       {chipLabel ? (
-                        <span className="inline-flex h-5 items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2.5 text-xs font-medium text-muted">
+                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-xs font-medium ${item.discGapMinutes > 0 ? "signal-load" : item.discOverMinutes > 0 ? "signal-risk" : "signal-ready"}`}>
                           {chipLabel}
                         </span>
                       ) : null}
                     </div>
                   </div>
-                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--bg-card))]" aria-label={barAriaLabel} role="img">
-                    <div className="h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%`, backgroundColor: item.color }} />
+                  <div className="progress-track relative mt-1 h-2 overflow-hidden rounded-full" aria-label={barAriaLabel} role="img">
+                    <div className="progress-fill-recovery h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%` }} />
                     {item.discOverMinutes > 0 ? (
                       <div
-                        className="absolute inset-y-0 right-0 rounded-r-full"
+                        className="progress-fill-load absolute inset-y-0 right-0 rounded-r-full"
                         style={{
                           width: `${overTailWidthPx}px`,
-                          backgroundColor: item.color,
-                          opacity: 0.6,
+                          opacity: 0.8,
                           backgroundImage: "repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 12px)"
                         }}
                       />

@@ -38,18 +38,50 @@ export function CoachChat() {
 
   const completionTone = useMemo(() => {
     if (!summary) {
-      return "from-slate-600 to-slate-700";
+      return "from-[hsl(var(--surface-2))] to-[hsl(var(--surface-1))]";
     }
 
     if (summary.completionPct >= 90) {
-      return "from-emerald-500 to-teal-500";
+      return "from-[hsl(var(--signal-ready))] to-[hsl(var(--signal-recovery))]";
     }
 
     if (summary.completionPct >= 70) {
-      return "from-cyan-500 to-blue-500";
+      return "from-[hsl(var(--signal-recovery))] to-[hsl(var(--ai-accent-core))]";
     }
 
-    return "from-amber-500 to-orange-500";
+    return "from-[hsl(var(--signal-load))] to-[hsl(var(--signal-risk))]";
+  }, [summary]);
+
+  const confidenceSignal = useMemo(() => {
+    if (!summary) {
+      return { label: "No data", tone: "signal-recovery" };
+    }
+
+    if (summary.completionPct >= 90) {
+      return { label: "High confidence", tone: "signal-ready" };
+    }
+
+    if (summary.completionPct >= 70) {
+      return { label: "Building confidence", tone: "signal-recovery" };
+    }
+
+    return { label: "Low confidence", tone: "signal-risk" };
+  }, [summary]);
+
+  const urgencySignal = useMemo(() => {
+    if (!summary) {
+      return { label: "Awaiting recommendation", tone: "signal-recovery" };
+    }
+
+    if (summary.completionPct >= 85) {
+      return { label: "Low urgency", tone: "signal-ready" };
+    }
+
+    if (summary.completionPct >= 65) {
+      return { label: "Moderate urgency", tone: "signal-load" };
+    }
+
+    return { label: "High urgency", tone: "signal-risk" };
   }, [summary]);
 
   async function loadConversations() {
@@ -145,8 +177,8 @@ export function CoachChat() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <section className="surface overflow-hidden">
-        <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-4">
-          <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">Coach Console</p>
+        <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-5 py-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--ai-accent-core))]">Coach Console</p>
           <h2 className="text-lg font-semibold">Adaptive triathlon guidance</h2>
         </div>
 
@@ -156,7 +188,7 @@ export function CoachChat() {
               <div
                 className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm transition ${
                   message.role === "user"
-                    ? "bg-cyan-600 text-white"
+                    ? "bg-[hsl(var(--ai-accent-core))] text-white"
                     : "border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
                 }`}
               >
@@ -201,6 +233,16 @@ export function CoachChat() {
           </p>
         </div>
 
+
+
+        <div className="surface p-5">
+          <h3 className="text-sm font-semibold">Signal mapping</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className={`signal-chip ${confidenceSignal.tone}`}>Coach confidence: {confidenceSignal.label}</span>
+            <span className={`signal-chip ${urgencySignal.tone}`}>Recommendation urgency: {urgencySignal.label}</span>
+          </div>
+        </div>
+
         <div className="surface p-5">
           <h3 className="text-sm font-semibold">Workout analysis snapshot</h3>
           <p className="mt-2 text-sm text-muted">
@@ -213,11 +255,11 @@ export function CoachChat() {
           </ul>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">Recent conversations</h3>
+        <div className="surface p-5">
+          <h3 className="text-sm font-semibold">Recent conversations</h3>
           <ul className="mt-3 space-y-2">
             {conversations.length === 0 ? (
-              <li className="text-sm text-slate-500">No saved chats yet.</li>
+              <li className="text-sm text-muted">No saved chats yet.</li>
             ) : (
               conversations.map((conversation) => (
                 <li key={conversation.id}>
@@ -226,12 +268,12 @@ export function CoachChat() {
                     onClick={() => void handleConversationClick(conversation.id)}
                     className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
                       conversationId === conversation.id
-                        ? "border-cyan-400 bg-cyan-50 text-cyan-900"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        ? "border-[hsl(var(--ai-accent-core)/0.5)] bg-[hsl(var(--ai-accent-core)/0.12)] text-[hsl(var(--text-primary))]"
+                        : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-1))]"
                     }`}
                   >
                     <p className="truncate font-medium">{conversation.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{new Date(conversation.updated_at).toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-tertiary">{new Date(conversation.updated_at).toLocaleString()}</p>
                   </button>
                 </li>
               ))
