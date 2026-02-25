@@ -341,16 +341,26 @@
     color: hsl(var(--signal-recovery));
   }
 
-  .calendar-status-planned {
-    @apply signal-chip signal-load;
+  .status-chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium;
   }
 
-  .calendar-status-completed {
-    @apply signal-chip signal-ready;
+  .status-chip-planned {
+    border-color: hsl(var(--signal-load) / 0.35);
+    background: hsl(var(--signal-load) / 0.14);
+    color: hsl(var(--signal-load));
   }
 
-  .calendar-status-skipped {
-    @apply signal-chip signal-risk;
+  .status-chip-completed {
+    border-color: hsl(var(--signal-ready) / 0.35);
+    background: hsl(var(--signal-ready) / 0.14);
+    color: hsl(var(--signal-ready));
+  }
+
+  .status-chip-skipped {
+    border-color: hsl(var(--signal-risk) / 0.35);
+    background: hsl(var(--signal-risk) / 0.14);
+    color: hsl(var(--signal-risk));
   }
 
   .status-card-transition {
@@ -390,6 +400,19 @@
     background: linear-gradient(90deg, hsl(var(--signal-load) / 0.85), hsl(var(--signal-load)));
   }
 
+  .discipline-texture-solid {
+    background-image: none;
+  }
+
+  .discipline-texture-dashed {
+    background-image: repeating-linear-gradient(135deg, hsl(var(--fg) / 0.18) 0 2px, transparent 2px 7px);
+  }
+
+  .discipline-texture-dot-grid {
+    background-image: radial-gradient(hsl(var(--fg) / 0.2) 0.9px, transparent 1.1px);
+    background-size: 6px 6px;
+  }
+
   .discipline-swim {
     @apply border;
     background: hsl(192 60% 18% / 0.5);
@@ -423,6 +446,14 @@
     background: hsl(214 17% 21% / 0.6);
     border-color: hsl(214 14% 45% / 0.7);
     color: hsl(210 20% 85%);
+  }
+
+  .discipline-swim,
+  .discipline-bike,
+  .discipline-run,
+  .discipline-strength,
+  .discipline-other {
+    background-blend-mode: soft-light;
   }
 }
 

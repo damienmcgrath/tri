@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { PageHeader } from "../page-header";
 import { markSkippedAction, moveSessionAction } from "./actions";
 import { WeekProgressCard } from "./week-progress-card";
@@ -394,22 +395,12 @@ export default async function DashboardPage({
                     <li key={session.id} className="surface-subtle p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>{discipline.label}</span>
+                          <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
                           <p className="mt-1 text-sm font-medium">{session.type}</p>
                           <p className="text-xs text-muted">{session.duration_minutes} min</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span
-                            className={`capitalize ${
-                              session.status === "completed"
-                                ? "calendar-status-completed"
-                                : session.status === "skipped"
-                                  ? "calendar-status-skipped"
-                                  : "calendar-status-planned"
-                            }`}
-                          >
-                            {session.status}
-                          </span>
+                          <SessionStatusChip status={session.status} />
                           <details className="relative">
                             <summary aria-label="Session actions" className="list-none cursor-pointer rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-xs">⋯</summary>
                             <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2">
@@ -528,7 +519,7 @@ export default async function DashboardPage({
                   <div className="mt-1 flex flex-wrap justify-center gap-1">
                     {day.sports.slice(0, 3).map((sport) => {
                       const d = getDisciplineMeta(sport);
-                      return <span key={`${day.iso}-${sport}`} className={`h-1.5 w-3 rounded-full ${d.className}`} aria-hidden="true" />;
+                      return <span key={`${day.iso}-${sport}`} className={`h-1.5 w-3 rounded-full ${d.className} ${d.textureClassName}`} aria-hidden="true" title={`${d.label} · ${d.shape}`} />;
                     })}
                   </div>
                 </Link>

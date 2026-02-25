@@ -18,6 +18,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { SessionStatusChip } from "@/lib/ui/status-chip";
 import {
   clearSkippedAction,
   markSkippedAction,
@@ -393,7 +394,7 @@ export function WeekCalendar({
             const ratio = item.planned ? Math.min(100, (item.completed / item.planned) * 100) : 0;
             return (
               <div key={item.sport} className="surface-subtle p-3">
-                <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</p>
+                <p title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></p>
                 <p className="mt-1 text-xs">{item.completed}/{item.planned} min</p>
                 <div className="mt-2 h-1.5 rounded-full bg-black/35">
                   <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-blue-400/90 transition-[width]" style={{ width: `${ratio}%` }} />
@@ -687,8 +688,7 @@ function SortableSessionCard({
   const discipline = getDisciplineMeta(session.sport);
   const skipped = session.status === "skipped" || isSkipped(session.notes);
   const title = buildSessionTitle(session);
-  const statusTone =
-    session.status === "completed" ? "calendar-status-completed" : session.status === "skipped" ? "calendar-status-skipped" : "calendar-status-planned";
+
   const statusMotion =
     session.status === "completed" ? "status-card-completed" : session.status === "skipped" ? "status-card-skipped" : "status-card-planned";
 
@@ -701,10 +701,8 @@ function SortableSessionCard({
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${discipline.className}`}>{discipline.label}</span>
-            <p className={statusTone}>
-              {session.status === "planned" ? "Pending" : session.status === "completed" ? "Completed" : "Skipped"}
-            </p>
+            <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
+            <SessionStatusChip status={session.status} />
           </div>
           <div className="flex items-center gap-1.5">
             <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
@@ -941,11 +939,19 @@ function QuickAddModal({
             </label>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            {(["swim", "bike", "run", "strength"] as const).map((item) => (
-              <button key={item} onClick={() => setSport(item)} className={`rounded-full px-3 py-1 text-xs ${sport === item ? getDisciplineMeta(item).className : "border border-[hsl(var(--border))] text-muted"}`}>
-                {getDisciplineMeta(item).label}
-              </button>
-            ))}
+            {(["swim", "bike", "run", "strength"] as const).map((item) => {
+              const discipline = getDisciplineMeta(item);
+              return (
+                <button
+                  key={item}
+                  onClick={() => setSport(item)}
+                  className={`rounded-full px-3 py-1 text-xs ${sport === item ? `${discipline.className} ${discipline.textureClassName}` : "border border-[hsl(var(--border))] text-muted"}`}
+                  title={`${discipline.label} · ${discipline.shape}`}
+                >
+                  <span className="inline-flex items-center gap-1"><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
+                </button>
+              );
+            })}
           </div>
           <input className="input-base" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" />
           <input className="input-base" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Planned minutes" type="number" min={1} step={1} required />
