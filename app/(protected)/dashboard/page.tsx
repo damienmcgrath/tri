@@ -326,34 +326,86 @@ export default async function DashboardPage({
       </header>
 
       {hasActivePlan && !hasWeekSessions ? (
-        <article className="surface p-6">
-          <h1 className="text-xl font-semibold">No sessions planned for this week.</h1>
-          <p className="mt-2 text-sm text-muted">Schedule this week to start tracking execution and coaching insights.</p>
+        <article className="priority-card-primary">
+          <p className="priority-kicker">Today&apos;s priority session</p>
+          <h1 className="priority-title">Set one key workout and execute it.</h1>
+          <p className="priority-subtitle">Add sessions for this week so your next best workout is always clear.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/plan" className="btn-primary">Add session</Link>
             <Link href="/plan" className="btn-secondary">Duplicate last week</Link>
-            <Link href="/plan" className="btn-secondary">Go to Plan</Link>
+            <Link href="/plan" className="btn-secondary">Go to plan</Link>
           </div>
         </article>
       ) : (
-        <>
-          {unassignedUploads.length > 0 ? (
-            <article className="surface border border-amber-400/30 bg-amber-500/10 p-4">
-              <p className="text-xs uppercase tracking-[0.12em] text-amber-200">Garmin uploads</p>
-              <p className="mt-1 text-sm text-amber-100">{unassignedUploads.length} unassigned uploaded activit{unassignedUploads.length === 1 ? "y" : "ies"} this week ({unassignedMinutes} min).</p>
-              <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-accent underline">Attach uploads to planned sessions</Link>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {unassignedUploads.slice(0, 3).map((item) => (
-                  <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-amber-200/30 px-2 py-1 text-amber-100">
-                    View {item.sport_type}
-                  </Link>
-                ))}
+        <div className="priority-layout">
+          <article className="priority-card-primary">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="priority-kicker">Today&apos;s priority session</p>
+                <h1 className="priority-title">Lock in your next workout now.</h1>
+                <p className="priority-subtitle">Focus on the highest-impact session first, then clear supporting work.</p>
               </div>
-            </article>
-          ) : null}
+              <p className="text-xs text-muted">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
+            </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-            <div className="lg:order-1">
+            {todaySessions.length === 0 ? (
+              <p className="surface-subtle mt-4 p-3 text-sm text-muted">No sessions for today. Pull one workout forward to keep momentum.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {todaySessions.map((session) => {
+                  const discipline = getDisciplineMeta(session.sport);
+                  return (
+                    <li key={session.id} className="surface-subtle p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>
+                            {discipline.label}
+                          </span>
+                          <p className="mt-1 text-sm font-medium">{session.type}</p>
+                          <p className="text-xs text-muted">{session.duration_minutes} min</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`capitalize ${
+                              session.status === "completed"
+                                ? "calendar-status-completed"
+                                : session.status === "skipped"
+                                  ? "calendar-status-skipped"
+                                  : "calendar-status-planned"
+                            }`}
+                          >
+                            {session.status}
+                          </span>
+                          <details className="relative">
+                            <summary aria-label="Session actions" className="list-none cursor-pointer rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-xs">⋯</summary>
+                            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2">
+                              <form action={markSkippedAction}>
+                                <input type="hidden" name="sessionId" value={session.id} />
+                                <button className="w-full rounded-md px-2 py-1 text-left text-xs hover:bg-[hsl(var(--bg-card))]">Mark skipped</button>
+                              </form>
+                            </div>
+                          </details>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
+                Open next session
+              </Link>
+              <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log completed work</Link>
+            </div>
+          </article>
+
+          <article className="priority-card-secondary">
+            <p className="priority-kicker">On track this week</p>
+            <h2 className="priority-title">Confirm your confidence trend.</h2>
+            <p className="priority-subtitle">Check completion pace and close the largest discipline gap before week end.</p>
+            <div className="mt-4">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
                 completedTotalMinutes={totals.completed}
@@ -366,70 +418,12 @@ export default async function DashboardPage({
                 }))}
               />
             </div>
+          </article>
 
-            <article className="surface p-4 lg:order-2">
-              <div className="mb-3 flex items-center justify-between">
-                <h1 className="text-xl font-semibold">Today + Next up</h1>
-                <p className="text-xs text-muted">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
-              </div>
-
-              {todaySessions.length === 0 ? (
-                <p className="surface-subtle p-3 text-sm text-muted">No sessions for today.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {todaySessions.map((session) => {
-                    const discipline = getDisciplineMeta(session.sport);
-                    return (
-                      <li key={session.id} className="surface-subtle p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className}`}>
-                              {discipline.label}
-                            </span>
-                            <p className="mt-1 text-sm font-medium">{session.type}</p>
-                            <p className="text-xs text-muted">{session.duration_minutes} min</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`capitalize ${
-                                session.status === "completed"
-                                  ? "calendar-status-completed"
-                                  : session.status === "skipped"
-                                    ? "calendar-status-skipped"
-                                    : "calendar-status-planned"
-                              }`}
-                            >
-                              {session.status}
-                            </span>
-                            <details className="relative">
-                              <summary aria-label="Session actions" className="list-none cursor-pointer rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-xs">⋯</summary>
-                              <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2">
-                                <form action={markSkippedAction}>
-                                  <input type="hidden" name="sessionId" value={session.id} />
-                                  <button className="w-full rounded-md px-2 py-1 text-left text-xs hover:bg-[hsl(var(--bg-card))]">Mark skipped</button>
-                                </form>
-                              </div>
-                            </details>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
-                  Open next session
-                </Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log done</Link>
-              </div>
-            </article>
-          </div>
-
-          <article id="coach-focus" className="surface p-4 scroll-mt-24">
-            <h2 className="text-lg font-semibold">Coach Focus — Today</h2>
-            <p className="mt-2 text-sm">{focusText}</p>
+          <article className="priority-card-secondary scroll-mt-24" id="coach-focus">
+            <p className="priority-kicker">Coach focus</p>
+            <h2 className="priority-title">Keep today&apos;s decision simple.</h2>
+            <p className="priority-subtitle">{focusText}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {keyTodaySession ? (
                 <>
@@ -450,14 +444,46 @@ export default async function DashboardPage({
                 </>
               ) : null}
             </div>
+          </article>
 
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-accent">Why?</summary>
-              <div className="mt-2 surface-subtle p-3 text-sm text-muted">
-                <p>Insight is generated from today&apos;s highest-load pending session or the largest weekly gap between planned and completed minutes.</p>
-                <Link href="/calendar" className="mt-2 inline-block text-xs text-accent underline-offset-2 hover:underline">View details</Link>
+          <article className="priority-card-secondary">
+            <p className="priority-kicker">Supporting analytics</p>
+            <h2 className="priority-title">Review sport load and upload gaps.</h2>
+            <p className="priority-subtitle">Use supporting signals to adjust volume and keep your data aligned.</p>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <div className="priority-card-supporting">
+                <h3 className="text-sm font-semibold">Sport breakdown</h3>
+                <ul className="mt-2 space-y-2">
+                  {progressBySport.map((sport) => (
+                    <li key={sport.sport} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium">{sport.label}</span>
+                      <span className="text-muted">{sport.completed}/{sport.planned} min</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </details>
+
+              <div className="priority-card-supporting">
+                <h3 className="text-sm font-semibold">Unmatched uploads</h3>
+                {unassignedUploads.length > 0 ? (
+                  <>
+                    <p className="mt-2 text-sm text-muted">
+                      {unassignedUploads.length} upload{unassignedUploads.length === 1 ? "" : "s"} still need matching ({unassignedMinutes} min).
+                    </p>
+                    <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-accent underline">Match uploads now</Link>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {unassignedUploads.slice(0, 3).map((item) => (
+                        <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-[hsl(var(--border))] px-2 py-1">
+                          View {item.sport_type}
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-muted">Great job—every uploaded activity is already matched to your plan.</p>
+                )}
+              </div>
+            </div>
           </article>
 
           <article className="surface p-3">
@@ -482,7 +508,7 @@ export default async function DashboardPage({
               ))}
             </div>
           </article>
-        </>
+        </div>
       )}
     </section>
   );

@@ -154,6 +154,39 @@
     @apply rounded-xl;
   }
 
+  .priority-layout {
+    @apply grid gap-4;
+  }
+
+  .priority-card-primary {
+    @apply surface p-6 md:p-7;
+    border-color: hsl(var(--accent-performance) / 0.45);
+    background:
+      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
+      hsl(var(--bg-elevated));
+    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+  }
+
+  .priority-card-secondary {
+    @apply surface p-5;
+  }
+
+  .priority-card-supporting {
+    @apply surface-subtle p-4;
+  }
+
+  .priority-title {
+    @apply text-lg font-semibold text-[hsl(var(--fg))];
+  }
+
+  .priority-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .priority-kicker {
+    @apply text-[11px] uppercase tracking-[0.14em] text-accent;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
     border: 1px solid hsl(var(--accent-performance) / 0.65);

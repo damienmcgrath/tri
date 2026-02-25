@@ -147,6 +147,7 @@ export default async function PlanPage({
   }
 
   let sessionsData: Session[] = [];
+
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
@@ -210,6 +211,10 @@ export default async function PlanPage({
     }
   }
 
+  const totalPlannedMinutes = sessionsData.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const completeSessions = sessionsData.filter((session) => session.status === "completed").length;
+  const nextSession = sessionsData.find((session) => session.status === "planned") ?? null;
+
   return (
     <section className="plan-editor-motion-lock space-y-4">
       <PageHeader
@@ -220,6 +225,54 @@ export default async function PlanPage({
           { href: "/dashboard", label: "Back to dashboard", variant: "secondary" }
         ]}
       />
+
+      <div className="priority-layout">
+        <article className="priority-card-primary">
+          <p className="priority-kicker">Today&apos;s priority session</p>
+          <h2 className="priority-title">Build the next session your athlete needs.</h2>
+          <p className="priority-subtitle">Keep today&apos;s key workout clear, specific, and realistic to execute.</p>
+          <p className="mt-3 text-sm text-muted">
+            {nextSession ? `Next up: ${nextSession.type} (${nextSession.duration_minutes} min).` : "No planned session yet. Add one now to set direction."}
+          </p>
+        </article>
+
+        <article className="priority-card-secondary">
+          <p className="priority-kicker">On track this week</p>
+          <h2 className="priority-title">Audit confidence before you publish.</h2>
+          <p className="priority-subtitle">Ensure volume and completion trend match your current race objective.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Weeks mapped</p>
+              <p className="mt-1 text-lg font-semibold">{weeksData.length}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Sessions planned</p>
+              <p className="mt-1 text-lg font-semibold">{sessionsData.length}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Completed sessions</p>
+              <p className="mt-1 text-lg font-semibold">{completeSessions}</p>
+            </div>
+          </div>
+        </article>
+
+        <article className="priority-card-secondary">
+          <p className="priority-kicker">Supporting analytics</p>
+          <h2 className="priority-title">Check volume and plan coverage.</h2>
+          <p className="priority-subtitle">Use supporting signals to keep structure balanced and actionable.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Total planned minutes</p>
+              <p className="mt-1 text-lg font-semibold">{totalPlannedMinutes}</p>
+            </div>
+            <div className="priority-card-supporting">
+              <p className="text-xs text-muted">Active plan</p>
+              <p className="mt-1 text-sm font-semibold">{selectedPlan?.name ?? "No active plan selected"}</p>
+            </div>
+          </div>
+        </article>
+      </div>
+
       <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
     </section>
   );
