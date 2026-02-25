@@ -94,6 +94,28 @@ Open `http://localhost:3000`.
 - Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
 - Garmin manual TCX upload now lives under **Settings → Integrations** as a temporary bridge until direct Garmin API sync.
 
+
+## 🎨 UI Palette Tokens & Usage Rules
+
+The UI uses semantic color tokens defined in `app/globals.css` and should avoid hard-coded hex/HSL values in components.
+
+### Core palette
+- **Base surfaces (deep navy / graphite)**
+  - `--surface-base`, `--surface-elevated`, `--surface-card`, `--surface-overlay`
+- **Performance accent (electric cyan / teal)**
+  - `--accent-performance`, `--accent-performance-strong`, `--accent-performance-glow`
+- **Human warmth accent (coaching cues)**
+  - `--accent-human`, `--accent-human-soft`
+- **Sport status accents**
+  - `--sport-swim`, `--sport-bike`, `--sport-run`, `--sport-strength`, `--sport-other`
+
+### Usage rules
+1. **Always map surfaces through semantic classes/tokens** (`.surface`, `.surface-subtle`, `.input-base`, `.btn-primary`, `.btn-secondary`).
+2. **Use performance accent for primary actions and focus rings**, warmth accent for guidance/coaching callouts.
+3. **Use discipline classes for sport chips** (`.discipline-swim`, `.discipline-bike`, `.discipline-run`, etc.) instead of custom per-component colors.
+4. **Maintain accessibility contrast (AA minimum)** for text and controls; if introducing new token values, validate foreground/background pairings before merge.
+5. **For hero/brand moments**, use the shared `hero-speedfield` treatment and flow-line motif for visual consistency.
+
 ## 📌 Overview
 TriCoach AI is a web-based training companion for amateur triathletes. It automates personalized training-plan management by integrating with Garmin Connect, analyzing workout data, and offering an AI coach for plan adaptation and guidance.
 

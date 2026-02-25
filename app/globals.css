@@ -4,30 +4,48 @@
 
 :root {
   color-scheme: dark;
-  --surface-0: 224 24% 8%;
-  --surface-1: 222 21% 12%;
-  --surface-2: 223 18% 15%;
-  --text-primary: 210 20% 96%;
-  --text-secondary: 215 14% 72%;
-  --text-tertiary: 215 10% 56%;
 
-  --signal-ready: 151 62% 51%;
-  --signal-load: 38 92% 56%;
-  --signal-risk: 8 86% 62%;
-  --signal-recovery: 198 95% 63%;
+  /* Core brand surfaces: deep navy + graphite */
+  --surface-base: 222 41% 8%;
+  --surface-elevated: 223 33% 12%;
+  --surface-card: 224 26% 16%;
+  --surface-overlay: 222 22% 22%;
 
-  --ai-accent-core: 198 100% 58%;
-  --ai-accent-glow: 204 70% 19%;
+  --text-primary: 210 24% 96%;
+  --text-secondary: 214 18% 74%;
+  --text-tertiary: 216 12% 59%;
 
-  --bg: var(--surface-0);
-  --bg-elevated: var(--surface-1);
-  --bg-card: var(--surface-2);
+  /* Performance accent: electric cyan/teal */
+  --accent-performance: 188 100% 56%;
+  --accent-performance-strong: 194 95% 48%;
+  --accent-performance-glow: 193 76% 20%;
+
+  /* Human warmth accent: coaching cues and supportive states */
+  --accent-human: 32 94% 64%;
+  --accent-human-soft: 15 82% 66%;
+
+  /* Signal system */
+  --signal-ready: 161 58% 50%;
+  --signal-load: 35 90% 58%;
+  --signal-risk: 9 82% 64%;
+  --signal-recovery: 192 96% 63%;
+
+  /* Sport status accents harmonized with global palette */
+  --sport-swim: 193 98% 62%;
+  --sport-bike: 163 66% 56%;
+  --sport-run: 23 91% 63%;
+  --sport-strength: 261 76% 71%;
+  --sport-other: 216 20% 70%;
+
+  --bg: var(--surface-base);
+  --bg-elevated: var(--surface-elevated);
+  --bg-card: var(--surface-card);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 218 18% 25%;
-  --ring: var(--ai-accent-core);
-  --accent: var(--ai-accent-core);
-  --accent-soft: var(--ai-accent-glow);
+  --border: 218 16% 30%;
+  --ring: var(--accent-performance);
+  --accent: var(--accent-performance);
+  --accent-soft: var(--accent-performance-glow);
 
   --motion-fast: 180ms;
   --motion-standard: 240ms;
@@ -77,9 +95,9 @@
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 24% 18%, hsl(var(--ai-accent-core) / 0.055), transparent 46%),
-      radial-gradient(circle at 70% 76%, hsl(var(--signal-recovery) / 0.035), transparent 48%),
-      radial-gradient(circle at 52% 44%, hsl(var(--surface-2) / 0.26), transparent 68%);
+      radial-gradient(circle at 24% 18%, hsl(var(--accent-performance) / 0.08), transparent 42%),
+      radial-gradient(circle at 70% 76%, hsl(var(--signal-recovery) / 0.05), transparent 48%),
+      radial-gradient(circle at 52% 44%, hsl(var(--surface-overlay) / 0.34), transparent 68%);
     animation: ambient-gradient-drift var(--motion-ambient-duration) ease-in-out infinite alternate;
     transform-origin: center;
   }
@@ -96,7 +114,7 @@
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
-    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+    @apply rounded-2xl shadow-[0_12px_42px_-24px_rgba(0,0,0,0.82)];
     transition:
       border-color var(--motion-standard) var(--motion-ease),
       box-shadow var(--motion-standard) var(--motion-ease),
@@ -104,7 +122,7 @@
   }
 
   .surface:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.26);
+    border-color: hsl(var(--accent-performance) / 0.3);
   }
 
   .surface-subtle {
@@ -114,8 +132,8 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    background: linear-gradient(130deg, hsl(var(--accent)) 0%, hsl(212 100% 62%) 100%);
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-slate-950;
+    background: linear-gradient(130deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance-strong)) 100%);
   }
 
   .btn-primary:hover {
@@ -154,7 +172,7 @@
   }
 
   .input-base:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.3);
+    border-color: hsl(var(--accent-performance) / 0.35);
   }
 
   .input-base:focus-visible,
@@ -244,7 +262,7 @@
   }
 
   .progress-track {
-    background: hsl(var(--surface-2));
+    background: hsl(var(--surface-card));
   }
 
   .progress-fill-recovery {
@@ -255,39 +273,78 @@
     background: linear-gradient(90deg, hsl(var(--signal-load) / 0.85), hsl(var(--signal-load)));
   }
 
-  .discipline-swim {
+  .discipline-swim,
+  .discipline-bike,
+  .discipline-run,
+  .discipline-strength,
+  .discipline-other {
     @apply border;
-    background: hsl(192 60% 18% / 0.5);
-    border-color: hsl(192 58% 42% / 0.7);
-    color: hsl(190 85% 78%);
+  }
+
+  .discipline-swim {
+    background: hsl(var(--sport-swim) / 0.16);
+    border-color: hsl(var(--sport-swim) / 0.55);
+    color: hsl(var(--sport-swim));
   }
 
   .discipline-bike {
-    @apply border;
-    background: hsl(114 33% 16% / 0.5);
-    border-color: hsl(122 32% 38% / 0.7);
-    color: hsl(118 45% 78%);
+    background: hsl(var(--sport-bike) / 0.16);
+    border-color: hsl(var(--sport-bike) / 0.55);
+    color: hsl(var(--sport-bike));
   }
 
   .discipline-run {
-    @apply border;
-    background: hsl(13 42% 16% / 0.5);
-    border-color: hsl(14 50% 40% / 0.7);
-    color: hsl(19 75% 78%);
+    background: hsl(var(--sport-run) / 0.16);
+    border-color: hsl(var(--sport-run) / 0.55);
+    color: hsl(var(--sport-run));
   }
 
   .discipline-strength {
-    @apply border;
-    background: hsl(262 34% 18% / 0.5);
-    border-color: hsl(258 32% 47% / 0.7);
-    color: hsl(258 78% 85%);
+    background: hsl(var(--sport-strength) / 0.16);
+    border-color: hsl(var(--sport-strength) / 0.55);
+    color: hsl(var(--sport-strength));
   }
 
   .discipline-other {
-    @apply border;
-    background: hsl(214 17% 21% / 0.6);
-    border-color: hsl(214 14% 45% / 0.7);
-    color: hsl(210 20% 85%);
+    background: hsl(var(--sport-other) / 0.16);
+    border-color: hsl(var(--sport-other) / 0.55);
+    color: hsl(var(--sport-other));
+  }
+
+  .hero-speedfield {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid hsl(var(--border) / 0.68);
+    background:
+      radial-gradient(110% 95% at 14% 12%, hsl(var(--accent-performance) / 0.28) 0%, transparent 52%),
+      radial-gradient(95% 110% at 86% 8%, hsl(var(--accent-human) / 0.2) 0%, transparent 58%),
+      radial-gradient(140% 120% at 52% 100%, hsl(var(--accent-performance-strong) / 0.16) 0%, transparent 64%),
+      linear-gradient(152deg, hsl(var(--surface-card)) 0%, hsl(var(--surface-elevated)) 58%, hsl(var(--surface-base)) 100%);
+    box-shadow: 0 20px 64px -36px hsl(var(--accent-performance) / 0.45);
+  }
+
+  .hero-speedfield::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.45;
+    background:
+      repeating-linear-gradient(
+        116deg,
+        transparent 0,
+        transparent 16px,
+        hsl(var(--accent-performance) / 0.1) 17px,
+        transparent 20px,
+        transparent 38px
+      );
+    mask-image: radial-gradient(circle at center, black 18%, transparent 86%);
+  }
+
+  .hero-speedfield > * {
+    position: relative;
+    z-index: 1;
   }
 }
 
