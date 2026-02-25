@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { parseTcxToSessions } from "@/lib/workouts/tcx";
+import { appendSkipTag } from "@/lib/plans/skip-notes";
 
 export type IngestResult = {
   status: "idle" | "success" | "failed";
@@ -143,10 +144,7 @@ export async function markSkippedAction(formData: FormData) {
     throw new Error("Session not found.");
   }
 
-  const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
-  const currentNotes = session.notes ?? "";
-  const hasSkipTag = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(currentNotes);
-  const nextNotes = hasSkipTag ? currentNotes : `${currentNotes}\n${skipTag}`.trim();
+  const nextNotes = appendSkipTag(session.notes, new Date());
 
   const { error } = await supabase
     .from("sessions")
