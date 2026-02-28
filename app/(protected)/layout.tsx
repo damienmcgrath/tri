@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "./actions";
-import { AccountMenu } from "./account-menu";
 import { GlobalHeader } from "./global-header";
 import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
 
@@ -94,12 +93,25 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   return (
     <div className="app-shell">
-      <GlobalHeader raceName={raceName} daysToRace={daysToRace} weekCompletion={completionRate} />
+      <GlobalHeader
+        raceName={raceName}
+        daysToRace={daysToRace}
+        weekCompletion={completionRate}
+        account={{
+          avatarUrl: profile?.avatar_url ?? null,
+          initials,
+          displayName,
+          email,
+          signOutAction
+        }}
+      />
 
-      <div className="mx-auto grid w-full max-w-[1280px] gap-4 px-4 pb-24 pt-4 md:px-6 lg:grid-cols-[72px_1fr] xl:grid-cols-[220px_1fr] lg:pb-8">
+      <div className="mx-auto grid w-full max-w-[1280px] gap-4 px-4 pb-24 pt-4 md:px-6 lg:grid-cols-[84px_1fr] xl:grid-cols-[250px_1fr] lg:pb-8">
         <aside className="hidden lg:block">
           <div className="surface sticky top-4 space-y-4 p-3 xl:p-4">
-            <ShellNavRail compact />
+            <div className="xl:hidden">
+              <ShellNavRail compact />
+            </div>
             <div className="hidden xl:block">
               <p className="text-xs uppercase tracking-[0.16em] text-accent">Primary nav</p>
               <div className="mt-2">
@@ -124,21 +136,11 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         </aside>
 
         <main className="min-w-0 space-y-4">
-          <div className="surface-subtle hidden items-center justify-between gap-3 px-3 py-2 lg:flex xl:hidden">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">Training nav</p>
-            <div className="flex items-center gap-2"><ShellNavRail compact /></div>
-          </div>
           {children}
         </main>
       </div>
 
       <MobileBottomTabs />
-      <div className="fixed right-4 top-3 z-40 lg:hidden">
-        <AccountMenu avatarUrl={profile?.avatar_url ?? null} initials={initials} displayName={displayName} email={email} signOutAction={signOutAction} />
-      </div>
-      <div className="fixed right-4 top-3 z-40 hidden lg:block">
-        <AccountMenu avatarUrl={profile?.avatar_url ?? null} initials={initials} displayName={displayName} email={email} signOutAction={signOutAction} />
-      </div>
     </div>
   );
 }

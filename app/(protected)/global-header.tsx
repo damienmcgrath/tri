@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { AccountMenu } from "./account-menu";
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -26,7 +27,23 @@ function weekRangeLabel(weekStart: string) {
   return `${shortDateFormatter.format(start)}–${shortDateFormatter.format(end)}`;
 }
 
-export function GlobalHeader({ raceName, daysToRace, weekCompletion }: { raceName: string; daysToRace: number | null; weekCompletion: number }) {
+export function GlobalHeader({
+  raceName,
+  daysToRace,
+  weekCompletion,
+  account
+}: {
+  raceName: string;
+  daysToRace: number | null;
+  weekCompletion: number;
+  account: {
+    avatarUrl: string | null;
+    initials: string;
+    displayName: string;
+    email: string;
+    signOutAction: (formData: FormData) => void;
+  };
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
@@ -58,6 +75,13 @@ export function GlobalHeader({ raceName, daysToRace, weekCompletion }: { raceNam
           {daysToRace !== null ? <span className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">{raceName} • {daysToRace} days</span> : null}
           <span className="signal-chip signal-recovery">Week {weekCompletion}%</span>
           <Link href="/coach" className="btn-primary px-3 py-1.5 text-xs">Ask tri.ai</Link>
+          <AccountMenu
+            avatarUrl={account.avatarUrl}
+            initials={account.initials}
+            displayName={account.displayName}
+            email={account.email}
+            signOutAction={account.signOutAction}
+          />
         </div>
       </div>
     </div>
