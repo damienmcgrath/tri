@@ -4,7 +4,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
 import { DetailsAccordion } from "../details-accordion";
-import { computeWeekMinuteTotals, getKeySessionsRemaining } from "@/lib/training/week-metrics";
+import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 
 type Session = {
   id: string;
@@ -42,8 +42,6 @@ type Plan = {
 };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
-
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
   const distanceFromMonday = day === 0 ? 6 : day - 1;
@@ -231,15 +229,6 @@ export default async function DashboardPage({
 
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
-  const keyRemainingIds = new Set(
-    getKeySessionsRemaining(weekMetricSessions, todayIso)
-      .slice(0, 3)
-      .map((session) => session.id)
-  );
-
-  const keySessionsRemaining = sessions
-    .filter((session) => keyRemainingIds.has(session.id))
-    .sort((a, b) => a.date.localeCompare(b.date));
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
   const keyRemainingCount = weekMetricSessions.filter((session) => session.isKey && session.status === "planned").length;
@@ -343,30 +332,6 @@ export default async function DashboardPage({
         </article>
 
         <div className="space-y-4">
-          <article className="surface-subtle p-3">
-            <h2 className="mb-2 text-sm font-semibold text-muted">Key sessions remaining</h2>
-            {keySessionsRemaining.length === 0 ? (
-              <div className="space-y-2 text-sm text-muted">
-                <p>No key sessions remaining this week.</p>
-                {hasGapSuggestion ? (
-                  <p>If you want extra load, add one short aerobic {biggestGap!.label.toLowerCase()} session later in the week.</p>
-                ) : null}
-                <Link href="/calendar" className="inline-flex text-xs text-accent underline">Add session</Link>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {keySessionsRemaining.map((session) => (
-                  <li key={session.id} className="flex items-center justify-between gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2">
-                    <p className="min-w-0 truncate text-sm font-medium">
-                      {weekdayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))} • {session.type} • {session.duration_minutes}m
-                    </p>
-                    <Link href={`/calendar?focus=${session.id}`} className="shrink-0 text-xs text-accent underline">Open</Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
           <article className="priority-card-supporting">
             <p className="priority-kicker">This week&apos;s focus</p>
             <h2 className="priority-title">{weeklyFocusText}</h2>
