@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PlanEditor } from "./plan-editor";
 
@@ -175,7 +174,6 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
           <h1 className="text-lg font-semibold">Plan</h1>
           <p className="text-xs uppercase tracking-[0.14em] text-muted">Week Schedule</p>
         </div>
-        <Link href="/plan/builder" className="btn-secondary px-3 py-1.5 text-xs">Plan settings</Link>
       </div>
 
       <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
