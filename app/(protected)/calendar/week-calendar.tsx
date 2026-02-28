@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -97,13 +96,19 @@ function completedDuration(session: CalendarSession) {
 export function WeekCalendar({
   weekDays,
   sessions,
-  weekStart,
-  isCurrentWeek,
+  executionLabel,
+  executionSubtext,
+  completedCount,
+  pendingCount,
+  skippedCount
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
-  weekStart: string;
-  isCurrentWeek: boolean;
+  executionLabel: string;
+  executionSubtext?: string;
+  completedCount: number;
+  pendingCount: number;
+  skippedCount: number;
 }) {
   const router = useRouter();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
@@ -188,14 +193,6 @@ export function WeekCalendar({
   );
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const prevWeek = new Date(`${weekStart}T00:00:00.000Z`);
-  prevWeek.setUTCDate(prevWeek.getUTCDate() - 7);
-  const nextWeek = new Date(`${weekStart}T00:00:00.000Z`);
-  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-
-  function weekLink(iso: string) {
-    return `/calendar?weekStart=${iso}`;
-  }
 
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -331,19 +328,29 @@ export function WeekCalendar({
   }
 
   return (
-    <section className="space-y-4">
-      <header className="surface sticky top-2 z-20 space-y-3 px-4 py-3 backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}</p>
-            <p className="text-sm font-semibold">
-              {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={weekLink(prevWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Prev week</Link>
-            <Link href="/calendar" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-[hsl(var(--accent-performance)/0.45)]" : ""}`}>Current week</Link>
-            <Link href={weekLink(nextWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Next week</Link>
+    <section className="space-y-3">
+      <div className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{executionLabel}</p>
+          {executionSubtext ? <p className="truncate text-xs text-muted">{executionSubtext}</p> : null}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="signal-chip signal-ready">Completed {completedCount}</span>
+          <span className="signal-chip signal-load">Planned {pendingCount}</span>
+          <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
+        </div>
+      </div>
+
+      <header className="surface-subtle space-y-2 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <div className="flex items-center gap-2">
+            <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
+              <option value="all">All statuses</option>
+              <option value="planned">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="skipped">Missed</option>
+            </select>
             <button
               className="btn-primary px-3 py-1.5 text-xs"
               onClick={() =>
@@ -357,8 +364,8 @@ export function WeekCalendar({
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max items-center gap-2">
             {(["all", "swim", "bike", "run", "strength"] as const).map((item) => (
               <button
                 key={item}
@@ -369,18 +376,13 @@ export function WeekCalendar({
               </button>
             ))}
           </div>
-          <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
-            <option value="all">All statuses</option>
-            <option value="planned">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="skipped">Missed</option>
-          </select>
         </div>
       </header>
 
-      <article className="surface sticky top-[74px] z-10 px-3 py-2">
-        <div className="grid gap-2 lg:grid-cols-6">
-          <div className="surface-subtle p-3 md:col-span-2">
+      <details className="surface-subtle px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-accent">Summary <span className="ml-2 text-xs text-muted">Completed {totals.completed} / {totals.planned} min • {totals.remaining} remaining</span></summary>
+        <div className="mt-3 grid gap-2 lg:grid-cols-6">
+          <div className="surface-subtle p-3 lg:col-span-2">
             <p className="text-xs uppercase tracking-wide text-muted">Week volume</p>
             <p className="mt-1 text-lg font-semibold">Completed {totals.completed} / {totals.planned} min</p>
             <p className="text-xs text-muted">{formatMinutes(totals.completed)} / {formatMinutes(totals.planned)} • {totals.remaining} min remaining</p>
@@ -401,10 +403,10 @@ export function WeekCalendar({
             );
           })}
         </div>
-      </article>
+      </details>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7 min-[1024px]:overflow-x-auto">
+        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
           {weekDays.map((day) => {
             const ids = filteredIdsByDay[day.iso] ?? [];
             const visibleIds = expandedDays[day.iso] ? ids : ids.slice(0, 2);

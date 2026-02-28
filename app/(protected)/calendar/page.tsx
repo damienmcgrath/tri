@@ -80,8 +80,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
 
   if (!user) return null;
 
-  const currentWeekStart = getMonday().toISOString().slice(0, 10);
-  const weekStart = isValidIsoDate(searchParams?.weekStart) ? searchParams.weekStart : currentWeekStart;
+  const weekStart = isValidIsoDate(searchParams?.weekStart) ? searchParams.weekStart : getMonday().toISOString().slice(0, 10);
   const weekEnd = addDays(weekStart, 7);
 
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
@@ -219,26 +218,15 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
 
 
   return (
-    <section className="space-y-4">
-      <article className="surface p-4">
-        <p className="text-xs uppercase tracking-[0.14em] text-accent">Execution header</p>
-        <h2 className="mt-1 text-lg font-semibold">{nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}</h2>
-        <p className="mt-1 text-sm text-muted">
-          {unmatchedUploads > 0 ? `${unmatchedUploads} uploads need matching. Resolve drift before week end.` : "Your uploads and schedule are aligned."}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <a href={unmatchedUploads > 0 ? "/settings/integrations" : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">{unmatchedUploads > 0 ? "Resolve drift" : "Add session"}</a>
-          <span className="signal-chip signal-ready">Completed {completedCount}</span>
-          <span className="signal-chip signal-load">Planned {pendingCount}</span>
-          <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
-        </div>
-      </article>
-
+    <section className="space-y-3">
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
-        weekStart={weekStart}
-        isCurrentWeek={weekStart === currentWeekStart}
+        executionLabel={nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}
+        executionSubtext={unmatchedUploads > 0 ? `${unmatchedUploads} uploads need matching.` : "Uploads and schedule aligned"}
+        completedCount={completedCount}
+        pendingCount={pendingCount}
+        skippedCount={skippedCount}
       />
     </section>
   );
