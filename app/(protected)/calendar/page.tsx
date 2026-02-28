@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
-import { PageHeader } from "../page-header";
 import { WeekCalendar } from "./week-calendar";
+import { computeWeekMinuteTotals, computeWeekSessionCounts } from "@/lib/training/week-metrics";
 
 type Session = {
   id: string;
@@ -12,6 +12,7 @@ type Session = {
   notes: string | null;
   created_at: string;
   status?: "planned" | "completed" | "skipped";
+  is_key?: boolean | null;
 };
 
 type LegacyPlannedSession = {
@@ -81,8 +82,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
 
   if (!user) return null;
 
-  const currentWeekStart = getMonday().toISOString().slice(0, 10);
-  const weekStart = isValidIsoDate(searchParams?.weekStart) ? searchParams.weekStart : currentWeekStart;
+  const weekStart = isValidIsoDate(searchParams?.weekStart) ? searchParams.weekStart : getMonday().toISOString().slice(0, 10);
   const weekEnd = addDays(weekStart, 7);
 
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
@@ -95,13 +95,34 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     };
   });
 
-  const { data: sessionData, error: sessionError } = await supabase
-    .from("sessions")
-    .select("id,date,sport,type,duration_minutes,notes,created_at,status")
-    .gte("date", weekStart)
-    .lt("date", weekEnd)
-    .order("date", { ascending: true })
-    .order("created_at", { ascending: true });
+  let sessionData: unknown[] | null = null;
+  let sessionError: { code?: string; message?: string } | null = null;
+
+  {
+    const query = await supabase
+      .from("sessions")
+      .select("id,date,sport,type,duration_minutes,notes,created_at,status,is_key")
+      .gte("date", weekStart)
+      .lt("date", weekEnd)
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    sessionData = query.data as unknown[] | null;
+    sessionError = query.error;
+
+    if (sessionError && sessionError.code !== "PGRST205" && /(is_key|schema cache|42703)/i.test(sessionError.message ?? "")) {
+      const fallbackQuery = await supabase
+        .from("sessions")
+        .select("id,date,sport,type,duration_minutes,notes,created_at,status")
+        .gte("date", weekStart)
+        .lt("date", weekEnd)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      sessionData = fallbackQuery.data as unknown[] | null;
+      sessionError = fallbackQuery.error;
+    }
+  }
 
   let normalizedSessions = (sessionData ?? []) as Session[];
 
@@ -126,7 +147,8 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       duration_minutes: session.duration ?? 0,
       notes: session.notes,
       created_at: session.created_at,
-      status: undefined
+      status: undefined,
+      is_key: false
     }));
   } else if (sessionError) {
     throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
@@ -206,89 +228,51 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       status: linked.length > 0 ? ("completed" as const) : getSessionStatus(session, completionLedger),
       linkedActivityCount: linked.length,
       linkedStats,
-      unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0)
+      unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0),
+      is_key: Boolean((session as any).is_key)
     };
   });
 
 
-  const completedCount = sessions.filter((session) => session.status === "completed").length;
-  const pendingCount = sessions.filter((session) => session.status === "planned").length;
-  const skippedCount = sessions.filter((session) => session.status === "skipped").length;
+  const countMetrics = computeWeekSessionCounts(
+    sessions.map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      durationMinutes: session.duration,
+      status: session.status,
+      isKey: session.is_key
+    }))
+  );
+  const minuteMetrics = computeWeekMinuteTotals(
+    sessions.map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      durationMinutes: session.duration,
+      status: session.status,
+      isKey: session.is_key
+    }))
+  );
   const unmatchedUploads = [...unassignedByDate.values()].reduce((sum, count) => sum + count, 0);
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
 
-  const raceDate = process.env.NEXT_PUBLIC_RACE_DATE;
-  const raceCountdown = raceDate
-    ? Math.max(0, Math.ceil((new Date(`${raceDate}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
 
   return (
-    <section className="space-y-4">
-      <PageHeader
-        title="Calendar"
-        objective="Execute each day with confidence by dragging, logging, and resolving conflicts before they become missed work."
-        actions={[
-          { href: "/plan", label: "Edit plan" },
-          { href: "/dashboard", label: "View dashboard", variant: "secondary" }
-        ]}
-      />
-
-      <div className="priority-layout">
-        <article className="priority-card-primary">
-          <p className="priority-kicker">Today&apos;s priority session</p>
-          <h2 className="priority-title">Execute your next key workout.</h2>
-          <p className="priority-subtitle">Keep focus on one clear session, then tidy the rest of the day.</p>
-          <p className="mt-3 text-sm text-muted">
-            {nextTodaySession
-              ? `Next up: ${nextTodaySession.type} (${nextTodaySession.duration} min).`
-              : "No planned session today. Pull one forward to keep confidence high."}
-          </p>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">On track this week</p>
-          <h2 className="priority-title">Monitor execution confidence daily.</h2>
-          <p className="priority-subtitle">Use completion and pending counts to prevent last-minute backlog.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Completed</p>
-              <p className="mt-1 text-lg font-semibold">{completedCount}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Planned</p>
-              <p className="mt-1 text-lg font-semibold">{pendingCount}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Skipped</p>
-              <p className="mt-1 text-lg font-semibold">{skippedCount}</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">Supporting analytics</p>
-          <h2 className="priority-title">Resolve upload and scheduling drift.</h2>
-          <p className="priority-subtitle">Catch unmatched activities early so your plan and execution stay aligned.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Unmatched uploads</p>
-              <p className="mt-1 text-lg font-semibold">{unmatchedUploads}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Current week view</p>
-              <p className="mt-1 text-sm font-semibold">{weekStart === currentWeekStart ? "Current" : "Historical / Future"}</p>
-            </div>
-          </div>
-        </article>
-      </div>
-
+    <section className="space-y-3">
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
-        weekStart={weekStart}
-        isCurrentWeek={weekStart === currentWeekStart}
-        raceCountdown={raceCountdown}
+        executionLabel={nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}
+        executionSubtext={unmatchedUploads > 0 ? `${unmatchedUploads} uploads need matching.` : "Uploads and schedule aligned"}
+        completedCount={countMetrics.completedCount}
+        plannedTotalCount={countMetrics.plannedTotalCount}
+        skippedCount={countMetrics.skippedCount}
+        plannedRemainingCount={countMetrics.plannedRemainingCount}
+        plannedMinutes={minuteMetrics.plannedMinutes}
+        completedMinutes={minuteMetrics.completedMinutes}
+        remainingMinutes={minuteMetrics.remainingMinutes}
       />
     </section>
   );
