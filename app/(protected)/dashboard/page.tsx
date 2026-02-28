@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { SessionStatusChip } from "@/lib/ui/status-chip";
-import { markSkippedAction, moveSessionAction } from "./actions";
 import { WeekProgressCard } from "./week-progress-card";
-import { StatusStrip } from "../status-strip";
-import { DetailsAccordion } from "../details-accordion";
-import { computeWeekMinuteTotals, computeWeekSessionCounts, getKeySessionsRemaining } from "@/lib/training/week-metrics";
+import { ProgressGlanceCard } from "./progress-glance-card";
+import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 
 type Session = {
   id: string;
@@ -44,9 +41,6 @@ type Plan = {
 };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
   const distanceFromMonday = day === 0 ? 6 : day - 1;
@@ -107,8 +101,6 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const previousWeekStart = addDays(weekStart, -7);
-  const previousWeekEnd = weekStart;
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
@@ -159,15 +151,6 @@ export default async function DashboardPage({
     }
   }
 
-  const { data: previousWeekSessionsData } = activePlanId
-    ? await supabase
-        .from("sessions")
-        .select("id,duration_minutes,status")
-        .eq("plan_id", activePlanId)
-        .gte("date", previousWeekStart)
-        .lt("date", previousWeekEnd)
-    : { data: [] };
-
   const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, session) => {
     const key = `${session.date}:${session.sport}`;
     acc[key] = (acc[key] ?? 0) + 1;
@@ -178,7 +161,6 @@ export default async function DashboardPage({
   const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null }>;
   const linkedActivityIds = new Set(links.map((item) => item.completed_activity_id));
   const linkedSessionIds = new Set(links.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
-  const unassignedUploads = uploadedActivities.filter((item) => !linkedActivityIds.has(item.id));
 
   const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
   const linkedMinutesBySession = links.reduce<Map<string, number>>((acc, link) => {
@@ -205,51 +187,20 @@ export default async function DashboardPage({
   }));
 
   const hasActivePlan = Boolean(activePlanId);
-  const hasWeekSessions = sessions.length > 0;
-
-  const weekDays = Array.from({ length: 7 }).map((_, index) => {
-    const iso = addDays(weekStart, index);
-    const daySessions = sessions.filter((session) => session.date === iso);
-    const planned = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-    const completed = daySessions
-      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
-
-    return {
-      iso,
-      weekday: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
-      day: shortDateFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
-      planned,
-      completed,
-      isToday: iso === todayIso,
-      sports: [...new Set(daySessions.map((session) => session.sport))]
-    };
-  });
-
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const nextPendingTodaySession = todaySessions.find((session) => session.status === "planned") ?? null;
 
-  const minuteMetrics = computeWeekMinuteTotals(
-    sessions.map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      durationMinutes: session.duration_minutes ?? 0,
-      status: session.status,
-      isKey: session.is_key
-    }))
-  );
+  const weekMetricSessions = sessions.map((session) => ({
+    id: session.id,
+    date: session.date,
+    sport: session.sport,
+    durationMinutes: session.duration_minutes ?? 0,
+    status: session.status,
+    isKey: session.is_key
+  }));
+
+  const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const countMetrics = computeWeekSessionCounts(
-    sessions.map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      durationMinutes: session.duration_minutes ?? 0,
-      status: session.status,
-      isKey: session.is_key
-    }))
-  );
-  const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
   const progressBySport = sports.map((sport) => {
     const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
@@ -273,62 +224,26 @@ export default async function DashboardPage({
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
-
-  const keyTodaySession = [...todaySessions]
-    .filter((session) => session.status === "planned")
-    .sort((a, b) => (b.duration_minutes ?? 0) - (a.duration_minutes ?? 0))[0];
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
-  const focusText = keyTodaySession
-    ? `Prioritize ${getDisciplineMeta(keyTodaySession.sport).label.toLowerCase()} ${keyTodaySession.type.toLowerCase()} (${keyTodaySession.duration_minutes} min) today.`
-    : biggestGap && biggestGap.planned > 0
-      ? `Your biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label} (${biggestGap.completed}/${biggestGap.planned} min).`
-      : "Start with one short session today to establish execution rhythm.";
-
-
-  const keyRemainingIds = new Set(
-    getKeySessionsRemaining(
-      sessions.map((session) => ({
-        id: session.id,
-        date: session.date,
-        sport: session.sport,
-        durationMinutes: session.duration_minutes ?? 0,
-        status: session.status,
-        isKey: session.is_key
-      })),
-      todayIso
-    )
-      .slice(0, 4)
-      .map((session) => session.id)
-  );
-
-  const keySessionsRemaining = sessions
-    .filter((session) => keyRemainingIds.has(session.id))
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const previousWeekSessions = (previousWeekSessionsData ?? []) as Array<{ duration_minutes: number | null; status: Session["status"] }>;
-  const previousWeekTotals = previousWeekSessions.reduce(
-    (acc, session) => {
-      const minutes = session.duration_minutes ?? 0;
-      acc.planned += minutes;
-      if (session.status === "completed") {
-        acc.completed += minutes;
-      }
-      return acc;
-    },
-    { planned: 0, completed: 0 }
-  );
-
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
-  const previousCompletionPct = previousWeekTotals.planned > 0 ? Math.round((previousWeekTotals.completed / previousWeekTotals.planned) * 100) : 0;
-  const completionDelta = completionPct - previousCompletionPct;
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
-  const remainingMinutesDelta = remainingMinutes - Math.max(previousWeekTotals.planned - previousWeekTotals.completed, 0);
-  const fatigueState = completionPct >= 85 ? "Controlled" : completionPct >= 60 ? "Balanced" : "Accumulating";
-  const confidenceLabel = completionPct >= 85 ? "High" : completionPct >= 60 ? "Building" : "Low";
-  const completionTrend = completionDelta > 2 ? "↑" : completionDelta < -2 ? "↓" : "→";
-  const loadTrend = remainingMinutesDelta < -20 ? "↓" : remainingMinutesDelta > 20 ? "↑" : "→";
-  const fatigueTrend = completionPct >= 85 ? "↓" : completionPct >= 60 ? "→" : "↑";
-  const confidenceTrend = completionDelta > 2 ? "↑" : completionDelta < -2 ? "↓" : "→";
+  const marginPct = 10;
+  const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
+  const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
+  const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
+  const progressStatus = completionPct > expectedByTodayPct + marginPct
+    ? "Ahead"
+    : completionPct < expectedByTodayPct - marginPct
+      ? "Behind plan"
+      : "On track";
+  const overdueKeySession = sessions
+    .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
+  const hasGapSuggestion = Boolean(biggestGap && biggestGap.planned > biggestGap.completed);
+  const weeklyFocusText = biggestGap && biggestGap.planned > biggestGap.completed
+    ? `Close your ${biggestGap.label} gap (+${biggestGap.planned - biggestGap.completed}m) by adding 2 × 30–45m easy ${biggestGap.label.toLowerCase()} sessions.`
+    : "Protect consistency this week with short, low-friction sessions on open days.";
 
 
   if (!hasActivePlan && !hasAnyPlan) {
@@ -353,86 +268,77 @@ export default async function DashboardPage({
   return (
     <section className="space-y-4">
       <div className="space-y-4">
+        <ProgressGlanceCard
+          completionPct={completionPct}
+          completedTimeLabel={toHoursAndMinutes(totals.completed)}
+          plannedTimeLabel={toHoursAndMinutes(totals.planned)}
+          remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
+          statusLabel={progressStatus}
+        />
+
         <article className="priority-card-primary">
-          <p className="priority-kicker">Weekly coaching takeaway</p>
-          <h1 className="priority-title">{hasWeekSessions ? focusText : "Set one key workout and execute it."}</h1>
-          <p className="priority-subtitle">
-            {hasWeekSessions
-              ? "Keep execution tight this week and protect recovery on non-key days."
-              : "Add sessions for this week so your next best workout is always clear."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {hasWeekSessions ? (
-              <>
-                <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
-                  Open next session
-                </Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log completed work</Link>
-              </>
-            ) : (
-              <>
-                <Link href="/plan" className="btn-primary">Add session</Link>
-                <Link href="/plan" className="btn-secondary">Duplicate last week</Link>
-              </>
-            )}
+          <p className="priority-kicker">Next action</p>
+          {nextPendingTodaySession ? (
+            <>
+              <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
+              <p className="priority-subtitle">
+                {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
+                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
+              </p>
+              <p className="mt-1 text-sm text-muted">Why today matters: lock in today to keep your key-session quality intact.</p>
+            </>
+          ) : overdueKeySession ? (
+            <>
+              <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
+              <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
+            </>
+          ) : (
+            <>
+              <h1 className="priority-title">No session planned today</h1>
+              <p className="priority-subtitle">
+                Keep momentum by pulling one session forward
+                {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
+              </p>
+            </>
+          )}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {nextPendingTodaySession ? (
+                <>
+                  <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">
+                    Open session
+                  </Link>
+                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View in calendar</Link>
+                </>
+              ) : overdueKeySession ? (
+                <>
+                  <Link href={`/calendar?focus=${overdueKeySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Reschedule in calendar</Link>
+                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Skip and adjust week</Link>
+                </>
+              ) : null}
+              {!nextPendingTodaySession && !overdueKeySession ? (
+                <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Open calendar</Link>
+              ) : null}
+            </div>
+            {!nextPendingTodaySession && !overdueKeySession ? (
+              <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
+            ) : null}
           </div>
         </article>
 
-        <StatusStrip
-          items={[
-            { label: "Completion", value: `${completionPct}%`, hint: `${completionTrend} ${completionDelta >= 0 ? `+${completionDelta}` : completionDelta} pts` },
-            { label: "Planned", value: `${countMetrics.plannedTotalCount} sessions`, hint: `${countMetrics.plannedRemainingCount} remaining` },
-            { label: "Fatigue", value: fatigueState, hint: fatigueTrend },
-            { label: "Confidence", value: confidenceLabel, hint: confidenceTrend }
-          ]}
-        />
-
-        <div className="priority-layout">
-          <article className="priority-card-emphasis">
-            <p className="priority-kicker">Today&apos;s sessions</p>
-            <h2 className="priority-title">Execute high-impact work first.</h2>
-            <p className="priority-subtitle">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
-            {todaySessions.length === 0 ? (
-              <div className="surface-subtle mt-4 p-3 text-sm text-muted">
-                <p>No sessions for today.</p>
-                <Link href="/calendar" className="mt-2 inline-flex text-xs text-accent underline">Open calendar</Link>
-              </div>
-            ) : (
-              <ul className="mt-4 space-y-2">
-                {todaySessions.map((session) => {
-                  const discipline = getDisciplineMeta(session.sport);
-                  return (
-                    <li key={session.id} className="surface-subtle p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
-                          <p className="mt-1 text-sm font-medium">{session.type}</p>
-                          <p className="text-xs text-muted">{session.duration_minutes} min</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <SessionStatusChip status={session.status} />
-                          <details className="relative">
-                            <summary aria-label="Session actions" className="list-none cursor-pointer rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-xs">⋯</summary>
-                            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2">
-                              <form action={markSkippedAction}>
-                                <input type="hidden" name="sessionId" value={session.id} />
-                                <button className="w-full rounded-md px-2 py-1 text-left text-xs hover:bg-[hsl(var(--bg-card))]">Mark skipped</button>
-                              </form>
-                            </div>
-                          </details>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+        <div className="space-y-4">
+          <article className="priority-card-supporting">
+            <p className="priority-kicker">This week&apos;s focus</p>
+            <h2 className="priority-title">{weeklyFocusText}</h2>
+            <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
+            <div className="mt-4">
+              <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Add suggested sessions</Link>
+            </div>
           </article>
 
-          <article className="priority-card-supporting">
-            <p className="priority-kicker">On track this week</p>
-            <h2 className="priority-title">Confirm your confidence trend.</h2>
-            <p className="priority-subtitle">Check completion pace and close the largest discipline gap before week end.</p>
+          <article id="week-progress-details" className="priority-card-supporting scroll-mt-20">
+            <p className="priority-kicker">Week progress</p>
+            <h2 className="priority-title">Discipline breakdown and gaps.</h2>
             <div className="mt-4">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
@@ -448,64 +354,6 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <DetailsAccordion title="Details">
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="priority-card-supporting">
-                <h3 className="text-sm font-semibold">Sport breakdown</h3>
-                <ul className="mt-2 space-y-2">
-                  {progressBySport.map((sport) => (
-                    <li key={sport.sport} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-medium">{sport.label}</span>
-                      <span className="text-muted">{sport.completed}/{sport.planned} min</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="priority-card-supporting">
-                <h3 className="text-sm font-semibold">Unmatched uploads</h3>
-                {unassignedUploads.length > 0 ? (
-                  <>
-                    <p className="mt-2 text-sm text-muted">
-                      {unassignedUploads.length} upload{unassignedUploads.length === 1 ? "" : "s"} still need matching ({unassignedMinutes} min).
-                    </p>
-                    <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-accent underline">Match uploads now</Link>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {unassignedUploads.slice(0, 3).map((item) => (
-                        <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-[hsl(var(--border))] px-2 py-1">
-                          View {item.sport_type}
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-muted">Great job—every uploaded activity is already matched to your plan.</p>
-                )}
-              </div>
-            </div>
-          </DetailsAccordion>
-
-          <article className="surface-subtle p-3">
-            <h2 className="mb-2 text-sm font-semibold text-muted">Key sessions remaining</h2>
-            {keySessionsRemaining.length === 0 ? (
-              <p className="text-sm text-muted">No key sessions remaining. Keep consistency by protecting recovery and showing up for planned sessions.</p>
-            ) : (
-              <ul className="space-y-2">
-                {keySessionsRemaining.map((session) => (
-                  <li key={session.id} className="flex items-center justify-between gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.12em] text-muted">{weekdayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
-                      <p className="truncate text-sm font-medium">{session.type}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold">{session.duration_minutes}m</p>
-                      <Link href={`/calendar?focus=${session.id}`} className="text-xs text-accent underline">Open</Link>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
         </div>
       </div>
     </section>
