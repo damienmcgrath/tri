@@ -130,7 +130,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
               ) : (
                 <p className="mt-2 text-sm text-muted">Create or activate a plan to see week context.</p>
               )}
-              <Link href="/plan" className="mt-3 inline-flex text-xs text-accent underline">Manage plan</Link>
+              <Link href="/plan/builder" className="mt-3 inline-flex text-xs text-accent underline">Manage plan</Link>
             </div>
           </div>
         </aside>

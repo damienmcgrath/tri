@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PlanEditor } from "./plan-editor";
 
@@ -49,56 +50,26 @@ function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: str
   });
 }
 
-
 function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === "PGRST205") {
-    return true;
-  }
-
+  if (!error) return false;
+  if (error.code === "PGRST205") return true;
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-function isMissingColumnError(error: { code?: string; message?: string } | null, columnName: string) {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === "42703") {
-    return true;
-  }
-
-  return (error.message ?? "").toLowerCase().includes(columnName.toLowerCase());
-}
-
-export default async function PlanPage({
-  searchParams
-}: {
-  searchParams?: {
-    plan?: string;
-  };
-}) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string } }) {
   const supabase = await createClient();
-
   const {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const { data: plansData, error: plansError } = await supabase
     .from("training_plans")
     .select("id,name,start_date,duration_weeks")
     .order("start_date", { ascending: false });
 
-  if (plansError) {
-    throw new Error(plansError.message);
-  }
+  if (plansError) throw new Error(plansError.message);
 
   const plans = (plansData ?? []) as Plan[];
   const selectedPlan = plans.find((plan) => plan.id === searchParams?.plan) ?? plans[0];
@@ -128,9 +99,7 @@ export default async function PlanPage({
       ignoreDuplicates: true
     });
 
-    if (seedWeeksError) {
-      throw new Error(seedWeeksError.message);
-    }
+    if (seedWeeksError) throw new Error(seedWeeksError.message);
 
     const { data: seededWeeksData, error: seededWeeksFetchError } = await supabase
       .from("training_weeks")
@@ -138,10 +107,7 @@ export default async function PlanPage({
       .eq("plan_id", selectedPlan.id)
       .order("week_index", { ascending: true });
 
-    if (seededWeeksFetchError) {
-      throw new Error(seededWeeksFetchError.message);
-    }
-
+    if (seededWeeksFetchError) throw new Error(seededWeeksFetchError.message);
     weeksData = (seededWeeksData ?? []) as TrainingWeek[];
   }
 
@@ -180,15 +146,7 @@ export default async function PlanPage({
         throw new Error(legacy.error.message);
       }
 
-      sessionsData = ((legacy.data ?? []) as Array<{
-        id: string;
-        plan_id: string;
-        date: string;
-        sport: string;
-        type: string;
-        duration: number;
-        notes: string | null;
-      }>).map((session) => ({
+      sessionsData = ((legacy.data ?? []) as Array<{ id: string; plan_id: string; date: string; sport: string; type: string; duration: number; notes: string | null }>).map((session) => ({
         id: session.id,
         plan_id: session.plan_id,
         week_id: "",
@@ -210,14 +168,15 @@ export default async function PlanPage({
     }
   }
 
-
   return (
-    <section className="plan-editor-motion-lock space-y-4">
-      <article className="surface p-4">
-        <p className="text-xs uppercase tracking-[0.14em] text-accent">Plan</p>
-        <h1 className="mt-1 text-lg font-semibold">Week Schedule</h1>
-        <p className="mt-1 text-sm text-muted">Use Week Schedule to edit workouts. Plan setup and discipline analytics are now in collapsible Week Details inside the editor.</p>
-      </article>
+    <section className="plan-editor-motion-lock space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div>
+          <h1 className="text-lg font-semibold">Plan</h1>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Week Schedule</p>
+        </div>
+        <Link href="/plan/builder" className="btn-secondary px-3 py-1.5 text-xs">Plan settings</Link>
+      </div>
 
       <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
     </section>

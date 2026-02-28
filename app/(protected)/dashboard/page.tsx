@@ -250,6 +250,11 @@ export default async function DashboardPage({
       ? `Your biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label} (${biggestGap.completed}/${biggestGap.planned} min).`
       : "Start with one short session today to establish execution rhythm.";
 
+
+  const keySessionsRemaining = sessions
+    .filter((session) => session.status === "planned" && session.date >= todayIso)
+    .sort((a, b) => (a.date.localeCompare(b.date) || (b.duration_minutes ?? 0) - (a.duration_minutes ?? 0)))
+    .slice(0, 4);
   const previousWeekSessions = (previousWeekSessionsData ?? []) as Array<{ duration_minutes: number | null; status: Session["status"] }>;
   const previousWeekTotals = previousWeekSessions.reduce(
     (acc, session) => {
@@ -303,7 +308,7 @@ export default async function DashboardPage({
           <h1 className="priority-title">{hasWeekSessions ? focusText : "Set one key workout and execute it."}</h1>
           <p className="priority-subtitle">
             {hasWeekSessions
-              ? `You have ${remainingMinutes} minutes left this week. Keep execution tight and protect recovery.`
+              ? "Keep execution tight this week and protect recovery on non-key days."
               : "Add sessions for this week so your next best workout is always clear."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -428,26 +433,25 @@ export default async function DashboardPage({
           </DetailsAccordion>
 
           <article className="surface-subtle p-3">
-            <h2 className="mb-2 text-sm font-semibold text-muted">Week at a glance</h2>
-            <div className="grid grid-cols-7 gap-1 overflow-x-auto">
-              {weekDays.map((day) => (
-                <Link
-                  key={day.iso}
-                  href={`/calendar?date=${day.iso}`}
-                  className={`block min-w-[96px] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2 text-center transition hover:border-[hsl(var(--accent-performance)/0.55)] ${day.isToday ? "border-[hsl(var(--accent-performance)/0.6)] bg-[hsl(var(--accent-performance)/0.12)]" : ""}`}
-                >
-                  <p className="text-[10px] uppercase tracking-wide text-muted">{day.weekday}</p>
-                  <p className="text-xs font-medium">{day.day}</p>
-                  <p className="mt-1 text-[10px] text-muted">{day.completed}/{day.planned}m</p>
-                  <div className="mt-1 flex flex-wrap justify-center gap-1">
-                    {day.sports.slice(0, 3).map((sport) => {
-                      const d = getDisciplineMeta(sport);
-                      return <span key={`${day.iso}-${sport}`} className={`h-1.5 w-3 rounded-full ${d.className} ${d.textureClassName}`} aria-hidden="true" title={`${d.label} · ${d.shape}`} />;
-                    })}
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <h2 className="mb-2 text-sm font-semibold text-muted">Key sessions remaining</h2>
+            {keySessionsRemaining.length === 0 ? (
+              <p className="text-sm text-muted">No planned sessions remaining this week.</p>
+            ) : (
+              <ul className="space-y-2">
+                {keySessionsRemaining.map((session) => (
+                  <li key={session.id} className="flex items-center justify-between gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.12em] text-muted">{weekdayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
+                      <p className="truncate text-sm font-medium">{session.type}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold">{session.duration_minutes}m</p>
+                      <Link href={`/calendar?focus=${session.id}`} className="text-xs text-accent underline">Open</Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </article>
         </div>
       </div>
