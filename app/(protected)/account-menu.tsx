@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type AccountMenuProps = {
   avatarUrl: string | null;
@@ -20,14 +20,29 @@ export function AccountMenu({ avatarUrl, initials, displayName, email, signOutAc
     }
   };
 
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const details = detailsRef.current;
+      if (!details?.open) return;
+      if (event.target instanceof Node && !details.contains(event.target)) {
+        details.open = false;
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
+
   return (
     <details className="group relative" ref={detailsRef}>
-      <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-0.5 transition hover:border-cyan-400/50">
+      <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--bg-elevated))] p-0.5 shadow-[0_0_0_1px_hsl(var(--bg)),0_10px_25px_hsl(210_30%_5%_/_0.35)] transition hover:border-[hsl(var(--accent-performance)/0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="User avatar" className="h-9 w-9 rounded-full object-cover" />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-200">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent-performance)/0.2)] text-xs font-semibold text-accent">
             {initials}
           </span>
         )}

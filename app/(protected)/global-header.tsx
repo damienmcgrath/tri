@@ -30,12 +30,10 @@ function weekRangeLabel(weekStart: string) {
 export function GlobalHeader({
   raceName,
   daysToRace,
-  weekCompletion,
   account
 }: {
   raceName: string;
   daysToRace: number | null;
-  weekCompletion: number;
   account: {
     avatarUrl: string | null;
     initials: string;
@@ -73,7 +71,6 @@ export function GlobalHeader({
 
         <div className="flex flex-wrap items-center gap-2">
           {daysToRace !== null ? <span className="rounded-full border pill-accent px-3 py-1 text-xs font-medium">{raceName} • {daysToRace} days</span> : null}
-          <span className="signal-chip signal-recovery">Week {weekCompletion}%</span>
           <Link href="/coach" className="btn-primary px-3 py-1.5 text-xs">Ask tri.ai</Link>
           <AccountMenu
             avatarUrl={account.avatarUrl}

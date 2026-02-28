@@ -14,11 +14,6 @@ type Profile = {
   race_name: string | null;
 };
 
-type Session = {
-  date: string;
-  duration_minutes: number | null;
-  status: "planned" | "completed" | "skipped";
-};
 
 type TrainingWeek = {
   week_index: number;
@@ -41,11 +36,6 @@ function getMonday(date = new Date()) {
   return monday;
 }
 
-function addDays(isoDate: string, days: number) {
-  const date = new Date(`${isoDate}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -63,29 +53,20 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const initials = getInitials(displayName);
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
-  const currentWeekEnd = addDays(currentWeekStart, 7);
   const activePlanId = profile?.active_plan_id ?? null;
 
-  const [{ data: weekData }, { data: sessionsData }] = activePlanId
-    ? await Promise.all([
-        supabase
-          .from("training_weeks")
-          .select("week_index,focus,week_start_date,target_minutes")
-          .eq("plan_id", activePlanId)
-          .lte("week_start_date", currentWeekStart)
-          .order("week_start_date", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase.from("sessions").select("date,duration_minutes,status").eq("plan_id", activePlanId).gte("date", currentWeekStart).lt("date", currentWeekEnd)
-      ])
-    : [{ data: null }, { data: [] }];
+  const { data: weekData } = activePlanId
+    ? await supabase
+        .from("training_weeks")
+        .select("week_index,focus,week_start_date,target_minutes")
+        .eq("plan_id", activePlanId)
+        .lte("week_start_date", currentWeekStart)
+        .order("week_start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   const weekContext = (weekData ?? null) as TrainingWeek | null;
-  const sessions = (sessionsData ?? []) as Session[];
-  const plannedMinutes = sessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-  const completedMinutes = sessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-  const completionRate = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0;
-
   const raceName = profile?.race_name?.trim() || "Target race";
   const daysToRace = profile?.race_date
     ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -96,7 +77,6 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       <GlobalHeader
         raceName={raceName}
         daysToRace={daysToRace}
-        weekCompletion={completionRate}
         account={{
           avatarUrl: profile?.avatar_url ?? null,
           initials,
