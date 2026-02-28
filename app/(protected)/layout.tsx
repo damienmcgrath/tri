@@ -82,9 +82,6 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   const weekContext = (weekData ?? null) as TrainingWeek | null;
   const sessions = (sessionsData ?? []) as Session[];
-  const plannedMinutes = sessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-  const completedMinutes = sessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-  const completionRate = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0;
 
   const raceName = profile?.race_name?.trim() || "Target race";
   const daysToRace = profile?.race_date
@@ -96,7 +93,6 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       <GlobalHeader
         raceName={raceName}
         daysToRace={daysToRace}
-        weekCompletion={completionRate}
         account={{
           avatarUrl: profile?.avatar_url ?? null,
           initials,

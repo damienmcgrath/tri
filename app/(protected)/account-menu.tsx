@@ -22,12 +22,12 @@ export function AccountMenu({ avatarUrl, initials, displayName, email, signOutAc
 
   return (
     <details className="group relative" ref={detailsRef}>
-      <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-0.5 transition hover:border-cyan-400/50">
+      <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[hsl(var(--ai-accent-core)/0.45)] bg-[hsl(var(--surface-2))] p-0.5 shadow-[0_0_0_1px_hsl(var(--bg-elevated))] transition hover:border-[hsl(var(--ai-accent-core)/0.65)] hover:bg-[hsl(var(--bg-card))]">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="User avatar" className="h-9 w-9 rounded-full object-cover" />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-200">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--ai-accent-core)/0.2)] text-xs font-semibold text-[hsl(var(--ai-accent-core))]">
             {initials}
           </span>
         )}
