@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "../page-header";
 import { PlanEditor } from "./plan-editor";
 
 type Plan = {
@@ -34,6 +34,7 @@ type Session = {
   distance_value: number | null;
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
+  is_key?: boolean | null;
 };
 
 function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
@@ -50,56 +51,26 @@ function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: str
   });
 }
 
-
 function isMissingTableError(error: { code?: string; message?: string } | null, tableName: string) {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === "PGRST205") {
-    return true;
-  }
-
+  if (!error) return false;
+  if (error.code === "PGRST205") return true;
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-function isMissingColumnError(error: { code?: string; message?: string } | null, columnName: string) {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === "42703") {
-    return true;
-  }
-
-  return (error.message ?? "").toLowerCase().includes(columnName.toLowerCase());
-}
-
-export default async function PlanPage({
-  searchParams
-}: {
-  searchParams?: {
-    plan?: string;
-  };
-}) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string } }) {
   const supabase = await createClient();
-
   const {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const { data: plansData, error: plansError } = await supabase
     .from("training_plans")
     .select("id,name,start_date,duration_weeks")
     .order("start_date", { ascending: false });
 
-  if (plansError) {
-    throw new Error(plansError.message);
-  }
+  if (plansError) throw new Error(plansError.message);
 
   const plans = (plansData ?? []) as Plan[];
   const selectedPlan = plans.find((plan) => plan.id === searchParams?.plan) ?? plans[0];
@@ -129,9 +100,7 @@ export default async function PlanPage({
       ignoreDuplicates: true
     });
 
-    if (seedWeeksError) {
-      throw new Error(seedWeeksError.message);
-    }
+    if (seedWeeksError) throw new Error(seedWeeksError.message);
 
     const { data: seededWeeksData, error: seededWeeksFetchError } = await supabase
       .from("training_weeks")
@@ -139,10 +108,7 @@ export default async function PlanPage({
       .eq("plan_id", selectedPlan.id)
       .order("week_index", { ascending: true });
 
-    if (seededWeeksFetchError) {
-      throw new Error(seededWeeksFetchError.message);
-    }
-
+    if (seededWeeksFetchError) throw new Error(seededWeeksFetchError.message);
     weeksData = (seededWeeksData ?? []) as TrainingWeek[];
   }
 
@@ -151,7 +117,7 @@ export default async function PlanPage({
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status")
+      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
@@ -181,15 +147,7 @@ export default async function PlanPage({
         throw new Error(legacy.error.message);
       }
 
-      sessionsData = ((legacy.data ?? []) as Array<{
-        id: string;
-        plan_id: string;
-        date: string;
-        sport: string;
-        type: string;
-        duration: number;
-        notes: string | null;
-      }>).map((session) => ({
+      sessionsData = ((legacy.data ?? []) as Array<{ id: string; plan_id: string; date: string; sport: string; type: string; duration: number; notes: string | null }>).map((session) => ({
         id: session.id,
         plan_id: session.plan_id,
         week_id: "",
@@ -202,7 +160,8 @@ export default async function PlanPage({
         notes: session.notes,
         distance_value: null,
         distance_unit: null,
-        status: "planned"
+        status: "planned",
+        is_key: false
       }));
     } else if (primaryError) {
       throw new Error(primaryError.message);
@@ -211,66 +170,14 @@ export default async function PlanPage({
     }
   }
 
-  const totalPlannedMinutes = sessionsData.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-  const completeSessions = sessionsData.filter((session) => session.status === "completed").length;
-  const nextSession = sessionsData.find((session) => session.status === "planned") ?? null;
-
   return (
-    <section className="plan-editor-motion-lock space-y-4">
-      <PageHeader
-        title="Plan"
-        objective="Shape your training blocks, tune week intent, and publish sessions that keep race-day goals realistic."
-        actions={[
-          { href: "/calendar", label: "Review week" },
-          { href: "/dashboard", label: "Back to dashboard", variant: "secondary" }
-        ]}
-      />
-
-      <div className="priority-layout">
-        <article className="priority-card-primary">
-          <p className="priority-kicker">Today&apos;s priority session</p>
-          <h2 className="priority-title">Build the next session your athlete needs.</h2>
-          <p className="priority-subtitle">Keep today&apos;s key workout clear, specific, and realistic to execute.</p>
-          <p className="mt-3 text-sm text-muted">
-            {nextSession ? `Next up: ${nextSession.type} (${nextSession.duration_minutes} min).` : "No planned session yet. Add one now to set direction."}
-          </p>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">On track this week</p>
-          <h2 className="priority-title">Audit confidence before you publish.</h2>
-          <p className="priority-subtitle">Ensure volume and completion trend match your current race objective.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Weeks mapped</p>
-              <p className="mt-1 text-lg font-semibold">{weeksData.length}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Sessions planned</p>
-              <p className="mt-1 text-lg font-semibold">{sessionsData.length}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Completed sessions</p>
-              <p className="mt-1 text-lg font-semibold">{completeSessions}</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="priority-card-secondary">
-          <p className="priority-kicker">Supporting analytics</p>
-          <h2 className="priority-title">Check volume and plan coverage.</h2>
-          <p className="priority-subtitle">Use supporting signals to keep structure balanced and actionable.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Total planned minutes</p>
-              <p className="mt-1 text-lg font-semibold">{totalPlannedMinutes}</p>
-            </div>
-            <div className="priority-card-supporting">
-              <p className="text-xs text-muted">Active plan</p>
-              <p className="mt-1 text-sm font-semibold">{selectedPlan?.name ?? "No active plan selected"}</p>
-            </div>
-          </div>
-        </article>
+    <section className="plan-editor-motion-lock space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div>
+          <h1 className="text-lg font-semibold">Plan</h1>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Week Schedule</p>
+        </div>
+        <Link href="/plan/builder" className="btn-secondary px-3 py-1.5 text-xs">Plan settings</Link>
       </div>
 
       <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
