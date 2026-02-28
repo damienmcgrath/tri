@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col p-6 md:flex-row md:gap-8">
       <aside className="mb-6 rounded-2xl bg-slateBlue p-5 text-white md:mb-0 md:w-64">
-        <h1 className="text-xl font-semibold tracking-tight">TriCoach AI</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Tri.AI</h1>
         <p className="mt-1 text-sm text-blue-100">Week 1 foundation build</p>
         <nav className="mt-6 space-y-2">
           {navItems.map((item) => (

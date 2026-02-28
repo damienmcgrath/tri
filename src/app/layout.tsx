@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TriCoach AI",
+  title: "Tri.AI",
   description: "Training plan and AI coaching companion for triathletes."
 };
 
