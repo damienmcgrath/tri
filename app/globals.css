@@ -142,7 +142,7 @@
 
 
   .shell-header {
-    @apply relative overflow-hidden;
+    @apply relative z-30 overflow-visible;
   }
 
   .shell-header::before {
