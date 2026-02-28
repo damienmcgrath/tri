@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { SessionStatusChip } from "@/lib/ui/status-chip";
-import { markSkippedAction, moveSessionAction } from "./actions";
 import { WeekProgressCard } from "./week-progress-card";
 import { StatusStrip } from "../status-strip";
 import { DetailsAccordion } from "../details-accordion";
@@ -228,27 +226,18 @@ export default async function DashboardPage({
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const nextPendingTodaySession = todaySessions.find((session) => session.status === "planned") ?? null;
 
-  const minuteMetrics = computeWeekMinuteTotals(
-    sessions.map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      durationMinutes: session.duration_minutes ?? 0,
-      status: session.status,
-      isKey: session.is_key
-    }))
-  );
+  const weekMetricSessions = sessions.map((session) => ({
+    id: session.id,
+    date: session.date,
+    sport: session.sport,
+    durationMinutes: session.duration_minutes ?? 0,
+    status: session.status,
+    isKey: session.is_key
+  }));
+
+  const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const countMetrics = computeWeekSessionCounts(
-    sessions.map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      durationMinutes: session.duration_minutes ?? 0,
-      status: session.status,
-      isKey: session.is_key
-    }))
-  );
+  const countMetrics = computeWeekSessionCounts(weekMetricSessions);
   const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
   const progressBySport = sports.map((sport) => {
@@ -279,26 +268,9 @@ export default async function DashboardPage({
     .sort((a, b) => (b.duration_minutes ?? 0) - (a.duration_minutes ?? 0))[0];
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
-  const focusText = keyTodaySession
-    ? `Prioritize ${getDisciplineMeta(keyTodaySession.sport).label.toLowerCase()} ${keyTodaySession.type.toLowerCase()} (${keyTodaySession.duration_minutes} min) today.`
-    : biggestGap && biggestGap.planned > 0
-      ? `Your biggest weekly gap is ${getDisciplineMeta(biggestGap.sport).label} (${biggestGap.completed}/${biggestGap.planned} min).`
-      : "Start with one short session today to establish execution rhythm.";
-
-
   const keyRemainingIds = new Set(
-    getKeySessionsRemaining(
-      sessions.map((session) => ({
-        id: session.id,
-        date: session.date,
-        sport: session.sport,
-        durationMinutes: session.duration_minutes ?? 0,
-        status: session.status,
-        isKey: session.is_key
-      })),
-      todayIso
-    )
-      .slice(0, 4)
+    getKeySessionsRemaining(weekMetricSessions, todayIso)
+      .slice(0, 3)
       .map((session) => session.id)
   );
 
@@ -319,16 +291,15 @@ export default async function DashboardPage({
   );
 
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
-  const previousCompletionPct = previousWeekTotals.planned > 0 ? Math.round((previousWeekTotals.completed / previousWeekTotals.planned) * 100) : 0;
-  const completionDelta = completionPct - previousCompletionPct;
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
-  const remainingMinutesDelta = remainingMinutes - Math.max(previousWeekTotals.planned - previousWeekTotals.completed, 0);
-  const fatigueState = completionPct >= 85 ? "Controlled" : completionPct >= 60 ? "Balanced" : "Accumulating";
-  const confidenceLabel = completionPct >= 85 ? "High" : completionPct >= 60 ? "Building" : "Low";
-  const completionTrend = completionDelta > 2 ? "↑" : completionDelta < -2 ? "↓" : "→";
-  const loadTrend = remainingMinutesDelta < -20 ? "↓" : remainingMinutesDelta > 20 ? "↑" : "→";
-  const fatigueTrend = completionPct >= 85 ? "↓" : completionPct >= 60 ? "→" : "↑";
-  const confidenceTrend = completionDelta > 2 ? "↑" : completionDelta < -2 ? "↓" : "→";
+  const fatigueState = completionPct >= 85 ? "Ready" : completionPct >= 60 ? "Balanced" : "Needs focus";
+  const keyRemainingCount = weekMetricSessions.filter((session) => session.isKey && session.status === "planned").length;
+  const overdueKeySession = sessions
+    .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
+  const weeklyFocusText = biggestGap && biggestGap.planned > biggestGap.completed
+    ? `Close your ${biggestGap.label} gap (+${biggestGap.planned - biggestGap.completed}m) by adding 2 × 30–45m easy ${biggestGap.label.toLowerCase()} sessions.`
+    : "Protect consistency this week with short, low-friction sessions on open days.";
 
 
   if (!hasActivePlan && !hasAnyPlan) {
@@ -354,25 +325,47 @@ export default async function DashboardPage({
     <section className="space-y-4">
       <div className="space-y-4">
         <article className="priority-card-primary">
-          <p className="priority-kicker">Weekly coaching takeaway</p>
-          <h1 className="priority-title">{hasWeekSessions ? focusText : "Set one key workout and execute it."}</h1>
-          <p className="priority-subtitle">
-            {hasWeekSessions
-              ? "Keep execution tight this week and protect recovery on non-key days."
-              : "Add sessions for this week so your next best workout is always clear."}
-          </p>
+          <p className="priority-kicker">Next action</p>
+          {nextPendingTodaySession ? (
+            <>
+              <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
+              <p className="priority-subtitle">
+                {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
+                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
+              </p>
+              <p className="mt-2 text-sm text-muted">Why today matters: Consistent execution today protects the quality of your key sessions later this week.</p>
+            </>
+          ) : overdueKeySession ? (
+            <>
+              <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
+              <p className="priority-subtitle">Reschedule now to protect the week&apos;s intent.</p>
+            </>
+          ) : (
+            <>
+              <h1 className="priority-title">No session planned today</h1>
+              <p className="priority-subtitle">Keep momentum by pulling one session forward.</p>
+              {biggestGap && biggestGap.planned > biggestGap.completed ? (
+                <p className="mt-2 text-sm text-muted">Suggestion: add 30–45m easy {biggestGap.label.toLowerCase()} to close your {biggestGap.label.toLowerCase()} gap.</p>
+              ) : null}
+            </>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
-            {hasWeekSessions ? (
+            {nextPendingTodaySession ? (
               <>
-                <Link href={nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
-                  Open next session
+                <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">
+                  Open session
                 </Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Log completed work</Link>
+                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View in calendar</Link>
+              </>
+            ) : overdueKeySession ? (
+              <>
+                <Link href={`/calendar?focus=${overdueKeySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Reschedule in calendar</Link>
+                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Skip and adjust week</Link>
               </>
             ) : (
               <>
-                <Link href="/plan" className="btn-primary">Add session</Link>
-                <Link href="/plan" className="btn-secondary">Duplicate last week</Link>
+                <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Open calendar</Link>
+                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Why no session?</Link>
               </>
             )}
           </div>
@@ -380,59 +373,50 @@ export default async function DashboardPage({
 
         <StatusStrip
           items={[
-            { label: "Completion", value: `${completionPct}%`, hint: `${completionTrend} ${completionDelta >= 0 ? `+${completionDelta}` : completionDelta} pts` },
-            { label: "Planned", value: `${countMetrics.plannedTotalCount} sessions`, hint: `${countMetrics.plannedRemainingCount} remaining` },
-            { label: "Fatigue", value: fatigueState, hint: fatigueTrend },
-            { label: "Confidence", value: confidenceLabel, hint: confidenceTrend }
+            { label: "Week completion", value: `${completionPct}%`, hint: `${toHoursAndMinutes(totals.completed)} / ${toHoursAndMinutes(totals.planned)}` },
+            { label: "Remaining time", value: `${toHoursAndMinutes(remainingMinutes)} remaining`, hint: `${countMetrics.plannedRemainingCount} sessions left` },
+            { label: "Key sessions remaining", value: `${keyRemainingCount} key left`, hint: `${Math.max(keyRemainingCount - keySessionsRemaining.length, 0)} later this week` },
+            { label: "Fatigue/readiness", value: fatigueState, hint: "Current load" }
           ]}
         />
 
-        <div className="priority-layout">
-          <article className="priority-card-emphasis">
-            <p className="priority-kicker">Today&apos;s sessions</p>
-            <h2 className="priority-title">Execute high-impact work first.</h2>
-            <p className="priority-subtitle">{shortDateFormatter.format(new Date(`${todayIso}T00:00:00.000Z`))}</p>
-            {todaySessions.length === 0 ? (
-              <div className="surface-subtle mt-4 p-3 text-sm text-muted">
-                <p>No sessions for today.</p>
-                <Link href="/calendar" className="mt-2 inline-flex text-xs text-accent underline">Open calendar</Link>
+        <div className="space-y-4">
+          <article className="surface-subtle p-3">
+            <h2 className="mb-2 text-sm font-semibold text-muted">Key sessions remaining</h2>
+            {keySessionsRemaining.length === 0 ? (
+              <div className="space-y-2 text-sm text-muted">
+                <p>No key sessions remaining this week.</p>
+                {biggestGap && biggestGap.planned > biggestGap.completed ? (
+                  <p>Suggestion: add 30–45m easy {biggestGap.label.toLowerCase()} to close your {biggestGap.label.toLowerCase()} gap.</p>
+                ) : null}
+                <Link href="/calendar" className="inline-flex text-xs text-accent underline">Add session</Link>
               </div>
             ) : (
-              <ul className="mt-4 space-y-2">
-                {todaySessions.map((session) => {
-                  const discipline = getDisciplineMeta(session.sport);
-                  return (
-                    <li key={session.id} className="surface-subtle p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
-                          <p className="mt-1 text-sm font-medium">{session.type}</p>
-                          <p className="text-xs text-muted">{session.duration_minutes} min</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <SessionStatusChip status={session.status} />
-                          <details className="relative">
-                            <summary aria-label="Session actions" className="list-none cursor-pointer rounded-lg border border-[hsl(var(--border))] px-2 py-1 text-xs">⋯</summary>
-                            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-2">
-                              <form action={markSkippedAction}>
-                                <input type="hidden" name="sessionId" value={session.id} />
-                                <button className="w-full rounded-md px-2 py-1 text-left text-xs hover:bg-[hsl(var(--bg-card))]">Mark skipped</button>
-                              </form>
-                            </div>
-                          </details>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+              <ul className="space-y-2">
+                {keySessionsRemaining.map((session) => (
+                  <li key={session.id} className="flex items-center justify-between gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2">
+                    <p className="min-w-0 truncate text-sm font-medium">
+                      {weekdayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))} • {session.type} • {session.duration_minutes}m
+                    </p>
+                    <Link href={`/calendar?focus=${session.id}`} className="shrink-0 text-xs text-accent underline">Open</Link>
+                  </li>
+                ))}
               </ul>
             )}
           </article>
 
           <article className="priority-card-supporting">
-            <p className="priority-kicker">On track this week</p>
-            <h2 className="priority-title">Confirm your confidence trend.</h2>
-            <p className="priority-subtitle">Check completion pace and close the largest discipline gap before week end.</p>
+            <p className="priority-kicker">This week&apos;s focus</p>
+            <h2 className="priority-title">{weeklyFocusText}</h2>
+            <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
+            <div className="mt-4">
+              <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Add suggested sessions</Link>
+            </div>
+          </article>
+
+          <article className="priority-card-supporting">
+            <p className="priority-kicker">Week progress</p>
+            <h2 className="priority-title">On-track signal by discipline.</h2>
             <div className="mt-4">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
@@ -485,27 +469,6 @@ export default async function DashboardPage({
             </div>
           </DetailsAccordion>
 
-          <article className="surface-subtle p-3">
-            <h2 className="mb-2 text-sm font-semibold text-muted">Key sessions remaining</h2>
-            {keySessionsRemaining.length === 0 ? (
-              <p className="text-sm text-muted">No key sessions remaining. Keep consistency by protecting recovery and showing up for planned sessions.</p>
-            ) : (
-              <ul className="space-y-2">
-                {keySessionsRemaining.map((session) => (
-                  <li key={session.id} className="flex items-center justify-between gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.12em] text-muted">{weekdayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
-                      <p className="truncate text-sm font-medium">{session.type}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold">{session.duration_minutes}m</p>
-                      <Link href={`/calendar?focus=${session.id}`} className="text-xs text-accent underline">Open</Link>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
         </div>
       </div>
     </section>

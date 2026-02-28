@@ -65,8 +65,7 @@ export function WeekProgressCard({
   const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.plannedMinutes > 0) : disciplineRows;
   const biggestGap = [...disciplineRows].sort((a, b) => b.discGapMinutes - a.discGapMinutes)[0];
 
-  const chipLabel =
-    remainingMinutes > 0 ? `${formatMinutes(remainingMinutes)} left` : remainingMinutes === 0 ? "On target" : `+${formatMinutes(Math.abs(remainingMinutes))} over`;
+  const chipLabel = remainingMinutes > 0 ? "Behind plan" : remainingMinutes === 0 ? "On target" : "Ahead of plan";
 
   return (
     <article className="surface p-6">
