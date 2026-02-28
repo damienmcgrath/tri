@@ -4,17 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", semanticLabel: "Overview" },
-  { href: "/plan", label: "Plan", semanticLabel: "Design" },
-  { href: "/calendar", label: "Calendar", semanticLabel: "Execution" },
-  { href: "/coach", label: "Coach", semanticLabel: "Adaptation" }
+  { href: "/dashboard", label: "Dashboard", semanticLabel: "Overview", icon: "◧" },
+  { href: "/plan", label: "Plan", semanticLabel: "Design", icon: "▦" },
+  { href: "/calendar", label: "Calendar", semanticLabel: "Execution", icon: "◫" },
+  { href: "/coach", label: "Coach", semanticLabel: "Adaptation", icon: "◎" }
 ];
 
-export function ShellNavRail() {
+export function ShellNavRail({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav className="space-y-1">
+    <nav className={compact ? "flex flex-col gap-2" : "space-y-1"}>
       {navItems.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
@@ -22,14 +22,20 @@ export function ShellNavRail() {
             key={item.href}
             href={item.href}
             title={`${item.label} · ${item.semanticLabel}`}
-            className={`block rounded-xl px-3 py-2 text-sm transition ${
+            className={`rounded-xl px-3 py-2 text-sm transition ${
               active
                 ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))] ring-1 ring-[hsl(var(--accent-performance)/0.45)]"
                 : "text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
-            }`}
+            } ${compact ? "flex items-center justify-center" : "block"}`}
           >
-            <span className="block font-medium">{item.label}</span>
-            <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">{item.semanticLabel}</span>
+            {compact ? (
+              <span aria-hidden="true" className="text-base">{item.icon}</span>
+            ) : (
+              <>
+                <span className="block font-medium">{item.label}</span>
+                <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">{item.semanticLabel}</span>
+              </>
+            )}
           </Link>
         );
       })}

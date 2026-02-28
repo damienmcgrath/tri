@@ -35,7 +35,8 @@ const createSessionSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
   distanceValue: z.union([z.literal(""), z.coerce.number().positive()]).optional(),
   distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional(),
-  dayOrder: z.coerce.number().int().min(0).max(100).optional()
+  dayOrder: z.coerce.number().int().min(0).max(100).optional(),
+  isKey: z.coerce.boolean().optional()
 });
 
 const updateSessionSchema = createSessionSchema.extend({
@@ -144,6 +145,7 @@ async function insertSessionWithCompat(
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
+  delete withoutOptionalColumns.is_key;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -170,6 +172,7 @@ async function updateSessionWithCompat(
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
+  delete withoutOptionalColumns.is_key;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -196,6 +199,7 @@ async function insertSessionsBatchWithCompat(
     const next = { ...row };
     delete next.day_order;
     delete next.target;
+    delete next.is_key;
     return next;
   });
 
@@ -408,7 +412,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
 
   const sourceSessionsQuery = await supabase
     .from("sessions")
-    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,date,day_order")
+    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,is_key,date,day_order")
     .eq("week_id", sourceWeek.id)
     .order("date", { ascending: true });
 
@@ -418,7 +422,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
   if (sourceSessionsError && (isMissingColumnError(sourceSessionsError, "target") || isMissingColumnError(sourceSessionsError, "day_order"))) {
     const fallbackQuery = await supabase
       .from("sessions")
-      .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,date")
+      .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,is_key,date")
       .eq("week_id", sourceWeek.id)
       .order("date", { ascending: true });
 
@@ -602,7 +606,8 @@ export async function createSessionAction(formData: FormData) {
     notes: formData.get("notes"),
     distanceValue: formData.get("distanceValue"),
     distanceUnit: formData.get("distanceUnit"),
-    dayOrder: formData.get("dayOrder")
+    dayOrder: formData.get("dayOrder"),
+    isKey: formData.get("isKey")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -633,7 +638,8 @@ export async function createSessionAction(formData: FormData) {
     notes: parsed.notes ?? null,
     distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
     distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
-    status: "planned"
+    status: "planned",
+    is_key: Boolean(parsed.isKey)
   };
 
   await insertSessionWithCompat(supabase, canonicalPayload);
@@ -654,7 +660,8 @@ export async function updateSessionAction(formData: FormData) {
     notes: formData.get("notes"),
     distanceValue: formData.get("distanceValue"),
     distanceUnit: formData.get("distanceUnit"),
-    status: formData.get("status")
+    status: formData.get("status"),
+    isKey: formData.get("isKey")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -674,7 +681,8 @@ export async function updateSessionAction(formData: FormData) {
     distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
     duration_minutes: parsed.durationMinutes,
     status: parsed.status,
-    user_id: user.id
+    user_id: user.id,
+    is_key: Boolean(parsed.isKey)
   };
 
   await updateSessionWithCompat(supabase, parsed.sessionId, canonicalPayload);

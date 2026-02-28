@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -44,6 +43,7 @@ type CalendarSession = {
   linkedActivityCount?: number;
   linkedStats?: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
   unassignedSameDayCount?: number;
+  is_key?: boolean;
 };
 
 type WeekDay = { iso: string; weekday: string; label: string };
@@ -97,15 +97,27 @@ function completedDuration(session: CalendarSession) {
 export function WeekCalendar({
   weekDays,
   sessions,
-  weekStart,
-  isCurrentWeek,
-  raceCountdown
+  executionLabel,
+  executionSubtext,
+  completedCount,
+  plannedTotalCount,
+  skippedCount,
+  plannedRemainingCount,
+  plannedMinutes,
+  completedMinutes,
+  remainingMinutes
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
-  weekStart: string;
-  isCurrentWeek: boolean;
-  raceCountdown: number | null;
+  executionLabel: string;
+  executionSubtext?: string;
+  completedCount: number;
+  plannedTotalCount: number;
+  skippedCount: number;
+  plannedRemainingCount: number;
+  plannedMinutes: number;
+  completedMinutes: number;
+  remainingMinutes: number;
 }) {
   const router = useRouter();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
@@ -164,11 +176,6 @@ export function WeekCalendar({
     }, {});
   }, [orderByDay, sessionsById, sportFilter, statusFilter, weekDays]);
 
-  const totals = useMemo(() => {
-    const planned = localSessions.reduce((sum, session) => sum + session.duration, 0);
-    const completed = localSessions.reduce((sum, session) => sum + completedDuration(session), 0);
-    return { planned, completed, remaining: Math.max(planned - completed, 0) };
-  }, [localSessions]);
 
   const progressBySport = useMemo(
     () =>
@@ -181,6 +188,7 @@ export function WeekCalendar({
       }),
     [localSessions]
   );
+
   const maxSportMinutes = Math.max(...progressBySport.map((item) => item.planned), 1);
 
   const sensors = useSensors(
@@ -190,14 +198,6 @@ export function WeekCalendar({
   );
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const prevWeek = new Date(`${weekStart}T00:00:00.000Z`);
-  prevWeek.setUTCDate(prevWeek.getUTCDate() - 7);
-  const nextWeek = new Date(`${weekStart}T00:00:00.000Z`);
-  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-
-  function weekLink(iso: string) {
-    return `/calendar?weekStart=${iso}`;
-  }
 
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -333,19 +333,29 @@ export function WeekCalendar({
   }
 
   return (
-    <section className="space-y-4">
-      <header className="surface sticky top-2 z-20 space-y-3 px-4 py-3 backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}</p>
-            <p className="text-sm font-semibold">
-              {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={weekLink(prevWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Prev week</Link>
-            <Link href="/calendar" className={`btn-secondary px-3 py-1.5 text-xs ${isCurrentWeek ? "border-[hsl(var(--accent-performance)/0.45)]" : ""}`}>Current week</Link>
-            <Link href={weekLink(nextWeek.toISOString().slice(0, 10))} className="btn-secondary px-3 py-1.5 text-xs">Next week</Link>
+    <section className="space-y-3">
+      <div className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{executionLabel}</p>
+          {executionSubtext ? <p className="truncate text-xs text-muted">{executionSubtext}</p> : null}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="signal-chip signal-ready">Completed {completedCount}</span>
+          <span className="signal-chip signal-load">Planned {plannedTotalCount}</span>
+          <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
+        </div>
+      </div>
+
+      <header className="surface-subtle space-y-2 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <div className="flex items-center gap-2">
+            <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
+              <option value="all">All statuses</option>
+              <option value="planned">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="skipped">Missed</option>
+            </select>
             <button
               className="btn-primary px-3 py-1.5 text-xs"
               onClick={() =>
@@ -357,13 +367,10 @@ export function WeekCalendar({
             >
               Add session
             </button>
-            {raceCountdown !== null ? (
-              <span className="rounded-full border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.12)] px-3 py-1 text-xs font-medium text-accent">Race in {raceCountdown}d</span>
-            ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max items-center gap-2">
             {(["all", "swim", "bike", "run", "strength"] as const).map((item) => (
               <button
                 key={item}
@@ -374,22 +381,18 @@ export function WeekCalendar({
               </button>
             ))}
           </div>
-          <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
-            <option value="all">All statuses</option>
-            <option value="planned">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="skipped">Missed</option>
-          </select>
         </div>
       </header>
 
-      <article className="surface px-4 py-3">
-        <div className="grid gap-2 md:grid-cols-6">
-          <div className="surface-subtle p-3 md:col-span-2">
+      <details className="surface-subtle px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-accent">Summary <span className="ml-2 text-xs text-muted">Completed {completedMinutes} / {plannedMinutes} min • {remainingMinutes} remaining</span></summary>
+        <div className="mt-3 grid gap-2 lg:grid-cols-6">
+          <div className="surface-subtle p-3 lg:col-span-2">
             <p className="text-xs uppercase tracking-wide text-muted">Week volume</p>
-            <p className="mt-1 text-lg font-semibold">Completed {totals.completed} / {totals.planned} min</p>
-            <p className="text-xs text-muted">{formatMinutes(totals.completed)} / {formatMinutes(totals.planned)} • {totals.remaining} min remaining</p>
+            <p className="mt-1 text-lg font-semibold">Completed {completedMinutes} / {plannedMinutes} min</p>
+            <p className="text-xs text-muted">{formatMinutes(completedMinutes)} / {formatMinutes(plannedMinutes)} • {remainingMinutes} min remaining</p>
           </div>
+          <div className="surface-subtle p-3"><p className="text-xs text-muted">Remaining sessions: {plannedRemainingCount}</p></div>
           {progressBySport.map((item) => {
             const discipline = getDisciplineMeta(item.sport);
             const targetRatio = Math.min(100, (item.planned / maxSportMinutes) * 100);
@@ -406,10 +409,11 @@ export function WeekCalendar({
             );
           })}
         </div>
-      </article>
+      </details>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+        <div className="overflow-x-auto">
+        <article className="grid min-w-[1260px] grid-cols-7 gap-3">
           {weekDays.map((day) => {
             const ids = filteredIdsByDay[day.iso] ?? [];
             const visibleIds = expandedDays[day.iso] ? ids : ids.slice(0, 2);
@@ -478,6 +482,7 @@ export function WeekCalendar({
             );
           })}
         </article>
+        </div>
       </DndContext>
 
       {activeId ? <p className="text-[11px] text-accent/80">Drag a session to another day to reschedule.</p> : null}
@@ -706,6 +711,7 @@ function SortableSessionCard({
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
             <SessionStatusChip status={session.status} compact />
+            {session.is_key ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] px-2 py-0.5 text-[10px] font-semibold text-accent">Key</span> : null}
           </div>
           <div className="flex items-center gap-1.5">
             <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
@@ -717,7 +723,14 @@ function SortableSessionCard({
           <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
           {session.linkedActivityCount ? (
             <p className="mt-1 text-xs text-[hsl(var(--signal-ready))]">
-              Completed ✓ {session.linkedStats?.durationMin ?? 0}m{session.linkedStats?.distanceKm ? ` · ${session.linkedStats.distanceKm.toFixed(1)} km` : ""}
+              Completed ✓ {(() => {
+                const duration = session.linkedStats?.durationMin ?? session.duration;
+                const distance = session.linkedStats?.distanceKm;
+                const power = session.linkedStats?.avgPower;
+                if (session.sport === "bike") return `${duration}m${power ? ` · ${Math.round(power)}w` : ""}`;
+                if (session.sport === "run" || session.sport === "swim") return `${duration}m${distance ? ` · ${distance.toFixed(1)} km` : ""}`;
+                return `${duration}m`;
+              })()}
             </p>
           ) : session.unassignedSameDayCount ? (
             <p className="mt-1 text-xs text-[hsl(var(--signal-load))]">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
