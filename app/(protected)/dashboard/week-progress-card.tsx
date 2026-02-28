@@ -16,13 +16,6 @@ type WeekProgressCardProps = {
   disciplines: Discipline[];
 };
 
-function toHoursAndMinutes(minutes: number) {
-  const safeMinutes = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(safeMinutes / 60);
-  const mins = safeMinutes % 60;
-  return `${hours}h ${mins}m`;
-}
-
 function formatMinutes(minutes: number) {
   return `${Math.max(0, Math.round(minutes))}m`;
 }
@@ -37,11 +30,7 @@ export function WeekProgressCard({
   const [hideEmpty, setHideEmpty] = useState(true);
 
   const remainingMinutes = plannedTotalMinutes - completedTotalMinutes;
-  const percentComplete = plannedTotalMinutes > 0 ? completedTotalMinutes / plannedTotalMinutes : 0;
-  const percentCapped = Math.min(percentComplete, 1);
   const overMinutes = Math.max(completedTotalMinutes - plannedTotalMinutes, 0);
-  const percentLabel = `${Math.round(percentCapped * 100)}%`;
-  const hasNoPlannedSessions = plannedTotalMinutes === 0;
 
   const disciplineRows = useMemo(
     () =>
@@ -71,38 +60,13 @@ export function WeekProgressCard({
     <article className="surface p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Week Progress</h2>
-      </div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
-        <div
-          className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]"
-          aria-label={`Overall progress ${Math.round(completedTotalMinutes)} of ${Math.round(plannedTotalMinutes)} minutes, ${Math.round(percentCapped * 100)}%`}
-          role="img"
-        >
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: `conic-gradient(hsl(var(--signal-recovery) / 0.72) ${percentCapped * 360}deg, hsl(var(--surface-2)) 0deg)`
-            }}
-          />
-          <div className="relative flex h-[62px] w-[62px] flex-col items-center justify-center rounded-full bg-[hsl(var(--surface-1))] text-center">
-            <span className="text-lg font-semibold leading-none">{percentLabel}</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-3xl font-bold leading-tight text-[hsl(var(--fg))]">{hasNoPlannedSessions ? "No planned sessions" : toHoursAndMinutes(completedTotalMinutes)}</p>
-          <p className="text-sm text-muted">{hasNoPlannedSessions ? "Schedule sessions to start tracking progress." : `of ${toHoursAndMinutes(plannedTotalMinutes)} planned`}</p>
-        </div>
-
         <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
           {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
           <span>{chipLabel}</span>
         </span>
       </div>
 
-
-      <div className="mt-5">
+      <div className="mt-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">By discipline</p>
           {emptyCount > 0 || !hideEmpty ? (

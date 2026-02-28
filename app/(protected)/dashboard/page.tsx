@@ -2,9 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
-import { StatusStrip } from "../status-strip";
+import { ProgressGlanceCard } from "./progress-glance-card";
 import { DetailsAccordion } from "../details-accordion";
-import { computeWeekMinuteTotals, computeWeekSessionCounts, getKeySessionsRemaining } from "@/lib/training/week-metrics";
+import { computeWeekMinuteTotals, getKeySessionsRemaining } from "@/lib/training/week-metrics";
 
 type Session = {
   id: string;
@@ -43,7 +43,6 @@ type Plan = {
 
 const sports = ["swim", "bike", "run", "strength"] as const;
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
@@ -105,8 +104,6 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const previousWeekStart = addDays(weekStart, -7);
-  const previousWeekEnd = weekStart;
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
@@ -157,15 +154,6 @@ export default async function DashboardPage({
     }
   }
 
-  const { data: previousWeekSessionsData } = activePlanId
-    ? await supabase
-        .from("sessions")
-        .select("id,duration_minutes,status")
-        .eq("plan_id", activePlanId)
-        .gte("date", previousWeekStart)
-        .lt("date", previousWeekEnd)
-    : { data: [] };
-
   const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, session) => {
     const key = `${session.date}:${session.sport}`;
     acc[key] = (acc[key] ?? 0) + 1;
@@ -203,26 +191,6 @@ export default async function DashboardPage({
   }));
 
   const hasActivePlan = Boolean(activePlanId);
-  const hasWeekSessions = sessions.length > 0;
-
-  const weekDays = Array.from({ length: 7 }).map((_, index) => {
-    const iso = addDays(weekStart, index);
-    const daySessions = sessions.filter((session) => session.date === iso);
-    const planned = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-    const completed = daySessions
-      .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
-
-    return {
-      iso,
-      weekday: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
-      day: shortDateFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
-      planned,
-      completed,
-      isToday: iso === todayIso,
-      sports: [...new Set(daySessions.map((session) => session.sport))]
-    };
-  });
-
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const nextPendingTodaySession = todaySessions.find((session) => session.status === "planned") ?? null;
 
@@ -237,7 +205,6 @@ export default async function DashboardPage({
 
   const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const countMetrics = computeWeekSessionCounts(weekMetricSessions);
   const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
   const progressBySport = sports.map((sport) => {
@@ -262,10 +229,6 @@ export default async function DashboardPage({
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
-
-  const keyTodaySession = [...todaySessions]
-    .filter((session) => session.status === "planned")
-    .sort((a, b) => (b.duration_minutes ?? 0) - (a.duration_minutes ?? 0))[0];
   const biggestGap = [...progressBySport].sort((a, b) => b.planned - b.completed - (a.planned - a.completed))[0];
 
   const keyRemainingIds = new Set(
@@ -277,26 +240,22 @@ export default async function DashboardPage({
   const keySessionsRemaining = sessions
     .filter((session) => keyRemainingIds.has(session.id))
     .sort((a, b) => a.date.localeCompare(b.date));
-  const previousWeekSessions = (previousWeekSessionsData ?? []) as Array<{ duration_minutes: number | null; status: Session["status"] }>;
-  const previousWeekTotals = previousWeekSessions.reduce(
-    (acc, session) => {
-      const minutes = session.duration_minutes ?? 0;
-      acc.planned += minutes;
-      if (session.status === "completed") {
-        acc.completed += minutes;
-      }
-      return acc;
-    },
-    { planned: 0, completed: 0 }
-  );
-
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
-  const fatigueState = completionPct >= 85 ? "Ready" : completionPct >= 60 ? "Balanced" : "Needs focus";
   const keyRemainingCount = weekMetricSessions.filter((session) => session.isKey && session.status === "planned").length;
+  const marginPct = 10;
+  const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
+  const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
+  const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
+  const progressStatus = completionPct > expectedByTodayPct + marginPct
+    ? "Ahead"
+    : completionPct < expectedByTodayPct - marginPct
+      ? "Behind plan"
+      : "On track";
   const overdueKeySession = sessions
     .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
+  const hasGapSuggestion = Boolean(biggestGap && biggestGap.planned > biggestGap.completed);
   const weeklyFocusText = biggestGap && biggestGap.planned > biggestGap.completed
     ? `Close your ${biggestGap.label} gap (+${biggestGap.planned - biggestGap.completed}m) by adding 2 × 30–45m easy ${biggestGap.label.toLowerCase()} sessions.`
     : "Protect consistency this week with short, low-friction sessions on open days.";
@@ -324,6 +283,15 @@ export default async function DashboardPage({
   return (
     <section className="space-y-4">
       <div className="space-y-4">
+        <ProgressGlanceCard
+          completionPct={completionPct}
+          completedTimeLabel={toHoursAndMinutes(totals.completed)}
+          plannedTimeLabel={toHoursAndMinutes(totals.planned)}
+          remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
+          statusLabel={progressStatus}
+          keyRemainingCount={keyRemainingCount}
+        />
+
         <article className="priority-card-primary">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
@@ -333,52 +301,46 @@ export default async function DashboardPage({
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
                 {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
               </p>
-              <p className="mt-2 text-sm text-muted">Why today matters: Consistent execution today protects the quality of your key sessions later this week.</p>
+              <p className="mt-1 text-sm text-muted">Why today matters: lock in today to keep your key-session quality intact.</p>
             </>
           ) : overdueKeySession ? (
             <>
               <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
-              <p className="priority-subtitle">Reschedule now to protect the week&apos;s intent.</p>
+              <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
             </>
           ) : (
             <>
               <h1 className="priority-title">No session planned today</h1>
-              <p className="priority-subtitle">Keep momentum by pulling one session forward.</p>
-              {biggestGap && biggestGap.planned > biggestGap.completed ? (
-                <p className="mt-2 text-sm text-muted">Suggestion: add 30–45m easy {biggestGap.label.toLowerCase()} to close your {biggestGap.label.toLowerCase()} gap.</p>
-              ) : null}
+              <p className="priority-subtitle">
+                Keep momentum by pulling one session forward
+                {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
+              </p>
             </>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {nextPendingTodaySession ? (
-              <>
-                <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">
-                  Open session
-                </Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View in calendar</Link>
-              </>
-            ) : overdueKeySession ? (
-              <>
-                <Link href={`/calendar?focus=${overdueKeySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Reschedule in calendar</Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Skip and adjust week</Link>
-              </>
-            ) : (
-              <>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {nextPendingTodaySession ? (
+                <>
+                  <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">
+                    Open session
+                  </Link>
+                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View in calendar</Link>
+                </>
+              ) : overdueKeySession ? (
+                <>
+                  <Link href={`/calendar?focus=${overdueKeySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Reschedule in calendar</Link>
+                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Skip and adjust week</Link>
+                </>
+              ) : null}
+              {!nextPendingTodaySession && !overdueKeySession ? (
                 <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Open calendar</Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Why no session?</Link>
-              </>
-            )}
+              ) : null}
+            </div>
+            {!nextPendingTodaySession && !overdueKeySession ? (
+              <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
+            ) : null}
           </div>
         </article>
-
-        <StatusStrip
-          items={[
-            { label: "Week completion", value: `${completionPct}%`, hint: `${toHoursAndMinutes(totals.completed)} / ${toHoursAndMinutes(totals.planned)}` },
-            { label: "Remaining time", value: `${toHoursAndMinutes(remainingMinutes)} remaining`, hint: `${countMetrics.plannedRemainingCount} sessions left` },
-            { label: "Key sessions remaining", value: `${keyRemainingCount} key left`, hint: `${Math.max(keyRemainingCount - keySessionsRemaining.length, 0)} later this week` },
-            { label: "Fatigue/readiness", value: fatigueState, hint: "Current load" }
-          ]}
-        />
 
         <div className="space-y-4">
           <article className="surface-subtle p-3">
@@ -386,8 +348,8 @@ export default async function DashboardPage({
             {keySessionsRemaining.length === 0 ? (
               <div className="space-y-2 text-sm text-muted">
                 <p>No key sessions remaining this week.</p>
-                {biggestGap && biggestGap.planned > biggestGap.completed ? (
-                  <p>Suggestion: add 30–45m easy {biggestGap.label.toLowerCase()} to close your {biggestGap.label.toLowerCase()} gap.</p>
+                {hasGapSuggestion ? (
+                  <p>If you want extra load, add one short aerobic {biggestGap!.label.toLowerCase()} session later in the week.</p>
                 ) : null}
                 <Link href="/calendar" className="inline-flex text-xs text-accent underline">Add session</Link>
               </div>
@@ -414,9 +376,9 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article className="priority-card-supporting">
+          <article id="week-progress-details" className="priority-card-supporting scroll-mt-20">
             <p className="priority-kicker">Week progress</p>
-            <h2 className="priority-title">On-track signal by discipline.</h2>
+            <h2 className="priority-title">Discipline breakdown and gaps.</h2>
             <div className="mt-4">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
