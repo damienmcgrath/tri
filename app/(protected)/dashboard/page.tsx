@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
-import { DetailsAccordion } from "../details-accordion";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 
 type Session = {
@@ -162,7 +161,6 @@ export default async function DashboardPage({
   const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null }>;
   const linkedActivityIds = new Set(links.map((item) => item.completed_activity_id));
   const linkedSessionIds = new Set(links.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
-  const unassignedUploads = uploadedActivities.filter((item) => !linkedActivityIds.has(item.id));
 
   const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
   const linkedMinutesBySession = links.reduce<Map<string, number>>((acc, link) => {
@@ -203,7 +201,6 @@ export default async function DashboardPage({
 
   const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const unassignedMinutes = unassignedUploads.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
   const progressBySport = sports.map((sport) => {
     const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
@@ -231,7 +228,6 @@ export default async function DashboardPage({
 
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
   const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
-  const keyRemainingCount = weekMetricSessions.filter((session) => session.isKey && session.status === "planned").length;
   const marginPct = 10;
   const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
   const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
@@ -278,7 +274,6 @@ export default async function DashboardPage({
           plannedTimeLabel={toHoursAndMinutes(totals.planned)}
           remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
           statusLabel={progressStatus}
-          keyRemainingCount={keyRemainingCount}
         />
 
         <article className="priority-card-primary">
@@ -358,43 +353,6 @@ export default async function DashboardPage({
               />
             </div>
           </article>
-
-          <DetailsAccordion title="Details">
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="priority-card-supporting">
-                <h3 className="text-sm font-semibold">Sport breakdown</h3>
-                <ul className="mt-2 space-y-2">
-                  {progressBySport.map((sport) => (
-                    <li key={sport.sport} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-medium">{sport.label}</span>
-                      <span className="text-muted">{sport.completed}/{sport.planned} min</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="priority-card-supporting">
-                <h3 className="text-sm font-semibold">Unmatched uploads</h3>
-                {unassignedUploads.length > 0 ? (
-                  <>
-                    <p className="mt-2 text-sm text-muted">
-                      {unassignedUploads.length} upload{unassignedUploads.length === 1 ? "" : "s"} still need matching ({unassignedMinutes} min).
-                    </p>
-                    <Link href="/settings/integrations" className="mt-2 inline-block text-xs text-accent underline">Match uploads now</Link>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {unassignedUploads.slice(0, 3).map((item) => (
-                        <Link key={item.id} href={`/activities/${item.id}`} className="rounded-full border border-[hsl(var(--border))] px-2 py-1">
-                          View {item.sport_type}
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-muted">Great job—every uploaded activity is already matched to your plan.</p>
-                )}
-              </div>
-            </div>
-          </DetailsAccordion>
 
         </div>
       </div>

@@ -6,7 +6,6 @@ type ProgressGlanceCardProps = {
   plannedTimeLabel: string;
   remainingTimeLabel: string;
   statusLabel: "Ahead" | "On track" | "Behind plan";
-  keyRemainingCount: number;
 };
 
 export function ProgressGlanceCard({
@@ -14,8 +13,7 @@ export function ProgressGlanceCard({
   completedTimeLabel,
   plannedTimeLabel,
   remainingTimeLabel,
-  statusLabel,
-  keyRemainingCount
+  statusLabel
 }: ProgressGlanceCardProps) {
   const ringPct = Math.max(0, Math.min(completionPct, 100));
   const statusClassName = statusLabel === "Ahead"
@@ -49,7 +47,6 @@ export function ProgressGlanceCard({
             <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
               {statusLabel}
             </span>
-            <p className="mt-1 text-[11px] text-muted">Key left: {keyRemainingCount}</p>
           </div>
         </div>
       </article>
