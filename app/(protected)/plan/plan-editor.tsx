@@ -18,9 +18,9 @@ import {
   useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ReactNode, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { ReactNode, UIEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { SessionStatusChip } from "@/lib/ui/status-chip";
 import {
   bulkReorderSessionsAction,
   createSessionAction,
@@ -141,10 +141,7 @@ function SortableSessionCard({ session, onOpen }: { session: Session; onOpen: (i
           ⋮⋮
         </span>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <SessionStatusChip status={session.status} />
-      </div>
-      <p className="mt-1 line-clamp-2 text-xs font-semibold">{session.type || "Session"}</p>
+      <p className="mt-2 line-clamp-2 text-xs font-semibold">{session.type || "Session"}</p>
       <p className="mt-1 text-xs text-muted">{session.duration_minutes} min</p>
     </button>
   );
@@ -161,6 +158,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
   const [isPending, startTransition] = useTransition();
   const [weekActionOpen, setWeekActionOpen] = useState(false);
   const [localSessions, setLocalSessions] = useState<Session[]>([]);
+  const [showDesktopScrollCue, setShowDesktopScrollCue] = useState(false);
+  const desktopGridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setLocalSessions(withNormalizedOrder(sessions.filter((session) => session.week_id === selectedWeek?.id)));
@@ -249,24 +248,47 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
   const duplicateTargets = planWeeks.filter((week) => week.id !== selectedWeek?.id);
 
+  const setDesktopCueFromElement = (element: HTMLDivElement) => {
+    const hasOverflow = element.scrollWidth - element.clientWidth > 8;
+    const isAtEnd = element.scrollLeft + element.clientWidth >= element.scrollWidth - 8;
+    setShowDesktopScrollCue(hasOverflow && !isAtEnd);
+  };
+
+  const updateDesktopScrollCue = (event: UIEvent<HTMLDivElement>) => {
+    setDesktopCueFromElement(event.currentTarget);
+  };
+
+  useEffect(() => {
+    if (!desktopGridRef.current) return;
+    setDesktopCueFromElement(desktopGridRef.current);
+  }, [selectedWeek?.id, weekSessions.length]);
+
   return (
     <section className="space-y-4">
       {selectedPlan && selectedWeek ? (
         <>
-          <div className="surface-subtle flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+          <div className="sticky top-0 z-20 border border-transparent bg-[hsl(var(--bg))/0.94] py-1 backdrop-blur supports-[backdrop-filter]:bg-[hsl(var(--bg))/0.9]">
+            <div className="surface-subtle flex flex-wrap items-center justify-between gap-3 border-[hsl(var(--border))] px-3 py-2 shadow-[0_8px_20px_-20px_rgba(0,0,0,0.9)]">
             <div>
               <p className="text-sm font-semibold">Week {selectedWeek.week_index} • {selectedWeek.focus} • {weekRangeLabel(selectedWeek.week_start_date)}</p>
               <p className="text-xs text-muted">Planned {totalMinutes} min • {selectedWeek.target_minutes ? `Target ${selectedWeek.target_minutes} min` : "Target unset"} • Focus {selectedWeek.focus}</p>
             </div>
             <div className="flex items-center gap-2">
               <button form="week-details-form" className="btn-primary px-3 py-1.5 text-xs">Save</button>
-              <button type="button" onClick={() => setWeekActionOpen((v) => !v)} aria-expanded={weekActionOpen} className="btn-secondary px-3 py-1.5 text-xs">Week actions</button>
+              <button type="button" onClick={() => setWeekActionOpen((v) => !v)} aria-expanded={weekActionOpen} className="btn-secondary px-3 py-1.5 text-xs">More</button>
             </div>
+          </div>
           </div>
 
           {weekActionOpen ? (
             <div className="surface-subtle p-3">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+                <div className="surface p-3 md:col-span-2 xl:col-span-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted">Plan level</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Link href="/plan/builder" className="btn-secondary px-3 py-1.5 text-xs">Plan settings…</Link>
+                  </div>
+                </div>
                 <form action={duplicateWeekForwardAction} className="space-y-2"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><label className="label-base">Duplicate to week</label><select name="destinationWeekId" className="input-base" required>{duplicateTargets.map((week) => <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>)}</select><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copyMetadata" defaultChecked /> Copy metadata</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copySessions" defaultChecked /> Copy sessions</label><button className="btn-secondary w-full text-xs">Duplicate</button></form>
                 <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by +7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="forward" /><button className="btn-secondary w-full text-xs">Shift +7d</button></form>
                 <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by -7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="backward" /><button className="btn-secondary w-full text-xs">Shift -7d</button></form>
@@ -328,28 +350,39 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
                 })}
               </div>
 
-              <div className="mt-3 hidden overflow-x-auto lg:block">
+              <div className="relative mt-3 hidden lg:block">
+                <div className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-8 rounded-r-xl bg-gradient-to-l from-[hsl(var(--bg-elevated))/0.95] via-[hsl(var(--bg-elevated))/0.55] to-transparent transition-opacity duration-150 ${showDesktopScrollCue ? "opacity-100" : "opacity-0"}`} />
+                <div className={`pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.92] px-2 py-0.5 text-[11px] text-muted transition-opacity duration-150 ${showDesktopScrollCue ? "opacity-100" : "opacity-0"}`}>Scroll →</div>
+                <div
+                  ref={desktopGridRef}
+                  className="overflow-x-auto pb-1"
+                  onScroll={updateDesktopScrollCue}
+                  onMouseEnter={() => {
+                    if (desktopGridRef.current) setDesktopCueFromElement(desktopGridRef.current);
+                  }}
+                >
                 <div className="grid min-w-[1260px] grid-cols-7 gap-3">
                   {weekDays.map((day) => {
                     const isExpanded = expandedDays[day.iso] ?? false;
                     const visible = isExpanded ? day.sessions : day.sessions.slice(0, 3);
                     const hiddenCount = Math.max(day.sessions.length - visible.length, 0);
                     return (
-                      <section key={day.iso} className="surface-subtle min-h-[320px] min-w-0 p-3" id={`day-${day.iso}`}>
+                      <section key={day.iso} className="surface-subtle flex min-h-[320px] min-w-[178px] flex-col p-3" id={`day-${day.iso}`}>
                         <div className="border-b border-[hsl(var(--border))] pb-2">
                           <p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p><p className="mt-1 text-xs text-muted">{day.totalMinutes} min</p>
                         </div>
                         <SortableContext items={day.sessions.map((session) => `session-${session.id}`)} strategy={rectSortingStrategy}>
-                          <DayDropZone iso={day.iso}><div className="mt-3 space-y-2" data-day={day.iso}>
+                          <DayDropZone iso={day.iso}><div className="mt-3 flex h-full flex-col gap-2" data-day={day.iso}>
                             {visible.map((session) => <SortableSessionCard key={session.id} session={session} onOpen={setActiveSessionId} />)}
                             {hiddenCount > 0 ? <button type="button" className="w-full text-xs text-accent" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>+{hiddenCount} more</button> : null}
                             {day.sessions.length > 3 && isExpanded ? <button type="button" className="w-full text-xs text-muted" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>Collapse</button> : null}
-                            <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-full rounded-lg border border-dashed border-[hsl(var(--accent-performance)/0.45)] px-2 py-1 text-xs text-accent">+ Add</button>
+                            <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-auto w-full rounded-lg border border-dashed border-[hsl(var(--accent-performance)/0.45)] px-2 py-1 text-xs text-accent">+ Add</button>
                           </div></DayDropZone>
                         </SortableContext>
                       </section>
                     );
                   })}
+                </div>
                 </div>
               </div>
               <DragOverlay>{isPending ? <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--bg-card))] px-3 py-2 text-xs">Updating…</div> : null}</DragOverlay>
@@ -358,7 +391,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         </>
       ) : (
         <article className="surface p-5">
-          <p className="text-sm text-muted">Create a plan from Plan settings to start building week schedules.</p>
+          <p className="text-sm text-muted">Create a plan from Manage plan to start building week schedules.</p>
         </article>
       )}
 

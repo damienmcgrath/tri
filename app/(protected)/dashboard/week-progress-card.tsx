@@ -23,10 +23,6 @@ function toHoursAndMinutes(minutes: number) {
   return `${hours}h ${mins}m`;
 }
 
-function formatMinutes(minutes: number) {
-  return `${Math.max(0, Math.round(minutes))}m`;
-}
-
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 export function WeekProgressCard({
@@ -65,8 +61,7 @@ export function WeekProgressCard({
   const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.plannedMinutes > 0) : disciplineRows;
   const biggestGap = [...disciplineRows].sort((a, b) => b.discGapMinutes - a.discGapMinutes)[0];
 
-  const chipLabel =
-    remainingMinutes > 0 ? `${formatMinutes(remainingMinutes)} left` : remainingMinutes === 0 ? "On target" : `+${formatMinutes(Math.abs(remainingMinutes))} over`;
+  const paceLabel = remainingMinutes > 0 ? "Needs focus" : remainingMinutes === 0 ? "On target" : "Over target";
 
   return (
     <article className="surface p-6">
@@ -98,7 +93,7 @@ export function WeekProgressCard({
 
         <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
           {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
-          <span>{chipLabel}</span>
+          <span>{paceLabel}</span>
         </span>
       </div>
 
@@ -123,7 +118,7 @@ export function WeekProgressCard({
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
-              const chipLabel = item.discGapMinutes > 0 ? `Gap ${formatMinutes(item.discGapMinutes)}` : item.discOverMinutes > 0 ? `+${formatMinutes(item.discOverMinutes)}` : null;
+              const chipLabel = item.discGapMinutes > 0 ? `Gap ${Math.round(item.discGapMinutes)}m` : item.discOverMinutes > 0 ? `+${Math.round(item.discOverMinutes)}m` : null;
               const overTailWidthPx = item.plannedMinutes > 0
                 ? clamp(Math.round((item.discOverMinutes / item.plannedMinutes) * 120), 6, 24)
                 : 0;
@@ -171,7 +166,7 @@ export function WeekProgressCard({
 
       <a href="#coach-focus" className="mt-4 inline-block text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
         {biggestGap && biggestGap.discGapMinutes > 0
-          ? `Focus: ${biggestGap.label} +${formatMinutes(biggestGap.discGapMinutes)} (tap for why)`
+          ? `Focus: ${biggestGap.label} +${Math.round(biggestGap.discGapMinutes)}m (tap for why)`
           : "Focus: On track (tap for details)"}
       </a>
     </article>
