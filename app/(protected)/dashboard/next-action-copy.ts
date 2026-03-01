@@ -38,7 +38,7 @@ export function getWhyTodayMattersCopy(state: NextActionState, session?: NextAct
   }
 
   if (state === NEXT_ACTION_STATE.SESSION_DONE_TODAY) {
-    return "Why today matters: today’s work is done—lean into recovery so tomorrow starts strong.";
+    return "Why today matters: you showed up today—recover well to reinforce consistency.";
   }
 
   if (session?.is_key) {
