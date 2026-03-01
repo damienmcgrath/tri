@@ -54,15 +54,15 @@
 
 :root[data-theme="clinical-coral"] {
   color-scheme: light;
-  --surface: 210 20% 97%;
+  --surface: 210 16% 97%;
   --surface-elevated: 0 0% 100%;
-  --surface-soft: 210 18% 99%;
+  --surface-soft: 210 14% 96%;
   --surface-1: var(--surface-elevated);
-  --surface-2: 210 28% 95%;
+  --surface-2: 210 10% 94%;
 
   --text-primary: 215 30% 20%;
-  --text-secondary: 215 20% 32%;
-  --text-tertiary: 216 14% 44%;
+  --text-secondary: 215 16% 30%;
+  --text-tertiary: 216 12% 42%;
 
   --accent-performance: 18 87% 57%;
   --accent-recovery: 199 42% 44%;
@@ -91,7 +91,7 @@
   --bg-card: var(--surface-elevated);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 214 22% 80%;
+  --border: 210 8% 84%;
   --ring: 18 87% 57%;
   --accent: var(--ai-accent-core);
   --accent-soft: 195 40% 91%;
@@ -252,7 +252,20 @@
   }
 
   :root[data-theme="clinical-coral"] .surface {
+    border-color: hsl(var(--border) / 0.72);
     @apply shadow-sm;
+  }
+
+
+  :root[data-theme="clinical-coral"] .surface-subtle {
+    border-color: transparent;
+    background: hsl(var(--surface-2));
+  }
+
+  :root[data-theme="clinical-coral"] .priority-card-supporting .surface {
+    border-color: transparent;
+    background: hsl(var(--surface-2));
+    box-shadow: none;
   }
 
   :root[data-theme="clinical-coral"] .priority-card-primary,
@@ -340,6 +353,30 @@
     border-left: 2px solid hsl(var(--accent-performance));
   }
 
+  .nav-item-active {
+    position: relative;
+    background: hsl(var(--surface-2));
+    color: hsl(var(--fg));
+    font-weight: 600;
+  }
+
+  .nav-item-active::before {
+    content: "";
+    position: absolute;
+    left: 0.38rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 65%;
+    border-radius: 999px;
+    background: hsl(var(--accent-performance));
+  }
+
+  .nav-item-active--mobile::before {
+    left: 0.5rem;
+    height: 55%;
+  }
+
 
   .priority-title {
     @apply text-lg font-semibold text-[hsl(var(--fg))];
@@ -403,8 +440,8 @@
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible,
   .surface:focus-within {
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.26);
-    border-color: hsl(var(--ring) / 0.52);
+    box-shadow: none;
+    border-color: hsl(var(--ring) / 0.55);
   }
 
   .label-base {
@@ -427,7 +464,7 @@
 
   .pill-accent {
     border-color: hsl(var(--accent-performance) / 0.5);
-    background: hsl(var(--accent-performance) / 0.14);
+    background: transparent;
     color: hsl(var(--accent-performance));
   }
 
