@@ -1,5 +1,6 @@
 export const NEXT_ACTION_STATE = {
   SESSION_TODAY: "SESSION_TODAY",
+  SESSION_DONE_TODAY: "SESSION_DONE_TODAY",
   NO_SESSION_TODAY: "NO_SESSION_TODAY",
   MISSED_KEY: "MISSED_KEY"
 } as const;
@@ -34,6 +35,10 @@ export function getWhyTodayMattersCopy(state: NextActionState, session?: NextAct
 
   if (state === NEXT_ACTION_STATE.NO_SESSION_TODAY) {
     return "Why today matters: use the space to recover and protect your next key session.";
+  }
+
+  if (state === NEXT_ACTION_STATE.SESSION_DONE_TODAY) {
+    return "Why today matters: today’s work is done—lean into recovery so tomorrow starts strong.";
   }
 
   if (session?.is_key) {
