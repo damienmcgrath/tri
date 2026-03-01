@@ -360,8 +360,10 @@ export default async function DashboardPage({
         </article>
 
         <div className="space-y-4">
-          <article className="priority-card-supporting">
-            <p className="priority-kicker">This week&apos;s focus</p>
+          <article className="priority-card-supporting dashboard-supporting-card">
+            <div className="dashboard-supporting-header">
+              <p className="priority-kicker">This week&apos;s focus</p>
+            </div>
             <h2 className="priority-title">{weeklyFocusText}</h2>
             <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
             <div className="mt-4">
@@ -369,8 +371,10 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article id="week-progress-details" className="priority-card-supporting scroll-mt-20">
-            <p className="priority-kicker">Week progress</p>
+          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card scroll-mt-20">
+            <div className="dashboard-supporting-header">
+              <p className="priority-kicker">Week progress</p>
+            </div>
             <h2 className="priority-title">Discipline breakdown and gaps.</h2>
             <div className="mt-4">
               <WeekProgressCard

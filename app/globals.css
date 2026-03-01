@@ -54,11 +54,11 @@
 
 :root[data-theme="clinical-coral"] {
   color-scheme: light;
-  --surface: 210 16% 97%;
+  --surface: 210 14% 96%;
   --surface-elevated: 0 0% 100%;
-  --surface-soft: 210 14% 96%;
+  --surface-soft: 210 10% 95%;
   --surface-1: var(--surface-elevated);
-  --surface-2: 210 10% 94%;
+  --surface-2: 210 10% 93%;
 
   --text-primary: 215 30% 20%;
   --text-secondary: 215 16% 30%;
@@ -88,10 +88,10 @@
 
   --bg: var(--surface);
   --bg-elevated: var(--surface-elevated);
-  --bg-card: var(--surface-elevated);
+  --bg-card: 210 10% 95%;
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 210 8% 84%;
+  --border: 210 6% 86%;
   --ring: 18 87% 57%;
   --accent: var(--ai-accent-core);
   --accent-soft: 195 40% 91%;
@@ -252,19 +252,14 @@
   }
 
   :root[data-theme="clinical-coral"] .surface {
-    border-color: hsl(var(--border) / 0.72);
+    border-color: hsl(var(--border) / 0.62);
     @apply shadow-sm;
   }
 
 
   :root[data-theme="clinical-coral"] .surface-subtle {
-    border-color: transparent;
-    background: hsl(var(--surface-2));
-  }
-
-  :root[data-theme="clinical-coral"] .priority-card-supporting .surface {
-    border-color: transparent;
-    background: hsl(var(--surface-2));
+    border-color: hsl(var(--border) / 0.28);
+    background: hsl(var(--surface-2) / 0.58);
     box-shadow: none;
   }
 
@@ -346,11 +341,25 @@
   }
 
   .priority-card-supporting {
-    @apply surface-subtle p-4;
+    @apply surface p-4 shadow-none;
+    border-color: hsl(var(--border) / 0.56);
+    background: hsl(var(--bg-elevated));
   }
 
   .next-action-card {
     border-left: 2px solid hsl(var(--accent-performance));
+  }
+
+
+  .dashboard-supporting-card {
+    border-color: hsl(var(--border) / 0.48);
+    box-shadow: none;
+  }
+
+  .dashboard-supporting-header {
+    @apply mb-3 rounded-lg px-3 py-2;
+    background: hsl(var(--surface-2) / 0.42);
+    border: 1px solid hsl(var(--border) / 0.24);
   }
 
   .nav-item-active {
@@ -406,6 +415,14 @@
     background: hsl(var(--bg-card));
     border: 1px solid hsl(var(--border));
     color: hsl(var(--fg));
+  }
+
+  .btn-header-cta {
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-xs font-medium;
+    background: hsl(var(--bg-elevated) / 0.7);
+    border: 1px solid hsl(var(--accent-performance) / 0.38);
+    color: hsl(var(--accent-performance));
+    box-shadow: none;
   }
 
   .input-base {
