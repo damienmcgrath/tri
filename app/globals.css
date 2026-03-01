@@ -61,7 +61,7 @@
   --surface-2: 210 10% 93%;
 
   --text-primary: 215 30% 20%;
-  --text-secondary: 215 16% 30%;
+  --text-secondary: 215 16% 28%;
   --text-tertiary: 216 12% 42%;
 
   --accent-performance: 18 87% 57%;
@@ -396,7 +396,10 @@
   }
 
   .priority-kicker {
-    @apply text-[11px] uppercase tracking-[0.14em] text-accent;
+    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em];
+    color: hsl(var(--fg) / 0.68);
+    border-color: hsl(var(--border) / 0.35);
+    background: hsl(var(--surface-2) / 0.55);
   }
 
   .btn-primary {
@@ -423,6 +426,25 @@
     border: 1px solid hsl(var(--accent-performance) / 0.38);
     color: hsl(var(--accent-performance));
     box-shadow: none;
+    cursor: pointer;
+  }
+
+  .btn-header-cta:hover {
+    background: hsl(var(--accent-performance) / 0.08);
+    border-color: hsl(var(--accent-performance) / 0.52);
+  }
+
+  .btn-header-cta:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .status-badge-passive {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium;
+    color: hsl(var(--fg-muted));
+    border-color: hsl(var(--border) / 0.5);
+    background: hsl(var(--surface-2) / 0.5);
+    cursor: default;
   }
 
   .input-base {
