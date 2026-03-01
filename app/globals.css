@@ -2,23 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Theme tokens live here.
+  - Update theme palettes in the data-theme blocks below.
+  - Semantic aliases (--background, --foreground, --card, etc.) are what components should consume.
+*/
 :root {
   color-scheme: light;
-  /* Core semantic surfaces: warm neutral base with gentle elevation for cards and shells. */
-  --surface: 200 20% 96%;
-  --surface-elevated: 0 0% 100%;
-  --surface-soft: 200 33% 98%;
+
+  --background: 42 28% 97%;
+  --foreground: 217 31% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 217 31% 16%;
+  --muted: 42 18% 93%;
+  --muted-foreground: 217 15% 42%;
+  --border: 30 18% 86%;
+  --input: 30 18% 86%;
+  --primary: 15 82% 58%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 15 82% 58%;
+
+  --chart-1: 15 82% 58%;
+  --chart-2: 204 44% 56%;
+  --chart-3: 254 35% 60%;
+  --chart-4: 177 34% 48%;
+  --chart-5: 221 18% 52%;
+
+  --success: 145 52% 38%;
+  --warning: 38 84% 52%;
+  --danger: 2 69% 60%;
+
+  --surface: var(--background);
+  --surface-elevated: var(--card);
+  --surface-soft: var(--muted);
   --surface-1: var(--surface-elevated);
-  --surface-2: 197 56% 94%;
+  --surface-2: 42 24% 94%;
 
-  /* Typography semantics: high-contrast reading text and supportive secondary copy. */
-  --text-primary: 215 28% 17%;
-  --text-secondary: 216 13% 43%;
-  --text-tertiary: 213 15% 58%;
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-tertiary: 218 12% 56%;
 
-  /* Domain accents: performance and recovery cues tuned for readable contrast on light surfaces. */
-  --accent-performance: 195 83% 35%;
-  --accent-recovery: 193 39% 46%;
+  --accent-performance: var(--primary);
+  --accent-recovery: 194 36% 46%;
 
   --signal-ready: 146 50% 36%;
   --signal-load: 36 78% 48%;
@@ -26,17 +51,15 @@
   --signal-recovery: 200 36% 47%;
   --signal-neutral: 215 19% 63%;
 
-  --ai-accent-core: var(--accent-performance);
-  --ai-accent-glow: 192 52% 78%;
+  --ai-accent-core: var(--primary);
+  --ai-accent-glow: 195 44% 76%;
 
-  --bg: var(--surface);
-  --bg-elevated: var(--surface-elevated);
-  --bg-card: var(--surface-soft);
-  --fg: var(--text-primary);
-  --fg-muted: var(--text-secondary);
-  --border: 207 24% 87%;
-  --ring: var(--ai-accent-core);
-  --accent: var(--ai-accent-core);
+  --bg: var(--background);
+  --bg-elevated: var(--card);
+  --bg-card: var(--muted);
+  --fg: var(--foreground);
+  --fg-muted: var(--muted-foreground);
+  --accent: var(--primary);
   --accent-soft: var(--ai-accent-glow);
 
   --motion-fast: 180ms;
@@ -45,21 +68,110 @@
   --motion-ambient-duration: 22s;
 }
 
+:root[data-theme="coach-studio"] {
+  --background: 42 28% 97%;
+  --foreground: 217 31% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 217 31% 16%;
+  --muted: 42 18% 93%;
+  --muted-foreground: 217 15% 42%;
+  --border: 30 18% 86%;
+  --input: 30 18% 86%;
+  --primary: 15 82% 58%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 15 82% 58%;
+  --chart-1: 15 82% 58%;
+  --chart-2: 204 44% 56%;
+  --chart-3: 254 35% 60%;
+  --chart-4: 177 34% 48%;
+  --chart-5: 221 18% 52%;
+  --accent-recovery: 194 36% 46%;
+  --ai-accent-glow: 195 44% 76%;
+}
+
+:root[data-theme="coach-studio"][data-color-scheme="dark"] {
+  color-scheme: dark;
+  --background: 223 24% 10%;
+  --foreground: 210 22% 94%;
+  --card: 223 21% 14%;
+  --card-foreground: 210 22% 94%;
+  --muted: 223 18% 17%;
+  --muted-foreground: 215 12% 72%;
+  --border: 219 18% 26%;
+  --input: 219 18% 26%;
+  --primary: 15 82% 60%;
+  --ring: 15 82% 60%;
+  --chart-1: 15 82% 60%;
+  --chart-2: 204 52% 64%;
+  --chart-3: 255 42% 67%;
+  --chart-4: 178 40% 57%;
+  --chart-5: 216 20% 66%;
+  --accent-recovery: 166 48% 58%;
+  --ai-accent-glow: 206 58% 23%;
+  --signal-neutral: 216 12% 70%;
+}
+
+:root[data-theme="ember-night"] {
+  --background: 226 26% 14%;
+  --foreground: 210 22% 94%;
+  --card: 224 23% 18%;
+  --card-foreground: 210 22% 94%;
+  --muted: 224 20% 21%;
+  --muted-foreground: 216 14% 74%;
+  --border: 221 18% 30%;
+  --input: 221 18% 30%;
+  --primary: 15 82% 60%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 15 82% 60%;
+  --chart-1: 15 82% 60%;
+  --chart-2: 207 52% 64%;
+  --chart-3: 258 44% 68%;
+  --chart-4: 178 38% 58%;
+  --chart-5: 221 20% 70%;
+  --accent-recovery: 170 42% 56%;
+  --ai-accent-glow: 208 54% 23%;
+  --signal-neutral: 216 12% 70%;
+}
+
+:root[data-theme="ember-night"][data-color-scheme="dark"] {
+  color-scheme: dark;
+  --background: 225 27% 9%;
+  --foreground: 210 24% 95%;
+  --card: 224 23% 13%;
+  --card-foreground: 210 24% 95%;
+  --muted: 224 20% 16%;
+  --muted-foreground: 216 14% 74%;
+  --border: 221 18% 25%;
+  --input: 221 18% 25%;
+  --primary: 15 82% 60%;
+  --ring: 15 82% 60%;
+  --chart-1: 15 82% 60%;
+  --chart-2: 207 54% 65%;
+  --chart-3: 258 45% 70%;
+  --chart-4: 176 40% 59%;
+  --chart-5: 221 20% 72%;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-color-scheme]) {
     color-scheme: dark;
-    --surface: 224 24% 8%;
-    --surface-elevated: 222 21% 12%;
-    --surface-soft: 223 18% 15%;
-    --surface-1: var(--surface-elevated);
-    --surface-2: 223 16% 18%;
-    --text-primary: 210 20% 96%;
-    --text-secondary: 215 14% 72%;
-    --text-tertiary: 215 10% 56%;
-    --accent-performance: 195 100% 66%;
-    --accent-recovery: 166 70% 60%;
-    --ai-accent-glow: 204 70% 19%;
-    --border: 218 18% 25%;
+    --background: 223 24% 10%;
+    --foreground: 210 22% 94%;
+    --card: 223 21% 14%;
+    --card-foreground: 210 22% 94%;
+    --muted: 223 18% 17%;
+    --muted-foreground: 215 12% 72%;
+    --border: 219 18% 26%;
+    --input: 219 18% 26%;
+    --primary: 15 82% 60%;
+    --ring: 15 82% 60%;
+    --chart-1: 15 82% 60%;
+    --chart-2: 204 52% 64%;
+    --chart-3: 255 42% 67%;
+    --chart-4: 178 40% 57%;
+    --chart-5: 216 20% 66%;
+    --accent-recovery: 166 48% 58%;
+    --ai-accent-glow: 206 58% 23%;
     --signal-neutral: 216 12% 70%;
   }
 }
