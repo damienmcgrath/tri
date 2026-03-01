@@ -6,6 +6,8 @@ type ProgressGlanceCardProps = {
   plannedTimeLabel: string;
   remainingTimeLabel: string;
   statusLabel: "Ahead" | "On track" | "Behind plan";
+  unmatchedExtraCount: number;
+  missedPlannedCount: number;
 };
 
 export function ProgressGlanceCard({
@@ -13,7 +15,9 @@ export function ProgressGlanceCard({
   completedTimeLabel,
   plannedTimeLabel,
   remainingTimeLabel,
-  statusLabel
+  statusLabel,
+  unmatchedExtraCount,
+  missedPlannedCount
 }: ProgressGlanceCardProps) {
   const ringPct = Math.max(0, Math.min(completionPct, 100));
   const statusClassName = statusLabel === "Ahead"
@@ -40,7 +44,7 @@ export function ProgressGlanceCard({
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
-            <p className="text-xs text-muted">{remainingTimeLabel} remaining</p>
+            <p className="text-xs text-muted">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
           </div>
 
           <div className="text-right">

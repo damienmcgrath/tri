@@ -19,10 +19,16 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
     completed_activity_id: activityId,
     link_type: "manual",
     confidence: 1,
-    match_reason: { source: "activity_details" }
+    match_reason: { source: "activity_details" },
+    confirmation_status: "confirmed",
+    matched_by: user.id,
+    matched_at: new Date().toISOString(),
+    match_method: "manual_override"
   });
 
   if (error) return { error: error.message };
+
+  await supabase.from("completed_activities").update({ schedule_status: "scheduled", is_unplanned: false }).eq("id", activityId).eq("user_id", user.id);
 
   revalidatePath(`/activities/${activityId}`);
   revalidatePath("/dashboard");
@@ -37,6 +43,8 @@ export async function unlinkActivityAction(activityId: string) {
   const { error } = await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
   if (error) return { error: error.message };
 
+  await supabase.from("completed_activities").update({ schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
+
   revalidatePath(`/activities/${activityId}`);
   revalidatePath("/dashboard");
   return { ok: true };
@@ -48,7 +56,7 @@ export async function markUnplannedAction(activityId: string) {
   if (!user) return { error: "Unauthorized" };
 
   await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
-  const { error } = await supabase.from("completed_activities").update({ is_unplanned: true }).eq("id", activityId).eq("user_id", user.id);
+  const { error } = await supabase.from("completed_activities").update({ is_unplanned: true, schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
   if (error) return { error: error.message };
 
   revalidatePath(`/activities/${activityId}`);

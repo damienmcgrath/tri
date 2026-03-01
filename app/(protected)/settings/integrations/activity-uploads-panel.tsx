@@ -11,7 +11,7 @@ type UploadRow = {
   status: "uploaded" | "parsed" | "matched" | "error";
   error_message: string | null;
   completed_activities: { id: string; sport_type: string; duration_sec: number; distance_m: number | null; schedule_status: "scheduled" | "unscheduled" }[];
-  session_activity_links: { planned_session_id: string | null }[];
+  session_activity_links: { planned_session_id: string | null; confirmation_status: "suggested" | "confirmed" | "rejected" }[];
 };
 
 type PlannedSession = { id: string; date: string; sport: string; type: string; duration: number };
@@ -125,14 +125,16 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
           <tbody>
             {uploads.map((upload) => {
               const activity = upload.completed_activities[0];
-              const linked = activity?.schedule_status === "scheduled" || upload.status === "matched" || upload.session_activity_links.some((link) => Boolean(link.planned_session_id));
+              const hasConfirmedLink = upload.session_activity_links.some((link) => Boolean(link.planned_session_id) && link.confirmation_status === "confirmed");
+              const hasSuggestion = upload.session_activity_links.some((link) => Boolean(link.planned_session_id) && link.confirmation_status === "suggested");
+              const linked = activity?.schedule_status === "scheduled" || upload.status === "matched" || hasConfirmedLink;
               return (
                 <tr key={upload.id} className="border-t border-white/10">
                   <td className="py-2">{formatUploadDate(upload.created_at)}</td>
                   <td>{activity?.sport_type ?? "—"}</td>
                   <td>{fmtDuration(activity?.duration_sec)}</td>
                   <td>{activity?.distance_m ? `${(Number(activity.distance_m) / 1000).toFixed(2)} km` : "—"}</td>
-                  <td>{upload.status === "error" ? "Error" : linked ? "Scheduled" : "Unscheduled"}</td>
+                  <td>{upload.status === "error" ? "Error" : linked ? "Scheduled" : hasSuggestion ? "Suggested" : "Unscheduled"}</td>
                   <td className="space-x-2 text-xs">
                     {activity?.id ? <Link className="text-cyan-300 underline" href={`/activities/${activity.id}`}>View activity</Link> : <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>}
                     {!linked && upload.status !== "error" ? (
@@ -193,7 +195,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                         const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ plannedSessionId: candidate.id })
+                          body: JSON.stringify({ plannedSessionId: candidate.id, mode: "override", actor: "athlete" })
                         });
 
                         if (!response.ok) {

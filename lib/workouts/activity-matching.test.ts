@@ -55,5 +55,5 @@ test("score candidate tolerates missing distance", () => {
     { id: "s1", sport: "strength", startTimeUtc: "2026-02-22T10:05:00.000Z", targetDurationSec: 3000 }
   );
 
-  assert.ok(score.confidence > 0.7);
+  expect(score.confidence).toBeGreaterThan(0.7);
 });

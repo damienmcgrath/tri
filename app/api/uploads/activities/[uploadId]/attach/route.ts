@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
-const schema = z.object({ plannedSessionId: z.string().uuid() });
+const schema = z.object({
+  plannedSessionId: z.string().uuid(),
+  actor: z.enum(["coach", "athlete"]).default("athlete"),
+  mode: z.enum(["confirm", "override"]).default("override")
+});
 
 export async function POST(request: Request, { params }: { params: { uploadId: string } }) {
   const supabase = await createClient();
@@ -38,7 +42,15 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
     completed_activity_id: activity.id,
     link_type: "manual",
     confidence: 1,
-    match_reason: { source: "manual_attach" }
+    match_reason: { source: "manual_attach" },
+    confirmation_status: "confirmed",
+    matched_by: user.id,
+    matched_at: new Date().toISOString(),
+    match_method: body.data.mode === "confirm"
+      ? body.data.actor === "coach"
+        ? "coach_confirmed"
+        : "athlete_confirmed"
+      : "manual_override"
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

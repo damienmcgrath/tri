@@ -29,6 +29,8 @@ type CompletedActivity = {
   sport_type: string;
   start_time_utc: string;
   duration_sec: number;
+  schedule_status: "scheduled" | "unscheduled";
+  is_unplanned: boolean | null;
 };
 
 type Profile = {
@@ -110,11 +112,11 @@ export default async function DashboardPage({
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("completed_activities")
-      .select("id,sport_type,start_time_utc,duration_sec")
+      .select("id,sport_type,start_time_utc,duration_sec,schedule_status,is_unplanned")
       .eq("user_id", user.id)
       .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
       .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
-    supabase.from("session_activity_links").select("completed_activity_id,planned_session_id").eq("user_id", user.id)
+    supabase.from("session_activity_links").select("completed_activity_id,planned_session_id,confirmation_status").eq("user_id", user.id)
   ]);
 
   const profile = (profileData ?? null) as Profile | null;
@@ -159,12 +161,13 @@ export default async function DashboardPage({
   }, {});
 
   const uploadedActivities = (completedActivities ?? []) as CompletedActivity[];
-  const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null }>;
-  const linkedActivityIds = new Set(links.map((item) => item.completed_activity_id));
-  const linkedSessionIds = new Set(links.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
+  const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null; confirmation_status?: "suggested" | "confirmed" | "rejected" | null }>;
+  const confirmedLinks = links.filter((item) => item.confirmation_status === "confirmed" || !item.confirmation_status);
+  const linkedActivityIds = new Set(confirmedLinks.map((item) => item.completed_activity_id));
+  const linkedSessionIds = new Set(confirmedLinks.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
 
   const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
-  const linkedMinutesBySession = links.reduce<Map<string, number>>((acc, link) => {
+  const linkedMinutesBySession = confirmedLinks.reduce<Map<string, number>>((acc, link) => {
     if (!link.planned_session_id) return acc;
     const minutes = durationByActivityId.get(link.completed_activity_id) ?? 0;
     acc.set(link.planned_session_id, (acc.get(link.planned_session_id) ?? 0) + minutes);
@@ -202,6 +205,8 @@ export default async function DashboardPage({
   }));
 
   const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
+  const missedPlannedSessions = sessions.filter((session) => session.status === "planned").length;
+  const unmatchedExtraSessions = uploadedActivities.filter((activity) => (activity.schedule_status === "unscheduled" || !linkedActivityIds.has(activity.id)) && !activity.is_unplanned).length;
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
 
   const progressBySport = sports.map((sport) => {
@@ -289,6 +294,8 @@ export default async function DashboardPage({
           plannedTimeLabel={toHoursAndMinutes(totals.planned)}
           remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
           statusLabel={progressStatus}
+          missedPlannedCount={missedPlannedSessions}
+          unmatchedExtraCount={unmatchedExtraSessions}
         />
 
         <article className="priority-card-primary">
