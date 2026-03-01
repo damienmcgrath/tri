@@ -1,7 +1,8 @@
 "use client";
 
 import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
@@ -57,6 +58,20 @@ function formatMinutes(value: number) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hours}h ${mins}m`;
+}
+
+function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function getMonday(date = new Date()) {
+  const day = date.getUTCDay();
+  const distanceFromMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  monday.setUTCDate(monday.getUTCDate() - distanceFromMonday);
+  return monday;
 }
 
 function parseTarget(notes: string | null) {
@@ -124,7 +139,9 @@ export function WeekCalendar({
   completedMinutes: number;
   remainingMinutes: number;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
@@ -165,6 +182,19 @@ export function WeekCalendar({
   }, [sessions, weekDays]);
 
   const sessionsById = useMemo(() => Object.fromEntries(localSessions.map((session) => [session.id, session])), [localSessions]);
+  const currentWeekStart = getMonday().toISOString().slice(0, 10);
+  const activeWeekStart = weekDays[0]?.iso ?? currentWeekStart;
+
+  const withWeek = (targetWeekStart: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (targetWeekStart === currentWeekStart) {
+      params.delete("weekStart");
+    } else {
+      params.set("weekStart", targetWeekStart);
+    }
+    const query = params.toString();
+    return `${pathname}${query ? `?${query}` : ""}`;
+  };
   const detailSession = detailSessionId ? sessionsById[detailSessionId] ?? null : null;
 
   const filteredIdsByDay = useMemo(() => {
@@ -355,7 +385,12 @@ export function WeekCalendar({
 
       <header className="surface-subtle space-y-2 px-3 py-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs uppercase tracking-[0.14em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+            <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2.5 py-1 text-xs">Prev</Link>
+            <Link href={withWeek(currentWeekStart)} className={`btn-secondary px-2.5 py-1 text-xs ${activeWeekStart === currentWeekStart ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
+            <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2.5 py-1 text-xs">Next</Link>
+          </div>
           <div className="flex items-center gap-2">
             <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
               <option value="all">All statuses</option>
