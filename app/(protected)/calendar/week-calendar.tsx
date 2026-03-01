@@ -31,6 +31,7 @@ import {
 type SessionStatus = "planned" | "completed" | "skipped";
 type FilterStatus = "all" | SessionStatus;
 type SportFilter = "all" | "swim" | "bike" | "run" | "strength";
+type WorkFilter = "all" | "planned" | "unscheduled";
 
 type CalendarSession = {
   id: string;
@@ -122,6 +123,7 @@ export function WeekCalendar({
   completedCount,
   plannedTotalCount,
   skippedCount,
+  extraSessionCount,
   plannedRemainingCount,
   plannedMinutes,
   completedMinutes,
@@ -134,6 +136,7 @@ export function WeekCalendar({
   completedCount: number;
   plannedTotalCount: number;
   skippedCount: number;
+  extraSessionCount: number;
   plannedRemainingCount: number;
   plannedMinutes: number;
   completedMinutes: number;
@@ -144,6 +147,7 @@ export function WeekCalendar({
   const searchParams = useSearchParams();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
+  const [workFilter, setWorkFilter] = useState<WorkFilter>("all");
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [quickAddState, setQuickAddState] = useState<{ initialDate: string; allowDaySelection: boolean } | null>(null);
   const [swapSource, setSwapSource] = useState<CalendarSession | null>(null);
@@ -205,11 +209,15 @@ export function WeekCalendar({
         if (!session) return false;
         const sportMatch = sportFilter === "all" || session.sport === sportFilter;
         const statusMatch = statusFilter === "all" || session.status === statusFilter;
-        return sportMatch && statusMatch;
+        const workMatch =
+          workFilter === "all" ||
+          (workFilter === "planned" && session.displayType === "planned_session") ||
+          (workFilter === "unscheduled" && session.displayType === "completed_activity");
+        return sportMatch && statusMatch && workMatch;
       });
       return acc;
     }, {});
-  }, [orderByDay, sessionsById, sportFilter, statusFilter, weekDays]);
+  }, [orderByDay, sessionsById, sportFilter, statusFilter, weekDays, workFilter]);
 
 
   const progressBySport = useMemo(
@@ -380,6 +388,7 @@ export function WeekCalendar({
           <span className="signal-chip signal-ready">Completed {completedCount}</span>
           <span className="signal-chip signal-load">Planned {plannedTotalCount}</span>
           <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
+          <span className="signal-chip border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.12)] text-[hsl(var(--signal-risk))]">Extra sessions {extraSessionCount}</span>
         </div>
       </div>
 
@@ -392,6 +401,11 @@ export function WeekCalendar({
             <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2.5 py-1 text-xs">Next</Link>
           </div>
           <div className="flex items-center gap-2">
+            <select aria-label="Work filter" value={workFilter} onChange={(e) => setWorkFilter(e.target.value as WorkFilter)} className="input-base w-auto py-1 text-xs">
+              <option value="all">All work</option>
+              <option value="planned">Planned only</option>
+              <option value="unscheduled">Unscheduled only</option>
+            </select>
             <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
               <option value="all">All statuses</option>
               <option value="planned">Pending</option>
@@ -482,9 +496,12 @@ export function WeekCalendar({
                   <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                     <div className="mt-2 space-y-2">
                       {visibleIds.length === 0 ? (
-                        <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
-                          + Add
-                        </button>
+                        <div className="space-y-2">
+                          <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
+                            + Add
+                          </button>
+                          <p className="text-[11px] text-muted">Uploaded sessions still count, even with no planned slot.</p>
+                        </div>
                       ) : (
                         visibleIds.map((id) => {
                           const session = sessionsById[id];
@@ -754,6 +771,7 @@ function SortableSessionCard({
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
             <SessionStatusChip status={session.status} compact />
+            {session.displayType === "completed_activity" ? <span className="rounded-full border border-[hsl(var(--signal-risk)/0.55)] px-2 py-0.5 text-[10px] font-semibold text-[hsl(var(--signal-risk))]">Extra session</span> : null}
             {session.is_key ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] px-2 py-0.5 text-[10px] font-semibold text-accent">Key</span> : null}
           </div>
           <div className="flex items-center gap-1.5">
@@ -913,6 +931,7 @@ function SessionDetailDrawer({
           <button className="btn-secondary px-2 py-1 text-xs" onClick={onClose}>Close</button>
         </div>
         <p className="mt-1 text-xs text-muted">{buildSessionTitle(session)} • {dayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
+        {session.displayType === "completed_activity" ? <p className="mt-1 text-xs text-[hsl(var(--signal-risk))]">Unscheduled upload: this counts as extra work and does not replace planned completion.</p> : null}
         <div className="mt-4 space-y-3">
           <label className="block">
             <span className="label-base mb-1 text-xs">Title</span>

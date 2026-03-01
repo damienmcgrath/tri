@@ -62,7 +62,9 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
                 <div className="mt-2 flex gap-2 text-xs">
                   <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{activity.source === "upload" ? "Garmin upload" : "Synced"}</span>
                   <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{linkedSession ? "Linked" : "Unassigned"}</span>
+                  {!linkedSession ? <span className="rounded-full border border-[hsl(var(--signal-risk)/0.5)] bg-[hsl(var(--signal-risk)/0.12)] px-2 py-1 text-[hsl(var(--signal-risk))]">Unscheduled</span> : null}
                 </div>
+                {!linkedSession ? <p className="mt-2 text-xs text-muted">This uploaded activity counts as extra work even without a planned slot.</p> : null}
               </div>
             </div>
           </article>

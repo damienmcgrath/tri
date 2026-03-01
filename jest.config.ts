@@ -4,8 +4,8 @@ const createJestConfig = nextJest({ dir: './' });
 
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
-  testEnvironment: 'node',
-  testMatch: ['**/*.test.ts'],
+  testEnvironment: 'jsdom',
+  testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   collectCoverageFrom: ['lib/**/*.ts', '!lib/supabase/**', '!lib/env/**', '!lib/ui/**'],
   coverageThreshold: {
     global: {

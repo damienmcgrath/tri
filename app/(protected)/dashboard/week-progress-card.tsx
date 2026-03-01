@@ -13,7 +13,8 @@ type Discipline = {
 type WeekProgressCardProps = {
   plannedTotalMinutes: number;
   completedTotalMinutes: number;
-  disciplines: Discipline[];
+  extraTotalMinutes?: number;
+  disciplines: Array<Discipline & { extraMinutes?: number }>;
   showStatusChip?: boolean;
 };
 
@@ -26,10 +27,12 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 export function WeekProgressCard({
   plannedTotalMinutes,
   completedTotalMinutes,
+  extraTotalMinutes = 0,
   disciplines,
   showStatusChip = true
 }: WeekProgressCardProps) {
   const [hideEmpty, setHideEmpty] = useState(true);
+  const [workFilter, setWorkFilter] = useState<"all" | "planned" | "unscheduled">("all");
 
   const remainingMinutes = plannedTotalMinutes - completedTotalMinutes;
   const overMinutes = Math.max(completedTotalMinutes - plannedTotalMinutes, 0);
@@ -37,23 +40,27 @@ export function WeekProgressCard({
   const disciplineRows = useMemo(
     () =>
       disciplines.map((discipline) => {
-        const discPercent = discipline.plannedMinutes > 0 ? discipline.completedMinutes / discipline.plannedMinutes : 0;
+        const visibleCompletedMinutes = workFilter === "planned" ? discipline.completedMinutes : workFilter === "unscheduled" ? discipline.extraMinutes ?? 0 : discipline.completedMinutes + (discipline.extraMinutes ?? 0);
+        const visiblePlannedMinutes = workFilter === "unscheduled" ? 0 : discipline.plannedMinutes;
+        const discPercent = visiblePlannedMinutes > 0 ? visibleCompletedMinutes / visiblePlannedMinutes : 0;
         const discPercentCapped = Math.min(discPercent, 1);
-        const discOverMinutes = Math.max(discipline.completedMinutes - discipline.plannedMinutes, 0);
-        const discGapMinutes = Math.max(discipline.plannedMinutes - discipline.completedMinutes, 0);
+        const discOverMinutes = Math.max(visibleCompletedMinutes - visiblePlannedMinutes, 0);
+        const discGapMinutes = Math.max(visiblePlannedMinutes - visibleCompletedMinutes, 0);
 
         return {
           ...discipline,
+          visibleCompletedMinutes,
+          visiblePlannedMinutes,
           discPercentCapped,
           discOverMinutes,
           discGapMinutes
         };
       }),
-    [disciplines]
+    [disciplines, workFilter]
   );
 
-  const emptyCount = disciplineRows.filter((item) => item.plannedMinutes === 0).length;
-  const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.plannedMinutes > 0) : disciplineRows;
+  const emptyCount = disciplineRows.filter((item) => item.visiblePlannedMinutes === 0 && (item.extraMinutes ?? 0) === 0).length;
+  const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.visiblePlannedMinutes > 0 || (item.extraMinutes ?? 0) > 0) : disciplineRows;
   const biggestGap = [...disciplineRows].sort((a, b) => b.discGapMinutes - a.discGapMinutes)[0];
 
   const chipLabel = remainingMinutes > 0 ? "Behind plan" : remainingMinutes === 0 ? "On target" : "Ahead of plan";
@@ -71,6 +78,21 @@ export function WeekProgressCard({
       </div>
 
       <div className="mt-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-0.5 text-xs">
+            {(["all", "planned", "unscheduled"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setWorkFilter(option)}
+                className={`rounded-full px-2.5 py-1 ${workFilter === option ? "bg-[hsl(var(--bg-card))] text-[hsl(var(--fg))]" : "text-muted"}`}
+              >
+                {option === "all" ? "All" : option === "planned" ? "Planned only" : "Unscheduled only"}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted">Extra work: {formatMinutes(extraTotalMinutes)}</p>
+        </div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">By discipline</p>
           {emptyCount > 0 || !hideEmpty ? (
@@ -86,17 +108,17 @@ export function WeekProgressCard({
         </div>
 
         {visibleDisciplines.length === 0 ? (
-          <p className="text-xs text-muted">No planned minutes.</p>
+          <p className="text-xs text-muted">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
               const chipLabel = item.discGapMinutes > 0 ? `Gap ${formatMinutes(item.discGapMinutes)}` : item.discOverMinutes > 0 ? `+${formatMinutes(item.discOverMinutes)}` : null;
-              const overTailWidthPx = item.plannedMinutes > 0
-                ? clamp(Math.round((item.discOverMinutes / item.plannedMinutes) * 120), 6, 24)
+              const overTailWidthPx = item.visiblePlannedMinutes > 0
+                ? clamp(Math.round((item.discOverMinutes / item.visiblePlannedMinutes) * 120), 6, 24)
                 : 0;
               const barAriaLabel = item.discOverMinutes > 0
-                ? `${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, over ${Math.round(item.discOverMinutes)} minutes`
-                : `${item.label} ${Math.round(item.completedMinutes)} of ${Math.round(item.plannedMinutes)} minutes, gap ${Math.round(item.discGapMinutes)} minutes`;
+                ? `${item.label} ${Math.round(item.visibleCompletedMinutes)} of ${Math.round(item.visiblePlannedMinutes)} minutes, over ${Math.round(item.discOverMinutes)} minutes`
+                : `${item.label} ${Math.round(item.visibleCompletedMinutes)} of ${Math.round(item.visiblePlannedMinutes)} minutes, gap ${Math.round(item.discGapMinutes)} minutes`;
 
               return (
                 <div key={item.key} className="rounded-lg px-2 py-1 transition hover:bg-[hsl(var(--bg-card))]">
@@ -107,7 +129,7 @@ export function WeekProgressCard({
                     </div>
                     <div className="ml-auto flex items-center justify-end gap-2">
                       <div className="w-[96px] text-right text-xs text-muted tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        {Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min
+                        {Math.round(item.visibleCompletedMinutes)} / {Math.round(item.visiblePlannedMinutes)} min
                       </div>
                       {chipLabel ? (
                         <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-xs font-medium ${item.discGapMinutes > 0 ? "signal-load" : item.discOverMinutes > 0 ? "signal-risk" : "signal-ready"}`}>
