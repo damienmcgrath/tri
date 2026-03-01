@@ -206,7 +206,9 @@ export default async function DashboardPage({
 
   const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
   const missedPlannedSessions = sessions.filter((session) => session.status === "planned").length;
-  const unmatchedExtraSessions = uploadedActivities.filter((activity) => (activity.schedule_status === "unscheduled" || !linkedActivityIds.has(activity.id)) && !activity.is_unplanned).length;
+  const extraActivities = uploadedActivities.filter((activity) => (activity.schedule_status === "unscheduled" || !linkedActivityIds.has(activity.id)) && !activity.is_unplanned);
+  const unmatchedExtraSessions = extraActivities.length;
+  const extraMinutesTotal = extraActivities.reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
 
   const progressBySport = sports.map((sport) => {
@@ -214,11 +216,15 @@ export default async function DashboardPage({
     const completed = sessions
       .filter((session) => session.sport === sport)
       .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
+    const extraMinutes = extraActivities
+      .filter((activity) => activity.sport_type === sport)
+      .reduce((sum, activity) => sum + Math.round((activity.duration_sec ?? 0) / 60), 0);
 
     return {
       sport,
       planned,
       completed,
+      extraMinutes,
       label: getDisciplineMeta(sport).label,
       color:
         sport === "swim"
@@ -386,8 +392,10 @@ export default async function DashboardPage({
                   label: item.label,
                   plannedMinutes: item.planned,
                   completedMinutes: item.completed,
+                  extraMinutes: item.extraMinutes,
                   color: item.color
                 }))}
+                extraTotalMinutes={extraMinutesTotal}
                 showStatusChip={false}
               />
             </div>

@@ -152,8 +152,11 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     weekEndExclusive: weekEnd
   });
 
+  const plannedSessions = sessions.filter((item) => item.displayType === "planned_session");
+  const extraSessionCount = sessions.filter((item) => item.displayType === "completed_activity").length;
+
   const countMetrics = computeWeekSessionCounts(
-    sessions.map((session) => ({
+    plannedSessions.map((session) => ({
       id: session.id,
       date: session.date,
       sport: session.sport,
@@ -163,7 +166,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     }))
   );
   const minuteMetrics = computeWeekMinuteTotals(
-    sessions.map((session) => ({
+    plannedSessions.map((session) => ({
       id: session.id,
       date: session.date,
       sport: session.sport,
@@ -172,7 +175,6 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       isKey: session.is_key
     }))
   );
-  const unmatchedUploads = sessions.filter((item) => item.displayType === "completed_activity").length;
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
 
@@ -183,10 +185,11 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
         weekDays={weekDays}
         sessions={sessions}
         executionLabel={nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}
-        executionSubtext={unmatchedUploads > 0 ? `${unmatchedUploads} uploads need matching.` : "Uploads and schedule aligned"}
+        executionSubtext={extraSessionCount > 0 ? `${extraSessionCount} unscheduled uploads count as extra work.` : "Uploads and schedule aligned"}
         completedCount={countMetrics.completedCount}
         plannedTotalCount={countMetrics.plannedTotalCount}
         skippedCount={countMetrics.skippedCount}
+        extraSessionCount={extraSessionCount}
         plannedRemainingCount={countMetrics.plannedRemainingCount}
         plannedMinutes={minuteMetrics.plannedMinutes}
         completedMinutes={minuteMetrics.completedMinutes}
