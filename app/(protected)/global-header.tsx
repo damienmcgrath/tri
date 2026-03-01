@@ -3,28 +3,40 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { AccountMenu } from "./account-menu";
+import { addDays, getMonday, weekRangeLabel } from "./week-context";
 
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+type HeaderConfig = {
+  showWeekControls: boolean;
+  showWeekRangeLabel: boolean;
+  logoSizeVariant: "default" | "large";
+};
 
-function addDays(isoDate: string, days: number) {
-  const date = new Date(`${isoDate}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
+const DEFAULT_HEADER_CONFIG: HeaderConfig = {
+  showWeekControls: false,
+  showWeekRangeLabel: false,
+  logoSizeVariant: "large"
+};
 
-function getMonday(date = new Date()) {
-  const day = date.getUTCDay();
-  const distanceFromMonday = day === 0 ? 6 : day - 1;
-  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  monday.setUTCDate(monday.getUTCDate() - distanceFromMonday);
-  return monday;
-}
+const HEADER_CONFIG_BY_ROUTE: Record<string, HeaderConfig> = {
+  "/plan": {
+    showWeekControls: true,
+    showWeekRangeLabel: true,
+    logoSizeVariant: "default"
+  },
+  "/calendar": {
+    showWeekControls: true,
+    showWeekRangeLabel: true,
+    logoSizeVariant: "default"
+  }
+};
 
-function weekRangeLabel(weekStart: string) {
-  const start = new Date(`${weekStart}T00:00:00.000Z`);
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
-  return `${shortDateFormatter.format(start)}–${shortDateFormatter.format(end)}`;
+function getHeaderConfig(pathname: string): HeaderConfig {
+  if (pathname.startsWith("/plan") || pathname.startsWith("/calendar")) {
+    const key = pathname.startsWith("/plan") ? "/plan" : "/calendar";
+    return HEADER_CONFIG_BY_ROUTE[key];
+  }
+
+  return DEFAULT_HEADER_CONFIG;
 }
 
 export function GlobalHeader({
@@ -44,6 +56,7 @@ export function GlobalHeader({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const headerConfig = getHeaderConfig(pathname);
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = searchParams.get("weekStart") ?? currentWeekStart;
 
@@ -62,11 +75,15 @@ export function GlobalHeader({
     <div className="shell-header border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm uppercase tracking-[0.2em] text-accent">tri.ai</span>
-          <span className="hidden text-xs text-muted sm:inline">{weekRangeLabel(weekStart)}</span>
-          <Link href={withWeek(addDays(weekStart, -7))} className="btn-secondary px-2.5 py-1 text-xs">Prev</Link>
-          <Link href={withWeek(currentWeekStart)} className={`btn-secondary px-2.5 py-1 text-xs ${weekStart === currentWeekStart ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
-          <Link href={withWeek(addDays(weekStart, 7))} className="btn-secondary px-2.5 py-1 text-xs">Next</Link>
+          <span className={`uppercase tracking-[0.2em] text-accent ${headerConfig.logoSizeVariant === "large" ? "text-base md:text-lg" : "text-sm"}`}>tri.ai</span>
+          {headerConfig.showWeekRangeLabel ? <span className="hidden text-xs text-muted sm:inline">{weekRangeLabel(weekStart)}</span> : null}
+          {headerConfig.showWeekControls ? (
+            <>
+              <Link href={withWeek(addDays(weekStart, -7))} className="btn-secondary px-2.5 py-1 text-xs">Prev</Link>
+              <Link href={withWeek(currentWeekStart)} className={`btn-secondary px-2.5 py-1 text-xs ${weekStart === currentWeekStart ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
+              <Link href={withWeek(addDays(weekStart, 7))} className="btn-secondary px-2.5 py-1 text-xs">Next</Link>
+            </>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
