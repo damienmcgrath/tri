@@ -4,6 +4,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
+import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
 
 type Session = {
   id: string;
@@ -245,6 +246,12 @@ export default async function DashboardPage({
     ? `Close your ${biggestGap.label} gap (+${biggestGap.planned - biggestGap.completed}m) by adding 2 × 30–45m easy ${biggestGap.label.toLowerCase()} sessions.`
     : "Protect consistency this week with short, low-friction sessions on open days.";
 
+  const nextActionState = nextPendingTodaySession
+    ? NEXT_ACTION_STATE.SESSION_TODAY
+    : overdueKeySession
+      ? NEXT_ACTION_STATE.MISSED_KEY
+      : NEXT_ACTION_STATE.NO_SESSION_TODAY;
+
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
@@ -285,12 +292,13 @@ export default async function DashboardPage({
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
                 {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
               </p>
-              <p className="mt-1 text-sm text-muted">Why today matters: lock in today to keep your key-session quality intact.</p>
+              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
             </>
           ) : overdueKeySession ? (
             <>
               <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
               <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
+              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
             </>
           ) : (
             <>
@@ -299,6 +307,7 @@ export default async function DashboardPage({
                 Keep momentum by pulling one session forward
                 {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
               </p>
+              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -332,7 +341,7 @@ export default async function DashboardPage({
             <h2 className="priority-title">{weeklyFocusText}</h2>
             <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
             <div className="mt-4">
-              <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Add suggested sessions</Link>
+              <Link href="/calendar" className={`${nextActionState === NEXT_ACTION_STATE.SESSION_TODAY ? "btn-secondary" : "btn-primary"} px-3 py-1.5 text-xs`}>Add suggested sessions</Link>
             </div>
           </article>
 
@@ -350,6 +359,7 @@ export default async function DashboardPage({
                   completedMinutes: item.completed,
                   color: item.color
                 }))}
+                showStatusChip={false}
               />
             </div>
           </article>
