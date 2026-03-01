@@ -63,8 +63,8 @@ export function WeekProgressCard({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Week Progress</h2>
         {showStatusChip ? (
-          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
-            {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
+          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${remainingMinutes > 0 ? "signal-chip signal-load" : overMinutes > 0 ? "signal-chip signal-ready" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-muted-foreground"}`}>
+            {remainingMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
             <span>{chipLabel}</span>
           </span>
         ) : null}
@@ -77,7 +77,7 @@ export function WeekProgressCard({
             <button
               type="button"
               onClick={() => setHideEmpty((current) => !current)}
-              className="text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               aria-pressed={!hideEmpty}
             >
               {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
@@ -86,7 +86,7 @@ export function WeekProgressCard({
         </div>
 
         {visibleDisciplines.length === 0 ? (
-          <p className="text-xs text-muted">No planned minutes.</p>
+          <p className="text-xs text-muted-foreground">No planned minutes.</p>
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
@@ -106,7 +106,7 @@ export function WeekProgressCard({
                       <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
                     <div className="ml-auto flex items-center justify-end gap-2">
-                      <div className="w-[96px] text-right text-xs text-muted tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <div className="w-[96px] text-right text-xs text-muted-foreground tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
                         {Math.round(item.completedMinutes)} / {Math.round(item.plannedMinutes)} min
                       </div>
                       {chipLabel ? (
@@ -136,7 +136,7 @@ export function WeekProgressCard({
         )}
       </div>
 
-      <a href="#coach-focus" className="mt-4 inline-block text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
+      <a href="#coach-focus" className="mt-4 inline-block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
         {biggestGap && biggestGap.discGapMinutes > 0
           ? `Focus: ${biggestGap.label} +${formatMinutes(biggestGap.discGapMinutes)} (tap for why)`
           : "Focus: On track (tap for details)"}

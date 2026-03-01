@@ -221,13 +221,13 @@ export default async function DashboardPage({
       completed,
       label: getDisciplineMeta(sport).label,
       color:
-        sport === "swim"
-          ? "#56B6D9"
-          : sport === "bike"
-            ? "#6BAA75"
-            : sport === "run"
-              ? "#C48772"
-              : "#9A86C8"
+        sport === "run"
+          ? "hsl(var(--chart-1))"
+          : sport === "swim"
+            ? "hsl(var(--chart-2))"
+            : sport === "bike"
+              ? "hsl(146 28% 44%)"
+              : "hsl(var(--chart-3))"
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
@@ -298,14 +298,14 @@ export default async function DashboardPage({
           unmatchedExtraCount={unmatchedExtraSessions}
         />
 
-        <article className="priority-card-primary">
+        <article className="priority-card-primary next-action-card">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
             <>
               <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
               <p className="priority-subtitle">
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
-                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
+                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Key session</span> : null}
               </p>
               <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
             </>

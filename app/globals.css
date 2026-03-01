@@ -10,14 +10,14 @@
 :root {
   color-scheme: light;
 
-  --background: 42 28% 97%;
+  --background: 40 20% 97.5%;
   --foreground: 217 31% 16%;
   --card: 0 0% 100%;
   --card-foreground: 217 31% 16%;
-  --muted: 42 18% 93%;
-  --muted-foreground: 217 15% 42%;
-  --border: 30 18% 86%;
-  --input: 30 18% 86%;
+  --muted: 40 12% 94.5%;
+  --muted-foreground: 217 14% 34%;
+  --border: 35 16% 84%;
+  --input: 35 16% 84%;
   --primary: 15 82% 58%;
   --primary-foreground: 0 0% 100%;
   --ring: 15 82% 58%;
@@ -29,25 +29,25 @@
   --chart-5: 221 18% 52%;
 
   --success: 145 52% 38%;
-  --warning: 38 84% 52%;
-  --danger: 2 69% 60%;
+  --warning: 38 82% 46%;
+  --danger: 2 62% 54%;
 
   --surface: var(--background);
   --surface-elevated: var(--card);
   --surface-soft: var(--muted);
   --surface-1: var(--surface-elevated);
-  --surface-2: 42 24% 94%;
+  --surface-2: 40 10% 95%;
 
   --text-primary: var(--foreground);
   --text-secondary: var(--muted-foreground);
-  --text-tertiary: 218 12% 56%;
+  --text-tertiary: 218 11% 45%;
 
   --accent-performance: var(--primary);
   --accent-recovery: 194 36% 46%;
 
-  --signal-ready: 146 50% 36%;
-  --signal-load: 36 78% 48%;
-  --signal-risk: 2 63% 59%;
+  --signal-ready: var(--success);
+  --signal-load: var(--warning);
+  --signal-risk: var(--danger);
   --signal-recovery: 200 36% 47%;
   --signal-neutral: 215 19% 63%;
 
@@ -69,14 +69,14 @@
 }
 
 :root[data-theme="coach-studio"] {
-  --background: 42 28% 97%;
+  --background: 40 20% 97.5%;
   --foreground: 217 31% 16%;
   --card: 0 0% 100%;
   --card-foreground: 217 31% 16%;
-  --muted: 42 18% 93%;
-  --muted-foreground: 217 15% 42%;
-  --border: 30 18% 86%;
-  --input: 30 18% 86%;
+  --muted: 40 12% 94.5%;
+  --muted-foreground: 217 14% 34%;
+  --border: 35 16% 84%;
+  --input: 35 16% 84%;
   --primary: 15 82% 58%;
   --primary-foreground: 0 0% 100%;
   --ring: 15 82% 58%;
@@ -91,14 +91,14 @@
 
 :root[data-theme="coach-studio"][data-color-scheme="dark"] {
   color-scheme: dark;
-  --background: 223 24% 10%;
+  --background: 224 22% 11%;
   --foreground: 210 22% 94%;
-  --card: 223 21% 14%;
+  --card: 223 19% 15%;
   --card-foreground: 210 22% 94%;
-  --muted: 223 18% 17%;
-  --muted-foreground: 215 12% 72%;
-  --border: 219 18% 26%;
-  --input: 219 18% 26%;
+  --muted: 223 14% 18%;
+  --muted-foreground: 215 14% 78%;
+  --border: 219 14% 30%;
+  --input: 219 14% 30%;
   --primary: 15 82% 60%;
   --ring: 15 82% 60%;
   --chart-1: 15 82% 60%;
@@ -112,14 +112,14 @@
 }
 
 :root[data-theme="ember-night"] {
-  --background: 226 26% 14%;
+  --background: 226 21% 13%;
   --foreground: 210 22% 94%;
-  --card: 224 23% 18%;
+  --card: 224 18% 17%;
   --card-foreground: 210 22% 94%;
-  --muted: 224 20% 21%;
+  --muted: 224 14% 20%;
   --muted-foreground: 216 14% 74%;
-  --border: 221 18% 30%;
-  --input: 221 18% 30%;
+  --border: 221 14% 33%;
+  --input: 221 14% 33%;
   --primary: 15 82% 60%;
   --primary-foreground: 0 0% 100%;
   --ring: 15 82% 60%;
@@ -135,14 +135,14 @@
 
 :root[data-theme="ember-night"][data-color-scheme="dark"] {
   color-scheme: dark;
-  --background: 225 27% 9%;
+  --background: 225 22% 9%;
   --foreground: 210 24% 95%;
-  --card: 224 23% 13%;
+  --card: 224 18% 13%;
   --card-foreground: 210 24% 95%;
-  --muted: 224 20% 16%;
+  --muted: 224 14% 16%;
   --muted-foreground: 216 14% 74%;
-  --border: 221 18% 25%;
-  --input: 221 18% 25%;
+  --border: 221 14% 28%;
+  --input: 221 14% 28%;
   --primary: 15 82% 60%;
   --ring: 15 82% 60%;
   --chart-1: 15 82% 60%;
@@ -155,14 +155,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme]) {
     color-scheme: dark;
-    --background: 223 24% 10%;
+    --background: 224 22% 11%;
     --foreground: 210 22% 94%;
-    --card: 223 21% 14%;
+    --card: 223 19% 15%;
     --card-foreground: 210 22% 94%;
-    --muted: 223 18% 17%;
-    --muted-foreground: 215 12% 72%;
-    --border: 219 18% 26%;
-    --input: 219 18% 26%;
+    --muted: 223 14% 18%;
+    --muted-foreground: 215 14% 78%;
+    --border: 219 14% 30%;
+    --input: 219 14% 30%;
     --primary: 15 82% 60%;
     --ring: 15 82% 60%;
     --chart-1: 15 82% 60%;
@@ -283,7 +283,7 @@
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
-    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+    @apply rounded-2xl shadow-sm;
     transition:
       border-color var(--motion-standard) var(--motion-ease),
       box-shadow var(--motion-standard) var(--motion-ease),
@@ -291,7 +291,7 @@
   }
 
   .surface:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.38);
+    border-color: hsl(var(--border));
   }
 
   .surface-subtle {
@@ -306,11 +306,12 @@
 
   .priority-card-primary {
     @apply surface p-6 md:p-7;
-    border-color: hsl(var(--accent-performance) / 0.45);
-    background:
-      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+  }
+
+  .next-action-card {
+    border-top: 2px solid hsl(var(--primary) / 0.72);
   }
 
   .priority-card-secondary {
@@ -319,11 +320,8 @@
 
   .priority-card-emphasis {
     @apply surface p-5 md:p-6;
-    border-color: hsl(var(--accent-performance) / 0.4);
-    background:
-      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
   }
 
   .priority-card-supporting {
@@ -335,7 +333,7 @@
   }
 
   .priority-subtitle {
-    @apply mt-1 text-sm text-muted;
+    @apply mt-1 text-sm font-medium text-muted;
   }
 
   .priority-kicker {
@@ -344,21 +342,13 @@
 
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    border: 1px solid hsl(var(--accent-performance) / 0.65);
-    background:
-      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
-      repeating-linear-gradient(
-        115deg,
-        hsl(0 0% 100% / 0.16) 0,
-        hsl(0 0% 100% / 0.16) 1px,
-        transparent 1px,
-        transparent 5px
-      );
-    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
+    border: 1px solid hsl(var(--accent-performance) / 0.72);
+    background: linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.9) 100%);
+    box-shadow: 0 2px 8px hsl(var(--accent-performance) / 0.2);
   }
 
   .btn-primary:hover {
-    @apply brightness-110;
+    @apply brightness-105;
   }
 
   .btn-secondary {
@@ -411,6 +401,7 @@
 
   .text-muted {
     color: hsl(var(--fg-muted));
+    font-weight: 500;
   }
 
   .text-tertiary {
@@ -581,30 +572,30 @@
 
   .discipline-swim {
     @apply border;
-    background: hsl(193 67% 61% / 0.2);
-    border-color: hsl(193 60% 56% / 0.55);
-    color: hsl(197 58% 37%);
+    background: hsl(var(--chart-2) / 0.2);
+    border-color: hsl(var(--chart-2) / 0.46);
+    color: hsl(var(--chart-2));
   }
 
   .discipline-bike {
     @apply border;
-    background: hsl(133 36% 56% / 0.2);
-    border-color: hsl(133 30% 48% / 0.55);
-    color: hsl(136 30% 33%);
+    background: hsl(146 28% 54% / 0.2);
+    border-color: hsl(146 26% 48% / 0.46);
+    color: hsl(146 24% 35%);
   }
 
   .discipline-run {
     @apply border;
-    background: hsl(18 44% 62% / 0.2);
-    border-color: hsl(18 37% 57% / 0.55);
-    color: hsl(18 31% 37%);
+    background: hsl(var(--chart-1) / 0.2);
+    border-color: hsl(var(--chart-1) / 0.46);
+    color: hsl(var(--chart-1));
   }
 
   .discipline-strength {
     @apply border;
-    background: hsl(258 50% 72% / 0.22);
-    border-color: hsl(258 40% 64% / 0.55);
-    color: hsl(256 28% 42%);
+    background: hsl(var(--chart-3) / 0.22);
+    border-color: hsl(var(--chart-3) / 0.46);
+    color: hsl(var(--chart-3));
   }
 
   .discipline-other {

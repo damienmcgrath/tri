@@ -24,8 +24,8 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             title={`${item.label} · ${item.semanticLabel}`}
             className={`rounded-xl px-3 py-2 text-sm transition ${
               active
-                ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))] ring-1 ring-[hsl(var(--accent-performance)/0.45)]"
-                : "text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card))] hover:text-[hsl(var(--fg))]"
+                ? "bg-primary/10 text-primary ring-1 ring-primary/35"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             } ${compact ? "flex items-center justify-center" : "block"}`}
           >
             {compact ? (
@@ -33,7 +33,7 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             ) : (
               <>
                 <span className="block font-medium">{item.label}</span>
-                <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">{item.semanticLabel}</span>
+                <span className="block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{item.semanticLabel}</span>
               </>
             )}
           </Link>
@@ -47,7 +47,7 @@ export function MobileBottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.96] px-2 py-2 backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 py-2 backdrop-blur lg:hidden">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -56,7 +56,7 @@ export function MobileBottomTabs() {
               key={item.href}
               href={item.href}
               title={`${item.label} · ${item.semanticLabel}`}
-              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))]" : "text-muted"}`}
+              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
             >
               <span className="block">{item.label}</span>
               <span className="block text-[10px] uppercase tracking-[0.12em]">{item.semanticLabel}</span>

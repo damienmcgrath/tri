@@ -28,7 +28,7 @@ export function ProgressGlanceCard({
 
   return (
     <Link href="#week-progress-details" className="block">
-      <article className="surface p-4 transition hover:border-[hsl(var(--fg)/0.22)]">
+      <article className="surface p-4 transition hover:border-border">
         <div className="flex items-center gap-4">
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]">
             <div
@@ -44,7 +44,7 @@ export function ProgressGlanceCard({
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
-            <p className="text-xs text-muted">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
+            <p className="text-xs text-muted-foreground">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
           </div>
 
           <div className="text-right">
