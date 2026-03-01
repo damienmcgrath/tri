@@ -18,6 +18,11 @@ const THEME_OPTIONS: ThemeOption[] = [
     label: "Clinical Coral",
     value: "clinical-coral",
     description: "Cool clinical surfaces with restrained coral accents."
+  },
+  {
+    label: "Paper Studio",
+    value: "paper-studio",
+    description: "Airy editorial canvas with sparse coral emphasis."
   }
 ];
 
