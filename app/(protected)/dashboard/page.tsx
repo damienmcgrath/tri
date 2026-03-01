@@ -312,7 +312,7 @@ export default async function DashboardPage({
             </>
           ) : completedTodaySessions.length > 0 ? (
             <>
-              <h1 className="priority-title">Done for today</h1>
+              <h1 className="priority-title flex items-center gap-2">Done for today <span aria-hidden className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success)/0.7)]">✓</span></h1>
               <p className="priority-subtitle">
                 {completedTodaySummary}
                 {completedTodaySessions.length > 2 ? ` • +${completedTodaySessions.length - 2} more completed` : ""}

@@ -347,19 +347,18 @@
   }
 
   .next-action-card {
-    border-left: 2px solid hsl(var(--accent-performance));
+    border-color: hsl(var(--border) / 0.78);
+    box-shadow: 0 2px 8px hsl(215 18% 20% / 0.08);
   }
 
 
   .dashboard-supporting-card {
-    border-color: hsl(var(--border) / 0.48);
+    border-color: hsl(var(--border) / 0.44);
     box-shadow: none;
   }
 
   .dashboard-supporting-header {
-    @apply mb-3 rounded-lg px-3 py-2;
-    background: hsl(var(--surface-2) / 0.42);
-    border: 1px solid hsl(var(--border) / 0.24);
+    @apply mb-2;
   }
 
   .nav-item-active {
@@ -396,10 +395,18 @@
   }
 
   .priority-kicker {
-    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em];
+    @apply relative inline-flex items-center pb-1 text-[11px] font-semibold uppercase tracking-[0.18em];
     color: hsl(var(--fg) / 0.68);
-    border-color: hsl(var(--border) / 0.35);
-    background: hsl(var(--surface-2) / 0.55);
+  }
+
+  .priority-kicker::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: hsl(var(--border) / 0.56);
   }
 
   .btn-primary {
