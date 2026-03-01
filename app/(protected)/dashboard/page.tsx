@@ -5,6 +5,7 @@ import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
+import { addDays, getMonday, weekRangeLabel } from "../week-context";
 
 type Session = {
   id: string;
@@ -44,19 +45,6 @@ type Plan = {
 };
 
 const sports = ["swim", "bike", "run", "strength"] as const;
-function getMonday(date = new Date()) {
-  const day = date.getUTCDay();
-  const distanceFromMonday = day === 0 ? 6 : day - 1;
-  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  monday.setUTCDate(monday.getUTCDate() - distanceFromMonday);
-  return monday;
-}
-
-function addDays(isoDate: string, days: number) {
-  const date = new Date(`${isoDate}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
 
 function toHoursAndMinutes(minutes: number) {
   const safeMinutes = Math.max(0, Math.round(minutes));
@@ -289,6 +277,7 @@ export default async function DashboardPage({
     <section className="space-y-4">
       <div className="space-y-4">
         <ProgressGlanceCard
+          weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
           completionPct={completionPct}
           completedTimeLabel={toHoursAndMinutes(totals.completed)}
           plannedTimeLabel={toHoursAndMinutes(totals.planned)}

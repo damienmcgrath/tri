@@ -146,6 +146,9 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
   const planWeeks = weeks.filter((week) => week.plan_id === selectedPlan?.id).sort((a, b) => a.week_index - b.week_index);
   const [selectedWeekId, setSelectedWeekId] = useState(planWeeks[0]?.id ?? "");
   const selectedWeek = planWeeks.find((week) => week.id === selectedWeekId) ?? planWeeks[0];
+  const selectedWeekIndex = selectedWeek ? planWeeks.findIndex((week) => week.id === selectedWeek.id) : -1;
+  const previousWeek = selectedWeekIndex > 0 ? planWeeks[selectedWeekIndex - 1] : null;
+  const nextWeek = selectedWeekIndex >= 0 && selectedWeekIndex < planWeeks.length - 1 ? planWeeks[selectedWeekIndex + 1] : null;
   const [quickAddDay, setQuickAddDay] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
@@ -249,7 +252,35 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
               <p className="text-sm font-semibold">Week {selectedWeek.week_index} • {selectedWeek.focus} • {weekRangeLabel(selectedWeek.week_start_date)}</p>
               <p className="text-xs text-muted">Planned {totalMinutes} min • {selectedWeek.target_minutes ? `Target ${selectedWeek.target_minutes} min` : "Target unset"} • Focus {selectedWeek.focus}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary px-3 py-1.5 text-xs"
+                onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
+                disabled={!previousWeek}
+              >
+                Prev week
+              </button>
+              <select
+                aria-label="Select plan week"
+                value={selectedWeek.id}
+                onChange={(event) => setSelectedWeekId(event.target.value)}
+                className="input-base w-auto py-1.5 text-xs"
+              >
+                {planWeeks.map((week) => (
+                  <option key={week.id} value={week.id}>
+                    Week {week.week_index} ({weekRangeLabel(week.week_start_date)})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-secondary px-3 py-1.5 text-xs"
+                onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
+                disabled={!nextWeek}
+              >
+                Next week
+              </button>
               <button form="week-details-form" className="btn-primary px-3 py-1.5 text-xs">Save</button>
               <button type="button" onClick={() => setWeekActionOpen((v) => !v)} aria-expanded={weekActionOpen} className="btn-secondary px-3 py-1.5 text-xs">Week actions</button>
             </div>

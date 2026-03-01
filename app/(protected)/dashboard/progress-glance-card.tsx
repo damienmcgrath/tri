@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 type ProgressGlanceCardProps = {
+  weekRangeLabel: string;
   completionPct: number;
   completedTimeLabel: string;
   plannedTimeLabel: string;
@@ -11,6 +12,7 @@ type ProgressGlanceCardProps = {
 };
 
 export function ProgressGlanceCard({
+  weekRangeLabel,
   completionPct,
   completedTimeLabel,
   plannedTimeLabel,
@@ -43,6 +45,7 @@ export function ProgressGlanceCard({
           </div>
 
           <div className="min-w-0 flex-1">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted">{weekRangeLabel}</p>
             <p className="text-sm font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
             <p className="text-xs text-muted">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
           </div>
