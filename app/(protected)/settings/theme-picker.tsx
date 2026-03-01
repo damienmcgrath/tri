@@ -18,6 +18,11 @@ const THEME_OPTIONS: ThemeOption[] = [
     label: "Clinical Coral",
     value: "clinical-coral",
     description: "Cool clinical surfaces with restrained coral accents."
+  },
+  {
+    label: "Carbon Coach",
+    value: "carbon-coach",
+    description: "Dark-first graphite UI with crisp borders and coral performance accents."
   }
 ];
 
