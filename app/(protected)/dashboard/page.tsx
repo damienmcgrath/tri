@@ -190,6 +190,7 @@ export default async function DashboardPage({
   const hasActivePlan = Boolean(activePlanId);
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const nextPendingTodaySession = todaySessions.find((session) => session.status === "planned") ?? null;
+  const completedTodaySessions = todaySessions.filter((session) => session.status === "completed");
 
   const weekMetricSessions = sessions.map((session) => ({
     id: session.id,
@@ -250,7 +251,14 @@ export default async function DashboardPage({
     ? NEXT_ACTION_STATE.SESSION_TODAY
     : overdueKeySession
       ? NEXT_ACTION_STATE.MISSED_KEY
+      : completedTodaySessions.length > 0
+        ? NEXT_ACTION_STATE.SESSION_DONE_TODAY
       : NEXT_ACTION_STATE.NO_SESSION_TODAY;
+
+  const completedTodaySummary = completedTodaySessions
+    .slice(0, 2)
+    .map((session) => `${session.type} · ${session.duration_minutes} min · ${getDisciplineMeta(session.sport).label}`)
+    .join(" • ");
 
 
   if (!hasActivePlan && !hasAnyPlan) {
@@ -300,6 +308,15 @@ export default async function DashboardPage({
               <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
               <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
             </>
+          ) : completedTodaySessions.length > 0 ? (
+            <>
+              <h1 className="priority-title">Done for today</h1>
+              <p className="priority-subtitle">
+                {completedTodaySummary}
+                {completedTodaySessions.length > 2 ? ` • +${completedTodaySessions.length - 2} more completed` : ""}
+              </p>
+              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+            </>
           ) : (
             <>
               <h1 className="priority-title">No session planned today</h1>
@@ -324,12 +341,17 @@ export default async function DashboardPage({
                   <Link href={`/calendar?focus=${overdueKeySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Reschedule in calendar</Link>
                   <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Skip and adjust week</Link>
                 </>
+              ) : completedTodaySessions.length > 0 ? (
+                <>
+                  <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Open calendar</Link>
+                  <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Review recovery options</Link>
+                </>
               ) : null}
-              {!nextPendingTodaySession && !overdueKeySession ? (
+              {!nextPendingTodaySession && !overdueKeySession && completedTodaySessions.length === 0 ? (
                 <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Open calendar</Link>
               ) : null}
             </div>
-            {!nextPendingTodaySession && !overdueKeySession ? (
+            {!nextPendingTodaySession && !overdueKeySession && completedTodaySessions.length === 0 ? (
               <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
             ) : null}
           </div>
