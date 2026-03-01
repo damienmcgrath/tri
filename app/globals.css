@@ -112,8 +112,8 @@
   --surface-2: 220 12% 21%;
 
   --text-primary: 210 24% 94%;
-  --text-secondary: 214 16% 78%;
-  --text-tertiary: 214 12% 68%;
+  --text-secondary: 214 18% 82%;
+  --text-tertiary: 214 14% 72%;
 
   --accent-performance: 18 90% 64%;
   --accent-recovery: 198 34% 60%;
@@ -176,13 +176,13 @@
     color-scheme: dark;
     --surface: 218 24% 9%;
     --surface-elevated: 220 20% 12%;
-    --surface-soft: 220 18% 15%;
+    --surface-soft: 220 17% 16%;
     --surface-1: var(--surface-elevated);
     --surface-2: 220 16% 18%;
 
     --text-primary: 212 25% 94%;
-    --text-secondary: 214 14% 74%;
-    --text-tertiary: 215 12% 61%;
+    --text-secondary: 214 18% 79%;
+    --text-tertiary: 215 14% 67%;
 
     --accent-performance: 18 90% 64%;
     --accent-recovery: 193 60% 62%;
@@ -310,27 +310,29 @@
   }
 
   :root[data-theme="carbon-coach"] .surface {
-    border-color: hsl(var(--border) / 0.92);
+    border-color: hsl(var(--border) / 0.72);
     background: hsl(var(--bg-elevated));
-    box-shadow: 0 6px 14px hsl(220 34% 5% / 0.2);
+    box-shadow: 0 6px 12px hsl(220 34% 5% / 0.16);
   }
 
   :root[data-theme="carbon-coach"] .surface:hover {
-    border-color: hsl(var(--accent-performance) / 0.48);
+    transform: translateY(-1px);
+    border-color: hsl(var(--border) / 0.96);
+    box-shadow: 0 10px 18px hsl(220 34% 5% / 0.2);
   }
 
   :root[data-theme="carbon-coach"] .surface-subtle {
-    border-color: hsl(var(--border) / 0.76);
-    background: hsl(var(--surface-2) / 0.58);
-    box-shadow: none;
+    border-color: hsl(var(--border) / 0.58);
+    background: hsl(var(--surface-2) / 0.74);
+    box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.24);
   }
 
   :root[data-theme="carbon-coach"] .priority-card-primary,
   :root[data-theme="carbon-coach"] .priority-card-emphasis,
   :root[data-theme="carbon-coach"] .priority-card-supporting {
-    border-color: hsl(var(--border) / 0.92);
+    border-color: hsl(var(--border) / 0.74);
     background: hsl(var(--bg-elevated));
-    box-shadow: 0 6px 14px hsl(220 34% 5% / 0.2);
+    box-shadow: 0 6px 12px hsl(220 34% 5% / 0.16);
   }
 
   :root[data-theme="clinical-coral"] .surface {
@@ -340,9 +342,9 @@
 
 
   :root[data-theme="clinical-coral"] .surface-subtle {
-    border-color: hsl(var(--border) / 0.28);
-    background: hsl(var(--surface-2) / 0.58);
-    box-shadow: none;
+    border-color: hsl(var(--border) / 0.42);
+    background: hsl(var(--surface-2) / 0.68);
+    box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.22);
   }
 
   :root[data-theme="clinical-coral"] .priority-card-primary,
@@ -429,8 +431,26 @@
   }
 
   .next-action-card {
-    border-color: hsl(var(--border) / 0.78);
-    box-shadow: 0 2px 8px hsl(215 18% 20% / 0.08);
+    position: relative;
+    border-color: hsl(var(--border) / 0.64);
+    box-shadow: 0 4px 10px hsl(220 24% 7% / 0.14);
+  }
+
+  :root[data-theme="clinical-coral"] .next-action-card,
+  :root[data-theme="carbon-coach"] .next-action-card {
+    border-color: hsl(var(--border) / 0.72);
+  }
+
+  :root[data-theme="clinical-coral"] .next-action-card::before,
+  :root[data-theme="carbon-coach"] .next-action-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 2px;
+    border-radius: 999px;
+    background: hsl(var(--accent-performance) / 0.9);
   }
 
 
@@ -450,6 +470,11 @@
     font-weight: 600;
   }
 
+
+  :root[data-theme="clinical-coral"] .shell-header nav a:not(.nav-item-active),
+  :root[data-theme="carbon-coach"] .shell-header nav a:not(.nav-item-active) {
+    color: hsl(var(--fg-muted) / 0.96);
+  }
   .nav-item-active::before {
     content: "";
     position: absolute;
@@ -604,6 +629,15 @@
   .surface:focus-within {
     box-shadow: none;
     border-color: hsl(var(--ring) / 0.55);
+  }
+
+  :root[data-theme="clinical-coral"] .btn-primary:focus-visible,
+  :root[data-theme="clinical-coral"] .btn-secondary:focus-visible,
+  :root[data-theme="carbon-coach"] .btn-primary:focus-visible,
+  :root[data-theme="carbon-coach"] .btn-secondary:focus-visible {
+    outline: 2px solid hsl(var(--accent-performance));
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
   .label-base {
