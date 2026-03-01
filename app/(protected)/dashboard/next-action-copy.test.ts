@@ -24,4 +24,10 @@ describe("getWhyTodayMattersCopy", () => {
       "Why today matters: use the space to recover and protect your next key session."
     );
   });
+
+  it("returns completed-today copy when today's session is already done", () => {
+    expect(getWhyTodayMattersCopy(NEXT_ACTION_STATE.SESSION_DONE_TODAY)).toBe(
+      "Why today matters: you showed up today—recover well to reinforce consistency."
+    );
+  });
 });
