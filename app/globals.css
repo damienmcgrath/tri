@@ -103,6 +103,57 @@
   --ring-color: var(--ring);
 }
 
+:root[data-theme="paper-studio"] {
+  color-scheme: light;
+  --surface: 210 22% 96%;
+  --surface-elevated: 210 20% 99%;
+  --surface-soft: 210 18% 97%;
+  --surface-1: var(--surface-elevated);
+  --surface-2: 210 16% 94%;
+
+  --text-primary: 220 28% 18%;
+  --text-secondary: 218 14% 35%;
+  --text-tertiary: 215 12% 49%;
+
+  --accent-performance: 15 83% 60%;
+  --accent-recovery: 203 28% 47%;
+
+  --signal-ready: 147 26% 42%;
+  --signal-load: 35 76% 51%;
+  --signal-risk: 5 63% 58%;
+  --signal-recovery: 202 25% 50%;
+  --signal-neutral: 216 11% 59%;
+
+  --success: var(--signal-ready);
+  --warning: var(--signal-load);
+  --danger: var(--signal-risk);
+
+  --chart-1: 15 83% 60%;
+  --chart-2: 202 30% 48%;
+  --chart-3: 220 25% 56%;
+  --chart-4: 262 26% 61%;
+  --chart-5: 210 12% 58%;
+
+  --ai-accent-core: var(--accent-performance);
+  --ai-accent-glow: 16 82% 91%;
+
+  --bg: var(--surface);
+  --bg-elevated: var(--surface-elevated);
+  --bg-card: var(--surface-soft);
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
+  --border: 210 14% 88%;
+  --ring: var(--accent-performance);
+  --accent: var(--accent-performance);
+  --accent-soft: 18 54% 92%;
+
+  --background: var(--bg);
+  --card: var(--bg-elevated);
+  --muted-foreground: var(--fg-muted);
+  --border-color: var(--border);
+  --ring-color: var(--ring);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -156,6 +207,49 @@
     --border: 217 16% 30%;
     --ring: 18 90% 64%;
     --accent-soft: 214 22% 22%;
+
+    --background: var(--bg);
+    --card: var(--bg-elevated);
+    --muted-foreground: var(--fg-muted);
+    --border-color: var(--border);
+    --ring-color: var(--ring);
+  }
+
+  :root[data-theme="paper-studio"] {
+    color-scheme: dark;
+    --surface: 220 22% 10%;
+    --surface-elevated: 220 20% 13%;
+    --surface-soft: 219 17% 16%;
+    --surface-1: var(--surface-elevated);
+    --surface-2: 220 15% 19%;
+
+    --text-primary: 212 24% 94%;
+    --text-secondary: 214 13% 75%;
+    --text-tertiary: 214 12% 62%;
+
+    --accent-performance: 16 88% 66%;
+    --accent-recovery: 198 42% 66%;
+
+    --signal-ready: 148 33% 55%;
+    --signal-load: 38 85% 60%;
+    --signal-risk: 4 84% 67%;
+    --signal-recovery: 198 45% 64%;
+    --signal-neutral: 214 11% 68%;
+
+    --success: var(--signal-ready);
+    --warning: var(--signal-load);
+    --danger: var(--signal-risk);
+
+    --chart-1: 16 88% 66%;
+    --chart-2: 198 45% 64%;
+    --chart-3: 220 52% 68%;
+    --chart-4: 264 45% 72%;
+    --chart-5: 212 18% 65%;
+
+    --ai-accent-glow: 16 48% 26%;
+    --border: 218 14% 31%;
+    --ring: var(--accent-performance);
+    --accent-soft: 218 18% 23%;
 
     --background: var(--bg);
     --card: var(--bg-elevated);
@@ -245,9 +339,21 @@
     background: linear-gradient(165deg, hsl(var(--bg)) 8%, hsl(var(--bg-elevated)) 92%);
   }
 
+  :root[data-theme="paper-studio"] .app-shell::before {
+    background:
+      radial-gradient(circle at 24% 18%, hsl(var(--accent-performance) / 0.05), transparent 38%),
+      linear-gradient(165deg, hsl(var(--bg)) 10%, hsl(var(--bg-elevated)) 90%);
+    animation-duration: 28s;
+  }
+
 
   :root[data-theme="clinical-coral"] .app-shell::after,
   :root[data-theme="clinical-coral"] .shell-header::before {
+    opacity: 0;
+  }
+
+  :root[data-theme="paper-studio"] .app-shell::after,
+  :root[data-theme="paper-studio"] .shell-header::before {
     opacity: 0;
   }
 
@@ -268,6 +374,94 @@
     border-color: hsl(var(--border));
     background: hsl(var(--bg-elevated));
     box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
+  }
+
+  :root[data-theme="paper-studio"] .surface {
+    border-color: hsl(var(--border) / 0.42);
+    box-shadow: 0 1px 3px hsl(220 25% 20% / 0.03);
+  }
+
+  :root[data-theme="paper-studio"] .surface:hover {
+    border-color: hsl(var(--border) / 0.6);
+    box-shadow: 0 5px 12px hsl(220 25% 20% / 0.05);
+  }
+
+  :root[data-theme="paper-studio"] .surface-subtle {
+    border-color: hsl(var(--border) / 0.28);
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(220 25% 20% / 0.02);
+  }
+
+  :root[data-theme="paper-studio"] .priority-card-primary,
+  :root[data-theme="paper-studio"] .priority-card-emphasis,
+  :root[data-theme="paper-studio"] .priority-card-secondary {
+    border-color: hsl(var(--border) / 0.4);
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 2px 10px hsl(220 25% 20% / 0.04);
+  }
+
+  :root[data-theme="paper-studio"] .priority-card-supporting {
+    border-color: hsl(var(--border) / 0.25);
+    box-shadow: 0 1px 3px hsl(220 25% 20% / 0.025);
+  }
+
+  :root[data-theme="paper-studio"] .next-action-card {
+    border-left: 3px solid hsl(var(--accent-performance) / 0.6);
+    box-shadow: 0 10px 26px hsl(220 20% 18% / 0.08);
+  }
+
+  :root[data-theme="paper-studio"] .priority-title {
+    @apply font-semibold;
+    letter-spacing: -0.01em;
+  }
+
+  :root[data-theme="paper-studio"] .priority-kicker {
+    font-weight: 600;
+    color: hsl(var(--fg) / 0.56);
+  }
+
+  :root[data-theme="paper-studio"] .priority-kicker::after {
+    background: hsl(var(--border) / 0.5);
+  }
+
+  :root[data-theme="paper-studio"] .text-muted {
+    color: hsl(var(--fg-muted) / 0.95);
+  }
+
+  :root[data-theme="paper-studio"] .btn-primary {
+    border-color: hsl(var(--accent-performance) / 0.78);
+    background: hsl(var(--accent-performance));
+    box-shadow: 0 2px 6px hsl(var(--accent-performance) / 0.2);
+  }
+
+  :root[data-theme="paper-studio"] .btn-secondary {
+    background: transparent;
+    border-color: hsl(var(--border) / 0.72);
+    color: hsl(var(--fg-muted));
+    box-shadow: none;
+  }
+
+  :root[data-theme="paper-studio"] .btn-secondary:hover {
+    background: hsl(var(--surface-2) / 0.42);
+    color: hsl(var(--fg));
+  }
+
+  :root[data-theme="paper-studio"] .progress-track {
+    background: hsl(var(--surface-2));
+  }
+
+  :root[data-theme="paper-studio"] .progress-fill-recovery {
+    background: linear-gradient(90deg, hsl(210 13% 77%), hsl(210 10% 70%));
+  }
+
+  :root[data-theme="paper-studio"] .progress-fill-load {
+    background: linear-gradient(90deg, hsl(var(--accent-performance) / 0.62), hsl(var(--accent-performance) / 0.84));
+  }
+
+  :root[data-theme="paper-studio"] .status-chip-completed {
+    border-color: hsl(var(--signal-ready) / 0.32);
+    background: hsl(var(--signal-ready) / 0.13);
+    color: hsl(var(--signal-ready));
   }
 
 
