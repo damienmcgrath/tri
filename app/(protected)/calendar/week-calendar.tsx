@@ -44,6 +44,7 @@ type CalendarSession = {
   linkedStats?: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
   unassignedSameDayCount?: number;
   is_key?: boolean;
+  displayType?: "planned_session" | "completed_activity";
 };
 
 type WeekDay = { iso: string; weekday: string; label: string };
@@ -65,6 +66,10 @@ function parseTarget(notes: string | null) {
 }
 
 function buildSessionTitle(session: CalendarSession) {
+  if (session.displayType === "completed_activity") {
+    return "Completed activity";
+  }
+
   const type = session.type?.trim();
   if (type && type.toLowerCase() !== "session") {
     return type;
@@ -200,6 +205,8 @@ export function WeekCalendar({
   const todayIso = new Date().toISOString().slice(0, 10);
 
   function onDragStart(event: DragStartEvent) {
+    const activeSession = sessionsById[String(event.active.id)];
+    if (activeSession?.displayType === "completed_activity") return;
     setActiveId(String(event.active.id));
   }
 
@@ -210,7 +217,7 @@ export function WeekCalendar({
     if (!overId) return;
 
     const activeSession = sessionsById[activeIdValue];
-    if (!activeSession) return;
+    if (!activeSession || activeSession.displayType === "completed_activity") return;
 
     const fromDay = activeSession.date;
     const targetDay = overId.startsWith("day:") ? overId.replace("day:", "") : sessionsById[overId]?.date;
@@ -688,7 +695,8 @@ function SortableSessionCard({
   onMove: () => void;
   onSwap: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id });
+  const isReadOnly = session.displayType === "completed_activity";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id, disabled: isReadOnly });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition
@@ -714,11 +722,11 @@ function SortableSessionCard({
             {session.is_key ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] px-2 py-0.5 text-[10px] font-semibold text-accent">Key</span> : null}
           </div>
           <div className="flex items-center gap-1.5">
-            <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />
+            {isReadOnly ? null : <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />}
           </div>
         </div>
 
-        <button type="button" onClick={onOpen} className="w-full text-left" aria-label={`Open details for ${title}`}>
+        <div className="w-full text-left" aria-label={`Summary for ${title}`}>
           <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{title}</p>
           <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
           {session.linkedActivityCount ? (
@@ -735,9 +743,9 @@ function SortableSessionCard({
           ) : session.unassignedSameDayCount ? (
             <p className="mt-1 text-xs text-[hsl(var(--signal-load))]">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
           ) : null}
-        </button>
+        </div>
       </div>
-      <button
+      {isReadOnly ? null : <button
         type="button"
         className="absolute right-2 bottom-2 rounded p-1 text-accent/70 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
         aria-label={`Drag ${title}`}
@@ -745,7 +753,7 @@ function SortableSessionCard({
         {...listeners}
       >
         ⋮⋮
-      </button>
+      </button>}
     </article>
   );
 }

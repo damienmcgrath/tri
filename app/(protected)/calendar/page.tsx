@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
 import { computeWeekMinuteTotals, computeWeekSessionCounts } from "@/lib/training/week-metrics";
+import { buildCalendarDisplayItems } from "@/lib/calendar/day-items";
 
 type Session = {
   id: string;
@@ -25,17 +26,6 @@ type LegacyPlannedSession = {
   created_at: string;
 };
 
-type CompletedItem = {
-  id: string;
-  date: string;
-  sport: string;
-  duration_min: number;
-  distance_km: number | null;
-  avg_hr: number | null;
-  avg_power: number | null;
-  linked_session_id?: string;
-};
-
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -51,27 +41,6 @@ function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function getSessionStatus(session: Pick<Session, "date" | "sport" | "notes" | "status">, completionLedger: Record<string, number>) {
-  if (session.status) {
-    return session.status;
-  }
-
-  const isSkipped = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(session.notes ?? "");
-  if (isSkipped) {
-    return "skipped" as const;
-  }
-
-  const key = `${session.date}:${session.sport}`;
-  const completedCount = completionLedger[key] ?? 0;
-
-  if (completedCount > 0) {
-    completionLedger[key] = completedCount - 1;
-    return "completed" as const;
-  }
-
-  return "planned" as const;
 }
 
 export default async function CalendarPage({ searchParams }: { searchParams?: { weekStart?: string } }) {
@@ -160,79 +129,28 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .from("completed_activities")
       .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
       .eq("user_id", user.id)
-      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
-      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
+      .gte("start_time_utc", `${addDays(weekStart, -1)}T00:00:00.000Z`)
+      .lt("start_time_utc", `${addDays(weekEnd, 1)}T00:00:00.000Z`),
     supabase
       .from("session_activity_links")
       .select("planned_session_id,completed_activity_id")
       .eq("user_id", user.id)
   ]);
 
-  const activityById = new Map<string, CompletedItem>();
-  (activities ?? []).forEach((activity: any) => {
-    activityById.set(activity.id, {
-      id: activity.id,
-      date: String(activity.start_time_utc).slice(0, 10),
-      sport: activity.sport_type,
-      duration_min: Math.round(Number(activity.duration_sec ?? 0) / 60),
-      distance_km: activity.distance_m ? Number(activity.distance_m) / 1000 : null,
-      avg_hr: activity.avg_hr,
-      avg_power: activity.avg_power
-    });
+  const timeZone =
+    (user.user_metadata && typeof user.user_metadata.timezone === "string" && user.user_metadata.timezone) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "UTC";
+
+  const sessions = buildCalendarDisplayItems({
+    sessions: normalizedSessions,
+    activities: (activities ?? []) as any[],
+    links: (links ?? []) as any[],
+    legacyCompleted: (legacyCompleted ?? []) as Array<{ date: string; sport: string }>,
+    timeZone,
+    weekStart,
+    weekEndExclusive: weekEnd
   });
-
-  const linkedBySession = new Map<string, CompletedItem[]>();
-  const linkedActivityIds = new Set<string>();
-  (links ?? []).forEach((link: any) => {
-    const activity = activityById.get(link.completed_activity_id);
-    if (!activity) return;
-    linkedActivityIds.add(activity.id);
-    const list = linkedBySession.get(link.planned_session_id) ?? [];
-    list.push({ ...activity, linked_session_id: link.planned_session_id });
-    linkedBySession.set(link.planned_session_id, list);
-  });
-
-  const unassignedByDate = new Map<string, number>();
-  [...activityById.values()]
-    .filter((item) => !linkedActivityIds.has(item.id))
-    .forEach((item) => {
-      unassignedByDate.set(item.date, (unassignedByDate.get(item.date) ?? 0) + 1);
-    });
-
-  const completionLedger = ((legacyCompleted ?? []) as Array<{ date: string; sport: string }>).reduce<Record<string, number>>((acc, item) => {
-    const key = `${item.date}:${item.sport}`;
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-
-
-  const sessions = normalizedSessions.map((session) => {
-    const linked = linkedBySession.get(session.id) ?? [];
-    const linkedStats = linked[0]
-      ? {
-          durationMin: linked.reduce((sum, item) => sum + item.duration_min, 0),
-          distanceKm: linked.reduce((sum, item) => sum + (item.distance_km ?? 0), 0),
-          avgHr: linked[0].avg_hr,
-          avgPower: linked[0].avg_power
-        }
-      : null;
-
-    return {
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      type: session.type,
-      duration: session.duration_minutes ?? 0,
-      notes: session.notes,
-      created_at: session.created_at,
-      status: linked.length > 0 ? ("completed" as const) : getSessionStatus(session, completionLedger),
-      linkedActivityCount: linked.length,
-      linkedStats,
-      unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0),
-      is_key: Boolean((session as any).is_key)
-    };
-  });
-
 
   const countMetrics = computeWeekSessionCounts(
     sessions.map((session) => ({
@@ -254,7 +172,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       isKey: session.is_key
     }))
   );
-  const unmatchedUploads = [...unassignedByDate.values()].reduce((sum, count) => sum + count, 0);
+  const unmatchedUploads = sessions.filter((item) => item.displayType === "completed_activity").length;
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
 
