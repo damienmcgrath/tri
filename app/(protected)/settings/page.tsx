@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ThemePicker } from "./theme-picker";
+
 export default function SettingsPage() {
   return (
     <section className="space-y-4">
@@ -21,6 +23,8 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-muted">Upload TCX files and review recent ingestion events.</p>
         </Link>
       </div>
+
+      <ThemePicker />
     </section>
   );
 }
