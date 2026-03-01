@@ -14,6 +14,7 @@ type WeekProgressCardProps = {
   plannedTotalMinutes: number;
   completedTotalMinutes: number;
   disciplines: Discipline[];
+  showStatusChip?: boolean;
 };
 
 function formatMinutes(minutes: number) {
@@ -25,7 +26,8 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 export function WeekProgressCard({
   plannedTotalMinutes,
   completedTotalMinutes,
-  disciplines
+  disciplines,
+  showStatusChip = true
 }: WeekProgressCardProps) {
   const [hideEmpty, setHideEmpty] = useState(true);
 
@@ -60,10 +62,12 @@ export function WeekProgressCard({
     <article className="surface p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Week Progress</h2>
-        <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
-          {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
-          <span>{chipLabel}</span>
-        </span>
+        {showStatusChip ? (
+          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
+            {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
+            <span>{chipLabel}</span>
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-4">
