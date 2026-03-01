@@ -152,6 +152,69 @@
   --chart-5: 221 20% 72%;
 }
 
+:root[data-theme="clinical-coral"] {
+  --background: 210 25% 97%;
+  --foreground: 218 28% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 218 28% 18%;
+  --muted: 210 24% 94%;
+  --muted-foreground: 216 18% 34%;
+  --border: 215 18% 82%;
+  --input: 215 18% 82%;
+  --primary: 15 82% 58%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 15 82% 58%;
+  --chart-1: 15 82% 58%;
+  --chart-2: 204 40% 52%;
+  --chart-3: 188 32% 46%;
+  --chart-4: 254 30% 56%;
+  --chart-5: 220 14% 48%;
+  --success: 150 52% 36%;
+  --warning: 38 84% 52%;
+  --danger: 2 69% 56%;
+  --surface-2: 210 22% 95%;
+  --accent-recovery: 194 34% 44%;
+  --ai-accent-glow: 207 38% 72%;
+  --signal-neutral: 216 16% 54%;
+}
+
+:root[data-theme="clinical-coral"][data-color-scheme="dark"] {
+  color-scheme: dark;
+  --background: 222 24% 11%;
+  --foreground: 210 22% 94%;
+  --card: 221 20% 14%;
+  --card-foreground: 210 22% 94%;
+  --muted: 221 16% 18%;
+  --muted-foreground: 216 12% 70%;
+  --border: 217 14% 29%;
+  --input: 217 14% 29%;
+  --primary: 15 82% 60%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 15 82% 60%;
+  --chart-1: 15 82% 60%;
+  --chart-2: 206 48% 62%;
+  --chart-3: 188 36% 56%;
+  --chart-4: 255 38% 66%;
+  --chart-5: 220 16% 66%;
+  --success: 151 46% 52%;
+  --warning: 38 84% 58%;
+  --danger: 2 70% 64%;
+  --surface-2: 221 18% 16%;
+  --accent-recovery: 185 34% 54%;
+  --ai-accent-glow: 208 48% 24%;
+  --signal-neutral: 216 12% 70%;
+}
+
+:root[data-theme="clinical-coral"] .app-shell::before {
+  background: linear-gradient(165deg, hsl(var(--bg)) 12%, hsl(var(--bg-elevated)) 88%);
+  animation: none;
+}
+
+:root[data-theme="clinical-coral"] .shell-header::before {
+  background: none;
+  opacity: 0;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme]) {
     color-scheme: dark;
@@ -283,7 +346,7 @@
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
-    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+    @apply rounded-2xl shadow-sm;
     transition:
       border-color var(--motion-standard) var(--motion-ease),
       box-shadow var(--motion-standard) var(--motion-ease),
@@ -291,7 +354,7 @@
   }
 
   .surface:hover {
-    border-color: hsl(var(--ai-accent-core) / 0.38);
+    border-color: hsl(var(--border));
   }
 
   .surface-subtle {
@@ -306,11 +369,9 @@
 
   .priority-card-primary {
     @apply surface p-6 md:p-7;
-    border-color: hsl(var(--accent-performance) / 0.45);
-    background:
-      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+    background: hsl(var(--bg-elevated));
+    border-color: hsl(var(--border));
+    border-left: 2px solid hsl(var(--accent-performance));
   }
 
   .priority-card-secondary {
@@ -319,11 +380,8 @@
 
   .priority-card-emphasis {
     @apply surface p-5 md:p-6;
-    border-color: hsl(var(--accent-performance) / 0.4);
-    background:
-      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
   }
 
   .priority-card-supporting {
@@ -343,18 +401,9 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    border: 1px solid hsl(var(--accent-performance) / 0.65);
-    background:
-      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
-      repeating-linear-gradient(
-        115deg,
-        hsl(0 0% 100% / 0.16) 0,
-        hsl(0 0% 100% / 0.16) 1px,
-        transparent 1px,
-        transparent 5px
-      );
-    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm;
+    border: 1px solid hsl(var(--accent-performance) / 0.7);
+    background: hsl(var(--accent-performance));
   }
 
   .btn-primary:hover {
@@ -400,8 +449,8 @@
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible,
   .surface:focus-within {
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
-    border-color: hsl(var(--ring) / 0.55);
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.28);
+    border-color: hsl(var(--ring) / 0.5);
   }
 
   .label-base {

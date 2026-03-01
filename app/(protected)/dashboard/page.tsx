@@ -222,12 +222,12 @@ export default async function DashboardPage({
       label: getDisciplineMeta(sport).label,
       color:
         sport === "swim"
-          ? "#56B6D9"
+          ? "hsl(var(--chart-2))"
           : sport === "bike"
-            ? "#6BAA75"
+            ? "hsl(var(--chart-3))"
             : sport === "run"
-              ? "#C48772"
-              : "#9A86C8"
+              ? "hsl(var(--chart-1))"
+              : "hsl(var(--chart-4))"
     };
   }).sort((a, b) => (b.planned - b.completed) - (a.planned - a.completed));
 
@@ -305,15 +305,15 @@ export default async function DashboardPage({
               <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
               <p className="priority-subtitle">
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
-                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
+                {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Key session</span> : null}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
             </>
           ) : overdueKeySession ? (
             <>
               <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
               <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
             </>
           ) : completedTodaySessions.length > 0 ? (
             <>
@@ -322,7 +322,7 @@ export default async function DashboardPage({
                 {completedTodaySummary}
                 {completedTodaySessions.length > 2 ? ` • +${completedTodaySessions.length - 2} more completed` : ""}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           ) : (
             <>
@@ -331,7 +331,7 @@ export default async function DashboardPage({
                 Keep momentum by pulling one session forward
                 {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -359,7 +359,7 @@ export default async function DashboardPage({
               ) : null}
             </div>
             {!nextPendingTodaySession && !overdueKeySession && completedTodaySessions.length === 0 ? (
-              <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
+              <Link href="/calendar" className="text-xs text-muted-foreground underline underline-offset-2">Why no session?</Link>
             ) : null}
           </div>
         </article>

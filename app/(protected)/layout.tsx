@@ -97,15 +97,15 @@ export default async function ProtectedLayout({ children }: { children: React.Re
             </div>
 
             <div className="hidden xl:block surface-subtle p-3">
-              <p className="text-xs uppercase tracking-[0.14em] text-muted">Training week</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Training week</p>
               {weekContext ? (
                 <>
                   <p className="mt-2 text-sm font-semibold">Week {weekContext.week_index} · {weekContext.focus}</p>
-                  <p className="mt-1 text-xs text-muted">Starts {weekContext.week_start_date}</p>
-                  <p className="mt-1 text-xs text-muted">Target: {weekContext.target_minutes ? `${weekContext.target_minutes} min` : "not set"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Starts {weekContext.week_start_date}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Target: {weekContext.target_minutes ? `${weekContext.target_minutes} min` : "not set"}</p>
                 </>
               ) : (
-                <p className="mt-2 text-sm text-muted">Create or activate a plan to see week context.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Create or activate a plan to see week context.</p>
               )}
               <Link href="/plan/builder" className="mt-3 inline-flex text-xs text-accent underline">Manage plan</Link>
             </div>

@@ -23,18 +23,18 @@ export function ProgressGlanceCard({
   const statusClassName = statusLabel === "Ahead"
     ? "signal-ready"
     : statusLabel === "On track"
-      ? "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"
+      ? "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--fg))]"
       : "signal-load";
 
   return (
     <Link href="#week-progress-details" className="block">
-      <article className="surface p-4 transition hover:border-[hsl(var(--fg)/0.22)]">
+      <article className="surface p-4 transition hover:border-border">
         <div className="flex items-center gap-4">
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))]">
             <div
               className="absolute inset-0 rounded-full"
               style={{
-                background: `conic-gradient(hsl(var(--signal-recovery) / 0.76) ${ringPct * 3.6}deg, hsl(var(--surface-2)) 0deg)`
+                background: `conic-gradient(hsl(var(--signal-recovery) / 0.72) ${ringPct * 3.6}deg, hsl(var(--surface-2)) 0deg)`
               }}
             />
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--surface-1))] text-xs font-semibold">
@@ -44,7 +44,7 @@ export function ProgressGlanceCard({
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
-            <p className="text-xs text-muted">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
+            <p className="text-xs text-muted-foreground">{remainingTimeLabel} remaining • {unmatchedExtraCount} unmatched extras • {missedPlannedCount} missed planned</p>
           </div>
 
           <div className="text-right">

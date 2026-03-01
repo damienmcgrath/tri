@@ -13,8 +13,8 @@ export default function RootLayout({
 }>) {
   const themeInitScript = `(() => {
     const storageKey = "tri.theme";
-    const fallbackTheme = "coach-studio";
-    const supportedThemes = new Set(["coach-studio", "ember-night"]);
+    const fallbackTheme = "clinical-coral";
+    const supportedThemes = new Set(["coach-studio", "clinical-coral", "ember-night"]);
     const storedTheme = window.localStorage.getItem(storageKey);
     const theme = storedTheme && supportedThemes.has(storedTheme) ? storedTheme : fallbackTheme;
     const colorScheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -24,7 +24,7 @@ export default function RootLayout({
   })();`;
 
   return (
-    <html lang="en" data-theme="coach-studio">
+    <html lang="en" data-theme="clinical-coral">
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

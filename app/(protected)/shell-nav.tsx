@@ -33,7 +33,7 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             ) : (
               <>
                 <span className="block font-medium">{item.label}</span>
-                <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">{item.semanticLabel}</span>
+                <span className="block text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{item.semanticLabel}</span>
               </>
             )}
           </Link>
@@ -56,7 +56,7 @@ export function MobileBottomTabs() {
               key={item.href}
               href={item.href}
               title={`${item.label} · ${item.semanticLabel}`}
-              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))]" : "text-muted"}`}
+              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "bg-[hsl(var(--accent-performance)/0.14)] text-[hsl(var(--accent-performance))]" : "text-muted-foreground"}`}
             >
               <span className="block">{item.label}</span>
               <span className="block text-[10px] uppercase tracking-[0.12em]">{item.semanticLabel}</span>

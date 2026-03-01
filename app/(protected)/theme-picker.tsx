@@ -6,6 +6,7 @@ const STORAGE_KEY = "tri.theme";
 
 const THEMES = [
   { value: "coach-studio", label: "Coach Studio" },
+  { value: "clinical-coral", label: "Clinical Coral" },
   { value: "ember-night", label: "Ember Night" }
 ] as const;
 
