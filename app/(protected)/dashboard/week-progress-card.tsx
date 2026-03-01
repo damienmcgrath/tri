@@ -62,6 +62,7 @@ export function WeekProgressCard({
   const emptyCount = disciplineRows.filter((item) => item.visiblePlannedMinutes === 0 && (item.extraMinutes ?? 0) === 0).length;
   const visibleDisciplines = hideEmpty ? disciplineRows.filter((item) => item.visiblePlannedMinutes > 0 || (item.extraMinutes ?? 0) > 0) : disciplineRows;
   const biggestGap = [...disciplineRows].sort((a, b) => b.discGapMinutes - a.discGapMinutes)[0];
+  const focusDisciplineKey = biggestGap && biggestGap.discGapMinutes > 0 ? biggestGap.key : null;
 
   const chipLabel = remainingMinutes > 0 ? "Behind plan" : remainingMinutes === 0 ? "On target" : "Ahead of plan";
 
@@ -119,34 +120,46 @@ export function WeekProgressCard({
               const barAriaLabel = item.discOverMinutes > 0
                 ? `${item.label} ${Math.round(item.visibleCompletedMinutes)} of ${Math.round(item.visiblePlannedMinutes)} minutes, over ${Math.round(item.discOverMinutes)} minutes`
                 : `${item.label} ${Math.round(item.visibleCompletedMinutes)} of ${Math.round(item.visiblePlannedMinutes)} minutes, gap ${Math.round(item.discGapMinutes)} minutes`;
+              const isFocusDiscipline = item.key === focusDisciplineKey;
+              const isCompletedDiscipline = item.visiblePlannedMinutes > 0 && item.discGapMinutes === 0 && item.discOverMinutes === 0;
 
               return (
                 <div key={item.key} className="rounded-lg px-2 py-1 transition hover:bg-[hsl(var(--bg-card))]">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
+                      <span className={`h-2 w-2 rounded-full ${isFocusDiscipline ? "bg-[hsl(var(--accent-performance))]" : "bg-[hsl(var(--fg-muted)/0.45)]"}`} aria-hidden />
                       <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
                     <div className="ml-auto flex items-center justify-end gap-2">
-                      <div className="w-[96px] text-right text-xs text-[hsl(var(--fg-muted))] tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <div className="w-[96px] text-right text-xs text-[hsl(var(--fg))] tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
                         {Math.round(item.visibleCompletedMinutes)} / {Math.round(item.visiblePlannedMinutes)} min
                       </div>
                       {chipLabel ? (
-                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-xs font-medium ${item.discGapMinutes > 0 ? "signal-load" : item.discOverMinutes > 0 ? "signal-risk" : "signal-ready"}`}>
+                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-xs font-medium ${item.discGapMinutes > 0 ? "signal-load" : "signal-risk"}`}>
                           {chipLabel}
+                        </span>
+                      ) : isCompletedDiscipline ? (
+                        <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-[11px] font-medium text-[hsl(var(--fg-muted))]">
+                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success)/0.62)]" />
+                          Complete
                         </span>
                       ) : null}
                     </div>
                   </div>
-                  <div className="progress-track relative mt-1 h-2 overflow-hidden rounded-full" aria-label={barAriaLabel} role="img">
-                    <div className="progress-fill-recovery h-full rounded-full" style={{ width: `${item.discPercentCapped * 100}%` }} />
+                  <div className="progress-track relative mt-1 h-2 overflow-hidden rounded-full bg-[hsl(var(--surface-2))]" aria-label={barAriaLabel} role="img">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${item.discPercentCapped * 100}%`,
+                        background: isFocusDiscipline ? "hsl(var(--accent-performance))" : "hsl(var(--fg-muted) / 0.42)"
+                      }}
+                    />
                     {item.discOverMinutes > 0 ? (
                       <div
-                        className="progress-fill-load absolute inset-y-0 right-0 rounded-r-full"
+                        className="absolute inset-y-0 right-0 rounded-r-full bg-[hsl(var(--warning))]"
                         style={{
                           width: `${overTailWidthPx}px`,
-                          opacity: 0.8,
-                          backgroundImage: "repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 12px)"
+                          opacity: 0.72
                         }}
                       />
                     ) : null}
