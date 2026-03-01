@@ -140,7 +140,7 @@ export function WeekProgressCard({
                         </span>
                       ) : isCompletedDiscipline ? (
                         <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-[11px] font-medium text-[hsl(var(--fg-muted))]">
-                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success)/0.62)]" />
+                          <span aria-hidden className="inline-flex h-3 w-3 items-center justify-center rounded-full bg-[hsl(var(--success)/0.18)] text-[9px] leading-none text-[hsl(var(--success)/0.78)]">✓</span>
                           Complete
                         </span>
                       ) : null}
