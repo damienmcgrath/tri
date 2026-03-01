@@ -293,7 +293,7 @@ export default async function DashboardPage({
           unmatchedExtraCount={unmatchedExtraSessions}
         />
 
-        <article className="priority-card-primary">
+        <article className="priority-card-primary next-action-card">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
             <>
@@ -302,22 +302,22 @@ export default async function DashboardPage({
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
                 {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
             </>
           ) : overdueKeySession ? (
             <>
               <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
               <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
             </>
           ) : completedTodaySessions.length > 0 ? (
             <>
-              <h1 className="priority-title">Done for today</h1>
+              <h1 className="priority-title flex items-center gap-2">Done for today <span aria-hidden className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success)/0.7)]">✓</span></h1>
               <p className="priority-subtitle">
                 {completedTodaySummary}
                 {completedTodaySessions.length > 2 ? ` • +${completedTodaySessions.length - 2} more completed` : ""}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           ) : (
             <>
@@ -326,7 +326,7 @@ export default async function DashboardPage({
                 Keep momentum by pulling one session forward
                 {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -360,8 +360,10 @@ export default async function DashboardPage({
         </article>
 
         <div className="space-y-4">
-          <article className="priority-card-supporting">
-            <p className="priority-kicker">This week&apos;s focus</p>
+          <article className="priority-card-supporting dashboard-supporting-card">
+            <div className="dashboard-supporting-header">
+              <p className="priority-kicker">This week&apos;s focus</p>
+            </div>
             <h2 className="priority-title">{weeklyFocusText}</h2>
             <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
             <div className="mt-4">
@@ -369,8 +371,10 @@ export default async function DashboardPage({
             </div>
           </article>
 
-          <article id="week-progress-details" className="priority-card-supporting scroll-mt-20">
-            <p className="priority-kicker">Week progress</p>
+          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card scroll-mt-20">
+            <div className="dashboard-supporting-header">
+              <p className="priority-kicker">Week progress</p>
+            </div>
             <h2 className="priority-title">Discipline breakdown and gaps.</h2>
             <div className="mt-4">
               <WeekProgressCard

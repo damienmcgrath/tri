@@ -43,6 +43,115 @@
   --motion-standard: 240ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
   --motion-ambient-duration: 22s;
+
+  /* shadcn-compatible semantic aliases */
+  --background: var(--bg);
+  --card: var(--bg-elevated);
+  --muted-foreground: var(--fg-muted);
+  --border-color: var(--border);
+  --ring-color: var(--ring);
+}
+
+:root[data-theme="clinical-coral"] {
+  color-scheme: light;
+  --surface: 210 14% 96%;
+  --surface-elevated: 0 0% 100%;
+  --surface-soft: 210 10% 95%;
+  --surface-1: var(--surface-elevated);
+  --surface-2: 210 10% 93%;
+
+  --text-primary: 215 30% 20%;
+  --text-secondary: 215 16% 28%;
+  --text-tertiary: 216 12% 42%;
+
+  --accent-performance: 18 87% 57%;
+  --accent-recovery: 199 42% 44%;
+
+  --signal-ready: 155 48% 37%;
+  --signal-load: 39 89% 53%;
+  --signal-risk: 2 70% 55%;
+  --signal-recovery: 201 36% 46%;
+  --signal-neutral: 215 14% 54%;
+
+  --success: var(--signal-ready);
+  --warning: var(--signal-load);
+  --danger: var(--signal-risk);
+
+  --chart-1: 18 87% 57%;
+  --chart-2: 196 52% 45%;
+  --chart-3: 221 38% 53%;
+  --chart-4: 268 36% 58%;
+  --chart-5: 209 13% 55%;
+
+  --ai-accent-core: var(--accent-performance);
+  --ai-accent-glow: 20 88% 90%;
+
+  --bg: var(--surface);
+  --bg-elevated: var(--surface-elevated);
+  --bg-card: 210 10% 95%;
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
+  --border: 210 6% 86%;
+  --ring: 18 87% 57%;
+  --accent: var(--ai-accent-core);
+  --accent-soft: 195 40% 91%;
+
+  --background: var(--bg);
+  --card: var(--bg-elevated);
+  --muted-foreground: var(--fg-muted);
+  --border-color: var(--border);
+  --ring-color: var(--ring);
+}
+
+:root[data-theme="carbon-coach"] {
+  color-scheme: dark;
+  --surface: 220 16% 13%;
+  --surface-elevated: 220 14% 16%;
+  --surface-soft: 220 13% 18%;
+  --surface-1: var(--surface-elevated);
+  --surface-2: 220 12% 21%;
+
+  --text-primary: 210 24% 94%;
+  --text-secondary: 214 18% 82%;
+  --text-tertiary: 214 14% 72%;
+
+  --accent-performance: 18 90% 64%;
+  --accent-recovery: 198 34% 60%;
+
+  --signal-ready: 151 30% 56%;
+  --signal-load: 37 40% 62%;
+  --signal-risk: 4 47% 64%;
+  --signal-recovery: 198 29% 60%;
+  --signal-neutral: 214 13% 68%;
+
+  --success: var(--signal-ready);
+  --warning: var(--signal-load);
+  --danger: var(--signal-risk);
+
+  --chart-1: 18 90% 64%;
+  --chart-2: 198 34% 60%;
+  --chart-3: 220 33% 66%;
+  --chart-4: 258 25% 68%;
+  --chart-5: 164 21% 62%;
+
+  --ai-accent-core: var(--accent-performance);
+  --ai-accent-glow: 18 36% 26%;
+
+  --bg: var(--surface);
+  --bg-elevated: var(--surface-elevated);
+  --bg-card: var(--surface-soft);
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
+  --border: 220 10% 30%;
+  --ring: 18 90% 64%;
+  --accent: var(--ai-accent-core);
+  --accent-soft: 220 11% 24%;
+
+  --background: var(--bg);
+  --card: var(--bg-elevated);
+  --muted-foreground: var(--fg-muted);
+  --border-color: var(--border);
+  --ring-color: var(--ring);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +170,49 @@
     --ai-accent-glow: 204 70% 19%;
     --border: 218 18% 25%;
     --signal-neutral: 216 12% 70%;
+  }
+
+  :root[data-theme="clinical-coral"] {
+    color-scheme: dark;
+    --surface: 218 24% 9%;
+    --surface-elevated: 220 20% 12%;
+    --surface-soft: 220 17% 16%;
+    --surface-1: var(--surface-elevated);
+    --surface-2: 220 16% 18%;
+
+    --text-primary: 212 25% 94%;
+    --text-secondary: 214 18% 79%;
+    --text-tertiary: 215 14% 67%;
+
+    --accent-performance: 18 90% 64%;
+    --accent-recovery: 193 60% 62%;
+
+    --signal-ready: 152 56% 52%;
+    --signal-load: 40 92% 58%;
+    --signal-risk: 4 84% 66%;
+    --signal-recovery: 195 55% 60%;
+    --signal-neutral: 215 12% 67%;
+
+    --success: var(--signal-ready);
+    --warning: var(--signal-load);
+    --danger: var(--signal-risk);
+
+    --chart-1: 18 90% 64%;
+    --chart-2: 191 62% 62%;
+    --chart-3: 221 60% 66%;
+    --chart-4: 268 55% 70%;
+    --chart-5: 212 18% 64%;
+
+    --ai-accent-glow: 18 56% 26%;
+    --border: 217 16% 30%;
+    --ring: 18 90% 64%;
+    --accent-soft: 214 22% 22%;
+
+    --background: var(--bg);
+    --card: var(--bg-elevated);
+    --muted-foreground: var(--fg-muted);
+    --border-color: var(--border);
+    --ring-color: var(--ring);
   }
 }
 
@@ -140,6 +292,68 @@
     animation: none;
   }
 
+  :root[data-theme="clinical-coral"] .app-shell::before {
+    background: linear-gradient(165deg, hsl(var(--bg)) 8%, hsl(var(--bg-elevated)) 92%);
+  }
+
+
+  :root[data-theme="clinical-coral"] .app-shell::after,
+  :root[data-theme="clinical-coral"] .shell-header::before {
+    opacity: 0;
+  }
+
+  :root[data-theme="carbon-coach"] .app-shell::before,
+  :root[data-theme="carbon-coach"] .app-shell::after,
+  :root[data-theme="carbon-coach"] .shell-header::before {
+    opacity: 0;
+    animation: none;
+  }
+
+  :root[data-theme="carbon-coach"] .surface {
+    border-color: hsl(var(--border) / 0.72);
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 6px 12px hsl(220 34% 5% / 0.16);
+  }
+
+  :root[data-theme="carbon-coach"] .surface:hover {
+    transform: translateY(-1px);
+    border-color: hsl(var(--border) / 0.96);
+    box-shadow: 0 10px 18px hsl(220 34% 5% / 0.2);
+  }
+
+  :root[data-theme="carbon-coach"] .surface-subtle {
+    border-color: hsl(var(--border) / 0.58);
+    background: hsl(var(--surface-2) / 0.74);
+    box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.24);
+  }
+
+  :root[data-theme="carbon-coach"] .priority-card-primary,
+  :root[data-theme="carbon-coach"] .priority-card-emphasis,
+  :root[data-theme="carbon-coach"] .priority-card-supporting {
+    border-color: hsl(var(--border) / 0.74);
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 6px 12px hsl(220 34% 5% / 0.16);
+  }
+
+  :root[data-theme="clinical-coral"] .surface {
+    border-color: hsl(var(--border) / 0.62);
+    @apply shadow-sm;
+  }
+
+
+  :root[data-theme="clinical-coral"] .surface-subtle {
+    border-color: hsl(var(--border) / 0.42);
+    background: hsl(var(--surface-2) / 0.68);
+    box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.22);
+  }
+
+  :root[data-theme="clinical-coral"] .priority-card-primary,
+  :root[data-theme="clinical-coral"] .priority-card-emphasis {
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
+  }
+
 
   .shell-header {
     @apply relative z-30 overflow-visible;
@@ -171,7 +385,7 @@
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
-    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+    @apply rounded-2xl shadow-sm;
     transition:
       border-color var(--motion-standard) var(--motion-ease),
       box-shadow var(--motion-standard) var(--motion-ease),
@@ -194,11 +408,9 @@
 
   .priority-card-primary {
     @apply surface p-6 md:p-7;
-    border-color: hsl(var(--accent-performance) / 0.45);
-    background:
-      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
   }
 
   .priority-card-secondary {
@@ -207,16 +419,79 @@
 
   .priority-card-emphasis {
     @apply surface p-5 md:p-6;
-    border-color: hsl(var(--accent-performance) / 0.4);
-    background:
-      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
   }
 
   .priority-card-supporting {
-    @apply surface-subtle p-4;
+    @apply surface p-4 shadow-none;
+    border-color: hsl(var(--border) / 0.56);
+    background: hsl(var(--bg-elevated));
   }
+
+  .next-action-card {
+    position: relative;
+    border-color: hsl(var(--border) / 0.64);
+    box-shadow: 0 4px 10px hsl(220 24% 7% / 0.14);
+  }
+
+  :root[data-theme="clinical-coral"] .next-action-card,
+  :root[data-theme="carbon-coach"] .next-action-card {
+    border-color: hsl(var(--border) / 0.72);
+  }
+
+  :root[data-theme="clinical-coral"] .next-action-card::before,
+  :root[data-theme="carbon-coach"] .next-action-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 2px;
+    border-radius: 999px;
+    background: hsl(var(--accent-performance) / 0.9);
+  }
+
+
+  .dashboard-supporting-card {
+    border-color: hsl(var(--border) / 0.44);
+    box-shadow: none;
+  }
+
+  .dashboard-supporting-header {
+    @apply mb-2;
+  }
+
+  .nav-item-active {
+    position: relative;
+    background: hsl(var(--surface-2));
+    color: hsl(var(--fg));
+    font-weight: 600;
+  }
+
+
+  :root[data-theme="clinical-coral"] .shell-header nav a:not(.nav-item-active),
+  :root[data-theme="carbon-coach"] .shell-header nav a:not(.nav-item-active) {
+    color: hsl(var(--fg-muted) / 0.96);
+  }
+  .nav-item-active::before {
+    content: "";
+    position: absolute;
+    left: 0.38rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 65%;
+    border-radius: 999px;
+    background: hsl(var(--accent-performance));
+  }
+
+  .nav-item-active--mobile::before {
+    left: 0.5rem;
+    height: 55%;
+  }
+
 
   .priority-title {
     @apply text-lg font-semibold text-[hsl(var(--fg))];
@@ -227,26 +502,44 @@
   }
 
   .priority-kicker {
-    @apply text-[11px] uppercase tracking-[0.14em] text-accent;
+    @apply relative inline-flex items-center pb-1 text-[11px] font-semibold uppercase tracking-[0.18em];
+    color: hsl(var(--fg) / 0.68);
+  }
+
+  :root[data-theme="carbon-coach"] .priority-kicker {
+    color: hsl(var(--text-secondary));
+  }
+
+  .priority-kicker::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: hsl(var(--border) / 0.56);
   }
 
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    border: 1px solid hsl(var(--accent-performance) / 0.65);
-    background:
-      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
-      repeating-linear-gradient(
-        115deg,
-        hsl(0 0% 100% / 0.16) 0,
-        hsl(0 0% 100% / 0.16) 1px,
-        transparent 1px,
-        transparent 5px
-      );
-    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
+    border: 1px solid hsl(var(--accent-performance) / 0.7);
+    background: hsl(var(--accent-performance));
+    box-shadow: 0 1px 2px hsl(var(--accent-performance) / 0.28);
   }
 
   .btn-primary:hover {
     @apply brightness-110;
+  }
+
+  :root[data-theme="carbon-coach"] .btn-primary {
+    border-color: hsl(var(--accent-performance) / 0.88);
+    background: hsl(var(--accent-performance));
+    color: hsl(220 33% 10%);
+    box-shadow: none;
+  }
+
+  :root[data-theme="carbon-coach"] .btn-primary:hover {
+    filter: brightness(1.05);
   }
 
   .btn-secondary {
@@ -254,6 +547,52 @@
     background: hsl(var(--bg-card));
     border: 1px solid hsl(var(--border));
     color: hsl(var(--fg));
+  }
+
+  :root[data-theme="carbon-coach"] .btn-secondary {
+    background: hsl(var(--surface-soft));
+    border-color: hsl(var(--border) / 0.92);
+    color: hsl(var(--fg));
+    box-shadow: none;
+  }
+
+  .btn-header-cta {
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-xs font-medium;
+    background: hsl(var(--bg-elevated) / 0.7);
+    border: 1px solid hsl(var(--accent-performance) / 0.38);
+    color: hsl(var(--accent-performance));
+    box-shadow: none;
+    cursor: pointer;
+  }
+
+  :root[data-theme="carbon-coach"] .btn-header-cta {
+    background: hsl(var(--surface-soft));
+    border-color: hsl(var(--accent-performance) / 0.52);
+    color: hsl(var(--accent-performance));
+  }
+
+  .btn-header-cta:hover {
+    background: hsl(var(--accent-performance) / 0.08);
+    border-color: hsl(var(--accent-performance) / 0.52);
+  }
+
+  .btn-header-cta:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .status-badge-passive {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium;
+    color: hsl(var(--fg-muted));
+    border-color: hsl(var(--border) / 0.5);
+    background: hsl(var(--surface-2) / 0.5);
+    cursor: default;
+  }
+
+  :root[data-theme="carbon-coach"] .status-badge-passive {
+    color: hsl(var(--text-secondary));
+    border-color: hsl(var(--border) / 0.92);
+    background: hsl(var(--surface-soft));
   }
 
   .input-base {
@@ -288,8 +627,17 @@
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible,
   .surface:focus-within {
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
+    box-shadow: none;
     border-color: hsl(var(--ring) / 0.55);
+  }
+
+  :root[data-theme="clinical-coral"] .btn-primary:focus-visible,
+  :root[data-theme="clinical-coral"] .btn-secondary:focus-visible,
+  :root[data-theme="carbon-coach"] .btn-primary:focus-visible,
+  :root[data-theme="carbon-coach"] .btn-secondary:focus-visible {
+    outline: 2px solid hsl(var(--accent-performance));
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
   .label-base {
@@ -312,7 +660,7 @@
 
   .pill-accent {
     border-color: hsl(var(--accent-performance) / 0.5);
-    background: hsl(var(--accent-performance) / 0.14);
+    background: transparent;
     color: hsl(var(--accent-performance));
   }
 
@@ -320,6 +668,13 @@
     border-color: hsl(var(--accent-performance) / 0.35);
     background: hsl(var(--accent-performance) / 0.08);
     color: hsl(var(--accent-performance));
+  }
+
+  :root[data-theme="carbon-coach"] .pill-accent,
+  :root[data-theme="carbon-coach"] .pill-accent-soft {
+    border-color: hsl(var(--border) / 0.9);
+    background: hsl(var(--surface-soft));
+    color: hsl(var(--text-secondary));
   }
 
   /* Motif: restrained "lab diagram" linework reserved for hero/header surfaces only. */
@@ -417,6 +772,18 @@
     color: hsl(var(--signal-risk));
   }
 
+  :root[data-theme="carbon-coach"] .signal-ready,
+  :root[data-theme="carbon-coach"] .signal-load,
+  :root[data-theme="carbon-coach"] .signal-risk,
+  :root[data-theme="carbon-coach"] .signal-recovery,
+  :root[data-theme="carbon-coach"] .signal-neutral,
+  :root[data-theme="carbon-coach"] .status-chip-planned,
+  :root[data-theme="carbon-coach"] .status-chip-completed,
+  :root[data-theme="carbon-coach"] .status-chip-skipped {
+    border-color: hsl(var(--border) / 0.88);
+    background: hsl(var(--surface-soft));
+  }
+
   .status-card-transition {
     transition:
       opacity var(--motion-fast) var(--motion-ease),
@@ -446,12 +813,24 @@
     background: hsl(var(--surface-soft));
   }
 
+  :root[data-theme="carbon-coach"] .progress-track {
+    background: hsl(var(--surface-2));
+  }
+
   .progress-fill-recovery {
     background: linear-gradient(90deg, hsl(var(--signal-recovery)), hsl(var(--signal-ready)));
   }
 
+  :root[data-theme="carbon-coach"] .progress-fill-recovery {
+    background: linear-gradient(90deg, hsl(var(--accent-performance) / 0.66), hsl(var(--accent-performance)));
+  }
+
   .progress-fill-load {
     background: linear-gradient(90deg, hsl(var(--signal-load) / 0.85), hsl(var(--signal-load)));
+  }
+
+  :root[data-theme="carbon-coach"] .progress-fill-load {
+    background: linear-gradient(90deg, hsl(var(--signal-neutral) / 0.66), hsl(var(--signal-neutral) / 0.88));
   }
 
   .discipline-texture-solid {
