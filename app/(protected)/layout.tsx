@@ -93,10 +93,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
               <ShellNavRail compact />
             </div>
             <div className="hidden xl:block">
-              <p className="text-xs uppercase tracking-[0.16em] text-accent">Primary nav</p>
-              <div className="mt-2">
-                <ShellNavRail />
-              </div>
+              <ShellNavRail />
             </div>
 
             <div className="hidden xl:block surface-subtle p-3">
