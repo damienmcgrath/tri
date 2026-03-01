@@ -91,7 +91,7 @@ export function WeekProgressCard({
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted">Extra work: {formatMinutes(extraTotalMinutes)}</p>
+          <p className="text-xs text-[hsl(var(--fg-muted))]">Extra work: {formatMinutes(extraTotalMinutes)}</p>
         </div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">By discipline</p>
@@ -99,7 +99,7 @@ export function WeekProgressCard({
             <button
               type="button"
               onClick={() => setHideEmpty((current) => !current)}
-              className="text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
+              className="text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
               aria-pressed={!hideEmpty}
             >
               {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
@@ -108,7 +108,7 @@ export function WeekProgressCard({
         </div>
 
         {visibleDisciplines.length === 0 ? (
-          <p className="text-xs text-muted">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
+          <p className="text-xs text-[hsl(var(--fg-muted))]">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
@@ -128,7 +128,7 @@ export function WeekProgressCard({
                       <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
                     <div className="ml-auto flex items-center justify-end gap-2">
-                      <div className="w-[96px] text-right text-xs text-muted tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <div className="w-[96px] text-right text-xs text-[hsl(var(--fg-muted))] tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
                         {Math.round(item.visibleCompletedMinutes)} / {Math.round(item.visiblePlannedMinutes)} min
                       </div>
                       {chipLabel ? (
@@ -158,7 +158,7 @@ export function WeekProgressCard({
         )}
       </div>
 
-      <a href="#coach-focus" className="mt-4 inline-block text-xs text-muted underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
+      <a href="#coach-focus" className="mt-4 inline-block text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
         {biggestGap && biggestGap.discGapMinutes > 0
           ? `Focus: ${biggestGap.label} +${formatMinutes(biggestGap.discGapMinutes)} (tap for why)`
           : "Focus: On track (tap for details)"}

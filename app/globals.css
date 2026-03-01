@@ -61,8 +61,8 @@
   --surface-2: 210 28% 95%;
 
   --text-primary: 215 30% 20%;
-  --text-secondary: 215 18% 37%;
-  --text-tertiary: 216 12% 52%;
+  --text-secondary: 215 20% 32%;
+  --text-tertiary: 216 14% 44%;
 
   --accent-performance: 18 87% 57%;
   --accent-recovery: 199 42% 44%;
@@ -91,7 +91,7 @@
   --bg-card: var(--surface-elevated);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 214 22% 84%;
+  --border: 214 22% 80%;
   --ring: 18 87% 57%;
   --accent: var(--ai-accent-core);
   --accent-soft: 195 40% 91%;
@@ -242,20 +242,24 @@
   }
 
   :root[data-theme="clinical-coral"] .app-shell::before {
-    background:
-      radial-gradient(circle at 22% 16%, hsl(var(--accent-recovery) / 0.08), transparent 40%),
-      radial-gradient(circle at 78% 80%, hsl(var(--surface-2) / 0.4), transparent 52%),
-      linear-gradient(165deg, hsl(var(--bg)) 8%, hsl(var(--bg-elevated)) 92%);
+    background: linear-gradient(165deg, hsl(var(--bg)) 8%, hsl(var(--bg-elevated)) 92%);
+  }
+
+
+  :root[data-theme="clinical-coral"] .app-shell::after,
+  :root[data-theme="clinical-coral"] .shell-header::before {
+    opacity: 0;
   }
 
   :root[data-theme="clinical-coral"] .surface {
-    @apply shadow-[0_8px_24px_-20px_rgba(15,23,42,0.22)];
+    @apply shadow-sm;
   }
 
   :root[data-theme="clinical-coral"] .priority-card-primary,
   :root[data-theme="clinical-coral"] .priority-card-emphasis {
+    border-color: hsl(var(--border));
     background: hsl(var(--bg-elevated));
-    box-shadow: 0 12px 30px -24px hsl(var(--accent-performance) / 0.34);
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
   }
 
 
@@ -289,7 +293,7 @@
   .surface {
     background: hsl(var(--bg-elevated));
     border: 1px solid hsl(var(--border));
-    @apply rounded-2xl shadow-[0_10px_40px_-24px_rgba(0,0,0,0.8)];
+    @apply rounded-2xl shadow-sm;
     transition:
       border-color var(--motion-standard) var(--motion-ease),
       box-shadow var(--motion-standard) var(--motion-ease),
@@ -312,11 +316,9 @@
 
   .priority-card-primary {
     @apply surface p-6 md:p-7;
-    border-color: hsl(var(--accent-performance) / 0.45);
-    background:
-      linear-gradient(145deg, hsl(var(--bg-elevated)) 35%, hsl(var(--accent-performance) / 0.08) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 20px 45px -30px hsl(var(--accent-performance) / 0.7);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
   }
 
   .priority-card-secondary {
@@ -325,16 +327,19 @@
 
   .priority-card-emphasis {
     @apply surface p-5 md:p-6;
-    border-color: hsl(var(--accent-performance) / 0.4);
-    background:
-      linear-gradient(150deg, hsl(var(--bg-elevated)) 55%, hsl(var(--accent-performance) / 0.07) 100%),
-      hsl(var(--bg-elevated));
-    box-shadow: 0 16px 34px -24px hsl(var(--accent-performance) / 0.6);
+    border-color: hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    box-shadow: 0 1px 2px hsl(215 25% 18% / 0.08);
   }
 
   .priority-card-supporting {
     @apply surface-subtle p-4;
   }
+
+  .next-action-card {
+    border-left: 2px solid hsl(var(--accent-performance));
+  }
+
 
   .priority-title {
     @apply text-lg font-semibold text-[hsl(var(--fg))];
@@ -350,17 +355,9 @@
 
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white;
-    border: 1px solid hsl(var(--accent-performance) / 0.65);
-    background:
-      linear-gradient(135deg, hsl(var(--accent-performance)) 0%, hsl(var(--accent-performance) / 0.82) 100%),
-      repeating-linear-gradient(
-        115deg,
-        hsl(0 0% 100% / 0.16) 0,
-        hsl(0 0% 100% / 0.16) 1px,
-        transparent 1px,
-        transparent 5px
-      );
-    box-shadow: 0 12px 26px -14px hsl(var(--accent-performance) / 0.88);
+    border: 1px solid hsl(var(--accent-performance) / 0.7);
+    background: hsl(var(--accent-performance));
+    box-shadow: 0 1px 2px hsl(var(--accent-performance) / 0.28);
   }
 
   .btn-primary:hover {
@@ -406,8 +403,8 @@
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible,
   .surface:focus-within {
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
-    border-color: hsl(var(--ring) / 0.55);
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.26);
+    border-color: hsl(var(--ring) / 0.52);
   }
 
   .label-base {

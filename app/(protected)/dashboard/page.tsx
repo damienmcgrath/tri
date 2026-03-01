@@ -293,7 +293,7 @@ export default async function DashboardPage({
           unmatchedExtraCount={unmatchedExtraSessions}
         />
 
-        <article className="priority-card-primary">
+        <article className="priority-card-primary next-action-card">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
             <>
@@ -302,13 +302,13 @@ export default async function DashboardPage({
                 {nextPendingTodaySession.duration_minutes} min • {getDisciplineMeta(nextPendingTodaySession.sport).label}
                 {nextPendingTodaySession.is_key ? <span className="ml-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Key session</span> : null}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState, nextPendingTodaySession)}</p>
             </>
           ) : overdueKeySession ? (
             <>
               <h1 className="priority-title">Key session missed: {overdueKeySession.type}</h1>
               <p className="priority-subtitle">Reschedule now to protect this week&apos;s intent.</p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState, overdueKeySession)}</p>
             </>
           ) : completedTodaySessions.length > 0 ? (
             <>
@@ -317,7 +317,7 @@ export default async function DashboardPage({
                 {completedTodaySummary}
                 {completedTodaySessions.length > 2 ? ` • +${completedTodaySessions.length - 2} more completed` : ""}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           ) : (
             <>
@@ -326,7 +326,7 @@ export default async function DashboardPage({
                 Keep momentum by pulling one session forward
                 {hasGapSuggestion ? ` — 30–45m easy ${biggestGap!.label.toLowerCase()} is the best fit.` : "."}
               </p>
-              <p className="mt-1 text-sm text-muted">{getWhyTodayMattersCopy(nextActionState)}</p>
+              <p className="mt-1 text-sm text-[hsl(var(--fg-muted))]">{getWhyTodayMattersCopy(nextActionState)}</p>
             </>
           )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

@@ -22,12 +22,13 @@ const THEME_OPTIONS: ThemeOption[] = [
 ];
 
 const STORAGE_KEY = "tri-theme";
+const DEFAULT_THEME = "clinical-coral";
 
 export function ThemePicker() {
-  const [theme, setTheme] = useState("default");
+  const [theme, setTheme] = useState(DEFAULT_THEME);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem(STORAGE_KEY) ?? "default";
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY) ?? DEFAULT_THEME;
     setTheme(savedTheme);
     if (savedTheme === "default") {
       document.documentElement.removeAttribute("data-theme");

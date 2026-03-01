@@ -11,14 +11,14 @@ export default function SettingsPage() {
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Link href="/settings/race" className="surface p-5 transition hover:border-cyan-400/40">
-          <p className="text-sm uppercase tracking-[0.16em] text-cyan-300">Race</p>
+        <Link href="/settings/race" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
+          <p className="text-sm uppercase tracking-[0.16em] text-accent">Race</p>
           <h2 className="mt-2 text-lg font-semibold">Race settings</h2>
           <p className="mt-1 text-sm text-muted">Set your race name and date for dashboard countdown context.</p>
         </Link>
 
-        <Link href="/settings/integrations" className="surface p-5 transition hover:border-cyan-400/40">
-          <p className="text-sm uppercase tracking-[0.16em] text-cyan-300">Integrations</p>
+        <Link href="/settings/integrations" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
+          <p className="text-sm uppercase tracking-[0.16em] text-accent">Integrations</p>
           <h2 className="mt-2 text-lg font-semibold">Garmin import</h2>
           <p className="mt-1 text-sm text-muted">Upload TCX files and review recent ingestion events.</p>
         </Link>
