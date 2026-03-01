@@ -18,6 +18,11 @@ const THEME_OPTIONS: ThemeOption[] = [
     label: "Clinical Coral",
     value: "clinical-coral",
     description: "Cool clinical surfaces with restrained coral accents."
+  },
+  {
+    label: "Sport Luxe",
+    value: "sport-luxe",
+    description: "Premium warm-neutral surfaces with confident coral highlights."
   }
 ];
 
