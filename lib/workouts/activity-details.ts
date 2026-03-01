@@ -65,12 +65,12 @@ export async function loadActivityDetails(activityId: string): Promise<ActivityD
 
   const { data: existingLinks } = await supabase
     .from("session_activity_links")
-    .select("planned_session_id,confidence")
+    .select("planned_session_id,confidence,confirmation_status")
     .eq("user_id", user.id)
     .eq("completed_activity_id", activity.id)
     .limit(1);
 
-  const link = existingLinks?.[0] ?? null;
+  const link = existingLinks?.find((item: any) => item.confirmation_status === "confirmed") ?? null;
   const activityStart = new Date(activity.start_time_utc);
   const windowStart = new Date(activityStart.getTime() - 6 * 3600 * 1000).toISOString();
   const windowEnd = new Date(activityStart.getTime() + 6 * 3600 * 1000).toISOString();

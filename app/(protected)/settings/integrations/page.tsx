@@ -9,7 +9,7 @@ type UploadRow = {
   status: "uploaded" | "parsed" | "matched" | "error";
   error_message: string | null;
   completed_activities: { id: string; sport_type: string; duration_sec: number; distance_m: number | null; schedule_status: "scheduled" | "unscheduled" }[];
-  session_activity_links: { planned_session_id: string | null }[];
+  session_activity_links: { planned_session_id: string | null; confirmation_status: "suggested" | "confirmed" | "rejected" }[];
 };
 
 type PlannedCandidate = {
@@ -59,7 +59,7 @@ export default async function IntegrationsPage() {
     uploadIds.length
       ? supabase
           .from("session_activity_links")
-          .select("planned_session_id,completed_activity_id")
+          .select("planned_session_id,completed_activity_id,confirmation_status")
           .eq("user_id", user.id)
       : Promise.resolve({ data: [] as any[] }),
     supabase
@@ -100,7 +100,7 @@ export default async function IntegrationsPage() {
   const linksByActivityId = new Map<string, UploadRow["session_activity_links"]>();
   (links ?? []).forEach((link: any) => {
     const list = linksByActivityId.get(link.completed_activity_id) ?? [];
-    list.push({ planned_session_id: link.planned_session_id });
+    list.push({ planned_session_id: link.planned_session_id, confirmation_status: link.confirmation_status ?? "confirmed" });
     linksByActivityId.set(link.completed_activity_id, list);
   });
 

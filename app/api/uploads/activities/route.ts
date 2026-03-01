@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { pickAutoMatch, scoreCandidate } from "@/lib/workouts/activity-matching";
 import { parseFitFile, parseTcxFile, sha256Hex } from "@/lib/workouts/activity-parser";
+import { pickBestSuggestion, suggestSessionMatches } from "@/lib/workouts/matching-service";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const acceptedExtensions = [".fit", ".tcx"];
@@ -107,49 +107,46 @@ export async function POST(request: Request) {
       .gte("date", windowStart.slice(0, 10))
       .lte("date", windowEnd.slice(0, 10));
 
-    const scored = (candidates ?? []).map((candidate) =>
-      scoreCandidate(
-        {
-          sportType: createdActivity.sport_type,
-          startTimeUtc: createdActivity.start_time_utc,
-          durationSec: createdActivity.duration_sec,
-          distanceM: Number(createdActivity.distance_m ?? 0)
-        },
-        {
-          id: candidate.id,
-          sport: candidate.sport,
-          startTimeUtc: `${candidate.date}T06:00:00.000Z`,
-          targetDurationSec: candidate.duration_minutes ? candidate.duration_minutes * 60 : null,
-          targetDistanceM: null
-        }
-      )
+    const suggestions = suggestSessionMatches(
+      {
+        id: createdActivity.id,
+        userId: user.id,
+        sportType: createdActivity.sport_type,
+        startTimeUtc: createdActivity.start_time_utc,
+        durationSec: createdActivity.duration_sec,
+        distanceM: Number(createdActivity.distance_m ?? 0)
+      },
+      (candidates ?? []).map((candidate) => ({
+        id: candidate.id,
+        userId: user.id,
+        date: candidate.date,
+        sport: candidate.sport,
+        type: candidate.sport,
+        durationMinutes: candidate.duration_minutes,
+        distanceM: null
+      }))
     );
 
-    const best = pickAutoMatch(scored);
-    let matched = false;
+    const best = pickBestSuggestion(suggestions);
+    let suggested = false;
     if (best) {
       const { error: linkError } = await supabase.from("session_activity_links").insert({
         user_id: user.id,
-        planned_session_id: best.candidateId,
+        planned_session_id: best.plannedSessionId,
         completed_activity_id: createdActivity.id,
         link_type: "auto",
-        confidence: Number(best.confidence.toFixed(2)),
-        match_reason: best.reason
+        confidence: best.confidence,
+        match_reason: best.reason,
+        confirmation_status: "suggested",
+        match_method: best.matchMethod
       });
 
       if (!linkError) {
-        matched = true;
-        await supabase
-          .from("completed_activities")
-          .update({ schedule_status: "scheduled" })
-          .eq("id", createdActivity.id)
-          .eq("user_id", user.id);
-
-        await supabase.from("activity_uploads").update({ status: "matched" }).eq("id", upload.id).eq("user_id", user.id);
+        suggested = true;
       }
     }
 
-    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, matched });
+    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, suggested });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to parse file";
     await supabase.from("activity_uploads").update({ status: "error", error_message: message }).eq("id", upload.id).eq("user_id", user.id);
