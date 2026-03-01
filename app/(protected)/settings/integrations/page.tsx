@@ -8,8 +8,8 @@ type UploadRow = {
   created_at: string;
   status: "uploaded" | "parsed" | "matched" | "error";
   error_message: string | null;
-  completed_activities: { id: string; sport_type: string; duration_sec: number; distance_m: number | null }[];
-  session_activity_links: { planned_session_id: string }[];
+  completed_activities: { id: string; sport_type: string; duration_sec: number; distance_m: number | null; schedule_status: "scheduled" | "unscheduled" }[];
+  session_activity_links: { planned_session_id: string | null }[];
 };
 
 type PlannedCandidate = {
@@ -52,7 +52,7 @@ export default async function IntegrationsPage() {
     uploadIds.length
       ? supabase
           .from("completed_activities")
-          .select("id,upload_id,sport_type,duration_sec,distance_m")
+          .select("id,upload_id,sport_type,duration_sec,distance_m,schedule_status")
           .eq("user_id", user.id)
           .in("upload_id", uploadIds)
       : Promise.resolve({ data: [] as any[] }),

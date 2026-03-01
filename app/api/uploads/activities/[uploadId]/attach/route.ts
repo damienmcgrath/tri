@@ -43,6 +43,12 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
+  await supabase
+    .from("completed_activities")
+    .update({ schedule_status: "scheduled" })
+    .eq("id", activity.id)
+    .eq("user_id", user.id);
+
   await supabase.from("activity_uploads").update({ status: "matched", error_message: null }).eq("id", params.uploadId).eq("user_id", user.id);
 
   return NextResponse.json({ ok: true });

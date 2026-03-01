@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("activity_uploads")
-    .select("id,filename,file_type,file_size,status,error_message,created_at,completed_activities(id,sport_type,duration_sec,distance_m),session_activity_links(planned_session_id)")
+    .select("id,filename,file_type,file_size,status,error_message,created_at,completed_activities(id,sport_type,duration_sec,distance_m,schedule_status),session_activity_links(planned_session_id)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(15);
@@ -86,9 +86,10 @@ export async function POST(request: Request) {
         avg_power: parsed.avgPower,
         calories: parsed.calories,
         parse_summary: parsed.parseSummary,
-        source: "upload"
+        source: "upload",
+        schedule_status: "unscheduled"
       })
-      .select("id,start_time_utc,sport_type,duration_sec,distance_m")
+      .select("id,start_time_utc,sport_type,duration_sec,distance_m,schedule_status")
       .single();
 
     if (activityError || !createdActivity) throw new Error(activityError?.message ?? "Could not save parsed activity");
@@ -125,8 +126,9 @@ export async function POST(request: Request) {
     );
 
     const best = pickAutoMatch(scored);
+    let matched = false;
     if (best) {
-      await supabase.from("session_activity_links").insert({
+      const { error: linkError } = await supabase.from("session_activity_links").insert({
         user_id: user.id,
         planned_session_id: best.candidateId,
         completed_activity_id: createdActivity.id,
@@ -134,10 +136,20 @@ export async function POST(request: Request) {
         confidence: Number(best.confidence.toFixed(2)),
         match_reason: best.reason
       });
-      await supabase.from("activity_uploads").update({ status: "matched" }).eq("id", upload.id).eq("user_id", user.id);
+
+      if (!linkError) {
+        matched = true;
+        await supabase
+          .from("completed_activities")
+          .update({ schedule_status: "scheduled" })
+          .eq("id", createdActivity.id)
+          .eq("user_id", user.id);
+
+        await supabase.from("activity_uploads").update({ status: "matched" }).eq("id", upload.id).eq("user_id", user.id);
+      }
     }
 
-    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, matched: Boolean(best) });
+    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, matched });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to parse file";
     await supabase.from("activity_uploads").update({ status: "error", error_message: message }).eq("id", upload.id).eq("user_id", user.id);
