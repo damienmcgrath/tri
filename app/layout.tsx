@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="clinical-coral">
+    <html lang="en" data-theme="carbon-coach">
       <body>{children}</body>
     </html>
   );
