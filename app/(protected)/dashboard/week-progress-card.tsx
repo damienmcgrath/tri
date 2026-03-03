@@ -16,6 +16,8 @@ type WeekProgressCardProps = {
   extraTotalMinutes?: number;
   disciplines: Array<Discipline & { extraMinutes?: number }>;
   showStatusChip?: boolean;
+  compact?: boolean;
+  className?: string;
 };
 
 function formatMinutes(minutes: number) {
@@ -29,7 +31,9 @@ export function WeekProgressCard({
   completedTotalMinutes,
   extraTotalMinutes = 0,
   disciplines,
-  showStatusChip = true
+  showStatusChip = true,
+  compact = false,
+  className
 }: WeekProgressCardProps) {
   const [hideEmpty, setHideEmpty] = useState(true);
   const [workFilter, setWorkFilter] = useState<"all" | "planned" | "unscheduled">("all");
@@ -67,9 +71,9 @@ export function WeekProgressCard({
   const chipLabel = remainingMinutes > 0 ? "Behind plan" : remainingMinutes === 0 ? "On target" : "Ahead of plan";
 
   return (
-    <article className="surface p-6">
+    <article className={`surface min-w-0 ${compact ? "p-4" : "p-6"} ${className ?? ""}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Week Progress</h2>
+        <h2 className={`${compact ? "text-base" : "text-lg"} font-semibold`}>Week Progress</h2>
         {showStatusChip ? (
           <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
             {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}

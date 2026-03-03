@@ -281,19 +281,9 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
-      <div className="space-y-4">
-        <ProgressGlanceCard
-          weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
-          completionPct={completionPct}
-          completedTimeLabel={toHoursAndMinutes(totals.completed)}
-          plannedTimeLabel={toHoursAndMinutes(totals.planned)}
-          remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
-          statusLabel={progressStatus}
-          missedPlannedCount={missedPlannedSessions}
-          unmatchedExtraCount={unmatchedExtraSessions}
-        />
-
-        <article className="priority-card-primary next-action-card">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
+        <div className="contents lg:block lg:space-y-5">
+          <article className="priority-card-primary next-action-card order-2 lg:order-none">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
             <>
@@ -357,10 +347,9 @@ export default async function DashboardPage({
               <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
             ) : null}
           </div>
-        </article>
+          </article>
 
-        <div className="space-y-4">
-          <article className="priority-card-supporting dashboard-supporting-card">
+          <article className="priority-card-supporting dashboard-supporting-card order-3 lg:order-none">
             <div className="dashboard-supporting-header">
               <p className="priority-kicker">This week&apos;s focus</p>
             </div>
@@ -370,13 +359,28 @@ export default async function DashboardPage({
               <Link href="/calendar" className={`${nextActionState === NEXT_ACTION_STATE.SESSION_TODAY ? "btn-secondary" : "btn-primary"} px-3 py-1.5 text-xs`}>Add suggested sessions</Link>
             </div>
           </article>
+        </div>
 
-          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card scroll-mt-20">
+        <div className="contents lg:block lg:min-w-0 lg:space-y-5">
+          <div className="order-1 lg:order-none">
+            <ProgressGlanceCard
+              weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
+              completionPct={completionPct}
+              completedTimeLabel={toHoursAndMinutes(totals.completed)}
+              plannedTimeLabel={toHoursAndMinutes(totals.planned)}
+              remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
+              statusLabel={progressStatus}
+              missedPlannedCount={missedPlannedSessions}
+              unmatchedExtraCount={unmatchedExtraSessions}
+            />
+          </div>
+
+          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card order-4 scroll-mt-20 lg:order-none lg:min-w-0">
             <div className="dashboard-supporting-header">
               <p className="priority-kicker">Week progress</p>
             </div>
             <h2 className="priority-title">Discipline breakdown and gaps.</h2>
-            <div className="mt-4">
+            <div className="mt-4 min-w-0">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
                 completedTotalMinutes={totals.completed}
@@ -390,10 +394,11 @@ export default async function DashboardPage({
                 }))}
                 extraTotalMinutes={extraMinutesTotal}
                 showStatusChip={false}
+                compact
+                className="p-0"
               />
             </div>
           </article>
-
         </div>
       </div>
     </section>
