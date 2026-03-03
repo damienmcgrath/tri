@@ -133,6 +133,7 @@ export default async function DashboardPage({
   const activePlanId = profile?.active_plan_id ?? plans[0]?.id ?? null;
 
   let sessionsData: unknown[] | null = [];
+  let upcomingSessionsData: unknown[] | null = [];
 
   if (activePlanId) {
     const primary = await supabase
@@ -159,6 +160,36 @@ export default async function DashboardPage({
       throw new Error(primary.error.message);
     } else {
       sessionsData = primary.data as unknown[] | null;
+    }
+
+    // Fallback search window for the rail widget: if current week has no upcoming
+    // sessions after today, we can still show the next planned session in the next 14 days.
+    const fallbackUpcomingStart = addDays(todayIso, 1);
+    const fallbackUpcomingEnd = addDays(todayIso, 15);
+    const upcomingPrimary = await supabase
+      .from("sessions")
+      .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status,is_key")
+      .eq("plan_id", activePlanId)
+      .gte("date", fallbackUpcomingStart)
+      .lt("date", fallbackUpcomingEnd)
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (upcomingPrimary.error && /(is_key|42703|schema cache)/i.test(upcomingPrimary.error.message ?? "")) {
+      const upcomingFallback = await supabase
+        .from("sessions")
+        .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status")
+        .eq("plan_id", activePlanId)
+        .gte("date", fallbackUpcomingStart)
+        .lt("date", fallbackUpcomingEnd)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (upcomingFallback.error) throw new Error(upcomingFallback.error.message);
+      upcomingSessionsData = upcomingFallback.data as unknown[] | null;
+    } else if (upcomingPrimary.error) {
+      throw new Error(upcomingPrimary.error.message);
+    } else {
+      upcomingSessionsData = upcomingPrimary.data as unknown[] | null;
     }
   }
 
@@ -274,11 +305,32 @@ export default async function DashboardPage({
         ? NEXT_ACTION_STATE.SESSION_DONE_TODAY
       : NEXT_ACTION_STATE.NO_SESSION_TODAY;
 
-  const upcomingPlannedSessions = sessions
+  const upcomingSearchSessions = [
+    ...sessions,
+    ...((upcomingSessionsData ?? []) as Session[]).map((session) => ({
+      ...session,
+      duration_minutes: session.duration_minutes ?? 0,
+      is_key: Boolean((session as any).is_key)
+    }))
+  ].filter((session, index, arr) => arr.findIndex((candidate) => candidate.id === session.id) === index);
+
+  const upcomingPlannedSessions = upcomingSearchSessions
     .filter((session) => session.status === "planned" && session.date > todayIso)
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
   const upcomingKeySessions = upcomingPlannedSessions.filter((session) => session.is_key);
   const nextUpcomingSession = upcomingKeySessions[0] ?? upcomingPlannedSessions[0] ?? null;
+
+  if (process.env.NODE_ENV !== "production" && process.env.DEBUG_NEXT_SESSION_WIDGET === "1") {
+    console.log("[dashboard.next-session]", {
+      todayIso,
+      inWeekCandidateCount: sessions.filter((session) => session.status === "planned" && session.date > todayIso).length,
+      fallbackWindowCandidateCount: ((upcomingSessionsData ?? []) as Session[]).filter((session) => session.status === "planned" && session.date > todayIso).length,
+      mergedCandidateCount: upcomingPlannedSessions.length,
+      selectedSessionId: nextUpcomingSession?.id ?? null,
+      selectedSessionDate: nextUpcomingSession?.date ?? null,
+      emptyStateReason: nextUpcomingSession ? null : "no-planned-sessions-in-next-14-days"
+    });
+  }
 
   const completedTodaySummary = completedTodaySessions
     .slice(0, 2)
