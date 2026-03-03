@@ -27,7 +27,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 ];
 
 const STORAGE_KEY = "tri-theme";
-const DEFAULT_THEME = "clinical-coral";
+const DEFAULT_THEME = "carbon-coach";
 
 export function ThemePicker() {
   const [theme, setTheme] = useState(DEFAULT_THEME);
