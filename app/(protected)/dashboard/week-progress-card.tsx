@@ -20,6 +20,7 @@ type WeekProgressCardProps = {
   compact?: boolean;
   className?: string;
   defaultExpanded?: boolean;
+  showTitle?: boolean;
 };
 
 function formatMinutes(minutes: number) {
@@ -36,7 +37,8 @@ export function WeekProgressCard({
   showStatusChip = true,
   compact = false,
   className,
-  defaultExpanded = !compact
+  defaultExpanded = !compact,
+  showTitle = true
 }: WeekProgressCardProps) {
   const [hideEmpty, setHideEmpty] = useState(true);
   const [workFilter, setWorkFilter] = useState<"all" | "planned" | "unscheduled">("all");
@@ -80,7 +82,7 @@ export function WeekProgressCard({
   return (
     <article className={`surface min-w-0 ${compact ? "p-3.5" : "p-6"} ${className ?? ""}`}>
       <div className="flex items-center justify-between">
-        <h2 className={`${compact ? "text-sm" : "text-lg"} font-semibold`}>Week Progress</h2>
+        {showTitle ? <h2 className={`${compact ? "text-sm" : "text-lg"} font-semibold`}>Week Progress</h2> : <span />}
         {showStatusChip ? (
           <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
             {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
@@ -154,7 +156,10 @@ export function WeekProgressCard({
         ) : (
           <div className="transition-opacity duration-200 motion-reduce:transition-none">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold">By discipline</p>
+              <div>
+                <p className="text-sm font-semibold">By discipline</p>
+                <p className="text-xs text-[hsl(var(--fg-muted))]">Discipline breakdown and current gaps.</p>
+              </div>
               <div className="flex items-center gap-3">
                 {compact ? (
                   <button

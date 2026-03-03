@@ -356,7 +356,7 @@ export default async function DashboardPage({
             <h2 className="priority-title">{weeklyFocusText}</h2>
             <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
             <div className="mt-4">
-              <Link href="/calendar" className={`${nextActionState === NEXT_ACTION_STATE.SESSION_TODAY ? "btn-secondary" : "btn-primary"} px-3 py-1.5 text-xs`}>Add suggested sessions</Link>
+              <Link href="/calendar" className="btn-secondary border-[hsl(var(--fg)/0.42)] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs text-[hsl(var(--fg))] hover:border-[hsl(var(--fg)/0.58)] hover:bg-[hsl(var(--surface-2)/0.9)]">Add suggested sessions</Link>
             </div>
           </article>
         </div>
@@ -376,11 +376,12 @@ export default async function DashboardPage({
             />
           </div>
 
-          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card order-4 scroll-mt-20 lg:order-none lg:min-w-0">
+          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card order-4 scroll-mt-20 lg:order-none lg:min-w-0 lg:p-3.5">
             <div className="dashboard-supporting-header">
-              <p className="priority-kicker">Week progress</p>
+              <p className="priority-kicker">WEEK PROGRESS</p>
+              <h2 className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">Week Progress</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--fg-muted))] lg:hidden">Discipline breakdown and gaps.</p>
             </div>
-            <h2 className="text-base font-semibold text-[hsl(var(--fg))]">Discipline breakdown and gaps.</h2>
             <div className="mt-4 min-w-0">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
@@ -396,6 +397,7 @@ export default async function DashboardPage({
                 extraTotalMinutes={extraMinutesTotal}
                 showStatusChip={false}
                 compact
+                showTitle={false}
                 defaultExpanded={false}
               />
             </div>
