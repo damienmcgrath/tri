@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 type Discipline = {
   key: "bike" | "run" | "swim" | "strength";
@@ -41,6 +41,7 @@ export function WeekProgressCard({
   const [hideEmpty, setHideEmpty] = useState(true);
   const [workFilter, setWorkFilter] = useState<"all" | "planned" | "unscheduled">("all");
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const breakdownId = useId();
 
   const remainingMinutes = plannedTotalMinutes - completedTotalMinutes;
   const overMinutes = Math.max(completedTotalMinutes - plannedTotalMinutes, 0);
@@ -108,7 +109,13 @@ export function WeekProgressCard({
         {!isExpanded ? (
           <div className="space-y-3 rounded-lg border border-[hsl(var(--border)/0.5)] bg-[hsl(var(--surface-2)/0.35)] p-3">
             {biggestGap && biggestGap.discGapMinutes > 0 ? (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-[hsl(var(--border)/0.48)] bg-[hsl(var(--bg-card))] px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(true)}
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-[hsl(var(--border)/0.48)] bg-[hsl(var(--bg-card))] px-3 py-2 text-left transition motion-reduce:transition-none hover:border-[hsl(var(--fg)/0.28)] hover:bg-[hsl(var(--bg-card)/0.95)]"
+                aria-expanded={isExpanded}
+                aria-controls={breakdownId}
+              >
                 <div className="flex min-w-0 items-center gap-2">
                   <span aria-hidden className="h-6 w-1 rounded-full bg-[hsl(var(--accent-performance))]" />
                   <div className="min-w-0">
@@ -119,7 +126,7 @@ export function WeekProgressCard({
                 <span className="signal-load inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-[11px] font-medium">
                   Gap {formatMinutes(biggestGap.discGapMinutes)}
                 </span>
-              </div>
+              </button>
             ) : (
               <div className="rounded-md border border-dashed border-[hsl(var(--border)/0.55)] bg-[hsl(var(--bg-card)/0.45)] px-3 py-2">
                 <p className="text-xs font-medium text-[hsl(var(--fg))]">No sessions yet</p>
@@ -138,29 +145,42 @@ export function WeekProgressCard({
               type="button"
               onClick={() => setIsExpanded(true)}
               className="text-xs text-[hsl(var(--fg-muted))] underline underline-offset-2 hover:text-[hsl(var(--fg))]"
-              aria-expanded={false}
-              aria-controls="week-progress-breakdown"
+              aria-expanded={isExpanded}
+              aria-controls={breakdownId}
             >
               View full breakdown
             </button>
           </div>
         ) : (
-          <>
-            <div className="mb-2 flex items-center justify-between">
+          <div className="transition-opacity duration-200 motion-reduce:transition-none">
+            <div className="mb-2 flex items-center justify-between gap-3">
               <p className="text-sm font-semibold">By discipline</p>
-              {emptyCount > 0 || !hideEmpty ? (
-                <button
-                  type="button"
-                  onClick={() => setHideEmpty((current) => !current)}
-                  className="text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
-                  aria-pressed={!hideEmpty}
-                >
-                  {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
-                </button>
-              ) : null}
+              <div className="flex items-center gap-3">
+                {compact ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(false)}
+                    className="text-xs text-[hsl(var(--fg-muted))] underline underline-offset-2 hover:text-[hsl(var(--fg))]"
+                    aria-expanded={isExpanded}
+                    aria-controls={breakdownId}
+                  >
+                    Collapse breakdown
+                  </button>
+                ) : null}
+                {emptyCount > 0 || !hideEmpty ? (
+                  <button
+                    type="button"
+                    onClick={() => setHideEmpty((current) => !current)}
+                    className="text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
+                    aria-pressed={!hideEmpty}
+                  >
+                    {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
+                  </button>
+                ) : null}
+              </div>
             </div>
 
-            <div id="week-progress-breakdown">
+            <div id={breakdownId}>
               {visibleDisciplines.length === 0 ? (
                 <p className="text-xs text-[hsl(var(--fg-muted))]">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
               ) : (
@@ -223,19 +243,7 @@ export function WeekProgressCard({
                 </div>
               )}
             </div>
-
-            {compact ? (
-              <button
-                type="button"
-                onClick={() => setIsExpanded(false)}
-                className="mt-3 text-xs text-[hsl(var(--fg-muted))] underline underline-offset-2 hover:text-[hsl(var(--fg))]"
-                aria-expanded
-                aria-controls="week-progress-breakdown"
-              >
-                Collapse summary
-              </button>
-            ) : null}
-          </>
+          </div>
         )}
       </div>
 
