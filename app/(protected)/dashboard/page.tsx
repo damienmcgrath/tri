@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
+import { NextSessionWidget } from "./next-session-widget";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
@@ -53,6 +54,21 @@ function toHoursAndMinutes(minutes: number) {
   return `${hours}h ${mins}m`;
 }
 
+function getTodayIsoInTimeZone(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+
+  return `${year}-${month}-${day}`;
+}
+
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
   if (session.status === "completed" || session.status === "skipped") {
     return session.status;
@@ -92,7 +108,11 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const timeZone =
+    (user.user_metadata && typeof user.user_metadata.timezone === "string" && user.user_metadata.timezone) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "UTC";
+  const todayIso = getTodayIsoInTimeZone(timeZone);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -254,6 +274,12 @@ export default async function DashboardPage({
         ? NEXT_ACTION_STATE.SESSION_DONE_TODAY
       : NEXT_ACTION_STATE.NO_SESSION_TODAY;
 
+  const upcomingPlannedSessions = sessions
+    .filter((session) => session.status === "planned" && session.date > todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
+  const upcomingKeySessions = upcomingPlannedSessions.filter((session) => session.is_key);
+  const nextUpcomingSession = upcomingKeySessions[0] ?? upcomingPlannedSessions[0] ?? null;
+
   const completedTodaySummary = completedTodaySessions
     .slice(0, 2)
     .map((session) => `${session.type} · ${session.duration_minutes} min · ${getDisciplineMeta(session.sport).label}`)
@@ -373,6 +399,14 @@ export default async function DashboardPage({
               missedPlannedCount={missedPlannedSessions}
               unmatchedExtraCount={unmatchedExtraSessions}
               compact
+            />
+          </div>
+
+          <div className="order-3 lg:order-none">
+            <NextSessionWidget
+              session={nextUpcomingSession}
+              todayIso={todayIso}
+              timeZone={timeZone}
             />
           </div>
 
