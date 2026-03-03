@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
-import { ProgressGlanceCard } from "./progress-glance-card";
+import { WeekSnapshotCard } from "./week-snapshot-card";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
@@ -303,10 +303,20 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
-        <div className="contents lg:block lg:space-y-4">
-          <article className="priority-card-primary next-action-card order-2 lg:order-none">
-          <p className="priority-kicker">Next action</p>
+      <WeekSnapshotCard
+        completionPct={completionPct}
+        completedTimeLabel={toHoursAndMinutes(totals.completed)}
+        plannedTimeLabel={toHoursAndMinutes(totals.planned)}
+        remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
+        missedPlannedCount={missedPlannedSessions}
+        unmatchedExtraCount={unmatchedExtraSessions}
+        remainingSessionCount={missedPlannedSessions}
+      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-4">
+        <div className="space-y-4">
+          <article className="priority-card-primary next-action-card">
+          <p className="priority-kicker">Today</p>
           {nextPendingTodaySession ? (
             <>
               <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
@@ -371,7 +381,7 @@ export default async function DashboardPage({
           </div>
           </article>
 
-          <article className="priority-card-supporting dashboard-supporting-card order-3 lg:order-none">
+          <article className="priority-card-supporting dashboard-supporting-card">
             <div className="dashboard-supporting-header">
               <p className="priority-kicker">This week&apos;s focus</p>
             </div>
@@ -383,49 +393,32 @@ export default async function DashboardPage({
           </article>
         </div>
 
-        <div className="contents lg:block lg:min-w-0 lg:space-y-4">
-          <div className="order-1 lg:order-none">
-            <ProgressGlanceCard
-              weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
-              completionPct={completionPct}
-              completedTimeLabel={toHoursAndMinutes(totals.completed)}
-              plannedTimeLabel={toHoursAndMinutes(totals.planned)}
-              remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
-              statusLabel={progressStatus}
-              missedPlannedCount={missedPlannedSessions}
-              unmatchedExtraCount={unmatchedExtraSessions}
+        <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card lg:min-w-0 lg:p-3">
+          <div className="dashboard-supporting-header">
+            <p className="priority-kicker">WEEK PROGRESS</p>
+            <h2 className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">Week Progress</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--fg-muted))] lg:hidden">Discipline breakdown and gaps.</p>
+          </div>
+          <div className="mt-4 min-w-0">
+            <WeekProgressCard
+              plannedTotalMinutes={totals.planned}
+              completedTotalMinutes={totals.completed}
+              disciplines={progressBySport.map((item) => ({
+                key: item.sport,
+                label: item.label,
+                plannedMinutes: item.planned,
+                completedMinutes: item.completed,
+                extraMinutes: item.extraMinutes,
+                color: item.color
+              }))}
+              extraTotalMinutes={extraMinutesTotal}
+              showStatusChip={false}
               compact
+              showTitle={false}
+              defaultExpanded={false}
             />
           </div>
-
-
-          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card order-4 scroll-mt-20 lg:order-none lg:min-w-0 lg:p-3">
-            <div className="dashboard-supporting-header">
-              <p className="priority-kicker">WEEK PROGRESS</p>
-              <h2 className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">Week Progress</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--fg-muted))] lg:hidden">Discipline breakdown and gaps.</p>
-            </div>
-            <div className="mt-4 min-w-0">
-              <WeekProgressCard
-                plannedTotalMinutes={totals.planned}
-                completedTotalMinutes={totals.completed}
-                disciplines={progressBySport.map((item) => ({
-                  key: item.sport,
-                  label: item.label,
-                  plannedMinutes: item.planned,
-                  completedMinutes: item.completed,
-                  extraMinutes: item.extraMinutes,
-                  color: item.color
-                }))}
-                extraTotalMinutes={extraMinutesTotal}
-                showStatusChip={false}
-                compact
-                showTitle={false}
-                defaultExpanded={false}
-              />
-            </div>
-          </article>
-        </div>
+        </article>
       </div>
     </section>
   );
