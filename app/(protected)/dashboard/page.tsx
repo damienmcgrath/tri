@@ -372,6 +372,7 @@ export default async function DashboardPage({
               statusLabel={progressStatus}
               missedPlannedCount={missedPlannedSessions}
               unmatchedExtraCount={unmatchedExtraSessions}
+              compact
             />
           </div>
 
@@ -379,7 +380,7 @@ export default async function DashboardPage({
             <div className="dashboard-supporting-header">
               <p className="priority-kicker">Week progress</p>
             </div>
-            <h2 className="priority-title">Discipline breakdown and gaps.</h2>
+            <h2 className="text-base font-semibold text-[hsl(var(--fg))]">Discipline breakdown and gaps.</h2>
             <div className="mt-4 min-w-0">
               <WeekProgressCard
                 plannedTotalMinutes={totals.planned}
@@ -395,7 +396,7 @@ export default async function DashboardPage({
                 extraTotalMinutes={extraMinutesTotal}
                 showStatusChip={false}
                 compact
-                className="p-0"
+                defaultExpanded={false}
               />
             </div>
           </article>

@@ -25,4 +25,25 @@ describe("WeekProgressCard", () => {
     expect(screen.getByText("30 / 0 min")).toBeInTheDocument();
     expect(screen.getByText("15 / 0 min")).toBeInTheDocument();
   });
+
+  it("starts collapsed in compact mode and expands on demand", () => {
+    render(
+      <WeekProgressCard
+        plannedTotalMinutes={120}
+        completedTotalMinutes={60}
+        disciplines={[
+          { key: "run", label: "Run", plannedMinutes: 120, completedMinutes: 60, color: "#fff" }
+        ]}
+        compact
+      />
+    );
+
+    const toggle = screen.getByRole("button", { name: "View full breakdown" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Focus: Run")).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByText("By discipline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse summary" })).toHaveAttribute("aria-expanded", "true");
+  });
 });
