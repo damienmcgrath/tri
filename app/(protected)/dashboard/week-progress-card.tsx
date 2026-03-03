@@ -80,7 +80,7 @@ export function WeekProgressCard({
   const chipLabel = remainingMinutes > 0 ? "Behind plan" : remainingMinutes === 0 ? "On target" : "Ahead of plan";
 
   return (
-    <article className={`surface min-w-0 ${compact ? "p-3.5" : "p-6"} ${className ?? ""}`}>
+    <article className={`surface min-w-0 ${compact ? "p-2.5" : "p-6"} ${className ?? ""}`}>
       <div className="flex items-center justify-between">
         {showTitle ? <h2 className={`${compact ? "text-sm" : "text-lg"} font-semibold`}>Week Progress</h2> : <span />}
         {showStatusChip ? (
@@ -91,8 +91,8 @@ export function WeekProgressCard({
         ) : null}
       </div>
 
-      <div className="mt-3">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-2.5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-0.5 text-xs">
             {(["all", "planned", "unscheduled"] as const).map((option) => (
               <button
@@ -109,7 +109,7 @@ export function WeekProgressCard({
         </div>
 
         {!isExpanded ? (
-          <div className="space-y-3 rounded-lg border border-[hsl(var(--border)/0.5)] bg-[hsl(var(--surface-2)/0.35)] p-3">
+          <div className="space-y-2 rounded-lg border border-[hsl(var(--border)/0.5)] bg-[hsl(var(--surface-2)/0.35)] p-2">
             {biggestGap && biggestGap.discGapMinutes > 0 ? (
               <button
                 type="button"
