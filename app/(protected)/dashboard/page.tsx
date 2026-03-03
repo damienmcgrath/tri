@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
 import { ProgressGlanceCard } from "./progress-glance-card";
-import { NextSessionWidget } from "./next-session-widget";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
@@ -133,7 +132,6 @@ export default async function DashboardPage({
   const activePlanId = profile?.active_plan_id ?? plans[0]?.id ?? null;
 
   let sessionsData: unknown[] | null = [];
-  let upcomingSessionsData: unknown[] | null = [];
 
   if (activePlanId) {
     const primary = await supabase
@@ -162,35 +160,6 @@ export default async function DashboardPage({
       sessionsData = primary.data as unknown[] | null;
     }
 
-    // Fallback search window for the rail widget: if current week has no upcoming
-    // sessions after today, we can still show the next planned session in the next 14 days.
-    const fallbackUpcomingStart = addDays(todayIso, 1);
-    const fallbackUpcomingEnd = addDays(todayIso, 15);
-    const upcomingPrimary = await supabase
-      .from("sessions")
-      .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status,is_key")
-      .eq("plan_id", activePlanId)
-      .gte("date", fallbackUpcomingStart)
-      .lt("date", fallbackUpcomingEnd)
-      .order("date", { ascending: true })
-      .order("created_at", { ascending: true });
-
-    if (upcomingPrimary.error && /(is_key|42703|schema cache)/i.test(upcomingPrimary.error.message ?? "")) {
-      const upcomingFallback = await supabase
-        .from("sessions")
-        .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status")
-        .eq("plan_id", activePlanId)
-        .gte("date", fallbackUpcomingStart)
-        .lt("date", fallbackUpcomingEnd)
-        .order("date", { ascending: true })
-        .order("created_at", { ascending: true });
-      if (upcomingFallback.error) throw new Error(upcomingFallback.error.message);
-      upcomingSessionsData = upcomingFallback.data as unknown[] | null;
-    } else if (upcomingPrimary.error) {
-      throw new Error(upcomingPrimary.error.message);
-    } else {
-      upcomingSessionsData = upcomingPrimary.data as unknown[] | null;
-    }
   }
 
   const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, session) => {
@@ -305,32 +274,7 @@ export default async function DashboardPage({
         ? NEXT_ACTION_STATE.SESSION_DONE_TODAY
       : NEXT_ACTION_STATE.NO_SESSION_TODAY;
 
-  const upcomingSearchSessions = [
-    ...sessions,
-    ...((upcomingSessionsData ?? []) as Session[]).map((session) => ({
-      ...session,
-      duration_minutes: session.duration_minutes ?? 0,
-      is_key: Boolean((session as any).is_key)
-    }))
-  ].filter((session, index, arr) => arr.findIndex((candidate) => candidate.id === session.id) === index);
 
-  const upcomingPlannedSessions = upcomingSearchSessions
-    .filter((session) => session.status === "planned" && session.date > todayIso)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
-  const upcomingKeySessions = upcomingPlannedSessions.filter((session) => session.is_key);
-  const nextUpcomingSession = upcomingKeySessions[0] ?? upcomingPlannedSessions[0] ?? null;
-
-  if (process.env.NODE_ENV !== "production" && process.env.DEBUG_NEXT_SESSION_WIDGET === "1") {
-    console.log("[dashboard.next-session]", {
-      todayIso,
-      inWeekCandidateCount: sessions.filter((session) => session.status === "planned" && session.date > todayIso).length,
-      fallbackWindowCandidateCount: ((upcomingSessionsData ?? []) as Session[]).filter((session) => session.status === "planned" && session.date > todayIso).length,
-      mergedCandidateCount: upcomingPlannedSessions.length,
-      selectedSessionId: nextUpcomingSession?.id ?? null,
-      selectedSessionDate: nextUpcomingSession?.date ?? null,
-      emptyStateReason: nextUpcomingSession ? null : "no-planned-sessions-in-next-14-days"
-    });
-  }
 
   const completedTodaySummary = completedTodaySessions
     .slice(0, 2)
@@ -360,7 +304,7 @@ export default async function DashboardPage({
   return (
     <section className="space-y-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
-        <div className="contents lg:block lg:space-y-5">
+        <div className="contents lg:block lg:space-y-4">
           <article className="priority-card-primary next-action-card order-2 lg:order-none">
           <p className="priority-kicker">Next action</p>
           {nextPendingTodaySession ? (
@@ -439,7 +383,7 @@ export default async function DashboardPage({
           </article>
         </div>
 
-        <div className="contents lg:block lg:min-w-0 lg:space-y-5">
+        <div className="contents lg:block lg:min-w-0 lg:space-y-4">
           <div className="order-1 lg:order-none">
             <ProgressGlanceCard
               weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
@@ -454,13 +398,6 @@ export default async function DashboardPage({
             />
           </div>
 
-          <div className="order-3 lg:order-none">
-            <NextSessionWidget
-              session={nextUpcomingSession}
-              todayIso={todayIso}
-              timeZone={timeZone}
-            />
-          </div>
 
           <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card order-4 scroll-mt-20 lg:order-none lg:min-w-0 lg:p-3">
             <div className="dashboard-supporting-header">
