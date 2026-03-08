@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WeekStrip } from "./week-strip";
 
 type WeekSnapshotCardProps = {
   completionPct: number;
@@ -8,6 +9,15 @@ type WeekSnapshotCardProps = {
   missedPlannedCount: number;
   unmatchedExtraCount: number;
   remainingSessionCount: number;
+  weekStartIso: string;
+  weekStripDays: Array<{
+    dateIso: string;
+    label: string;
+    plannedCount: number;
+    completedCount: number;
+    state: "rest" | "planned" | "completed" | "in_progress" | "missed";
+    isToday: boolean;
+  }>;
 };
 
 export function WeekSnapshotCard({
@@ -17,7 +27,9 @@ export function WeekSnapshotCard({
   remainingTimeLabel,
   missedPlannedCount,
   unmatchedExtraCount,
-  remainingSessionCount
+  remainingSessionCount,
+  weekStartIso,
+  weekStripDays
 }: WeekSnapshotCardProps) {
   const ringPct = Math.max(0, Math.min(completionPct, 100));
 
@@ -46,6 +58,8 @@ export function WeekSnapshotCard({
           </span>
         </div>
       </div>
+
+      <WeekStrip weekStartIso={weekStartIso} days={weekStripDays} />
 
       <div className="mt-4">
         <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">Open calendar</Link>

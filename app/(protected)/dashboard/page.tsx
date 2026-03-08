@@ -68,6 +68,14 @@ function getTodayIsoInTimeZone(timeZone: string) {
   return `${year}-${month}-${day}`;
 }
 
+
+function formatWeekdayLabel(dateIso: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short"
+  }).format(new Date(`${dateIso}T12:00:00.000Z`));
+}
+
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
   if (session.status === "completed" || session.status === "skipped") {
     return session.status;
@@ -281,6 +289,38 @@ export default async function DashboardPage({
     .map((session) => `${session.type} · ${session.duration_minutes} min · ${getDisciplineMeta(session.sport).label}`)
     .join(" • ");
 
+  // Day states derive from planned vs completed counts and temporal position.
+  // - rest: no planned sessions, planned: none completed yet, completed: all done,
+  // - in_progress: some done, some left, missed: past day with remaining sessions.
+  const weekStripDays = Array.from({ length: 7 }, (_, index) => {
+    const dateIso = addDays(weekStart, index);
+    const sessionsOnDay = sessions.filter((session) => session.date === dateIso);
+    const plannedCount = sessionsOnDay.length;
+    const completedCount = sessionsOnDay.filter((session) => session.status === "completed").length;
+    const isToday = dateIso === todayIso;
+    const isPast = dateIso < todayIso;
+
+    const state: "rest" | "planned" | "completed" | "in_progress" | "missed" = plannedCount === 0
+      ? "rest"
+      : completedCount >= plannedCount
+        ? "completed"
+        : completedCount > 0
+          ? isPast
+            ? "missed"
+            : "in_progress"
+          : isPast
+            ? "missed"
+            : "planned";
+
+    return {
+      dateIso,
+      label: formatWeekdayLabel(dateIso, timeZone),
+      plannedCount,
+      completedCount,
+      state,
+      isToday
+    };
+  });
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
@@ -311,6 +351,8 @@ export default async function DashboardPage({
         missedPlannedCount={missedPlannedSessions}
         unmatchedExtraCount={unmatchedExtraSessions}
         remainingSessionCount={missedPlannedSessions}
+        weekStartIso={weekStart}
+        weekStripDays={weekStripDays}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-4">
