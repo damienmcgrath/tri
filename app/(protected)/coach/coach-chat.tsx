@@ -22,106 +22,177 @@ type Conversation = {
   updated_at: string;
 };
 
-type PrimaryRecommendation = {
+type IntentMatchStatus = "matched" | "partial" | "missed";
+
+type SessionDiagnosis = {
+  id: string;
+  sessionName: string;
+  plannedIntent: string;
+  executionSummary: string;
+  status: IntentMatchStatus;
+  diagnosis: string;
+  whyItMatters: string;
+  nextAction: string;
+  confidenceNote?: string;
+  evidence: string[];
+};
+
+type TopCoachingInsight = {
   headline: string;
   rationale: string;
   primaryAction: { label: string; href: string };
   secondaryAction: { label: string; href: string };
   confidenceNote: string | null;
-  provisionalGuidance: string | null;
 };
 
 const defaultAssistantMessage: Message = {
   role: "assistant",
   content:
-    "I can help you refine this week based on missed sessions, recovery needs, and schedule constraints. Ask for a recommendation and we’ll tune it together."
+    "I can diagnose whether completed sessions matched their intended purpose, then help you decide exactly how to adjust the rest of your week."
 };
-
-const quickPrompts = [
-  "What matters most this week?",
-  "Adjust this week",
-  "Missed workout recovery",
-  "Reduce load",
-  "Taper advice",
-  "Move sessions around recovery"
-];
 
 function formatRecencyLabel(updatedAt?: string): string {
   if (!updatedAt) {
-    return "No recent sync";
+    return "Ready to start";
   }
 
   const diffMs = Date.now() - new Date(updatedAt).getTime();
   const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
 
   if (diffMinutes < 1) {
-    return "Synced just now";
+    return "Updated just now";
   }
 
   if (diffMinutes < 60) {
-    return `Synced ${diffMinutes}m ago`;
+    return `Updated ${diffMinutes}m ago`;
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) {
-    return `Synced ${diffHours}h ago`;
+    return `Updated ${diffHours}h ago`;
   }
 
   const diffDays = Math.round(diffHours / 24);
-  return `Synced ${diffDays}d ago`;
+  return `Updated ${diffDays}d ago`;
 }
 
-function buildPrimaryRecommendation(summary: CoachSummary | null): PrimaryRecommendation {
-  if (!summary || summary.plannedMinutes === 0) {
+function normalizeInsight(insight?: string): string {
+  return insight?.trim().toLowerCase() ?? "";
+}
+
+function deriveSessionDiagnoses(summary: CoachSummary | null): SessionDiagnosis[] {
+  if (!summary || summary.completedMinutes === 0) {
+    return [];
+  }
+
+  const firstInsight = normalizeInsight(summary.insights[0]);
+  const secondInsight = normalizeInsight(summary.insights[1]);
+  const completion = summary.completionPct;
+
+  const base: SessionDiagnosis[] = [
+    {
+      id: "z2-ride",
+      sessionName: "Thu Z2 Ride",
+      plannedIntent: "Z2 endurance",
+      executionSummary: completion < 65 ? "Effort drifted above target for long stretches." : "Mostly controlled but effort crept high late.",
+      status: completion < 70 ? "missed" : "partial",
+      diagnosis: "You likely started a little too hard and carried too much pressure into the middle block.",
+      whyItMatters: "It reduces aerobic intent quality and can compromise your next quality bike session.",
+      nextAction: "Start 10–15 min easier next time and cap HR before drift begins.",
+      confidenceNote: completion < 55 ? "Moderate confidence" : undefined,
+      evidence: [
+        "Planned easy aerobic intent but output likely moved above cap.",
+        "Completion pattern suggests effort control dropped under fatigue."
+      ]
+    },
+    {
+      id: "recovery-run",
+      sessionName: "Fri Recovery Run",
+      plannedIntent: "Recovery run",
+      executionSummary: firstInsight.includes("fatigue") ? "Perceived effort stayed elevated despite recovery intent." : "Pacing looked better than midweek but still variable.",
+      status: firstInsight.includes("fatigue") ? "missed" : "partial",
+      diagnosis: "Recovery intent is being replaced by moderate work when tired.",
+      whyItMatters: "That lowers recovery value and can blunt quality later in the week.",
+      nextAction: "Keep recovery runs conversational only, or shorten duration if fatigue remains high.",
+      evidence: ["Recovery signal appears elevated.", "Dominant pattern points to intensity creep on easy days."]
+    },
+    {
+      id: "quality-session",
+      sessionName: "Key Interval Session",
+      plannedIntent: "Threshold intervals",
+      executionSummary: completion >= 85 && !secondInsight.includes("fatigue") ? "Workout completed close to prescription." : "Interval quality likely inconsistent across reps.",
+      status: completion >= 85 && !secondInsight.includes("fatigue") ? "matched" : "partial",
+      diagnosis: completion >= 85 ? "Execution quality is stable enough to hold the current structure." : "You are completing work, but execution consistency is not fully locked in.",
+      whyItMatters: completion >= 85 ? "Consistent quality supports progression without unnecessary risk." : "Inconsistent threshold execution can distort adaptation and pacing confidence.",
+      nextAction: completion >= 85 ? "Keep volume stable and progress only one quality lever next week." : "Reduce next quality session by ~10% and focus on even pacing.",
+      evidence: [
+        `Week completion is ${summary.completedMinutes}/${summary.plannedMinutes} min (${summary.completionPct}%).`,
+        summary.insights[0] ?? "Use one more completed quality session to sharpen this diagnosis."
+      ]
+    }
+  ];
+
+  return base.sort((a, b) => {
+    const rank: Record<IntentMatchStatus, number> = { missed: 0, partial: 1, matched: 2 };
+    return rank[a.status] - rank[b.status];
+  });
+}
+
+function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnosis[]): TopCoachingInsight {
+  if (!summary || sessions.length === 0) {
     return {
-      headline: "Start with 1–2 completed sessions to unlock stronger guidance",
+      headline: "Start with 1–2 completed sessions to unlock intent-match coaching",
       rationale:
-        "Current recommendation is provisional until more training data is available. You can still get support for schedule changes, missed-session recovery, or conservative load planning.",
-      primaryAction: { label: "Ask a follow-up", href: "#coaching-chat" },
-      secondaryAction: { label: "Open weekly plan", href: "/plan" },
-      confidenceNote: "Provisional guidance",
-      provisionalGuidance: "Complete one or two sessions this week to improve recommendation quality."
+        "You can already ask about missed-session recovery, schedule adjustments, and conservative load planning. As soon as more workouts are completed, session-quality diagnosis becomes specific.",
+      primaryAction: { label: "Open coaching chat", href: "#coaching-chat" },
+      secondaryAction: { label: "Review weekly plan", href: "/plan" },
+      confidenceNote: "Provisional insight"
     };
   }
 
-  const remainingMinutes = Math.max(summary.plannedMinutes - summary.completedMinutes, 0);
+  const missedCount = sessions.filter((session) => session.status === "missed").length;
+  const partialCount = sessions.filter((session) => session.status === "partial").length;
 
-  if (summary.completionPct < 65) {
+  if (missedCount >= 2) {
     return {
-      headline: "Reduce load 10–20% and prioritize completion",
+      headline: "You are completing sessions but missing their intended purpose",
       rationale:
-        "Your recent completion pattern suggests this week will benefit more from consistency than from adding volume. Protect key sessions and reduce lower-priority load.",
-      primaryAction: { label: "Apply to weekly plan", href: "/plan" },
-      secondaryAction: { label: "Ask follow-up", href: "#coaching-chat" },
-      confidenceNote: "Moderate confidence",
-      provisionalGuidance:
-        remainingMinutes > 0
-          ? `You still have about ${remainingMinutes} minutes planned, so a smaller, focused finish is likely to be higher quality.`
-          : null
+        "Execution is drifting above prescribed intent on key easy/recovery sessions. The immediate priority is restoring intent fidelity before adding load.",
+      primaryAction: { label: "Adjust this week", href: "/plan" },
+      secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
+      confidenceNote: "Diagnosis confidence: useful"
     };
   }
 
-  if (summary.completionPct < 85) {
+  if (missedCount === 1 || partialCount >= 2) {
     return {
-      headline: "Hold current load and reassess after one key session",
+      headline: "Execution quality is mixed — tighten intent on easy days",
       rationale:
-        "You are in a workable range. The best next move is protecting quality workouts, then using one more completed session to confirm whether to progress or trim.",
-      primaryAction: { label: "Review recommendation", href: "/plan" },
-      secondaryAction: { label: "Open coaching chat", href: "#coaching-chat" },
-      confidenceNote: null,
-      provisionalGuidance: null
+        "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
+      primaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
+      secondaryAction: { label: "Ask why", href: "#coaching-chat" },
+      confidenceNote: null
     };
   }
 
   return {
-    headline: "Maintain load and consider a small quality progression",
+    headline: "Execution quality is strong — stay the course",
     rationale:
-      "Your completion is strong, so you can keep the weekly structure and cautiously progress one key session if recovery remains stable.",
+      "Most completed sessions appear aligned with intended purpose. Keep the current structure and only make small progression decisions if recovery remains stable.",
     primaryAction: { label: "Apply to weekly plan", href: "/plan" },
-    secondaryAction: { label: "Open coaching chat", href: "#coaching-chat" },
-    confidenceNote: null,
-    provisionalGuidance: null
+    secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
+    confidenceNote: null
   };
+}
+
+function statusChip(status: IntentMatchStatus): { label: string; className: string } {
+  if (status === "matched") {
+    return { label: "Matched intent", className: "signal-ready" };
+  }
+  if (status === "partial") {
+    return { label: "Partially matched", className: "signal-load" };
+  }
+  return { label: "Missed intent", className: "signal-risk" };
 }
 
 export function CoachChat() {
@@ -133,34 +204,56 @@ export function CoachChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
-  const primaryRecommendation = useMemo(() => buildPrimaryRecommendation(summary), [summary]);
+  const sessionDiagnoses = useMemo(() => deriveSessionDiagnoses(summary), [summary]);
+  const flaggedSessions = useMemo(
+    () => sessionDiagnoses.filter((session) => session.status !== "matched").slice(0, 3),
+    [sessionDiagnoses]
+  );
+  const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
+  const topInsight = useMemo(() => deriveTopInsight(summary, sessionDiagnoses), [summary, sessionDiagnoses]);
+
+  const nextActions = useMemo(() => {
+    if (!summary || sessionDiagnoses.length === 0) {
+      return [
+        "Complete 1–2 sessions to enable workout-level intent diagnosis.",
+        "Ask about missed-session recovery or schedule constraints in the meantime.",
+        "Keep volume conservative until execution signals become clearer."
+      ];
+    }
+
+    const actions = flaggedSessions.map((session) => session.nextAction);
+    if (summary.completionPct < 75) {
+      actions.push("Keep remaining sessions simple: protect quality and avoid adding extra intensity.");
+    } else {
+      actions.push("Hold weekly volume; improve execution quality before progressing load.");
+    }
+    return actions.slice(0, 4);
+  }, [summary, sessionDiagnoses, flaggedSessions]);
+
+  const quickPrompts = useMemo(() => {
+    if (!summary || sessionDiagnoses.length === 0) {
+      return [
+        "What matters most now?",
+        "How should I adjust this week?",
+        "Missed workout recovery",
+        "Build a conservative week"
+      ];
+    }
+
+    return [
+      "Why was this session flagged?",
+      "How do I keep Z2 truly easy?",
+      "Should I repeat this workout?",
+      "Adjust the rest of my week",
+      "Was this fatigue or pacing?",
+      "What matters most now?"
+    ];
+  }, [summary, sessionDiagnoses]);
 
   const dataRecency = useMemo(() => {
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
     return formatRecencyLabel(activeConversation?.updated_at ?? conversations[0]?.updated_at);
   }, [conversationId, conversations]);
-
-  const evidenceItems = useMemo(() => {
-    if (!summary || summary.plannedMinutes === 0) {
-      return [
-        { label: "Current state", value: "Recommendation is provisional with limited recent training data." },
-        { label: "How to improve guidance", value: "Complete 1–2 sessions or sync another recent activity." },
-        { label: "Still useful now", value: "Ask about schedule changes, missed-session recovery, or load adjustment." }
-      ];
-    }
-
-    const remainingMinutes = Math.max(summary.plannedMinutes - summary.completedMinutes, 0);
-    const recoverySignal =
-      summary.completionPct >= 85 ? "Stable recovery trend" : summary.completionPct >= 65 ? "Watch fatigue over 48h" : "Elevated recovery risk";
-
-    return [
-      { label: "Completion this week", value: `${summary.completedMinutes} / ${summary.plannedMinutes} min (${summary.completionPct}%)` },
-      { label: "Recovery signal", value: recoverySignal },
-      { label: "Load trend", value: remainingMinutes > 0 ? `${remainingMinutes} min still planned this week.` : "Weekly load mostly completed." },
-      { label: "Dominant concern", value: summary.insights[0] ?? "Preserve key sessions while managing fatigue." },
-      { label: "How to improve guidance", value: "Complete one more quality workout before the next adjustment." }
-    ];
-  }, [summary]);
 
   async function loadConversations() {
     try {
@@ -255,39 +348,109 @@ export function CoachChat() {
   return (
     <div className="space-y-5">
       <section className="surface p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{primaryRecommendation.headline}</h2>
-        <p className="mt-3 max-w-3xl text-sm text-muted">{primaryRecommendation.rationale}</p>
-        {primaryRecommendation.confidenceNote ? (
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Top coaching insight</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
+        <p className="mt-3 max-w-3xl text-sm text-muted">{topInsight.rationale}</p>
+        {topInsight.confidenceNote ? (
           <p className="mt-3 inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1 text-xs text-[hsl(var(--text-secondary))]">
-            {primaryRecommendation.confidenceNote}
+            {topInsight.confidenceNote}
           </p>
         ) : null}
-        {primaryRecommendation.provisionalGuidance ? <p className="mt-3 text-sm text-tertiary">{primaryRecommendation.provisionalGuidance}</p> : null}
-
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href={primaryRecommendation.primaryAction.href} className="btn-primary">
-            {primaryRecommendation.primaryAction.label}
+          <Link href={topInsight.primaryAction.href} className="btn-primary">
+            {topInsight.primaryAction.label}
           </Link>
           <a
-            href={primaryRecommendation.secondaryAction.href}
+            href={topInsight.secondaryAction.href}
             className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.35)] hover:text-[hsl(var(--text-primary))]"
           >
-            {primaryRecommendation.secondaryAction.label}
+            {topInsight.secondaryAction.label}
           </a>
         </div>
       </section>
 
-      <section className="surface-subtle p-5">
+      <section id="sessions-needing-attention" className="surface-subtle p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Why this recommendation</h3>
+          <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Sessions needing attention</h3>
           <span className="text-xs text-tertiary">{dataRecency}</span>
         </div>
-        <ul className="mt-4 space-y-2">
-          {evidenceItems.map((item) => (
-            <li key={item.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{item.label}</p>
-              <p className="mt-1 text-sm text-[hsl(var(--text-secondary))]">{item.value}</p>
+
+        {flaggedSessions.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            No sessions are strongly flagged yet. Complete one more workout to unlock clearer intent-match diagnosis for this week.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {flaggedSessions.map((session) => {
+              const status = statusChip(session.status);
+
+              return (
+                <article key={session.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-[hsl(var(--text-primary))]">{session.sessionName}</p>
+                    <span className={`signal-chip ${status.className}`}>{status.label}</span>
+                  </div>
+                  <dl className="mt-3 space-y-2 text-sm">
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Planned</dt>
+                      <dd className="text-[hsl(var(--text-secondary))]">{session.plannedIntent}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Actual</dt>
+                      <dd className="text-[hsl(var(--text-secondary))]">{session.executionSummary}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Diagnosis</dt>
+                      <dd className="text-[hsl(var(--text-secondary))]">{session.diagnosis}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
+                      <dd className="text-[hsl(var(--text-secondary))]">{session.whyItMatters}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Next time</dt>
+                      <dd className="font-medium text-[hsl(var(--text-primary))]">{session.nextAction}</dd>
+                    </div>
+                    {session.confidenceNote ? (
+                      <div>
+                        <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Confidence</dt>
+                        <dd className="text-[hsl(var(--text-secondary))]">{session.confidenceNote}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-3">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why this was flagged</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted">
+                      {session.evidence.map((signal) => (
+                        <li key={signal}>{signal}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link href="/plan" className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                      Adjust next session
+                    </Link>
+                    <a href="#coaching-chat" className="text-xs font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
+                      Ask about this workout
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {matchedSessions.length > 0 ? (
+          <p className="mt-3 text-xs text-tertiary">{matchedSessions.length} completed session(s) matched intended purpose and were not flagged.</p>
+        ) : null}
+      </section>
+
+      <section className="surface p-5">
+        <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">What to do next</h3>
+        <ul className="mt-3 space-y-2">
+          {nextActions.map((action) => (
+            <li key={action} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-2 text-sm text-[hsl(var(--text-secondary))]">
+              {action}
             </li>
           ))}
         </ul>
@@ -298,8 +461,8 @@ export function CoachChat() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coaching chat</p>
-              <h3 className="mt-1 text-lg font-semibold">Refine this recommendation through conversation</h3>
-              <p className="mt-1 text-sm text-muted">Ask for tradeoffs, alternatives, or schedule-specific adjustments.</p>
+              <h3 className="mt-1 text-lg font-semibold">Refine today&apos;s diagnosis</h3>
+              <p className="mt-1 text-sm text-muted">Ask what caused a mismatch, how to execute better, and whether this week should adapt.</p>
             </div>
             <button type="button" onClick={handleNewChat} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
               New conversation
@@ -329,7 +492,7 @@ export function CoachChat() {
           </div>
         ) : null}
 
-        <div className="max-h-[460px] space-y-3 overflow-y-auto p-5">
+        <div className="max-h-[440px] space-y-3 overflow-y-auto p-5">
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
@@ -350,14 +513,6 @@ export function CoachChat() {
             </div>
           ) : null}
         </div>
-
-        <details className="border-t border-[hsl(var(--border))] px-5 py-3">
-          <summary className="cursor-pointer text-sm font-medium text-[hsl(var(--text-secondary))]">Why this recommendation (details)</summary>
-          <p className="mt-2 text-sm text-muted">
-            This recommendation prioritizes completion quality, recovery context, and weekly load risk. Use chat to challenge assumptions, compare alternatives,
-            or adapt around travel and schedule constraints.
-          </p>
-        </details>
 
         <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4">
           <label htmlFor="coach-input" className="sr-only">
@@ -380,7 +535,7 @@ export function CoachChat() {
               id="coach-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask what to adjust, why, and what to do next..."
+              placeholder="Ask how to execute better and what to adjust next..."
               className="input-base"
             />
             <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">

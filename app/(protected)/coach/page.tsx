@@ -5,8 +5,8 @@ export default function CoachPage() {
     <section className="space-y-4">
       <article className="surface p-4">
         <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach</p>
-        <h1 className="mt-1 text-lg font-semibold">Coaching briefing</h1>
-        <p className="mt-1 text-sm text-muted">Get one clear recommendation, review evidence, then refine it through conversation.</p>
+        <h1 className="mt-1 text-lg font-semibold">Session execution coaching</h1>
+        <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and what to change next.</p>
       </article>
       <CoachChat />
     </section>
