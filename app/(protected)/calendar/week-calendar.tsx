@@ -220,10 +220,10 @@ export function WeekCalendar({
         const plannedMin = planned.reduce((sum, item) => sum + item.duration, 0);
         const completedMin = planned.filter((item) => item.status === "completed").reduce((sum, item) => sum + item.duration, 0);
         const skipped = planned.filter((item) => item.status === "skipped" || isSkipped(item.notes)).length;
-        const isRest = planned.length === 0;
-        const openCapacity = !isRest && plannedMin <= 50;
+        const isRest = planned.length === 0 && all.some((item) => item.type?.toLowerCase().includes("rest"));
+        const openCapacity = planned.length > 0 && plannedMin <= 50;
         const fullyDone = planned.length > 0 && planned.every((item) => item.status === "completed");
-        const availableDay = isRest && all.length === 0;
+        const availableDay = planned.length === 0 && !isRest;
         return { day: day.iso, plannedMin, completedMin, skipped, openCapacity, isRest, fullyDone, availableDay };
       }),
     [localSessions, weekDays]
@@ -286,12 +286,12 @@ export function WeekCalendar({
 
       {hasAdaptation ? (
         <section className="surface-subtle space-y-2 px-3 py-2">
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">Adaptation tray</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Adaptation strip</p>
           <div className="flex flex-wrap gap-2 text-xs">
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="rounded-lg border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.08)] p-2">
                 <p className="font-semibold">Unmatched upload</p>
-                <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded today</p>
+                <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {new Date(upload.created_at).toLocaleDateString()}</p>
                 <div className="mt-1 flex gap-2">
                   {getActivityId(upload.id) ? <Link href={`/activities/${getActivityId(upload.id)}`} className="text-accent hover:underline">Assign</Link> : null}
                   <button onClick={() => setDismissedStripIds((prev) => [...prev, upload.id])} className="text-muted hover:text-foreground">Mark extra</button>
@@ -336,7 +336,7 @@ export function WeekCalendar({
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
           const isToday = day.iso === new Date().toISOString().slice(0, 10);
-          const dayLabel = metrics?.isRest ? "Rest day" : metrics?.fullyDone ? "Completed" : metrics?.openCapacity ? "Open capacity" : metrics?.availableDay ? "Available" : "In progress";
+          const dayLabel = metrics?.skipped ? "Needs reassignment" : metrics?.fullyDone ? "Completed" : metrics?.isRest ? "Rest day" : metrics?.openCapacity ? "Open capacity" : metrics?.availableDay ? "Available" : "In progress";
           const dayTone = metrics?.skipped ? "text-[hsl(var(--signal-risk))]" : "text-muted";
 
           return (
