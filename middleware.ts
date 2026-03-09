@@ -4,6 +4,12 @@ import { NextResponse } from "next/server";
 
 const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings"];
 
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+}
+
 function applySecurityHeaders(response: NextResponse) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -32,28 +38,33 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabasePublishableKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-        }
+  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route));
+
+  if (isProtectedRoute && !hasSupabaseAuthCookie(request)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/auth/sign-in";
+    redirectUrl.searchParams.set("next", request.nextUrl.pathname);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    applySecurityHeaders(redirectResponse);
+    return redirectResponse;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       }
     }
-  );
+  });
 
   const {
     data: { user }
   } = await supabase.auth.getUser();
-
-  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route));
 
   if (!user && isProtectedRoute) {
     const redirectUrl = request.nextUrl.clone();
