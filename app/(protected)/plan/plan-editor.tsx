@@ -23,6 +23,7 @@ type TrainingWeek = {
   target_minutes: number | null;
   target_tss: number | null;
 };
+type SessionRole = "Key" | "Supporting" | "Recovery" | "Optional";
 type Session = {
   id: string;
   plan_id: string;
@@ -38,6 +39,7 @@ type Session = {
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
   is_key?: boolean | null;
+  session_role?: SessionRole | null;
 };
 
 type PlanEditorProps = { plans: Plan[]; weeks: TrainingWeek[]; sessions: Session[]; selectedPlanId?: string };
@@ -51,11 +53,12 @@ const templates = [
   { label: "Long Run 90", sport: "run", duration: 90, type: "Long Run", target: "Steady" },
   { label: "Power Bike 60", sport: "bike", duration: 60, type: "Power Bike", target: "3x10 @ FTP" },
   { label: "Long Ride 180", sport: "bike", duration: 180, type: "Long Ride", target: "Z2 low" },
-  { label: "Aerobic Endurance Swim 45", sport: "swim", duration: 45, type: "Aerobic Endurance", target: "Aerobic" },
+  { label: "Aerobic Swim 45", sport: "swim", duration: 45, type: "Aerobic Swim", target: "Aerobic" },
   { label: "General Strength 30", sport: "strength", duration: 30, type: "General Strength", target: "Core + mobility" }
 ];
 
 const sports = ["swim", "bike", "run", "strength", "other"] as const;
+const sessionRoles: SessionRole[] = ["Key", "Supporting", "Recovery", "Optional"];
 
 function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
@@ -70,16 +73,21 @@ function weekRangeLabel(weekStartDate: string) {
   return `${shortDateFormatter.format(start)} – ${shortDateFormatter.format(end)}`;
 }
 
-function sessionLabel(session: Session) {
-  return session.type?.trim() || `${getDisciplineMeta(session.sport).label} Session`;
+function sessionRoleLabel(session: Session) {
+  if (session.session_role) return session.session_role;
+  if (session.is_key) return "Key";
+  return null;
 }
 
-function daySignalLabel(totalMinutes: number, sessionCount: number, keyCount: number) {
-  if (sessionCount === 0) return "Rest";
-  if (keyCount > 0) return "Key day";
-  if (totalMinutes >= 90) return "Heavy";
-  if (totalMinutes <= 40) return "Recovery";
-  return "Support";
+function sessionTitle(session: Session) {
+  const explicit = session.type?.trim();
+  if (explicit) return explicit;
+  const discipline = getDisciplineMeta(session.sport).label;
+  const targetSubtype = session.target?.trim();
+  if (targetSubtype && !/^z\d/i.test(targetSubtype) && targetSubtype.length <= 24) {
+    return `${discipline} ${targetSubtype}`;
+  }
+  return discipline;
 }
 
 export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEditorProps) {
@@ -123,9 +131,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
   );
 
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
-  const targetMinutes = Number(weekDraft.targetMinutes || selectedWeek?.target_minutes || 0);
-  const minuteDelta = totalMinutes - targetMinutes;
-  const keySessions = weekSessions.filter((s) => Boolean(s.is_key)).length;
+  const keySessions = weekSessions.filter((session) => sessionRoleLabel(session) === "Key").length;
 
   const disciplineTotals = ["swim", "bike", "run", "strength", "other"]
     .map((sport) => ({
@@ -139,21 +145,20 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         const iso = addDays(selectedWeek.week_start_date, index);
         const daySessions = weekSessions.filter((session) => session.date === iso);
         const totalDayMinutes = daySessions.reduce((sum, session) => sum + session.duration_minutes, 0);
-        const keyCount = daySessions.filter((session) => Boolean(session.is_key)).length;
+        const hasKeySession = daySessions.some((session) => sessionRoleLabel(session) === "Key");
         return {
           iso,
           label: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
           date: shortDateFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
           sessions: daySessions,
           totalMinutes: totalDayMinutes,
-          signal: daySignalLabel(totalDayMinutes, daySessions.length, keyCount)
+          isRest: daySessions.length === 0,
+          hasKeySession
         };
       })
     : [];
 
-  const restDays = weekDays.filter((day) => day.sessions.length === 0).length;
-  const heavyDays = weekDays.filter((day) => day.signal === "Heavy" || day.signal === "Key day").length;
-
+  const restDays = weekDays.filter((day) => day.isRest).length;
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
@@ -164,6 +169,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
   const duplicateTargets = planWeeks.filter((week) => week.id !== selectedWeek?.id);
   const activeSession = weekSessions.find((session) => session.id === activeSessionId);
+  const notePreview = weekDraft.notes.trim();
 
   if (!selectedPlan || !selectedWeek) {
     return <div className="surface p-4 text-sm text-muted">Create a plan to start programming weeks.</div>;
@@ -196,13 +202,24 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">Week intent</p>
-            <p className="mt-1 text-sm">{weekDraft.notes?.trim() || `${weekDraft.focus} week targeting balanced triathlon load.`}</p>
+            <p className="mt-1 text-sm">{weekDraft.focus}</p>
           </div>
-          <div><p className="text-xs uppercase tracking-wide text-muted">Discipline split</p><p className="mt-1 text-sm">{disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ")}</p></div>
-          <div><p className="text-xs uppercase tracking-wide text-muted">Key sessions</p><p className="mt-1 text-sm">{keySessions}</p></div>
-          <div><p className="text-xs uppercase tracking-wide text-muted">Recovery / rest</p><p className="mt-1 text-sm">{restDays} rest day{restDays === 1 ? "" : "s"}</p></div>
-          <div><p className="text-xs uppercase tracking-wide text-muted">Load pattern</p><p className="mt-1 text-sm">{heavyDays} heavier day{heavyDays === 1 ? "" : "s"} · {minuteDelta > 0 ? `+${minuteDelta}` : minuteDelta} min vs target</p></div>
+          <div className="md:col-span-2">
+            <p className="text-xs uppercase tracking-wide text-muted">Discipline split (minutes)</p>
+            <p className="mt-1 text-sm">{disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted">Rest days</p>
+            <p className="mt-1 text-sm">{restDays}</p>
+          </div>
+          {keySessions > 0 ? (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">Key sessions</p>
+              <p className="mt-1 text-sm">{keySessions}</p>
+            </div>
+          ) : null}
         </div>
+        {notePreview ? <p className="mt-3 text-xs text-muted">Week note: {notePreview}</p> : null}
       </section>
 
       {weekActionOpen ? (
@@ -235,18 +252,23 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
             <section key={day.iso} className="surface-subtle min-h-[280px] min-w-0 p-3">
               <div className="mb-2 flex items-start justify-between border-b border-[hsl(var(--border))] pb-2">
                 <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
-                <div className="text-right"><p className="text-xs text-muted">{day.totalMinutes} min</p><p className="text-[11px] text-accent">{day.signal}</p></div>
+                <div className="text-right">
+                  <p className="text-xs text-muted">{day.totalMinutes} min</p>
+                  {day.isRest ? <p className="text-[11px] text-muted">Rest</p> : null}
+                  {!day.isRest && day.hasKeySession ? <p className="text-[11px] text-accent">Key day</p> : null}
+                </div>
               </div>
               <div className="space-y-2">
                 {day.sessions.map((session) => {
                   const meta = getDisciplineMeta(session.sport);
+                  const role = sessionRoleLabel(session);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${meta.className} ${meta.textureClassName}`}><span aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></span>
-                        {session.is_key ? <span className="text-[10px] font-semibold text-accent">Key</span> : null}
+                        {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
-                      <p className="mt-1 text-xs font-semibold">{sessionLabel(session)}</p>
+                      <p className="mt-1 text-xs font-semibold">{sessionTitle(session)}</p>
                       <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
                     </button>
                   );
@@ -263,10 +285,18 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
             <section key={day.iso} className="surface-subtle p-3">
               <div className="mb-2 flex items-center justify-between border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-sm font-semibold">{day.label} · {day.date}</p>
-                <p className="text-xs text-muted">{day.totalMinutes} min · {day.signal}</p>
+                <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.hasKeySession ? " · Key day" : ""}</p>
               </div>
               <div className="space-y-2">
-                {day.sessions.map((session) => <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs font-semibold">{getDisciplineMeta(session.sport).label} — {sessionLabel(session)} — {session.duration_minutes} min</button>)}
+                {day.sessions.map((session) => {
+                  const role = sessionRoleLabel(session);
+                  return (
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
+                      <p className="font-semibold">{getDisciplineMeta(session.sport).label} — {sessionTitle(session)}</p>
+                      <p className="text-muted">{session.duration_minutes} min{role ? ` · ${role}` : ""}</p>
+                    </button>
+                  );
+                })}
                 {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">No sessions programmed.</p> : null}
               </div>
               <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 text-xs text-accent">+ Add session</button>
@@ -275,8 +305,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
         </div>
       </article>
 
-      <section className="surface-subtle p-3">
-        <h4 className="text-sm font-semibold">Week programming notes</h4>
+      <details className="surface-subtle p-3">
+        <summary className="cursor-pointer text-sm font-medium">Week notes & settings</summary>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div>
             <label className="label-base">Focus</label>
@@ -287,11 +317,11 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
             <input className="input-base" type="number" min={0} value={weekDraft.targetMinutes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, targetMinutes: event.target.value }))} />
           </div>
           <div>
-            <label className="label-base">Coach note</label>
+            <label className="label-base">Week note</label>
             <textarea className="input-base min-h-20" value={weekDraft.notes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, notes: event.target.value }))} />
           </div>
         </div>
-      </section>
+      </details>
 
       {quickAddDay ? (
         <div className="fixed inset-y-0 right-0 z-30 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
@@ -300,10 +330,11 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
           <form action={createSessionAction} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
             <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
             <label className="label-base">Discipline</label><select className="input-base" name="sport" defaultValue="run">{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
-            <label className="label-base">Session name</label><input name="sessionType" className="input-base" placeholder="Easy Run, Power Bike, Aerobic Endurance" />
+            <label className="label-base">Session name</label><input name="sessionType" className="input-base" placeholder="Easy Run, Power Bike, Aerobic Swim" />
             <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
             <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 4x8 threshold, etc" />
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="isKey" /> Key session</label>
+            <label className="label-base">Role (optional)</label>
+            <select name="sessionRole" className="input-base" defaultValue=""><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
             <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
             <button className="btn-primary w-full">Add session</button>
           </form>
@@ -316,11 +347,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
           <form action={updateSessionAction} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
             <label className="label-base">Discipline</label><select name="sport" defaultValue={activeSession.sport} className="input-base" required>{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
-            <label className="label-base">Session name</label><input name="sessionType" defaultValue={sessionLabel(activeSession)} className="input-base" />
+            <label className="label-base">Session name</label><input name="sessionType" defaultValue={activeSession.type ?? ""} className="input-base" />
             <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} defaultValue={activeSession.duration_minutes} className="input-base" required />
             <label className="label-base">Target</label><input name="target" defaultValue={activeSession.target ?? ""} className="input-base" />
+            <label className="label-base">Role (optional)</label>
+            <select name="sessionRole" className="input-base" defaultValue={activeSession.session_role ?? (activeSession.is_key ? "Key" : "")}><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
             <label className="label-base">Status</label><select name="status" defaultValue={activeSession.status} className="input-base"><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option></select>
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="isKey" defaultChecked={Boolean(activeSession.is_key)} /> Key session</label>
             <label className="label-base">Notes</label><textarea name="notes" defaultValue={activeSession.notes ?? ""} className="input-base min-h-20" />
             <div className="flex gap-2"><button className="btn-primary flex-1">Save changes</button><button formAction={deleteSessionAction} formMethod="post" onClick={(event) => { if (!window.confirm("Delete this session?")) event.preventDefault(); }} className="btn-secondary px-3">Delete</button></div>
           </form>

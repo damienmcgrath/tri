@@ -34,6 +34,7 @@ type Session = {
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
   is_key?: boolean | null;
+  session_role?: "Key" | "Supporting" | "Recovery" | "Optional" | null;
 };
 
 function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
@@ -116,7 +117,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key")
+      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key,session_role")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
