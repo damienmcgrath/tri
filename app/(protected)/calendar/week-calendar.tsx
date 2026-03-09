@@ -371,25 +371,30 @@ export function WeekCalendar({
                         ? "Planned"
                         : "Planned";
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
+          const dayHelper = metrics?.isRest
+            ? "Protected recovery"
+            : metrics?.availableDay
+              ? "Open for moved work"
+              : metrics?.openCapacity
+                ? `Can absorb ${metrics.remainingPlanned} min more`
+                : " ";
 
           return (
             <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 border-b border-[hsl(var(--border))] pb-2">
+              <div className="mb-2 min-h-[106px] border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
                   {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
                 </div>
-                <p className="text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
-                <p className={`text-[11px] ${dayTone}`}>{dayLabel}</p>
-                {metrics?.isRest ? <p className="text-[10px] text-muted">Protected recovery</p> : null}
-                {metrics?.availableDay ? <p className="text-[10px] text-muted">Open for moved work</p> : null}
-                {metrics?.openCapacity ? <p className="text-[10px] text-muted">Can absorb {metrics.remainingPlanned} min more</p> : null}
+                <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
+                <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
+                <p className="mt-1 text-[10px] text-muted">{dayHelper}</p>
               </div>
 
               <div className="space-y-2">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] py-3 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[96px] rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-3 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
                     + Add session
                   </button>
                 ) : null}
@@ -410,9 +415,20 @@ export function WeekCalendar({
                               ? "border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.06)]"
                               : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
+                  const stateBadge =
+                    state === "extra" ? (
+                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
+                    ) : state === "moved" ? (
+                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
+                    ) : state === "assigned" ? (
+                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent">Assigned</span>
+                    ) : (
+                      <SessionStatusChip status={session.status} compact />
+                    );
+
                   return (
                     <article key={session.id} className={`rounded-xl border p-2 text-xs ${toneClass}`}>
-                      <div className="mb-1 flex items-center justify-between gap-1">
+                      <div className="flex items-center justify-between gap-1">
                         <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
                           {discipline.label}
@@ -437,19 +453,9 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium">{getSessionTitle(session)}</p>
-                        {state === "extra" ? (
-                          <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
-                        ) : state === "moved" ? (
-                          <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
-                        ) : state === "assigned" ? (
-                          <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent">Assigned</span>
-                        ) : (
-                          <SessionStatusChip status={session.status} compact />
-                        )}
-                      </div>
-                      <p className="text-muted">{session.duration} min</p>
+                      <p className="mt-2 min-h-[2.5rem] font-medium leading-snug">{getSessionTitle(session)}</p>
+                      <p className="mt-1 text-muted">{session.duration} min</p>
+                      <div className="mt-2 flex min-h-[1.25rem] items-center justify-end">{stateBadge}</div>
                     </article>
                   );
                 })}
