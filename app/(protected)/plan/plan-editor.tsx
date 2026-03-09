@@ -90,6 +90,42 @@ function sessionTitle(session: Session) {
   return discipline;
 }
 
+function plannerFocusFromNotes(notes: string) {
+  const trimmed = notes.trim();
+  if (!trimmed) return "";
+
+  const focusMatch = trimmed.match(/^(?:focus|week focus)\s*:\s*(.+)$/i);
+  if (focusMatch?.[1]) {
+    return focusMatch[1].trim();
+  }
+
+  const firstLine = trimmed.split(/\n+/)[0]?.trim() ?? "";
+  if (firstLine.length > 0 && firstLine.length <= 48) {
+    return firstLine;
+  }
+
+  return "";
+}
+
+function derivedWeekFocusLabel(
+  weekIntent: TrainingWeek["focus"],
+  disciplineTotals: Array<{ sport: string; minutes: number }>,
+  restDays: number
+) {
+  if (weekIntent === "Recovery" || restDays >= 2) return "Recovery emphasis";
+
+  const ranked = disciplineTotals
+    .filter((item) => item.minutes > 0 && item.sport !== "other")
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, 2)
+    .map((item) => getDisciplineMeta(item.sport).label.toLowerCase());
+
+  if (ranked.length === 2) return `${ranked[0]} + ${ranked[1]} emphasis`;
+  if (ranked.length === 1) return `${ranked[0]} emphasis`;
+
+  return "Balanced triathlon load";
+}
+
 export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEditorProps) {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0];
   const planWeeks = weeks.filter((week) => week.plan_id === selectedPlan?.id).sort((a, b) => a.week_index - b.week_index);
@@ -159,6 +195,11 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
     : [];
 
   const restDays = weekDays.filter((day) => day.isRest).length;
+  const explicitWeekFocus = plannerFocusFromNotes(weekDraft.notes);
+  const weekFocusLabel = explicitWeekFocus
+    || (weekDraft.focus && weekDraft.focus !== "Custom" ? weekDraft.focus : "")
+    || derivedWeekFocusLabel(weekDraft.focus, disciplineTotals, restDays)
+    || "Balanced triathlon load";
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
@@ -205,8 +246,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
             <p className="mt-1 text-sm">{weekDraft.focus}</p>
           </div>
           <div className="md:col-span-2">
-            <p className="text-xs uppercase tracking-wide text-muted">Discipline split (minutes)</p>
-            <p className="mt-1 text-sm">{disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
+            <p className="text-xs uppercase tracking-wide text-muted">Week focus</p>
+            <p className="mt-1 text-sm">{weekFocusLabel}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">Rest days</p>
@@ -307,6 +348,9 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
       <details className="surface-subtle p-3">
         <summary className="cursor-pointer text-sm font-medium">Week notes & settings</summary>
+        <div className="mt-2">
+          <p className="text-xs text-muted">Discipline totals: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
+        </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div>
             <label className="label-base">Focus</label>
