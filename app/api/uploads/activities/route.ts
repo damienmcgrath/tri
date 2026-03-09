@@ -7,6 +7,10 @@ import { pickBestSuggestion, suggestSessionMatches } from "@/lib/workouts/matchi
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const acceptedExtensions = [".fit", ".tcx"];
 
+function isMissingScheduleStatus(errorMessage: string) {
+  return errorMessage.includes("schedule_status") && errorMessage.includes("schema cache");
+}
+
 function ext(name: string) {
   return name.slice(name.lastIndexOf(".")).toLowerCase();
 }
@@ -16,15 +20,40 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const baseSelect = "id,filename,file_type,file_size,status,error_message,created_at,completed_activities(id,sport_type,duration_sec,distance_m),session_activity_links(planned_session_id)";
+  const scheduleSelect = "id,filename,file_type,file_size,status,error_message,created_at,completed_activities(id,sport_type,duration_sec,distance_m,schedule_status),session_activity_links(planned_session_id)";
+
+  const { data: withStatus, error: withStatusError } = await supabase
     .from("activity_uploads")
-    .select("id,filename,file_type,file_size,status,error_message,created_at,completed_activities(id,sport_type,duration_sec,distance_m,schedule_status),session_activity_links(planned_session_id)")
+    .select(scheduleSelect)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(15);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ uploads: data ?? [] });
+  if (!withStatusError) return NextResponse.json({ uploads: withStatus ?? [] });
+
+  if (!isMissingScheduleStatus(withStatusError.message)) {
+    return NextResponse.json({ error: withStatusError.message }, { status: 400 });
+  }
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("activity_uploads")
+    .select(baseSelect)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(15);
+
+  if (legacyError) return NextResponse.json({ error: legacyError.message }, { status: 400 });
+
+  const uploads = (legacyData ?? []).map((upload) => ({
+    ...upload,
+    completed_activities: (upload.completed_activities ?? []).map((activity) => ({
+      ...activity,
+      schedule_status: "unscheduled" as const
+    }))
+  }));
+
+  return NextResponse.json({ uploads });
 }
 
 export async function POST(request: Request) {
@@ -86,10 +115,9 @@ export async function POST(request: Request) {
         avg_power: parsed.avgPower,
         calories: parsed.calories,
         parse_summary: parsed.parseSummary,
-        source: "upload",
-        schedule_status: "unscheduled"
+        source: "upload"
       })
-      .select("id,start_time_utc,sport_type,duration_sec,distance_m,schedule_status")
+      .select("id,start_time_utc,sport_type,duration_sec,distance_m")
       .single();
 
     if (activityError || !createdActivity) throw new Error(activityError?.message ?? "Could not save parsed activity");
