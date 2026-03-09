@@ -265,7 +265,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const restDays = weekDays.filter((day) => day.isRest).length;
   const explicitWeekFocus = plannerFocusFromNotes(weekDraft.notes);
   const derivedWeekFocus = derivedWeekFocusLabel(weekDraft.focus, disciplineTotals, restDays);
-  const weekFocusLabel = explicitWeekFocus || derivedWeekFocus;
+  const weekFocusLabel = (explicitWeekFocus || derivedWeekFocus).trim();
+  const normalizedBlock = weekDraft.focus.trim().toLowerCase();
+  const normalizedFocus = weekFocusLabel.toLowerCase();
+  const displayWeekFocus = weekFocusLabel && normalizedFocus !== normalizedBlock ? weekFocusLabel : "";
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
@@ -308,13 +311,13 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       <section className="surface-subtle px-4 py-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Week intent</p>
+            <p className="text-xs uppercase tracking-wide text-muted">Block</p>
             <p className="mt-1 text-sm">{weekDraft.focus}</p>
           </div>
-          {weekFocusLabel ? (
+          {displayWeekFocus ? (
             <div className="md:col-span-2">
               <p className="text-xs uppercase tracking-wide text-muted">Week focus</p>
-              <p className="mt-1 text-sm">{weekFocusLabel}</p>
+              <p className="mt-1 text-sm">{displayWeekFocus}</p>
             </div>
           ) : null}
           <div>
@@ -358,21 +361,21 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
           {weekDays.map((day) => (
-            <section key={day.iso} className={`min-h-[280px] min-w-0 p-3 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
-              <div className="mb-2 flex items-start justify-between border-b border-[hsl(var(--border))] pb-2">
+            <section key={day.iso} className={`group/day flex min-h-[236px] min-w-0 flex-col p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
+              <div className="mb-1.5 flex items-start justify-between border-b border-[hsl(var(--border))] pb-1.5">
                 <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
                 <div className="text-right">
                   <p className="text-xs text-muted">{day.totalMinutes} min</p>
-                  {day.isRest ? <p className="text-[11px] text-muted">Rest</p> : null}
+                  {day.isRest ? <p className="text-[11px] text-muted/90">Rest</p> : null}
                   {!day.isRest && day.hasKeySession ? <p className="text-[11px] text-accent">Key day</p> : null}
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="flex-1 space-y-1.5">
                 {day.sessions.map((session) => {
                   const meta = getDisciplineMeta(session.sport);
                   const role = sessionRoleLabel(session);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-1.5 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
@@ -387,30 +390,30 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </span>
                         {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
-                      <p className="mt-1 text-xs font-semibold">{sessionTitle(session)}</p>
+                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{sessionTitle(session)}</p>
                       <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery</p> : null}
+                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery window</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-3 w-full text-left text-xs text-accent">+ Add session</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
             </section>
           ))}
         </div>
 
         <div className="space-y-3 lg:hidden">
           {weekDays.map((day) => (
-            <section key={day.iso} className={`p-3 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
-              <div className="mb-2 flex items-center justify-between border-b border-[hsl(var(--border))] pb-2">
+            <section key={day.iso} className={`group/day p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
+              <div className="mb-1.5 flex items-center justify-between border-b border-[hsl(var(--border))] pb-1.5">
                 <p className="text-sm font-semibold">{day.label} · {day.date}</p>
                 <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.hasKeySession ? " · Key day" : ""}</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {day.sessions.map((session) => {
                   const role = sessionRoleLabel(session);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-1.5 text-left text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
@@ -425,14 +428,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </span>
                         {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
-                      <p className="mt-1 font-semibold">{sessionTitle(session)}</p>
+                      <p className="mt-1 line-clamp-2 font-semibold leading-snug">{sessionTitle(session)}</p>
                       <p className="text-muted">{session.duration_minutes} min</p>
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery.</p> : null}
+                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 text-xs text-accent">+ Add session</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
             </section>
           ))}
         </div>
