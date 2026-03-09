@@ -119,12 +119,17 @@ function sessionRoleLabel(session: Session) {
 
 function sessionTitle(session: Session) {
   const explicit = session.type?.trim();
-  if (explicit) return explicit;
   const discipline = getDisciplineMeta(session.sport).label;
-  const targetSubtype = session.target?.trim();
-  if (targetSubtype && !/^z\d/i.test(targetSubtype) && targetSubtype.length <= 24) {
-    return `${discipline} ${targetSubtype}`;
+
+  if (explicit && explicit.toLowerCase() !== "session") {
+    return explicit;
   }
+
+  const subtype = session.target?.trim();
+  if (subtype && !/^z\d/i.test(subtype) && subtype.length <= 24) {
+    return `${subtype} ${discipline}`;
+  }
+
   return discipline;
 }
 
@@ -161,7 +166,7 @@ function derivedWeekFocusLabel(
   if (ranked.length === 2) return `${ranked[0]} + ${ranked[1]} emphasis`;
   if (ranked.length === 1) return `${ranked[0]} emphasis`;
 
-  return "Balanced triathlon load";
+  return "";
 }
 
 export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeekId }: PlanEditorProps) {
@@ -236,10 +241,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
   const restDays = weekDays.filter((day) => day.isRest).length;
   const explicitWeekFocus = plannerFocusFromNotes(weekDraft.notes);
-  const weekFocusLabel = explicitWeekFocus
-    || (weekDraft.focus && weekDraft.focus !== "Custom" ? weekDraft.focus : "")
-    || derivedWeekFocusLabel(weekDraft.focus, disciplineTotals, restDays)
-    || "Balanced triathlon load";
+  const derivedWeekFocus = derivedWeekFocusLabel(weekDraft.focus, disciplineTotals, restDays);
+  const weekFocusLabel = explicitWeekFocus || derivedWeekFocus;
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
@@ -285,10 +288,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <p className="text-xs uppercase tracking-wide text-muted">Week intent</p>
             <p className="mt-1 text-sm">{weekDraft.focus}</p>
           </div>
-          <div className="md:col-span-2">
-            <p className="text-xs uppercase tracking-wide text-muted">Week focus</p>
-            <p className="mt-1 text-sm">{weekFocusLabel}</p>
-          </div>
+          {weekFocusLabel ? (
+            <div className="md:col-span-2">
+              <p className="text-xs uppercase tracking-wide text-muted">Week focus</p>
+              <p className="mt-1 text-sm">{weekFocusLabel}</p>
+            </div>
+          ) : null}
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">Rest days</p>
             <p className="mt-1 text-sm">{restDays}</p>
@@ -330,7 +335,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
           {weekDays.map((day) => (
-            <section key={day.iso} className="surface-subtle min-h-[280px] min-w-0 p-3">
+            <section key={day.iso} className={`min-h-[280px] min-w-0 p-3 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
               <div className="mb-2 flex items-start justify-between border-b border-[hsl(var(--border))] pb-2">
                 <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
                 <div className="text-right">
@@ -354,7 +359,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">No sessions programmed.</p> : null}
+                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery</p> : null}
               </div>
               <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-3 w-full text-left text-xs text-accent">+ Add session</button>
             </section>
@@ -363,7 +368,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
         <div className="space-y-3 lg:hidden">
           {weekDays.map((day) => (
-            <section key={day.iso} className="surface-subtle p-3">
+            <section key={day.iso} className={`p-3 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
               <div className="mb-2 flex items-center justify-between border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-sm font-semibold">{day.label} · {day.date}</p>
                 <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.hasKeySession ? " · Key day" : ""}</p>
@@ -378,7 +383,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">No sessions programmed.</p> : null}
+                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery.</p> : null}
               </div>
               <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 text-xs text-accent">+ Add session</button>
             </section>
