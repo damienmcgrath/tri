@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PlanEditor } from "./plan-editor";
 
@@ -35,6 +34,7 @@ type Session = {
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
   is_key?: boolean | null;
+  session_role?: "Key" | "Supporting" | "Recovery" | "Optional" | null;
 };
 
 function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
@@ -57,7 +57,7 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string } }) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string } }) {
   const supabase = await createClient();
   const {
     data: { user }
@@ -117,7 +117,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key")
+      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key,session_role")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
@@ -171,16 +171,8 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   }
 
   return (
-    <section className="plan-editor-motion-lock space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <div>
-          <h1 className="text-lg font-semibold">Plan</h1>
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Week Schedule</p>
-        </div>
-        <Link href="/plan/builder" className="btn-secondary px-3 py-1.5 text-xs">Plan settings</Link>
-      </div>
-
-      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
+    <section className="plan-editor-motion-lock">
+      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} initialWeekId={searchParams?.week} />
     </section>
   );
 }

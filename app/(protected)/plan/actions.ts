@@ -36,7 +36,8 @@ const createSessionSchema = z.object({
   distanceValue: z.union([z.literal(""), z.coerce.number().positive()]).optional(),
   distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional(),
   dayOrder: z.coerce.number().int().min(0).max(100).optional(),
-  isKey: z.coerce.boolean().optional()
+  isKey: z.coerce.boolean().optional(),
+  sessionRole: z.union([z.literal(""), z.enum(["Key", "Supporting", "Recovery", "Optional"])]).optional()
 });
 
 const updateSessionSchema = createSessionSchema.extend({
@@ -131,6 +132,19 @@ function isMissingColumnError(error: { code?: string; message?: string } | null,
   return /schema cache/i.test(message) && new RegExp(`['\"]${column}['\"]`, "i").test(message);
 }
 
+function fallbackSessionType(sport: string, sessionType?: string | null) {
+  const explicitType = sessionType?.trim();
+  if (explicitType) {
+    return explicitType;
+  }
+
+  if (sport === "swim") return "Swim";
+  if (sport === "bike") return "Bike";
+  if (sport === "run") return "Run";
+  if (sport === "strength") return "Strength";
+  return "Training";
+}
+
 
 async function insertSessionWithCompat(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -146,6 +160,7 @@ async function insertSessionWithCompat(
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
   delete withoutOptionalColumns.is_key;
+  delete withoutOptionalColumns.session_role;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -173,6 +188,7 @@ async function updateSessionWithCompat(
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
   delete withoutOptionalColumns.is_key;
+  delete withoutOptionalColumns.session_role;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
     throw new Error(initialError.message);
@@ -200,6 +216,7 @@ async function insertSessionsBatchWithCompat(
     delete next.day_order;
     delete next.target;
     delete next.is_key;
+    delete next.session_role;
     return next;
   });
 
@@ -412,7 +429,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
 
   const sourceSessionsQuery = await supabase
     .from("sessions")
-    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,is_key,date,day_order")
+    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,is_key,session_role,date,day_order")
     .eq("week_id", sourceWeek.id)
     .order("date", { ascending: true });
 
@@ -422,7 +439,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
   if (sourceSessionsError && (isMissingColumnError(sourceSessionsError, "target") || isMissingColumnError(sourceSessionsError, "day_order"))) {
     const fallbackQuery = await supabase
       .from("sessions")
-      .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,is_key,date")
+      .select("sport,type,duration_minutes,notes,distance_value,distance_unit,status,is_key,session_role,date")
       .eq("week_id", sourceWeek.id)
       .order("date", { ascending: true });
 
@@ -443,6 +460,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
     distance_value: number | null;
     distance_unit: string | null;
     status: string;
+    session_role?: "Key" | "Supporting" | "Recovery" | "Optional" | null;
     date: string;
     day_order?: number | null;
   }>;
@@ -481,7 +499,8 @@ export async function duplicateWeekForwardAction(formData: FormData) {
         notes: session.notes,
         distance_value: session.distance_value,
         distance_unit: session.distance_unit,
-        status: "planned"
+        status: "planned",
+        session_role: session.session_role ?? null
       };
     });
 
@@ -607,7 +626,8 @@ export async function createSessionAction(formData: FormData) {
     distanceValue: formData.get("distanceValue"),
     distanceUnit: formData.get("distanceUnit"),
     dayOrder: formData.get("dayOrder"),
-    isKey: formData.get("isKey")
+    isKey: formData.get("isKey"),
+    sessionRole: formData.get("sessionRole")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -631,7 +651,7 @@ export async function createSessionAction(formData: FormData) {
     week_id: parsed.weekId,
     date: parsed.date,
     sport: parsed.sport,
-    type: parsed.sessionType || "Session",
+    type: fallbackSessionType(parsed.sport, parsed.sessionType),
     target: parsed.target || null,
     day_order: parsed.dayOrder ?? (daySessions?.length ?? 0),
     duration_minutes: parsed.durationMinutes,
@@ -639,7 +659,8 @@ export async function createSessionAction(formData: FormData) {
     distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
     distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
     status: "planned",
-    is_key: Boolean(parsed.isKey)
+    is_key: Boolean(parsed.isKey) || parsed.sessionRole === "Key",
+    session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 
   await insertSessionWithCompat(supabase, canonicalPayload);
@@ -661,7 +682,8 @@ export async function updateSessionAction(formData: FormData) {
     distanceValue: formData.get("distanceValue"),
     distanceUnit: formData.get("distanceUnit"),
     status: formData.get("status"),
-    isKey: formData.get("isKey")
+    isKey: formData.get("isKey"),
+    sessionRole: formData.get("sessionRole")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -674,7 +696,7 @@ export async function updateSessionAction(formData: FormData) {
     week_id: parsed.weekId,
     date: parsed.date,
     sport: parsed.sport,
-    type: parsed.sessionType || "Session",
+    type: fallbackSessionType(parsed.sport, parsed.sessionType),
     target: parsed.target || null,
     notes: parsed.notes ?? null,
     distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
@@ -682,7 +704,8 @@ export async function updateSessionAction(formData: FormData) {
     duration_minutes: parsed.durationMinutes,
     status: parsed.status,
     user_id: user.id,
-    is_key: Boolean(parsed.isKey)
+    is_key: Boolean(parsed.isKey) || parsed.sessionRole === "Key",
+    session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 
   await updateSessionWithCompat(supabase, parsed.sessionId, canonicalPayload);
