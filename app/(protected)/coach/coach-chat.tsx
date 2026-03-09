@@ -144,7 +144,7 @@ function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnos
       headline: "Start with 1–2 completed sessions to unlock intent-match coaching",
       rationale:
         "You can already ask about missed-session recovery, schedule adjustments, and conservative load planning. As soon as more workouts are completed, session-quality diagnosis becomes specific.",
-      primaryAction: { label: "Open coaching chat", href: "#coaching-chat" },
+      primaryAction: { label: "Ask why", href: "#coaching-chat" },
       secondaryAction: { label: "Review weekly plan", href: "/plan" },
       confidenceNote: "Provisional insight"
     };
@@ -169,7 +169,7 @@ function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnos
       headline: "Execution quality is mixed — tighten intent on easy days",
       rationale:
         "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
-      primaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
+      primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
       secondaryAction: { label: "Ask why", href: "#coaching-chat" },
       confidenceNote: null
     };
@@ -179,7 +179,7 @@ function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnos
     headline: "Execution quality is strong — stay the course",
     rationale:
       "Most completed sessions appear aligned with intended purpose. Keep the current structure and only make small progression decisions if recovery remains stable.",
-    primaryAction: { label: "Apply to weekly plan", href: "/plan" },
+    primaryAction: { label: "Review recommendation", href: "/plan" },
     secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
     confidenceNote: null
   };
@@ -215,17 +215,17 @@ export function CoachChat() {
   const nextActions = useMemo(() => {
     if (!summary || sessionDiagnoses.length === 0) {
       return [
-        "Complete 1–2 sessions to enable workout-level intent diagnosis.",
-        "Ask about missed-session recovery or schedule constraints in the meantime.",
-        "Keep volume conservative until execution signals become clearer."
+        "Protect 2–3 key sessions this week and keep the rest deliberately easy.",
+        "Use Calendar to move sessions instead of stacking missed work.",
+        "Ask for a conservative adjustment if recovery feels off."
       ];
     }
 
     const actions = flaggedSessions.map((session) => session.nextAction);
     if (summary.completionPct < 75) {
-      actions.push("Keep remaining sessions simple: protect quality and avoid adding extra intensity.");
+      actions.push("Keep easy days easy until execution signals stabilise.");
     } else {
-      actions.push("Hold weekly volume; improve execution quality before progressing load.");
+      actions.push("Keep volume steady this week and improve pacing quality before progressing.");
     }
     return actions.slice(0, 4);
   }, [summary, sessionDiagnoses, flaggedSessions]);
@@ -352,11 +352,11 @@ export function CoachChat() {
         <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
         <p className="mt-3 max-w-3xl text-sm text-muted">{topInsight.rationale}</p>
         {topInsight.confidenceNote ? (
-          <p className="mt-3 inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1 text-xs text-[hsl(var(--text-secondary))]">
+          <p className="mt-3 inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-xs text-[hsl(var(--text-secondary))]">
             {topInsight.confidenceNote}
           </p>
         ) : null}
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-2">
           <Link href={topInsight.primaryAction.href} className="btn-primary">
             {topInsight.primaryAction.label}
           </Link>
@@ -376,9 +376,13 @@ export function CoachChat() {
         </div>
 
         {flaggedSessions.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">
-            No sessions are strongly flagged yet. Complete one more workout to unlock clearer intent-match diagnosis for this week.
-          </p>
+          <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-3">
+            <p className="text-sm text-muted">No sessions are strongly flagged yet.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-tertiary">
+              <li>After 1–2 more completed workouts, this section will highlight missed intent sessions.</li>
+              <li>It will show why execution drifted and what to change next time.</li>
+            </ul>
+          </div>
         ) : (
           <div className="mt-4 space-y-3">
             {flaggedSessions.map((session) => {
@@ -457,12 +461,12 @@ export function CoachChat() {
       </section>
 
       <section id="coaching-chat" className="surface overflow-hidden">
-        <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-5 py-4">
+        <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coaching chat</p>
-              <h3 className="mt-1 text-lg font-semibold">Refine today&apos;s diagnosis</h3>
-              <p className="mt-1 text-sm text-muted">Ask what caused a mismatch, how to execute better, and whether this week should adapt.</p>
+              <h3 className="mt-0.5 text-base font-semibold">Refine today&apos;s diagnosis</h3>
+              <p className="mt-0.5 text-sm text-muted">Ask what caused a mismatch, how to execute better, and whether this week should adapt.</p>
             </div>
             <button type="button" onClick={handleNewChat} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
               New conversation
@@ -471,15 +475,15 @@ export function CoachChat() {
         </div>
 
         {conversations.length > 0 ? (
-          <div className="border-b border-[hsl(var(--border))] px-5 py-3">
+          <div className="border-b border-[hsl(var(--border))] px-4 py-2">
             <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent threads</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {conversations.slice(0, 4).map((conversation) => (
                 <button
                   key={conversation.id}
                   type="button"
                   onClick={() => void handleConversationClick(conversation.id)}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
                     conversationId === conversation.id
                       ? "border-[hsl(var(--ai-accent-core)/0.4)] bg-[hsl(var(--ai-accent-core)/0.12)] text-[hsl(var(--text-primary))]"
                       : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]"
@@ -492,7 +496,7 @@ export function CoachChat() {
           </div>
         ) : null}
 
-        <div className="max-h-[440px] space-y-3 overflow-y-auto p-5">
+        <div className="max-h-[320px] space-y-2 overflow-y-auto p-4">
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
@@ -514,17 +518,17 @@ export function CoachChat() {
           ) : null}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4">
+        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
           <label htmlFor="coach-input" className="sr-only">
             Ask your triathlon coach
           </label>
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {quickPrompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
                 onClick={() => setInput(prompt)}
-                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1 text-xs font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
               >
                 {prompt}
               </button>
