@@ -375,10 +375,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const meta = getDisciplineMeta(session.sport);
                   const role = sessionRoleLabel(session);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-1.5 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
                         <span
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text,
@@ -413,10 +413,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 {day.sessions.map((session) => {
                   const role = sessionRoleLabel(session);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-1.5 text-left text-xs">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text,
