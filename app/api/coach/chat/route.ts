@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildWorkoutSummary, CompletedSessionLite, PlannedSessionLite } from "@/lib/coach/workout-summary";
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 
 type ChatRequestBody = {
   message?: string;
@@ -84,6 +86,7 @@ Rules:
   ];
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -156,6 +159,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   const body = (await request.json()) as ChatRequestBody;
 
   if (!body.message || body.message.trim().length < 3) {
@@ -166,10 +173,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please keep messages under 2000 characters." }, { status: 400 });
   }
 
+  const ip = getClientIp(request);
+  const ipRateLimit = checkRateLimit("chat-ip", ip, { maxRequests: 40, windowMs: 60_000 });
+
+  if (!ipRateLimit.allowed) {
+    return NextResponse.json({ error: "Too many chat requests. Please try again shortly." }, {
+      status: 429,
+      headers: rateLimitHeaders(ipRateLimit)
+    });
+  }
+
   const { supabase, user } = await getUserAndClient();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userRateLimit = checkRateLimit("chat-user", user.id, { maxRequests: 20, windowMs: 60_000 });
+
+  if (!userRateLimit.allowed) {
+    return NextResponse.json({ error: "Chat limit reached. Please wait a minute and retry." }, {
+      status: 429,
+      headers: rateLimitHeaders(userRateLimit)
+    });
   }
 
   const sinceDate = getDateDaysAgo(14);
@@ -281,5 +307,7 @@ export async function POST(request: Request) {
 
   await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
 
-  return NextResponse.json({ answer, summary, conversationId });
+  return NextResponse.json({ answer, summary, conversationId }, {
+    headers: rateLimitHeaders(userRateLimit)
+  });
 }
