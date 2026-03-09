@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", semanticLabel: "Overview", icon: "◧" },
-  { href: "/plan", label: "Plan", semanticLabel: "Design", icon: "▦" },
-  { href: "/calendar", label: "Calendar", semanticLabel: "Execution", icon: "◫" },
-  { href: "/coach", label: "Coach", semanticLabel: "Adaptation", icon: "◎" }
+  { href: "/dashboard", label: "Dashboard", icon: "◧" },
+  { href: "/plan", label: "Plan", icon: "▦" },
+  { href: "/calendar", label: "Calendar", icon: "◫" },
+  { href: "/coach", label: "Coach", icon: "◎", deemphasized: true }
 ];
 
 export function ShellNavRail({ compact = false }: { compact?: boolean }) {
@@ -21,20 +21,17 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
           <Link
             key={item.href}
             href={item.href}
-            title={`${item.label} · ${item.semanticLabel}`}
+            title={item.label}
             className={`rounded-xl px-3 py-2 text-sm transition ${
               active
                 ? "nav-item-active pl-5"
-                : "text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--surface-2))] hover:text-[hsl(var(--fg))]"
+                : `${item.deemphasized ? "text-[hsl(var(--fg-muted)/0.78)]" : "text-[hsl(var(--fg-muted))]"} hover:bg-[hsl(var(--surface-2))] hover:text-[hsl(var(--fg))]`
             } ${compact ? "flex items-center justify-center" : "block"}`}
           >
             {compact ? (
               <span aria-hidden="true" className="text-base">{item.icon}</span>
             ) : (
-              <>
-                <span className="block font-medium">{item.label}</span>
-                <span className="block text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">{item.semanticLabel}</span>
-              </>
+              <span className="block font-medium">{item.label}</span>
             )}
           </Link>
         );
@@ -55,11 +52,10 @@ export function MobileBottomTabs() {
             <Link
               key={item.href}
               href={item.href}
-              title={`${item.label} · ${item.semanticLabel}`}
+              title={item.label}
               className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
             >
               <span className="block">{item.label}</span>
-              <span className="block text-[10px] uppercase tracking-[0.12em]">{item.semanticLabel}</span>
             </Link>
           );
         })}
