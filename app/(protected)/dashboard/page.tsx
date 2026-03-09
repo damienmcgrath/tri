@@ -94,6 +94,17 @@ function weekdayName(isoDate: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00.000Z`));
 }
 
+function getSessionDisplayName(session: Pick<Session, "type" | "sport">) {
+  const rawType = session.type?.trim() ?? "";
+  const isGenericType = /^(session|workout|training)$/i.test(rawType);
+
+  if (rawType && !isGenericType) {
+    return rawType;
+  }
+
+  return getDisciplineMeta(session.sport).label;
+}
+
 export default async function DashboardPage({
   searchParams
 }: {
@@ -239,8 +250,8 @@ export default async function DashboardPage({
     const label = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
 
     let tone: "rest" | "upcoming" | "today-remaining" | "today-complete" | "completed" | "missed" = "rest";
-    let stateLabel = "Rest day";
-    let microLabel = "";
+    let stateLabel = "Rest";
+    let microLabel = "Rest";
 
     if (iso === todayIso) {
       if (plannedCount > 0) {
@@ -249,7 +260,7 @@ export default async function DashboardPage({
         microLabel = `${remainingMinutesOnDay}m left`;
       } else if (daySessions.length > 0) {
         tone = "today-complete";
-        stateLabel = "Today done";
+        stateLabel = "Today";
         microLabel = `${completedMinutesOnDay}m done`;
       }
     } else if (iso < todayIso) {
@@ -265,7 +276,7 @@ export default async function DashboardPage({
     } else if (plannedCount > 0) {
       tone = "upcoming";
       stateLabel = "Planned";
-      microLabel = `${plannedMinutes}m`;
+      microLabel = `${plannedMinutes}m planned`;
     }
 
     return { iso, label, tone, stateLabel, microLabel };
@@ -330,7 +341,9 @@ export default async function DashboardPage({
         detail: nextGapSession
           ? `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete ${weekdayName(nextGapSession.date)} ${nextGapSession.type} and keep weekend load unchanged.`
           : `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete the next planned ${biggestGap.label.toLowerCase()} session and keep weekend load unchanged.`,
-        cta: nextGapSession ? `Open ${weekdayName(nextGapSession.date)} session` : `Open next ${biggestGap.label.toLowerCase()} session`,
+        cta: nextGapSession
+          ? `Open ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()}`
+          : `Open next ${biggestGap.label.toLowerCase()} workout`,
         href: nextGapSession ? `/calendar?focus=${nextGapSession.id}` : "/calendar",
         ctaStyle: "secondary"
       }
@@ -406,10 +419,8 @@ export default async function DashboardPage({
         <article className="surface p-5 md:p-6">
           {pendingTodaySessions.length > 0 ? (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Today</p>
-              <h2 className="mt-2 text-xl font-semibold">
-                {completedTodaySessions.length > 0 ? "Remaining and completed" : `${pendingTodaySessions.length} remaining session${pendingTodaySessions.length > 1 ? "s" : ""}`}
-              </h2>
+              <h2 className="text-xl font-semibold">Today</h2>
+              <p className="mt-1 text-sm text-muted">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length} completed`}</p>
 
               <div className="mt-4 space-y-3">
                 <div>
@@ -417,7 +428,7 @@ export default async function DashboardPage({
                   <div className="space-y-2">
                     {pendingTodaySessions.map((session) => (
                       <div key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">
-                        <p className="text-sm font-medium">{session.type}</p>
+                        <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
                         <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label}{session.is_key ? " • Key" : ""} • Remaining</p>
                       </div>
                     ))}
@@ -430,7 +441,7 @@ export default async function DashboardPage({
                     <div className="space-y-2">
                       {completedTodaySessions.map((session) => (
                         <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                          <p className="text-sm font-medium">{session.type}</p>
+                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
                           <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label} • Done</p>
                         </div>
                       ))}
@@ -446,13 +457,14 @@ export default async function DashboardPage({
             </>
           ) : completedTodaySessions.length > 0 ? (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Today complete</p>
-              <h2 className="mt-2 text-xl font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h2>
+              <h2 className="text-xl font-semibold">Today</h2>
+              <p className="mt-1 text-sm text-muted">0 remaining · {completedTodaySessions.length} completed</p>
+              <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
               <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {statusChip.label === "On track" ? "on track" : "still in reach"} this week.</p>
               <div className="mt-4 space-y-2">
                 {completedTodaySessions.map((session) => (
                   <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                    <p className="text-sm font-medium">{session.type}</p>
+                    <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
                     <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label} • Done</p>
                   </div>
                 ))}
@@ -464,8 +476,9 @@ export default async function DashboardPage({
             </>
           ) : (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Today</p>
-              <h2 className="mt-2 text-xl font-semibold">No sessions scheduled today</h2>
+              <h2 className="text-xl font-semibold">Today</h2>
+              <p className="mt-1 text-sm text-muted">No sessions scheduled</p>
+              <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
               <p className="mt-2 text-sm text-muted">Use today for recovery.</p>
               <div className="mt-4">
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
