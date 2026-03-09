@@ -88,6 +88,11 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
+function getOptionalFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return value === null ? undefined : value;
+}
+
 async function getAuthedClient() {
   const supabase = await createClient();
   const {
@@ -619,15 +624,15 @@ export async function createSessionAction(formData: FormData) {
     weekId: formData.get("weekId"),
     date: formData.get("date"),
     sport: formData.get("sport"),
-    sessionType: formData.get("sessionType"),
-    target: formData.get("target"),
+    sessionType: getOptionalFormValue(formData, "sessionType"),
+    target: getOptionalFormValue(formData, "target"),
     durationMinutes: formData.get("durationMinutes"),
-    notes: formData.get("notes"),
-    distanceValue: formData.get("distanceValue"),
-    distanceUnit: formData.get("distanceUnit"),
-    dayOrder: formData.get("dayOrder"),
-    isKey: formData.get("isKey"),
-    sessionRole: formData.get("sessionRole")
+    notes: getOptionalFormValue(formData, "notes"),
+    distanceValue: getOptionalFormValue(formData, "distanceValue"),
+    distanceUnit: getOptionalFormValue(formData, "distanceUnit"),
+    dayOrder: getOptionalFormValue(formData, "dayOrder"),
+    isKey: getOptionalFormValue(formData, "isKey"),
+    sessionRole: getOptionalFormValue(formData, "sessionRole")
   });
 
   const { supabase, user } = await getAuthedClient();
@@ -675,15 +680,15 @@ export async function updateSessionAction(formData: FormData) {
     weekId: formData.get("weekId"),
     date: formData.get("date"),
     sport: formData.get("sport"),
-    sessionType: formData.get("sessionType"),
-    target: formData.get("target"),
+    sessionType: getOptionalFormValue(formData, "sessionType"),
+    target: getOptionalFormValue(formData, "target"),
     durationMinutes: formData.get("durationMinutes"),
-    notes: formData.get("notes"),
-    distanceValue: formData.get("distanceValue"),
-    distanceUnit: formData.get("distanceUnit"),
+    notes: getOptionalFormValue(formData, "notes"),
+    distanceValue: getOptionalFormValue(formData, "distanceValue"),
+    distanceUnit: getOptionalFormValue(formData, "distanceUnit"),
     status: formData.get("status"),
-    isKey: formData.get("isKey"),
-    sessionRole: formData.get("sessionRole")
+    isKey: getOptionalFormValue(formData, "isKey"),
+    sessionRole: getOptionalFormValue(formData, "sessionRole")
   });
 
   const { supabase, user } = await getAuthedClient();
