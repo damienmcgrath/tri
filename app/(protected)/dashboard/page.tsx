@@ -105,6 +105,26 @@ function getSessionDisplayName(session: Pick<Session, "type" | "sport">) {
   return getDisciplineMeta(session.sport).label;
 }
 
+function getDayMeaningLabel(daySessions: Session[]) {
+  const plannedSessions = daySessions.filter((session) => session.status === "planned");
+  if (plannedSessions.length === 0) return null;
+
+  if (plannedSessions.length === 1) {
+    return getSessionDisplayName(plannedSessions[0]);
+  }
+
+  const uniqueSports = [...new Set(plannedSessions.map((session) => getDisciplineMeta(session.sport).label))];
+  if (uniqueSports.length === 1) {
+    return `${uniqueSports[0]} x${plannedSessions.length}`;
+  }
+
+  if (uniqueSports.length >= 2) {
+    return `${uniqueSports[0]} + ${uniqueSports[1]}`;
+  }
+
+  return `${plannedSessions.length} sessions`;
+}
+
 export default async function DashboardPage({
   searchParams
 }: {
@@ -242,10 +262,10 @@ export default async function DashboardPage({
     const iso = addDays(weekStart, index);
     const daySessions = sessions.filter((session) => session.date === iso);
     const plannedCount = daySessions.filter((session) => session.status === "planned").length;
-    const completedCount = daySessions.filter((session) => session.status === "completed" || session.status === "skipped").length;
     const plannedMinutes = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const remainingMinutesOnDay = daySessions.filter((session) => session.status === "planned").reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const completedMinutesOnDay = daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0);
+    const trainingMeaning = getDayMeaningLabel(daySessions);
 
     const label = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
 
@@ -260,14 +280,14 @@ export default async function DashboardPage({
         microLabel = `${remainingMinutesOnDay}m left`;
       } else if (daySessions.length > 0) {
         tone = "today-complete";
-        stateLabel = "Today";
+        stateLabel = "Completed";
         microLabel = `${completedMinutesOnDay}m done`;
       }
     } else if (iso < todayIso) {
       if (plannedCount > 0) {
         tone = "missed";
         stateLabel = "Missed";
-        microLabel = `${plannedCount} missed`;
+        microLabel = `${remainingMinutesOnDay || plannedMinutes}m missed`;
       } else if (daySessions.length > 0) {
         tone = "completed";
         stateLabel = "Completed";
@@ -275,8 +295,8 @@ export default async function DashboardPage({
       }
     } else if (plannedCount > 0) {
       tone = "upcoming";
-      stateLabel = "Planned";
-      microLabel = `${plannedMinutes}m planned`;
+      stateLabel = trainingMeaning ? `${trainingMeaning} · ${plannedMinutes}m` : `${plannedMinutes}m planned`;
+      microLabel = trainingMeaning ? "Planned" : `${plannedMinutes}m planned`;
     }
 
     return { iso, label, tone, stateLabel, microLabel };
@@ -339,8 +359,8 @@ export default async function DashboardPage({
         kicker: "Focus this week",
         title: `Protect ${biggestGap.label.toLowerCase()} consistency`,
         detail: nextGapSession
-          ? `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete ${weekdayName(nextGapSession.date)} ${nextGapSession.type} and keep weekend load unchanged.`
-          : `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete the next planned ${biggestGap.label.toLowerCase()} session and keep weekend load unchanged.`,
+          ? `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()} and keep weekend load unchanged.`
+          : `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete the next planned ${biggestGap.label.toLowerCase()} workout and keep weekend load unchanged.`,
         cta: nextGapSession
           ? `Open ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()}`
           : `Open next ${biggestGap.label.toLowerCase()} workout`,
@@ -390,29 +410,29 @@ export default async function DashboardPage({
               const toneClass = day.tone === "today-remaining"
                 ? "border-[hsl(var(--accent-performance)/0.72)] bg-[hsl(var(--accent-performance)/0.18)]"
                 : day.tone === "today-complete"
-                  ? "border-[hsl(var(--success)/0.52)] bg-[hsl(var(--success)/0.18)]"
+                  ? "border-[hsl(var(--success)/0.45)] bg-[hsl(var(--success)/0.13)]"
                   : day.tone === "completed"
-                    ? "border-[hsl(var(--success)/0.4)] bg-[hsl(var(--success)/0.11)]"
+                    ? "border-[hsl(var(--success)/0.34)] bg-[hsl(var(--success)/0.08)]"
                     : day.tone === "missed"
-                      ? "border-[hsl(var(--danger)/0.48)] bg-[hsl(var(--danger)/0.14)]"
+                      ? "border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.1)]"
                       : day.tone === "upcoming"
-                        ? "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"
-                        : "border-[hsl(var(--border)/0.5)] bg-transparent";
+                        ? "border-[hsl(var(--border))] bg-[hsl(var(--surface-2)/0.68)]"
+                        : "border-transparent bg-transparent opacity-70";
 
               return (
-                <div key={day.iso} className={`rounded-lg border px-2 py-2 ${toneClass}`}>
-                  <p className="text-[11px] font-semibold">{day.stateLabel}</p>
-                  <p className="mt-0.5 text-[10px] text-[hsl(var(--fg-muted))]">{day.label}</p>
-                  {day.microLabel ? <p className="mt-1 text-[10px] text-[hsl(var(--fg-muted))]">{day.microLabel}</p> : null}
+                <div key={day.iso} className={`rounded-lg border px-2 py-1.5 ${toneClass}`}>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.04em] text-[hsl(var(--fg-muted))]">{day.label}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold leading-tight">{day.stateLabel}</p>
+                  {day.microLabel ? <p className="mt-0.5 text-[10px] text-[hsl(var(--fg-muted))]">{day.microLabel}</p> : null}
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
-            <p className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">Completed <span className="block text-base font-semibold">{toHoursAndMinutes(totals.completed)}</span></p>
-            <p className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">Remaining <span className="block text-base font-semibold">{toHoursAndMinutes(remainingMinutes)}</span></p>
-            <p className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">Missed <span className="block text-base font-semibold">{toHoursAndMinutes(missedMinutes)}</span></p>
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[hsl(var(--border)/0.7)] pt-3 text-sm">
+            <p className="px-1">Completed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(totals.completed)}</span></p>
+            <p className="px-1">Remaining <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(remainingMinutes)}</span></p>
+            <p className="px-1">Missed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(missedMinutes)}</span></p>
           </div>
         </article>
 
