@@ -57,7 +57,7 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string } }) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string } }) {
   const supabase = await createClient();
   const {
     data: { user }
@@ -172,7 +172,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
 
   return (
     <section className="plan-editor-motion-lock">
-      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} />
+      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} initialWeekId={searchParams?.week} />
     </section>
   );
 }

@@ -42,7 +42,13 @@ type Session = {
   session_role?: SessionRole | null;
 };
 
-type PlanEditorProps = { plans: Plan[]; weeks: TrainingWeek[]; sessions: Session[]; selectedPlanId?: string };
+type PlanEditorProps = {
+  plans: Plan[];
+  weeks: TrainingWeek[];
+  sessions: Session[];
+  selectedPlanId?: string;
+  initialWeekId?: string;
+};
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
@@ -71,6 +77,38 @@ function weekRangeLabel(weekStartDate: string) {
   const end = new Date(start);
   end.setUTCDate(start.getUTCDate() + 6);
   return `${shortDateFormatter.format(start)} – ${shortDateFormatter.format(end)}`;
+}
+
+function getLocalTodayIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
+  if (!weeks.length) return "";
+
+  if (explicitWeekId && weeks.some((week) => week.id === explicitWeekId)) {
+    return explicitWeekId;
+  }
+
+  const todayIso = getLocalTodayIso();
+  const byStartDate = [...weeks].sort((a, b) => a.week_start_date.localeCompare(b.week_start_date));
+
+  const currentWeek = byStartDate.find((week) => {
+    const weekEnd = addDays(week.week_start_date, 6);
+    return week.week_start_date <= todayIso && todayIso <= weekEnd;
+  });
+
+  if (currentWeek) return currentWeek.id;
+
+  const upcomingWeek = byStartDate.find((week) => week.week_start_date > todayIso);
+  if (upcomingWeek) return upcomingWeek.id;
+
+  const mostRecentPastWeek = [...byStartDate].reverse().find((week) => week.week_start_date < todayIso);
+  return mostRecentPastWeek?.id ?? byStartDate[0].id;
 }
 
 function sessionRoleLabel(session: Session) {
@@ -126,10 +164,10 @@ function derivedWeekFocusLabel(
   return "Balanced triathlon load";
 }
 
-export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEditorProps) {
+export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeekId }: PlanEditorProps) {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0];
   const planWeeks = weeks.filter((week) => week.plan_id === selectedPlan?.id).sort((a, b) => a.week_index - b.week_index);
-  const [selectedWeekId, setSelectedWeekId] = useState(planWeeks[0]?.id ?? "");
+  const [selectedWeekId, setSelectedWeekId] = useState(() => resolveInitialWeekId(planWeeks, initialWeekId));
   const [quickAddDay, setQuickAddDay] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [weekActionOpen, setWeekActionOpen] = useState(false);
@@ -147,8 +185,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId }: PlanEdito
 
   useEffect(() => {
     if (!planWeeks.length) return setSelectedWeekId("");
-    if (!planWeeks.some((week) => week.id === selectedWeekId)) setSelectedWeekId(planWeeks[0].id);
-  }, [planWeeks, selectedWeekId]);
+    if (!planWeeks.some((week) => week.id === selectedWeekId)) {
+      setSelectedWeekId(resolveInitialWeekId(planWeeks, initialWeekId));
+    }
+  }, [initialWeekId, planWeeks, selectedWeekId]);
 
   useEffect(() => {
     if (!selectedWeek) return;
