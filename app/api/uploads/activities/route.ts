@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseFitFile, parseTcxFile, sha256Hex } from "@/lib/workouts/activity-parser";
 import { pickBestSuggestion, suggestSessionMatches } from "@/lib/workouts/matching-service";
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const acceptedExtensions = [".fit", ".tcx"];
@@ -57,9 +59,32 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const ip = getClientIp(request);
+  const ipRateLimit = checkRateLimit("upload-ip", ip, { maxRequests: 20, windowMs: 60 * 60 * 1000 });
+
+  if (!ipRateLimit.allowed) {
+    return NextResponse.json({ error: "Too many upload attempts. Try again later." }, {
+      status: 429,
+      headers: rateLimitHeaders(ipRateLimit)
+    });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const userRateLimit = checkRateLimit("upload-user", user.id, { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+
+  if (!userRateLimit.allowed) {
+    return NextResponse.json({ error: "Upload limit reached for this hour." }, {
+      status: 429,
+      headers: rateLimitHeaders(userRateLimit)
+    });
+  }
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -85,7 +110,9 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (duplicate) {
-    return NextResponse.json({ duplicate: true, uploadId: duplicate.id, status: duplicate.status });
+    return NextResponse.json({ duplicate: true, uploadId: duplicate.id, status: duplicate.status }, {
+      headers: rateLimitHeaders(userRateLimit)
+    });
   }
 
   const base64 = bytes.toString("base64");
@@ -174,7 +201,9 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, suggested });
+    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, suggested }, {
+      headers: rateLimitHeaders(userRateLimit)
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to parse file";
     await supabase.from("activity_uploads").update({ status: "error", error_message: message }).eq("id", upload.id).eq("user_id", user.id);
