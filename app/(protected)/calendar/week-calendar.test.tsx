@@ -71,7 +71,7 @@ describe("WeekCalendar", () => {
       />
     );
 
-    expect(screen.getByText("Adaptation strip")).toBeInTheDocument();
+    expect(screen.getByText("Adaptation tray")).toBeInTheDocument();
     expect(screen.getByText("Unmatched upload")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "extra" } });
