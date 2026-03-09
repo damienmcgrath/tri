@@ -11,9 +11,7 @@ jest.mock("./actions", () => ({
   clearSkippedAction: jest.fn(),
   markSkippedAction: jest.fn(),
   moveSessionAction: jest.fn(),
-  quickAddSessionAction: jest.fn(),
-  swapSessionDayAction: jest.fn(),
-  updateSessionAction: jest.fn()
+  quickAddSessionAction: jest.fn()
 }));
 
 const weekDays = [
@@ -56,7 +54,7 @@ const sessions = [
 ];
 
 describe("WeekCalendar", () => {
-  it("renders extra session label and filters unscheduled sessions", () => {
+  it("shows adaptation strip for unmatched uploads and filters by extra state", () => {
     render(
       <WeekCalendar
         weekDays={weekDays}
@@ -73,14 +71,11 @@ describe("WeekCalendar", () => {
       />
     );
 
-    expect(screen.getByText("Extra session")).toBeInTheDocument();
+    expect(screen.getByText("Adaptation strip")).toBeInTheDocument();
+    expect(screen.getByText("Unmatched upload")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Work filter"), { target: { value: "unscheduled" } });
+    fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "extra" } });
     expect(screen.queryByText("Tempo")).not.toBeInTheDocument();
     expect(screen.getByText("Completed activity")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Work filter"), { target: { value: "planned" } });
-    expect(screen.getByText("Tempo")).toBeInTheDocument();
-    expect(screen.queryByText("Completed activity")).not.toBeInTheDocument();
   });
 });

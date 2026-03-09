@@ -1,37 +1,15 @@
 "use client";
 
-import { ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  DndContext,
-  DragEndEvent,
-  DragStartEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  closestCenter,
-  useDroppable,
-  useSensor,
-  useSensors
-} from "@dnd-kit/core";
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
-import {
-  clearSkippedAction,
-  markSkippedAction,
-  moveSessionAction,
-  quickAddSessionAction,
-  swapSessionDayAction,
-  updateSessionAction
-} from "@/app/(protected)/calendar/actions";
+import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 
 type SessionStatus = "planned" | "completed" | "skipped";
-type FilterStatus = "all" | SessionStatus;
+type FilterStatus = "all" | SessionStatus | "extra";
 type SportFilter = "all" | "swim" | "bike" | "run" | "strength";
-type WorkFilter = "all" | "planned" | "unscheduled";
 
 type CalendarSession = {
   id: string;
@@ -51,15 +29,7 @@ type CalendarSession = {
 
 type WeekDay = { iso: string; weekday: string; label: string };
 
-const sports = ["swim", "bike", "run", "strength"] as const;
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
-
-function formatMinutes(value: number) {
-  const minutes = Math.max(0, Math.round(value));
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours}h ${mins}m`;
-}
 
 function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
@@ -75,59 +45,29 @@ function getMonday(date = new Date()) {
   return monday;
 }
 
-function parseTarget(notes: string | null) {
-  if (!notes) return "";
-  const firstLine = notes.split("\n")[0]?.trim() ?? "";
-  return firstLine.replace(/\[skipped\s\d{4}-\d{2}-\d{2}\]/i, "").trim();
-}
-
-function buildSessionTitle(session: CalendarSession) {
-  if (session.displayType === "completed_activity") {
-    return "Completed activity";
-  }
-
-  const type = session.type?.trim();
-  if (type && type.toLowerCase() !== "session") {
-    return type;
-  }
-
-  const target = parseTarget(session.notes);
-  if (target) {
-    return target;
-  }
-
-  return `${getDisciplineMeta(session.sport).label} session`;
-}
-
 function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
 
-function clearSkippedTag(notes: string | null) {
-  return (notes ?? "").replace(/\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+
+function getActivityId(sessionId: string) {
+  return sessionId.startsWith("activity:") ? sessionId.replace("activity:", "") : null;
 }
 
-function completedDuration(session: CalendarSession) {
-  if (session.status !== "completed") {
-    return 0;
+function getSessionState(session: CalendarSession) {
+  if (session.displayType === "completed_activity") {
+    return "extra" as const;
   }
-
-  return session.linkedStats?.durationMin ?? session.duration;
+  return session.status;
 }
 
 export function WeekCalendar({
   weekDays,
   sessions,
-  executionLabel,
-  executionSubtext,
   completedCount,
-  plannedTotalCount,
-  skippedCount,
-  extraSessionCount,
   plannedRemainingCount,
-  plannedMinutes,
-  completedMinutes,
-  remainingMinutes
+  skippedCount,
+  extraSessionCount
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
@@ -147,231 +87,89 @@ export function WeekCalendar({
   const searchParams = useSearchParams();
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
-  const [workFilter, setWorkFilter] = useState<WorkFilter>("all");
-  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
-  const [quickAddState, setQuickAddState] = useState<{ initialDate: string; allowDaySelection: boolean } | null>(null);
-  const [swapSource, setSwapSource] = useState<CalendarSession | null>(null);
+  const [quickAddDate, setQuickAddDate] = useState<string | null>(null);
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
-  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
-  const [skipConfirmSession, setSkipConfirmSession] = useState<CalendarSession | null>(null);
-  const [toast, setToast] = useState<{ message: string; undoLabel?: string; onUndo?: () => void } | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [dismissedStripIds, setDismissedStripIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
 
-  useEffect(() => {
-    setLocalSessions(sessions);
-  }, [sessions]);
-
+  useEffect(() => setLocalSessions(sessions), [sessions]);
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 5200);
+    const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const [orderByDay, setOrderByDay] = useState<Record<string, string[]>>(() =>
-    weekDays.reduce<Record<string, string[]>>((acc, day) => {
-      acc[day.iso] = sessions.filter((session) => session.date === day.iso).map((session) => session.id);
-      return acc;
-    }, {})
-  );
-
-  useEffect(() => {
-    setOrderByDay(
-      weekDays.reduce<Record<string, string[]>>((acc, day) => {
-        acc[day.iso] = sessions.filter((session) => session.date === day.iso).map((session) => session.id);
-        return acc;
-      }, {})
-    );
-  }, [sessions, weekDays]);
-
-  const sessionsById = useMemo(() => Object.fromEntries(localSessions.map((session) => [session.id, session])), [localSessions]);
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const activeWeekStart = weekDays[0]?.iso ?? currentWeekStart;
 
   const withWeek = (targetWeekStart: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (targetWeekStart === currentWeekStart) {
-      params.delete("weekStart");
-    } else {
-      params.set("weekStart", targetWeekStart);
-    }
+    if (targetWeekStart === currentWeekStart) params.delete("weekStart");
+    else params.set("weekStart", targetWeekStart);
     const query = params.toString();
     return `${pathname}${query ? `?${query}` : ""}`;
   };
-  const detailSession = detailSessionId ? sessionsById[detailSessionId] ?? null : null;
 
-  const filteredIdsByDay = useMemo(() => {
-    return weekDays.reduce<Record<string, string[]>>((acc, day) => {
-      const sourceIds = orderByDay[day.iso] ?? [];
-      acc[day.iso] = sourceIds.filter((id) => {
-        const session = sessionsById[id];
-        if (!session) return false;
-        const sportMatch = sportFilter === "all" || session.sport === sportFilter;
-        const statusMatch = statusFilter === "all" || session.status === statusFilter;
-        const workMatch =
-          workFilter === "all" ||
-          (workFilter === "planned" && session.displayType === "planned_session") ||
-          (workFilter === "unscheduled" && session.displayType === "completed_activity");
-        return sportMatch && statusMatch && workMatch;
-      });
-      return acc;
-    }, {});
-  }, [orderByDay, sessionsById, sportFilter, statusFilter, weekDays, workFilter]);
+  const filteredSessions = useMemo(() => {
+    return localSessions.filter((session) => {
+      const sportMatch = sportFilter === "all" || session.sport === sportFilter;
+      const state = getSessionState(session);
+      const statusMatch = statusFilter === "all" || state === statusFilter;
+      return sportMatch && statusMatch;
+    });
+  }, [localSessions, sportFilter, statusFilter]);
 
+  const visibleIds = useMemo(() => new Set(filteredSessions.map((session) => session.id)), [filteredSessions]);
 
-  const progressBySport = useMemo(
+  const sessionsByDay = useMemo(
     () =>
-      sports.map((sport) => {
-        const planned = localSessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + session.duration, 0);
-        const completed = localSessions
-          .filter((session) => session.sport === sport)
-          .reduce((sum, session) => sum + completedDuration(session), 0);
-        return { sport, planned, completed };
+      weekDays.reduce<Record<string, CalendarSession[]>>((acc, day) => {
+        acc[day.iso] = localSessions.filter((session) => session.date === day.iso && visibleIds.has(session.id));
+        return acc;
+      }, {}),
+    [localSessions, visibleIds, weekDays]
+  );
+
+  const dayMetrics = useMemo(
+    () =>
+      weekDays.map((day) => {
+        const all = localSessions.filter((session) => session.date === day.iso);
+        const planned = all.filter((session) => session.displayType !== "completed_activity");
+        const extras = all.filter((session) => session.displayType === "completed_activity");
+        const plannedMin = planned.reduce((sum, item) => sum + item.duration, 0);
+        const completedMin = planned.filter((item) => item.status === "completed").reduce((sum, item) => sum + item.duration, 0);
+        const skipped = planned.filter((item) => item.status === "skipped" || isSkipped(item.notes)).length;
+        const openCapacity = plannedMin <= 50;
+        const isRest = planned.length === 0;
+        const fullyDone = planned.length > 0 && planned.every((item) => item.status === "completed");
+        return { day: day.iso, plannedMin, completedMin, skipped, extras: extras.length, openCapacity, isRest, fullyDone };
       }),
-    [localSessions]
+    [localSessions, weekDays]
   );
 
-  const maxSportMinutes = Math.max(...progressBySport.map((item) => item.planned), 1);
+  const unmatchedUploads = localSessions
+    .filter((session) => session.displayType === "completed_activity" && !dismissedStripIds.includes(session.id))
+    .slice(0, 3);
+  const skippedToResolve = localSessions
+    .filter((session) => session.displayType !== "completed_activity" && session.status === "skipped" && !dismissedStripIds.includes(session.id))
+    .slice(0, 2);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const hasAdaptation = unmatchedUploads.length > 0 || skippedToResolve.length > 0 || extraSessionCount > 0;
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const absorbDay = dayMetrics.find((day) => day.openCapacity && !day.isRest)?.day ?? weekDays[0]?.iso;
 
-  function onDragStart(event: DragStartEvent) {
-    const activeSession = sessionsById[String(event.active.id)];
-    if (activeSession?.displayType === "completed_activity") return;
-    setActiveId(String(event.active.id));
-  }
-
-  function onDragEnd(event: DragEndEvent) {
-    setActiveId(null);
-    const activeIdValue = String(event.active.id);
-    const overId = event.over?.id ? String(event.over.id) : null;
-    if (!overId) return;
-
-    const activeSession = sessionsById[activeIdValue];
-    if (!activeSession || activeSession.displayType === "completed_activity") return;
-
-    const fromDay = activeSession.date;
-    const targetDay = overId.startsWith("day:") ? overId.replace("day:", "") : sessionsById[overId]?.date;
-
-    if (!targetDay) return;
-
-    if (fromDay === targetDay) {
-      if (!sessionsById[overId]) return;
-      const current = orderByDay[fromDay] ?? [];
-      const oldIndex = current.indexOf(activeIdValue);
-      const newIndex = current.indexOf(overId);
-      if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
-        setOrderByDay((prev) => ({ ...prev, [fromDay]: arrayMove(current, oldIndex, newIndex) }));
-      }
-      return;
-    }
-
-    const toList = orderByDay[targetDay] ?? [];
-    const insertIndex = sessionsById[overId] ? toList.indexOf(overId) : toList.length;
-
-    setOrderByDay((prev) => {
-      const next = { ...prev };
-      next[fromDay] = (next[fromDay] ?? []).filter((id) => id !== activeIdValue);
-      const nextTarget = [...(next[targetDay] ?? [])];
-      const safeIndex = insertIndex < 0 ? nextTarget.length : insertIndex;
-      nextTarget.splice(safeIndex, 0, activeIdValue);
-      next[targetDay] = nextTarget;
-      return next;
-    });
-
+  function moveSession(session: CalendarSession, newDate: string) {
+    if (session.date === newDate) return;
     startTransition(() => {
       void (async () => {
         try {
-          await moveSessionAction({ sessionId: activeSession.id, newDate: targetDay });
-          setToast({
-            message: "Session moved",
-            undoLabel: "Undo",
-            onUndo: () => {
-              startTransition(() => {
-                void (async () => {
-                  try {
-                    await moveSessionAction({ sessionId: activeSession.id, newDate: fromDay });
-                    setToast({ message: "Move undone" });
-                    router.refresh();
-                  } catch {
-                    setToast({ message: "Could not undo move" });
-                  }
-                })();
-              });
-            }
-          });
+          await moveSessionAction({ sessionId: session.id, newDate });
+          setToast(`Moved to ${weekDays.find((day) => day.iso === newDate)?.weekday ?? "new day"}`);
           router.refresh();
         } catch {
-          setToast({ message: "Could not move session" });
-          router.refresh();
-        }
-      })();
-    });
-  }
-
-  function handleSkipSession(session: CalendarSession) {
-    startTransition(() => {
-      void (async () => {
-        const wasSkipped = session.status === "skipped";
-
-        setLocalSessions((prev) =>
-          prev.map((item) => {
-            if (item.id !== session.id) {
-              return item;
-            }
-
-            if (wasSkipped) {
-              return {
-                ...item,
-                status: "planned",
-                notes: clearSkippedTag(item.notes) || null
-              };
-            }
-
-            const skipTag = `[Skipped ${new Date().toISOString().slice(0, 10)}]`;
-            return {
-              ...item,
-              status: "skipped",
-              notes: item.notes ? `${item.notes}\n${skipTag}` : skipTag
-            };
-          })
-        );
-
-        try {
-          if (wasSkipped) {
-            await clearSkippedAction({ sessionId: session.id });
-            setToast({ message: "Skipped status removed" });
-          } else {
-            await markSkippedAction({ sessionId: session.id });
-            setToast({
-              message: "Marked skipped",
-              undoLabel: "Undo",
-              onUndo: () => {
-                startTransition(() => {
-                  void (async () => {
-                    try {
-                      await clearSkippedAction({ sessionId: session.id });
-                      setToast({ message: "Skip undone" });
-                      router.refresh();
-                    } catch {
-                      setToast({ message: "Could not undo" });
-                    }
-                  })();
-                });
-              }
-            });
-          }
-          router.refresh();
-        } catch {
-          setLocalSessions((prev) => prev.map((item) => (item.id === session.id ? { ...item, status: session.status, notes: session.notes } : item)));
-          setToast({ message: wasSkipped ? "Could not undo skipped status" : "Could not mark session as skipped" });
+          setToast("Could not move session");
         }
       })();
     });
@@ -379,752 +177,186 @@ export function WeekCalendar({
 
   return (
     <section className="space-y-3">
-      <div className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{executionLabel}</p>
-          {executionSubtext ? <p className="truncate text-xs text-muted">{executionSubtext}</p> : null}
-        </div>
+      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
         <div className="flex items-center gap-2 text-xs">
-          <span className="signal-chip signal-ready">Completed {completedCount}</span>
-          <span className="signal-chip signal-load">Planned {plannedTotalCount}</span>
-          <span className="signal-chip signal-risk">Skipped {skippedCount}</span>
-          <span className="signal-chip border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.12)] text-[hsl(var(--signal-risk))]">Extra sessions {extraSessionCount}</span>
+          <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
+          <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">Current</Link>
+          <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
         </div>
-      </div>
-
-      <header className="surface-subtle space-y-2 px-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs uppercase tracking-[0.14em] text-accent">Week of {dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))}–{dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
-            <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2.5 py-1 text-xs">Prev</Link>
-            <Link href={withWeek(currentWeekStart)} className={`btn-secondary px-2.5 py-1 text-xs ${activeWeekStart === currentWeekStart ? "border-[hsl(var(--accent-performance)/0.55)] text-accent" : ""}`}>Current</Link>
-            <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2.5 py-1 text-xs">Next</Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <select aria-label="Work filter" value={workFilter} onChange={(e) => setWorkFilter(e.target.value as WorkFilter)} className="input-base w-auto py-1 text-xs">
-              <option value="all">All work</option>
-              <option value="planned">Planned only</option>
-              <option value="unscheduled">Unscheduled only</option>
-            </select>
-            <select aria-label="Status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="input-base w-auto py-1 text-xs">
-              <option value="all">All statuses</option>
-              <option value="planned">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="skipped">Missed</option>
-            </select>
-            <button
-              className="btn-primary px-3 py-1.5 text-xs"
-              onClick={() =>
-                setQuickAddState({
-                  initialDate: weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0].iso,
-                  allowDaySelection: true
-                })
-              }
-            >
-              Add session
-            </button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max items-center gap-2">
-            {(["all", "swim", "bike", "run", "strength"] as const).map((item) => (
-              <button
-                key={item}
-                className={`rounded-full border px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)] ${sportFilter === item ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.12)] text-accent" : "border-[hsl(var(--border))] text-muted"}`}
-                onClick={() => setSportFilter(item)}
-              >
-                {item === "all" ? "All" : getDisciplineMeta(item).label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
+          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+            <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
+          </select>
+          <label className="sr-only" htmlFor="status-filter">Status filter</label>
+          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+            <option value="all">All states</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="extra">Extra</option>
+          </select>
+          <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
+          <span className="text-muted">{completedCount} completed · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
         </div>
       </header>
 
-      <details className="surface-subtle px-3 py-2">
-        <summary className="cursor-pointer text-sm font-medium text-accent">Summary <span className="ml-2 text-xs text-muted">Completed {completedMinutes} / {plannedMinutes} min • {remainingMinutes} remaining</span></summary>
-        <div className="mt-3 grid gap-2 lg:grid-cols-6">
-          <div className="surface-subtle p-3 lg:col-span-2">
-            <p className="text-xs uppercase tracking-wide text-muted">Week volume</p>
-            <p className="mt-1 text-lg font-semibold">Completed {completedMinutes} / {plannedMinutes} min</p>
-            <p className="text-xs text-muted">{formatMinutes(completedMinutes)} / {formatMinutes(plannedMinutes)} • {remainingMinutes} min remaining</p>
-          </div>
-          <div className="surface-subtle p-3"><p className="text-xs text-muted">Remaining sessions: {plannedRemainingCount}</p></div>
-          {progressBySport.map((item) => {
-            const discipline = getDisciplineMeta(item.sport);
-            const targetRatio = Math.min(100, (item.planned / maxSportMinutes) * 100);
-            const completedRatio = Math.min(100, (item.completed / maxSportMinutes) * 100);
-            return (
-              <div key={item.sport} className="surface-subtle p-3">
-                <p title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></p>
-                <p className="mt-1 text-xs">{item.completed}/{item.planned} min</p>
-                <div className="relative mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-2))]">
-                  <div className="h-full rounded-full bg-[hsl(var(--accent-performance))] transition-[width]" style={{ width: `${completedRatio}%` }} />
-                  <span className="absolute -top-0.5 h-2.5 w-px bg-[hsl(var(--text-tertiary))]" style={{ left: `${targetRatio}%` }} aria-hidden="true" />
+      {hasAdaptation ? (
+        <section className="surface-subtle space-y-2 px-3 py-2">
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Adaptation strip</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {unmatchedUploads.map((upload) => (
+              <div key={upload.id} className="rounded-xl border border-[hsl(var(--accent-performance)/0.32)] bg-[hsl(var(--accent-performance)/0.08)] p-2 text-xs">
+                <p className="font-semibold">Unmatched upload</p>
+                <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {new Date(upload.created_at).toLocaleDateString()}</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {getActivityId(upload.id) ? <Link href={`/activities/${getActivityId(upload.id)}`} className="btn-secondary px-2 py-1 text-[11px]">Assign to planned</Link> : null}
+                  <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => setDismissedStripIds((prev) => [...prev, upload.id])}>Mark as extra</button>
+                  <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => setDismissedStripIds((prev) => [...prev, upload.id])}>Dismiss</button>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </details>
+            ))}
+            {skippedToResolve.map((session) => (
+              <div key={session.id} className="rounded-xl border border-[hsl(var(--signal-risk)/0.38)] bg-[hsl(var(--signal-risk)/0.08)] p-2 text-xs">
+                <p className="font-semibold">Skipped session</p>
+                <p className="text-muted">{session.type} · {session.duration} min</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => absorbDay && moveSession(session, absorbDay)}>Move to absorb day</button>
+                  <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => setDismissedStripIds((prev) => [...prev, session.id])}>Keep skipped</button>
+                  <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => setDismissedStripIds((prev) => [...prev, session.id])}>Dismiss</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="overflow-x-auto">
-        <article className="grid min-w-[1260px] grid-cols-7 gap-3">
-          {weekDays.map((day) => {
-            const ids = filteredIdsByDay[day.iso] ?? [];
-            const visibleIds = expandedDays[day.iso] ? ids : ids.slice(0, 2);
-            const hiddenCount = Math.max(ids.length - visibleIds.length, 0);
-            const planned = (orderByDay[day.iso] ?? []).map((id) => sessionsById[id]).filter(Boolean).reduce((sum, s) => sum + s.duration, 0);
-            const completed = (orderByDay[day.iso] ?? [])
-              .map((id) => sessionsById[id])
-              .filter((s) => s?.status === "completed")
-              .reduce((sum, s) => sum + (s?.duration ?? 0), 0);
-            const isToday = day.iso === todayIso;
+      <article className="grid gap-2 lg:grid-cols-7">
+        {weekDays.map((day) => {
+          const daySessions = sessionsByDay[day.iso] ?? [];
+          const metrics = dayMetrics.find((metric) => metric.day === day.iso);
+          const isToday = day.iso === new Date().toISOString().slice(0, 10);
+          return (
+            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
+              <div className="mb-2 border-b border-[hsl(var(--border))] pb-2">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold">{day.label}</p>
+                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                </div>
+                <p className="text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
+                <p className="text-[11px] text-muted">{metrics?.isRest ? "Rest" : metrics?.fullyDone ? "Completed day" : metrics?.openCapacity ? "Open capacity" : "Load set"}</p>
+              </div>
 
-            return (
-              <DayDropZone key={day.iso} id={`day:${day.iso}`} isActive={activeId !== null}>
-                <section className="surface min-h-[280px] p-3">
-                  <div className={`border-b pb-2 ${isToday ? "border-[hsl(var(--accent-performance)/0.5)] bg-[hsl(var(--accent-performance)/0.08)] px-2" : "border-[hsl(var(--border))]"}`}>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs uppercase tracking-wide text-muted">{day.weekday}</p>
-                      {isToday ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] bg-[hsl(var(--accent-performance)/0.12)] px-1.5 py-0.5 text-[10px] font-medium text-accent">Today</span> : null}
-                    </div>
-                    <p className="text-sm font-semibold">{day.label}</p>
-                    <p className="text-xs text-muted">{planned === 0 ? "rest" : `${completed}/${planned} min`}</p>
-                  </div>
-
-                  <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-                    <div className="mt-2 space-y-2">
-                      {visibleIds.length === 0 ? (
-                        <div className="space-y-2">
-                          <button onClick={() => setQuickAddState({ initialDate: day.iso, allowDaySelection: false })} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-6 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
-                            + Add
+              <div className="space-y-2">
+                {daySessions.length === 0 ? <button onClick={() => setQuickAddDate(day.iso)} className="w-full rounded-xl border border-dashed border-[hsl(var(--border))] py-3 text-xs text-muted">+ Drop / add session</button> : null}
+                {daySessions.map((session) => {
+                  const state = getSessionState(session);
+                  return (
+                    <article key={session.id} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2 text-xs">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-medium">{session.type}</p>
+                        {state === "extra" ? <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span> : <SessionStatusChip status={session.status} compact />}
+                      </div>
+                      <p className="text-muted">{getDisciplineMeta(session.sport).label} · {session.duration} min</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {session.displayType !== "completed_activity" ? <button className="btn-secondary px-2 py-1 text-[11px]" onClick={() => setMoveSource(session)}>Move</button> : null}
+                        {session.displayType !== "completed_activity" ? (
+                          <button
+                            className="btn-secondary px-2 py-1 text-[11px]"
+                            onClick={() => {
+                              startTransition(() => {
+                                void (async () => {
+                                  try {
+                                    if (session.status === "skipped") await clearSkippedAction({ sessionId: session.id });
+                                    else await markSkippedAction({ sessionId: session.id });
+                                    router.refresh();
+                                  } catch {
+                                    setToast("Could not update skipped state");
+                                  }
+                                })();
+                              });
+                            }}
+                          >
+                            {session.status === "skipped" || isSkipped(session.notes) ? "Unskip" : "Skip"}
                           </button>
-                          <p className="text-[11px] text-muted">Uploaded sessions still count, even with no planned slot.</p>
-                        </div>
-                      ) : (
-                        visibleIds.map((id) => {
-                          const session = sessionsById[id];
-                          if (!session) return null;
-                          return (
-                            <SortableSessionCard
-                              key={session.id}
-                              session={session}
-                              onOpen={() => setDetailSessionId(session.id)}
-                              onMove={() => setMoveSource(session)}
-                              onSwap={() => setSwapSource(session)}
-                              onSkip={() => {
-                                if (session.status === "skipped") {
-                                  handleSkipSession(session);
-                                } else {
-                                  setSkipConfirmSession(session);
-                                }
-                              }}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
-                  </SortableContext>
+                        ) : null}
+                        {session.displayType === "completed_activity" && getActivityId(session.id) ? <Link href={`/activities/${getActivityId(session.id)}`} className="btn-secondary px-2 py-1 text-[11px]">Assign upload</Link> : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </article>
 
-                  {hiddenCount > 0 ? (
-                    <button className="mt-2 text-xs text-accent hover:underline" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: true }))}>
-                      +{hiddenCount} more
-                    </button>
-                  ) : ids.length > 2 && expandedDays[day.iso] ? (
-                    <button className="mt-2 text-xs text-muted hover:text-accent" onClick={() => setExpandedDays((prev) => ({ ...prev, [day.iso]: false }))}>
-                      Show less
-                    </button>
-                  ) : null}
-                </section>
-              </DayDropZone>
-            );
-          })}
-        </article>
-        </div>
-      </DndContext>
-
-      {activeId ? <p className="text-[11px] text-accent/80">Drag a session to another day to reschedule.</p> : null}
-
-      {quickAddState ? (
-        <QuickAddModal
-          initialDate={quickAddState.initialDate}
-          allowDaySelection={quickAddState.allowDaySelection}
-          weekDays={weekDays}
-          onClose={() => setQuickAddState(null)}
-          onSubmit={(payload) => {
-            startTransition(() => {
-              void (async () => {
-                const optimisticId = `temp-${Date.now()}`;
-                const optimisticSession: CalendarSession = {
-                  id: optimisticId,
-                  date: payload.date,
-                  sport: payload.sport,
-                  type: payload.type?.trim() || "Session",
-                  duration: payload.duration,
-                  notes: payload.notes?.trim() || null,
-                  created_at: new Date().toISOString(),
-                  status: "planned"
-                };
-
-                setLocalSessions((prev) => [...prev, optimisticSession]);
-                setOrderByDay((prev) => ({
-                  ...prev,
-                  [payload.date]: [...(prev[payload.date] ?? []), optimisticId]
-                }));
-                setQuickAddState(null);
-
-                try {
-                  await quickAddSessionAction(payload);
-                  setToast({ message: "Session added" });
-                  router.refresh();
-                } catch (error) {
-                  setLocalSessions((prev) => prev.filter((session) => session.id !== optimisticId));
-                  setOrderByDay((prev) => ({
-                    ...prev,
-                    [payload.date]: (prev[payload.date] ?? []).filter((id) => id !== optimisticId)
-                  }));
-                  const message = error instanceof Error ? error.message : "Could not add session";
-                  setToast({ message });
-                }
-              })();
-            });
-          }}
-        />
-      ) : null}
-
-      {moveSource ? (
-        <MoveModal
-          session={moveSource}
-          days={weekDays}
-          onClose={() => setMoveSource(null)}
-          onMove={(newDate) => {
-            const prevDate = moveSource.date;
-            startTransition(() => {
-              void (async () => {
-                try {
-                  await moveSessionAction({ sessionId: moveSource.id, newDate });
-                  setToast({
-                    message: "Session moved",
-                    undoLabel: "Undo",
-                    onUndo: () => {
-                      startTransition(() => {
-                        void (async () => {
-                          try {
-                            await moveSessionAction({ sessionId: moveSource.id, newDate: prevDate });
-                            setToast({ message: "Move undone" });
-                            router.refresh();
-                          } catch {
-                            setToast({ message: "Could not undo move" });
-                          }
-                        })();
-                      });
-                    }
-                  });
-                  setMoveSource(null);
-                } catch {
-                  setToast({ message: "Could not move session" });
-                }
-                router.refresh();
-              })();
-            });
-          }}
-        />
-      ) : null}
-
-      {swapSource ? (
-        <SwapModal
-          session={swapSource}
-          sessions={localSessions}
-          onClose={() => setSwapSource(null)}
-          onSwap={(targetSessionId) => {
-            const sourceSessionId = swapSource.id;
-            startTransition(() => {
-              void (async () => {
-                try {
-                  await swapSessionDayAction({ sourceSessionId, targetSessionId });
-                  setToast({
-                    message: "Sessions swapped",
-                    undoLabel: "Undo",
-                    onUndo: () => {
-                      startTransition(() => {
-                        void (async () => {
-                          try {
-                            await swapSessionDayAction({ sourceSessionId, targetSessionId });
-                            setToast({ message: "Swap undone" });
-                            router.refresh();
-                          } catch {
-                            setToast({ message: "Could not undo swap" });
-                          }
-                        })();
-                      });
-                    }
-                  });
-                  setSwapSource(null);
-                } catch {
-                  setToast({ message: "Could not swap sessions" });
-                }
-                router.refresh();
-              })();
-            });
-          }}
-        />
-      ) : null}
-
-      {skipConfirmSession ? (
-        <SkipConfirmModal
-          session={skipConfirmSession}
-          onCancel={() => setSkipConfirmSession(null)}
-          onConfirm={() => {
-            handleSkipSession(skipConfirmSession);
-            setSkipConfirmSession(null);
-          }}
-        />
-      ) : null}
-
-      {detailSession ? (
-        <SessionDetailDrawer
-          session={detailSession}
-          onClose={() => setDetailSessionId(null)}
-          onSave={(payload) => {
-            const previous = detailSession;
-            setLocalSessions((prev) => prev.map((item) => (item.id === detailSession.id ? { ...item, ...payload, notes: payload.notes || null } : item)));
-            startTransition(() => {
-              void (async () => {
-                try {
-                  await updateSessionAction({ sessionId: detailSession.id, ...payload });
-                  setToast({ message: "Session updated" });
-                  setDetailSessionId(null);
-                  router.refresh();
-                } catch {
-                  setLocalSessions((prev) => prev.map((item) => (item.id === previous.id ? previous : item)));
-                  setToast({ message: "Could not update session" });
-                }
-              })();
-            });
-          }}
-        />
-      ) : null}
-
-      {toast ? (
-        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--bg-elevated))] px-3 py-2 text-xs text-[hsl(var(--text-primary))] shadow-lg sm:left-auto sm:right-6 sm:translate-x-0">
-          <span>{toast.message}</span>
-          {toast.onUndo ? (
-            <button
-              className="rounded-md border border-[hsl(var(--accent-performance)/0.45)] px-2 py-1 font-medium text-accent hover:bg-[hsl(var(--accent-performance)/0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
-              onClick={() => {
-                const undo = toast.onUndo;
-                setToast(null);
-                if (undo) undo();
-              }}
-            >
-              {toast.undoLabel ?? "Undo"}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {isPending ? <p className="text-xs text-muted">Saving changes…</p> : null}
+      {quickAddDate ? <QuickAddModal initialDate={quickAddDate} weekDays={weekDays} onClose={() => setQuickAddDate(null)} /> : null}
+      {moveSource ? <MoveModal session={moveSource} weekDays={weekDays} onClose={() => setMoveSource(null)} onMove={moveSession} /> : null}
+      {toast ? <p className="text-xs text-accent">{toast}</p> : null}
+      {isPending ? <p className="text-xs text-muted">Saving…</p> : null}
     </section>
   );
 }
 
-function DayDropZone({ children, id, isActive }: { children: ReactNode; id: string; isActive: boolean }) {
-  const { isOver, setNodeRef } = useDroppable({ id });
-  const highlight = isActive && isOver;
-  return <div ref={setNodeRef} className={highlight ? "rounded-2xl ring-1 ring-[hsl(var(--accent-performance)/0.5)]" : ""}>{children}</div>;
-}
-
-function SortableSessionCard({
-  session,
-  onOpen,
-  onSkip,
-  onMove,
-  onSwap
-}: {
-  session: CalendarSession;
-  onOpen: () => void;
-  onSkip: () => void;
-  onMove: () => void;
-  onSwap: () => void;
-}) {
-  const isReadOnly = session.displayType === "completed_activity";
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id, disabled: isReadOnly });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition
-  };
-  const discipline = getDisciplineMeta(session.sport);
-  const skipped = session.status === "skipped" || isSkipped(session.notes);
-  const title = buildSessionTitle(session);
-
-  const statusMotion =
-    session.status === "completed" ? "status-card-completed" : session.status === "skipped" ? "status-card-skipped" : "status-card-planned";
+function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string; weekDays: WeekDay[]; onClose: () => void }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [form, setForm] = useState({ date: initialDate, sport: "run", type: "", duration: "45", notes: "" });
 
   return (
-    <article
-      ref={setNodeRef}
-      style={style}
-      className={`group relative surface-subtle status-card-transition ${statusMotion} p-2.5 pr-8 focus-within:ring-1 focus-within:ring-[hsl(var(--accent-performance)/0.5)] ${isDragging ? "opacity-60" : ""} `}
-    >
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span title={`${discipline.label} · ${discipline.shape}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${discipline.className} ${discipline.textureClassName}`}><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
-            <SessionStatusChip status={session.status} compact />
-            {session.displayType === "completed_activity" ? <span className="rounded-full border border-[hsl(var(--signal-risk)/0.55)] px-2 py-0.5 text-[10px] font-semibold text-[hsl(var(--signal-risk))]">Extra session</span> : null}
-            {session.is_key ? <span className="rounded-full border border-[hsl(var(--accent-performance)/0.5)] px-2 py-0.5 text-[10px] font-semibold text-accent">Key</span> : null}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {isReadOnly ? null : <SessionOverflowMenu sessionTitle={title} sessionStatus={session.status} onOpen={onOpen} onMove={onMove} onSwap={onSwap} onSkip={onSkip} />}
-          </div>
-        </div>
-
-        <div className="w-full text-left" aria-label={`Summary for ${title}`}>
-          <p className={`truncate text-sm font-medium leading-tight ${skipped ? "line-through opacity-80" : ""}`}>{title}</p>
-          <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{session.duration}<span className="ml-1 text-sm font-medium text-muted">min</span></p>
-          {session.linkedActivityCount ? (
-            <p className="mt-1 text-xs text-[hsl(var(--signal-ready))]">
-              Completed ✓ {(() => {
-                const duration = session.linkedStats?.durationMin ?? session.duration;
-                const distance = session.linkedStats?.distanceKm;
-                const power = session.linkedStats?.avgPower;
-                if (session.sport === "bike") return `${duration}m${power ? ` · ${Math.round(power)}w` : ""}`;
-                if (session.sport === "run" || session.sport === "swim") return `${duration}m${distance ? ` · ${distance.toFixed(1)} km` : ""}`;
-                return `${duration}m`;
-              })()}
-            </p>
-          ) : session.unassignedSameDayCount ? (
-            <p className="mt-1 text-xs text-[hsl(var(--signal-load))]">{session.unassignedSameDayCount} unassigned activit{session.unassignedSameDayCount === 1 ? "y" : "ies"} on this day</p>
-          ) : null}
-        </div>
-      </div>
-      {isReadOnly ? null : <button
-        type="button"
-        className="absolute right-2 bottom-2 rounded p-1 text-accent/70 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
-        aria-label={`Drag ${title}`}
-        {...attributes}
-        {...listeners}
-      >
-        ⋮⋮
-      </button>}
-    </article>
-  );
-}
-
-function SessionOverflowMenu({
-  sessionTitle,
-  sessionStatus,
-  onOpen,
-  onMove,
-  onSwap,
-  onSkip
-}: {
-  sessionTitle: string;
-  sessionStatus: SessionStatus;
-  onOpen: () => void;
-  onMove: () => void;
-  onSwap: () => void;
-  onSkip: () => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const onWindowClick = (event: MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return;
-      setIsOpen(false);
-    };
-
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    window.addEventListener("mousedown", onWindowClick);
-    window.addEventListener("keydown", onEscape);
-    return () => {
-      window.removeEventListener("mousedown", onWindowClick);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, [isOpen]);
-
-  const skipLabel = sessionStatus === "skipped" ? "Clear skipped" : "Mark skipped";
-
-  return (
-    <div className="relative" ref={menuRef}>
-      <button
-        type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-sm text-muted hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-label={`Open actions for ${sessionTitle}`}
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          setIsOpen((prev) => !prev);
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
+      <form
+        className="surface-card w-full max-w-md space-y-2 rounded-2xl p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          startTransition(() => {
+            void (async () => {
+              try {
+                await quickAddSessionAction({
+                  date: form.date,
+                  sport: form.sport as "swim" | "bike" | "run" | "strength",
+                  type: form.type,
+                  duration: Number(form.duration),
+                  notes: form.notes
+                });
+                onClose();
+                router.refresh();
+              } catch {
+                // no-op
+              }
+            })();
+          });
         }}
       >
-        ⋯
-      </button>
-
-      {isOpen ? (
-        <div
-          className="absolute right-0 top-8 z-30 min-w-[160px] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-1 shadow-xl"
-          role="menu"
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {[
-            { label: "Open details", action: onOpen },
-            { label: "Move", action: onMove },
-            { label: "Swap days", action: onSwap },
-            { label: skipLabel, action: onSkip }
-          ].map((item) => (
-            <button
-              key={item.label}
-              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--bg-card))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-performance)/0.45)]"
-              role="menuitem"
-              onClick={() => {
-                item.action();
-                setIsOpen(false);
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+        <p className="font-semibold">Add session</p>
+        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+          {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
+        </select>
+        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+          <option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
+        </select>
+        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Session title" className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm" />
+        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm" />
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
+          <button disabled={isPending} className="btn-primary px-2 py-1 text-xs">Save</button>
         </div>
-      ) : null}
+      </form>
     </div>
   );
 }
 
-function SessionDetailDrawer({
-  session,
-  onClose,
-  onSave
-}: {
-  session: CalendarSession;
-  onClose: () => void;
-  onSave: (payload: { type: string; duration: number; notes: string; status: SessionStatus }) => void;
-}) {
-  const [type, setType] = useState(session.type);
-  const [duration, setDuration] = useState(String(session.duration));
-  const [notes, setNotes] = useState(session.notes ?? "");
-  const [status, setStatus] = useState<SessionStatus>(session.status);
-  const parsedDuration = Number(duration);
-  const isDurationValid = Number.isInteger(parsedDuration) && parsedDuration >= 1 && parsedDuration <= 480;
-
-  useEffect(() => {
-    setType(session.type);
-    setDuration(String(session.duration));
-    setNotes(session.notes ?? "");
-    setStatus(session.status);
-  }, [session]);
-
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/45" onClick={onClose}>
-      <aside className="surface h-full w-full max-w-md p-4" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Session details</h3>
-          <button className="btn-secondary px-2 py-1 text-xs" onClick={onClose}>Close</button>
-        </div>
-        <p className="mt-1 text-xs text-muted">{buildSessionTitle(session)} • {dayFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}</p>
-        {session.displayType === "completed_activity" ? <p className="mt-1 text-xs text-[hsl(var(--signal-risk))]">Unscheduled upload: this counts as extra work and does not replace planned completion.</p> : null}
-        <div className="mt-4 space-y-3">
-          <label className="block">
-            <span className="label-base mb-1 text-xs">Title</span>
-            <input className="input-base" value={type} onChange={(e) => setType(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="label-base mb-1 text-xs">Duration (min)</span>
-            <input className="input-base" value={duration} type="number" min={1} max={480} onChange={(e) => setDuration(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="label-base mb-1 text-xs">Status</span>
-            <select className="input-base" value={status} onChange={(event) => setStatus(event.target.value as SessionStatus)}>
-              <option value="planned">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="skipped">Skipped</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="label-base mb-1 text-xs">Target / Notes</span>
-            <textarea className="input-base min-h-[110px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
-          <button className="btn-primary px-3 py-1.5 text-xs" disabled={!isDurationValid} onClick={() => isDurationValid && onSave({ type, duration: parsedDuration, notes, status })}>Save</button>
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function SkipConfirmModal({ session, onCancel, onConfirm }: { session: CalendarSession; onCancel: () => void; onConfirm: () => void }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/65 p-3" onClick={onCancel}>
-      <div className="surface w-full max-w-sm p-4" onClick={(event) => event.stopPropagation()}>
-        <h3 className="text-base font-semibold">Mark as skipped?</h3>
-        <p className="mt-2 text-xs text-muted">{buildSessionTitle(session)}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onCancel}>Cancel</button>
-          <button className="btn-primary px-3 py-1.5 text-xs" onClick={onConfirm}>Mark skipped</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickAddModal({
-  initialDate,
-  allowDaySelection,
-  weekDays,
-  onClose,
-  onSubmit
-}: {
-  initialDate: string;
-  allowDaySelection: boolean;
-  weekDays: WeekDay[];
-  onClose: () => void;
-  onSubmit: (payload: { date: string; sport: "swim" | "bike" | "run" | "strength" | "other"; type?: string; duration: number; notes?: string }) => void;
-}) {
-  const [date, setDate] = useState(initialDate);
-  const [sport, setSport] = useState<"swim" | "bike" | "run" | "strength" | "other">("run");
-  const [title, setTitle] = useState("");
-  const [duration, setDuration] = useState("45");
-  const [notes, setNotes] = useState("");
-  const parsedDuration = Number(duration);
-  const isDurationValid = Number.isInteger(parsedDuration) && parsedDuration >= 1;
-
-  return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-3">
-      <div className="surface w-full max-w-md p-4">
-        <h3 className="text-base font-semibold">Quick Add • {dayFormatter.format(new Date(`${date}T00:00:00.000Z`))}</h3>
-        <div className="mt-3 space-y-3">
-          {allowDaySelection ? (
-            <label className="block">
-              <span className="label-base mb-1 text-xs">Day</span>
-              <select className="input-base" value={date} onChange={(event) => setDate(event.target.value)} aria-label="Select day for new session">
-                {weekDays.map((day) => (
-                  <option key={day.iso} value={day.iso}>
-                    {day.weekday} • {day.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            {(["swim", "bike", "run", "strength"] as const).map((item) => {
-              const discipline = getDisciplineMeta(item);
-              return (
-                <button
-                  key={item}
-                  onClick={() => setSport(item)}
-                  className={`rounded-full px-3 py-1 text-xs ${sport === item ? `${discipline.className} ${discipline.textureClassName}` : "border border-[hsl(var(--border))] text-muted"}`}
-                  title={`${discipline.label} · ${discipline.shape}`}
-                >
-                  <span className="inline-flex items-center gap-1"><span aria-hidden="true">{discipline.icon}</span><span>{discipline.label}</span></span>
-                </button>
-              );
-            })}
-          </div>
-          <input className="input-base" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" />
-          <input className="input-base" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Planned minutes" type="number" min={1} step={1} required />
-          {!isDurationValid ? <p className="text-[11px] text-rose-300">Enter whole minutes (min 1).</p> : null}
-          <input className="input-base" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Target / Notes (optional)" />
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
-          <button
-            className="btn-primary px-3 py-1.5 text-xs"
-            disabled={!isDurationValid}
-            onClick={() => {
-              if (!isDurationValid) {
-                return;
-              }
-
-              onSubmit({ date, sport, type: title, duration: parsedDuration, notes });
-            }}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MoveModal({
-  session,
-  days,
-  onClose,
-  onMove
-}: {
-  session: CalendarSession;
-  days: WeekDay[];
-  onClose: () => void;
-  onMove: (newDate: string) => void;
-}) {
+function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSession; weekDays: WeekDay[]; onClose: () => void; onMove: (session: CalendarSession, newDate: string) => void }) {
   const [date, setDate] = useState(session.date);
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-3">
-      <div className="surface w-full max-w-sm p-4">
-        <h3 className="text-base font-semibold">Move session</h3>
-        <select className="input-base mt-3" value={date} onChange={(e) => setDate(e.target.value)}>
-          {days.map((day) => (
-            <option key={day.iso} value={day.iso}>
-              {day.weekday} • {day.label}
-            </option>
-          ))}
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
+      <div className="surface-card w-full max-w-sm space-y-2 rounded-2xl p-4">
+        <p className="font-semibold">Move {session.type}</p>
+        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+          {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
         </select>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
-          <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => onMove(date)}>Move</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SwapModal({
-  session,
-  sessions,
-  onClose,
-  onSwap
-}: {
-  session: CalendarSession;
-  sessions: CalendarSession[];
-  onClose: () => void;
-  onSwap: (targetSessionId: string) => void;
-}) {
-  const options = sessions.filter((item) => item.id !== session.id);
-  const [selected, setSelected] = useState(options[0]?.id ?? "");
-  const grouped = options.reduce<Record<string, CalendarSession[]>>((acc, item) => {
-    acc[item.date] = [...(acc[item.date] ?? []), item];
-    return acc;
-  }, {});
-
-  return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-3">
-      <div className="surface w-full max-w-md p-4">
-        <h3 className="text-base font-semibold">Swap with another session</h3>
-        <select className="input-base mt-3" value={selected} onChange={(e) => setSelected(e.target.value)}>
-          {Object.entries(grouped).map(([day, daySessions]) => (
-            <optgroup key={day} label={dayFormatter.format(new Date(`${day}T00:00:00.000Z`))}>
-              {daySessions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {getDisciplineMeta(item.sport).label} • {item.type}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary px-3 py-1.5 text-xs" onClick={onClose}>Cancel</button>
-          <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => onSwap(selected)} disabled={!selected}>Swap</button>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
+          <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move</button>
         </div>
       </div>
     </div>
