@@ -38,6 +38,19 @@ const sportFallbackTitle: Record<string, string> = {
   strength: "General Strength"
 };
 
+
+function calendarDisciplineChipTone(sport: string) {
+  const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    swim: { bg: "rgba(86,182,217,0.16)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.28)" },
+    bike: { bg: "rgba(107,170,117,0.15)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.28)" },
+    run: { bg: "rgba(196,135,114,0.15)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.28)" },
+    strength: { bg: "rgba(154,134,200,0.16)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.3)" },
+    other: { bg: "rgba(148,163,184,0.15)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.28)" }
+  };
+
+  return tones[sport] ?? tones.other;
+}
+
 function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -224,7 +237,9 @@ export function WeekCalendar({
         const openCapacity = planned.length > 0 && plannedMin <= 50;
         const fullyDone = planned.length > 0 && planned.every((item) => item.status === "completed");
         const availableDay = planned.length === 0 && !isRest;
-        return { day: day.iso, plannedMin, completedMin, skipped, openCapacity, isRest, fullyDone, availableDay };
+        const hasPlanned = planned.length > 0;
+        const remainingPlanned = Math.max(plannedMin - completedMin, 0);
+        return { day: day.iso, plannedMin, completedMin, skipped, openCapacity, isRest, fullyDone, availableDay, hasPlanned, remainingPlanned };
       }),
     [localSessions, weekDays]
   );
@@ -338,22 +353,24 @@ export function WeekCalendar({
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
           const isToday = day.iso === todayIso;
           const isFuture = day.iso > todayIso;
-          const dayLabel = metrics?.skipped
-            ? "Needs attention"
-            : isToday
-              ? "Today"
+          const isPast = day.iso < todayIso;
+          const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
+          const dayLabel = isToday
+            ? "Today"
+            : needsAttention
+              ? "Needs attention"
               : metrics?.fullyDone
                 ? "Complete"
                 : metrics?.isRest
                   ? "Rest day"
-                  : metrics?.openCapacity
-                    ? "Open capacity"
-                    : metrics?.availableDay
-                      ? "Available"
-                      : isFuture
+                  : metrics?.availableDay
+                    ? "Available"
+                    : metrics?.openCapacity
+                      ? "Open capacity"
+                      : isFuture && metrics?.hasPlanned
                         ? "Planned"
                         : "Planned";
-          const dayTone = metrics?.skipped ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
+          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
           return (
             <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
@@ -365,6 +382,9 @@ export function WeekCalendar({
                 </div>
                 <p className="text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`text-[11px] ${dayTone}`}>{dayLabel}</p>
+                {metrics?.isRest ? <p className="text-[10px] text-muted">Protected recovery</p> : null}
+                {metrics?.availableDay ? <p className="text-[10px] text-muted">Open for moved work</p> : null}
+                {metrics?.openCapacity ? <p className="text-[10px] text-muted">Can absorb {metrics.remainingPlanned} min more</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -376,6 +396,7 @@ export function WeekCalendar({
                 {daySessions.map((session) => {
                   const state = getSessionState(session, recentMoves);
                   const discipline = getDisciplineMeta(session.sport);
+                  const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
                     state === "completed"
                       ? "border-[hsl(var(--signal-ready)/0.45)] bg-[hsl(var(--signal-ready)/0.08)]"
@@ -392,8 +413,8 @@ export function WeekCalendar({
                   return (
                     <article key={session.id} className={`rounded-xl border p-2 text-xs ${toneClass}`}>
                       <div className="mb-1 flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: `${discipline.color}22`, color: discipline.color }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: discipline.color }} />
+                        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
                           {discipline.label}
                         </span>
                         <SessionActionMenu
@@ -423,7 +444,7 @@ export function WeekCalendar({
                         ) : state === "moved" ? (
                           <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
                         ) : state === "assigned" ? (
-                          <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent">Assigned upload</span>
+                          <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent">Assigned</span>
                         ) : (
                           <SessionStatusChip status={session.status} compact />
                         )}
