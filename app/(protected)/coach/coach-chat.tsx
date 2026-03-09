@@ -255,6 +255,14 @@ export function CoachChat() {
     return formatRecencyLabel(activeConversation?.updated_at ?? conversations[0]?.updated_at);
   }, [conversationId, conversations]);
 
+  const meaningfulRecentThreads = useMemo(
+    () =>
+      conversations
+        .filter((conversation) => conversation.title.trim().length > 0)
+        .slice(0, 4),
+    [conversations]
+  );
+
   async function loadConversations() {
     try {
       const response = await fetch("/api/coach/chat", { method: "GET" });
@@ -474,11 +482,11 @@ export function CoachChat() {
           </div>
         </div>
 
-        {conversations.length > 0 ? (
+        {meaningfulRecentThreads.length > 0 ? (
           <div className="border-b border-[hsl(var(--border))] px-4 py-2">
             <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent threads</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {conversations.slice(0, 4).map((conversation) => (
+              {meaningfulRecentThreads.map((conversation) => (
                 <button
                   key={conversation.id}
                   type="button"
@@ -489,7 +497,7 @@ export function CoachChat() {
                       : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]"
                   }`}
                 >
-                  {conversation.title}
+                  {conversation.title.trim()} · {formatRecencyLabel(conversation.updated_at)}
                 </button>
               ))}
             </div>
