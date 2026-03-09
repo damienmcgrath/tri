@@ -198,6 +198,9 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const [selectedWeekId, setSelectedWeekId] = useState(() => resolveInitialWeekId(planWeeks, initialWeekId));
   const [quickAddDay, setQuickAddDay] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isSavingQuickAdd, setIsSavingQuickAdd] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
   const [weekActionOpen, setWeekActionOpen] = useState(false);
 
   const selectedWeek = planWeeks.find((week) => week.id === selectedWeekId) ?? planWeeks[0];
@@ -280,6 +283,53 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const duplicateTargets = planWeeks.filter((week) => week.id !== selectedWeek?.id);
   const activeSession = weekSessions.find((session) => session.id === activeSessionId);
   const notePreview = weekDraft.notes.trim();
+
+  async function handleQuickAddSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingQuickAdd(true);
+
+    try {
+      await createSessionAction(new FormData(event.currentTarget));
+      setQuickAddDay(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not add session");
+    } finally {
+      setIsSavingQuickAdd(false);
+    }
+  }
+
+  async function handleSessionUpdateSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingSession(true);
+
+    try {
+      await updateSessionAction(new FormData(event.currentTarget));
+      setActiveSessionId(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not save session");
+    } finally {
+      setIsSavingSession(false);
+    }
+  }
+
+  async function handleSessionDelete(sessionId: string) {
+    if (!window.confirm("Delete this session?")) {
+      return;
+    }
+
+    setIsDeletingSession(true);
+
+    try {
+      const formData = new FormData();
+      formData.set("sessionId", sessionId);
+      await deleteSessionAction(formData);
+      setActiveSessionId(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not delete session");
+    } finally {
+      setIsDeletingSession(false);
+    }
+  }
 
   if (!selectedPlan || !selectedWeek) {
     return <div className="surface p-4 text-sm text-muted">Create a plan to start programming weeks.</div>;
@@ -463,10 +513,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       </details>
 
       {quickAddDay ? (
-        <div className="fixed inset-y-0 right-0 z-30 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
+        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
           <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
-          <form action={createSessionAction} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
+          <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
             <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
             <label className="label-base">Discipline</label><select className="input-base" name="sport" defaultValue="run">{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
             <label className="label-base">Session name</label><input name="sessionType" className="input-base" placeholder="Easy Run, Power Bike, Aerobic Swim" />
@@ -475,15 +525,15 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <label className="label-base">Role (optional)</label>
             <select name="sessionRole" className="input-base" defaultValue=""><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
             <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
-            <button className="btn-primary w-full">Add session</button>
+            <button disabled={isSavingQuickAdd} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-70">{isSavingQuickAdd ? "Saving..." : "Add session"}</button>
           </form>
         </div>
       ) : null}
 
       {activeSession ? (
-        <div className="fixed inset-y-0 right-0 z-30 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
+        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
-          <form action={updateSessionAction} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
+          <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
             <label className="label-base">Discipline</label><select name="sport" defaultValue={activeSession.sport} className="input-base" required>{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
             <label className="label-base">Session name</label><input name="sessionType" defaultValue={activeSession.type ?? ""} className="input-base" />
@@ -493,7 +543,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <select name="sessionRole" className="input-base" defaultValue={activeSession.session_role ?? (activeSession.is_key ? "Key" : "")}><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
             <label className="label-base">Status</label><select name="status" defaultValue={activeSession.status} className="input-base"><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option></select>
             <label className="label-base">Notes</label><textarea name="notes" defaultValue={activeSession.notes ?? ""} className="input-base min-h-20" />
-            <div className="flex gap-2"><button className="btn-primary flex-1">Save changes</button><button formAction={deleteSessionAction} formMethod="post" onClick={(event) => { if (!window.confirm("Delete this session?")) event.preventDefault(); }} className="btn-secondary px-3">Delete</button></div>
+            <div className="flex gap-2"><button disabled={isSavingSession || isDeletingSession} className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-70">{isSavingSession ? "Saving..." : "Save changes"}</button><button type="button" disabled={isSavingSession || isDeletingSession} onClick={() => void handleSessionDelete(activeSession.id)} className="btn-secondary px-3 disabled:cursor-not-allowed disabled:opacity-70">{isDeletingSession ? "Deleting..." : "Delete"}</button></div>
           </form>
         </div>
       ) : null}
