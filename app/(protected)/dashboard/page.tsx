@@ -79,15 +79,21 @@ function getSessionStatus(session: Session, completionLedger: Record<string, num
 }
 
 function getStatusChip(completionPct: number, expectedByTodayPct: number) {
-  if (completionPct >= expectedByTodayPct + 8) {
+  if (expectedByTodayPct <= 0) {
     return { label: "On track", className: "signal-ready" };
   }
 
-  if (completionPct < expectedByTodayPct - 20) {
-    return { label: "At risk", className: "signal-risk" };
+  const delta = completionPct - expectedByTodayPct;
+
+  if (delta >= -12) {
+    return { label: "On track", className: "signal-ready" };
   }
 
-  return { label: "Slightly behind", className: "signal-load" };
+  if (delta >= -22) {
+    return { label: "Slightly behind", className: "signal-load" };
+  }
+
+  return { label: "At risk", className: "signal-risk" };
 }
 
 function weekdayName(isoDate: string) {
@@ -296,7 +302,7 @@ export default async function DashboardPage({
     } else if (plannedCount > 0) {
       tone = "upcoming";
       stateLabel = trainingMeaning ? `${trainingMeaning} · ${plannedMinutes}m` : `${plannedMinutes}m planned`;
-      microLabel = trainingMeaning ? "Planned" : `${plannedMinutes}m planned`;
+      microLabel = trainingMeaning ? "" : `${plannedMinutes}m planned`;
     }
 
     return { iso, label, tone, stateLabel, microLabel };
@@ -410,9 +416,9 @@ export default async function DashboardPage({
               const toneClass = day.tone === "today-remaining"
                 ? "border-[hsl(var(--accent-performance)/0.72)] bg-[hsl(var(--accent-performance)/0.18)]"
                 : day.tone === "today-complete"
-                  ? "border-[hsl(var(--success)/0.45)] bg-[hsl(var(--success)/0.13)]"
+                  ? "border-[hsl(var(--success)/0.52)] bg-[hsl(var(--success)/0.16)]"
                   : day.tone === "completed"
-                    ? "border-[hsl(var(--success)/0.34)] bg-[hsl(var(--success)/0.08)]"
+                    ? "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.07)]"
                     : day.tone === "missed"
                       ? "border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.1)]"
                       : day.tone === "upcoming"
@@ -449,7 +455,7 @@ export default async function DashboardPage({
                     {pendingTodaySessions.map((session) => (
                       <div key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">
                         <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                        <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label}{session.is_key ? " • Key" : ""} • Remaining</p>
+                        <p className="text-xs text-muted">{session.duration_minutes} min{session.is_key ? " • Key" : ""} • Remaining</p>
                       </div>
                     ))}
                   </div>
@@ -462,7 +468,7 @@ export default async function DashboardPage({
                       {completedTodaySessions.map((session) => (
                         <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
                           <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                          <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label} • Done</p>
+                          <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
                         </div>
                       ))}
                     </div>
@@ -485,7 +491,7 @@ export default async function DashboardPage({
                 {completedTodaySessions.map((session) => (
                   <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
                     <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                    <p className="text-xs text-muted">{session.duration_minutes} min • {getDisciplineMeta(session.sport).label} • Done</p>
+                    <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
                   </div>
                 ))}
               </div>
