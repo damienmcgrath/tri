@@ -22,6 +22,7 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             key={item.href}
             href={item.href}
             title={item.label}
+            prefetch
             className={`rounded-xl px-3 py-2 text-sm transition ${
               active
                 ? "nav-item-active pl-5"
@@ -53,6 +54,7 @@ export function MobileBottomTabs() {
               key={item.href}
               href={item.href}
               title={item.label}
+              prefetch
               className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
             >
               <span className="block">{item.label}</span>
