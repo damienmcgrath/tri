@@ -2,7 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { WeekCalendar } from "./week-calendar";
 
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: jest.fn() })
+  usePathname: () => "/calendar",
+  useRouter: () => ({ refresh: jest.fn(), replace: jest.fn() }),
+  useSearchParams: () => new URLSearchParams()
 }));
 
 jest.mock("./actions", () => ({

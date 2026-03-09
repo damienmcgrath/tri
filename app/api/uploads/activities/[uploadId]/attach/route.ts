@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { isSameOrigin } from "@/lib/security/request";
 
 const schema = z.object({
   plannedSessionId: z.string().uuid(),
@@ -9,6 +10,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request, { params }: { params: { uploadId: string } }) {
+  if (!isSameOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
