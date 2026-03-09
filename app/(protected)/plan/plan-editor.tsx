@@ -120,17 +120,40 @@ function sessionRoleLabel(session: Session) {
 function sessionTitle(session: Session) {
   const explicit = session.type?.trim();
   const discipline = getDisciplineMeta(session.sport).label;
+  const subtype = session.target?.trim();
 
-  if (explicit && explicit.toLowerCase() !== "session") {
+  const defaultBySport: Record<string, string> = {
+    swim: "Aerobic Swim",
+    bike: "Endurance Ride",
+    run: "Easy Run",
+    strength: "General Strength",
+    other: "Training Session"
+  };
+
+  const explicitLower = explicit?.toLowerCase() ?? "";
+  const isGenericExplicit = explicitLower === "session" || explicitLower === discipline.toLowerCase();
+
+  if (explicit && !isGenericExplicit) {
     return explicit;
   }
 
-  const subtype = session.target?.trim();
   if (subtype && !/^z\d/i.test(subtype) && subtype.length <= 24) {
     return `${subtype} ${discipline}`;
   }
 
-  return discipline;
+  return defaultBySport[session.sport] ?? discipline;
+}
+
+function disciplineChipTone(sport: string) {
+  const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    swim: { bg: "rgba(86,182,217,0.22)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.35)" },
+    bike: { bg: "rgba(107,170,117,0.2)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.34)" },
+    run: { bg: "rgba(196,135,114,0.2)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.34)" },
+    strength: { bg: "rgba(154,134,200,0.22)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.36)" },
+    other: { bg: "rgba(148,163,184,0.2)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.35)" }
+  };
+
+  return tones[sport] ?? tones.other;
 }
 
 function plannerFocusFromNotes(notes: string) {
@@ -351,7 +374,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${meta.className} ${meta.textureClassName}`}><span aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></span>
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          style={{
+                            backgroundColor: disciplineChipTone(session.sport).bg,
+                            color: disciplineChipTone(session.sport).text,
+                            borderColor: disciplineChipTone(session.sport).border
+                          }}
+                        >
+                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
+                          <span>{meta.label}</span>
+                        </span>
                         {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
                       <p className="mt-1 text-xs font-semibold">{sessionTitle(session)}</p>
@@ -378,8 +411,22 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const role = sessionRoleLabel(session);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
-                      <p className="font-semibold">{getDisciplineMeta(session.sport).label} — {sessionTitle(session)}</p>
-                      <p className="text-muted">{session.duration_minutes} min{role ? ` · ${role}` : ""}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          style={{
+                            backgroundColor: disciplineChipTone(session.sport).bg,
+                            color: disciplineChipTone(session.sport).text,
+                            borderColor: disciplineChipTone(session.sport).border
+                          }}
+                        >
+                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
+                          <span>{getDisciplineMeta(session.sport).label}</span>
+                        </span>
+                        {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
+                      </div>
+                      <p className="mt-1 font-semibold">{sessionTitle(session)}</p>
+                      <p className="text-muted">{session.duration_minutes} min</p>
                     </button>
                   );
                 })}
