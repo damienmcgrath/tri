@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { WeekProgressCard } from "./week-progress-card";
-import { ProgressGlanceCard } from "./progress-glance-card";
+import { WeekSnapshotCard } from "./week-snapshot-card";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getWhyTodayMattersCopy, NEXT_ACTION_STATE } from "./next-action-copy";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
@@ -53,6 +53,29 @@ function toHoursAndMinutes(minutes: number) {
   return `${hours}h ${mins}m`;
 }
 
+function getTodayIsoInTimeZone(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+
+  return `${year}-${month}-${day}`;
+}
+
+
+function formatWeekdayLabel(dateIso: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short"
+  }).format(new Date(`${dateIso}T12:00:00.000Z`));
+}
+
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
   if (session.status === "completed" || session.status === "skipped") {
     return session.status;
@@ -92,7 +115,11 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const timeZone =
+    (user.user_metadata && typeof user.user_metadata.timezone === "string" && user.user_metadata.timezone) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "UTC";
+  const todayIso = getTodayIsoInTimeZone(timeZone);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -140,6 +167,7 @@ export default async function DashboardPage({
     } else {
       sessionsData = primary.data as unknown[] | null;
     }
+
   }
 
   const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, session) => {
@@ -254,11 +282,45 @@ export default async function DashboardPage({
         ? NEXT_ACTION_STATE.SESSION_DONE_TODAY
       : NEXT_ACTION_STATE.NO_SESSION_TODAY;
 
+
+
   const completedTodaySummary = completedTodaySessions
     .slice(0, 2)
     .map((session) => `${session.type} · ${session.duration_minutes} min · ${getDisciplineMeta(session.sport).label}`)
     .join(" • ");
 
+  // Day states derive from planned vs completed counts and temporal position.
+  // - rest: no planned sessions, planned: none completed yet, completed: all done,
+  // - in_progress: some done, some left, missed: past day with remaining sessions.
+  const weekStripDays = Array.from({ length: 7 }, (_, index) => {
+    const dateIso = addDays(weekStart, index);
+    const sessionsOnDay = sessions.filter((session) => session.date === dateIso);
+    const plannedCount = sessionsOnDay.length;
+    const completedCount = sessionsOnDay.filter((session) => session.status === "completed").length;
+    const isToday = dateIso === todayIso;
+    const isPast = dateIso < todayIso;
+
+    const state: "rest" | "planned" | "completed" | "in_progress" | "missed" = plannedCount === 0
+      ? "rest"
+      : completedCount >= plannedCount
+        ? "completed"
+        : completedCount > 0
+          ? isPast
+            ? "missed"
+            : "in_progress"
+          : isPast
+            ? "missed"
+            : "planned";
+
+    return {
+      dateIso,
+      label: formatWeekdayLabel(dateIso, timeZone),
+      plannedCount,
+      completedCount,
+      state,
+      isToday
+    };
+  });
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
@@ -281,20 +343,22 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
-      <div className="space-y-4">
-        <ProgressGlanceCard
-          weekRangeLabel={`Week of ${weekRangeLabel(weekStart)}`}
-          completionPct={completionPct}
-          completedTimeLabel={toHoursAndMinutes(totals.completed)}
-          plannedTimeLabel={toHoursAndMinutes(totals.planned)}
-          remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
-          statusLabel={progressStatus}
-          missedPlannedCount={missedPlannedSessions}
-          unmatchedExtraCount={unmatchedExtraSessions}
-        />
+      <WeekSnapshotCard
+        completionPct={completionPct}
+        completedTimeLabel={toHoursAndMinutes(totals.completed)}
+        plannedTimeLabel={toHoursAndMinutes(totals.planned)}
+        remainingTimeLabel={toHoursAndMinutes(remainingMinutes)}
+        missedPlannedCount={missedPlannedSessions}
+        unmatchedExtraCount={unmatchedExtraSessions}
+        remainingSessionCount={missedPlannedSessions}
+        weekStartIso={weekStart}
+        weekStripDays={weekStripDays}
+      />
 
-        <article className="priority-card-primary next-action-card">
-          <p className="priority-kicker">Next action</p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:items-start lg:gap-4">
+        <div className="space-y-4">
+          <article className="priority-card-primary next-action-card">
+          <p className="priority-kicker">Today</p>
           {nextPendingTodaySession ? (
             <>
               <h1 className="priority-title">Today: {nextPendingTodaySession.type}</h1>
@@ -357,9 +421,8 @@ export default async function DashboardPage({
               <Link href="/calendar" className="text-xs text-muted underline underline-offset-2">Why no session?</Link>
             ) : null}
           </div>
-        </article>
+          </article>
 
-        <div className="space-y-4">
           <article className="priority-card-supporting dashboard-supporting-card">
             <div className="dashboard-supporting-header">
               <p className="priority-kicker">This week&apos;s focus</p>
@@ -367,34 +430,37 @@ export default async function DashboardPage({
             <h2 className="priority-title">{weeklyFocusText}</h2>
             <p className="priority-subtitle">Make one scheduling decision now, then return to execution.</p>
             <div className="mt-4">
-              <Link href="/calendar" className={`${nextActionState === NEXT_ACTION_STATE.SESSION_TODAY ? "btn-secondary" : "btn-primary"} px-3 py-1.5 text-xs`}>Add suggested sessions</Link>
+              <Link href="/calendar" className="btn-secondary border-[hsl(var(--fg)/0.56)] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--fg))] shadow-[inset_0_0_0_1px_hsl(var(--fg)/0.08)] hover:border-[hsl(var(--fg)/0.72)] hover:bg-[hsl(var(--surface-2)/0.82)]">＋ Add suggested sessions</Link>
             </div>
           </article>
-
-          <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card scroll-mt-20">
-            <div className="dashboard-supporting-header">
-              <p className="priority-kicker">Week progress</p>
-            </div>
-            <h2 className="priority-title">Discipline breakdown and gaps.</h2>
-            <div className="mt-4">
-              <WeekProgressCard
-                plannedTotalMinutes={totals.planned}
-                completedTotalMinutes={totals.completed}
-                disciplines={progressBySport.map((item) => ({
-                  key: item.sport,
-                  label: item.label,
-                  plannedMinutes: item.planned,
-                  completedMinutes: item.completed,
-                  extraMinutes: item.extraMinutes,
-                  color: item.color
-                }))}
-                extraTotalMinutes={extraMinutesTotal}
-                showStatusChip={false}
-              />
-            </div>
-          </article>
-
         </div>
+
+        <article id="week-progress-details" className="priority-card-supporting dashboard-supporting-card lg:min-w-0 lg:p-3">
+          <div className="dashboard-supporting-header">
+            <p className="priority-kicker">WEEK PROGRESS</p>
+            <h2 className="mt-1 text-sm font-semibold text-[hsl(var(--fg))]">Week Progress</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--fg-muted))] lg:hidden">Discipline breakdown and gaps.</p>
+          </div>
+          <div className="mt-4 min-w-0">
+            <WeekProgressCard
+              plannedTotalMinutes={totals.planned}
+              completedTotalMinutes={totals.completed}
+              disciplines={progressBySport.map((item) => ({
+                key: item.sport,
+                label: item.label,
+                plannedMinutes: item.planned,
+                completedMinutes: item.completed,
+                extraMinutes: item.extraMinutes,
+                color: item.color
+              }))}
+              extraTotalMinutes={extraMinutesTotal}
+              showStatusChip={false}
+              compact
+              showTitle={false}
+              defaultExpanded={false}
+            />
+          </div>
+        </article>
       </div>
     </section>
   );

@@ -25,4 +25,42 @@ describe("WeekProgressCard", () => {
     expect(screen.getByText("30 / 0 min")).toBeInTheDocument();
     expect(screen.getByText("15 / 0 min")).toBeInTheDocument();
   });
+
+  it("lets the collapsed focus summary button expand the breakdown", () => {
+    render(
+      <WeekProgressCard
+        plannedTotalMinutes={120}
+        completedTotalMinutes={60}
+        disciplines={[
+          { key: "run", label: "Run", plannedMinutes: 120, completedMinutes: 60, color: "#fff" }
+        ]}
+        compact
+      />
+    );
+
+    const focusButton = screen.getByRole("button", { name: /Focus: Run/i });
+    expect(focusButton).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(focusButton);
+
+    expect(screen.getByText("By discipline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse breakdown" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps the explicit view full breakdown action", () => {
+    render(
+      <WeekProgressCard
+        plannedTotalMinutes={120}
+        completedTotalMinutes={60}
+        disciplines={[
+          { key: "run", label: "Run", plannedMinutes: 120, completedMinutes: 60, color: "#fff" }
+        ]}
+        compact
+      />
+    );
+
+    const toggle = screen.getByRole("button", { name: "View full breakdown" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(screen.getByText("By discipline")).toBeInTheDocument();
+  });
 });
