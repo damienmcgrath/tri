@@ -371,17 +371,10 @@ export function WeekCalendar({
                         ? "Planned"
                         : "Planned";
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
-          const dayHelper = metrics?.isRest
-            ? "Protected recovery"
-            : metrics?.availableDay
-              ? "Open for moved work"
-              : metrics?.openCapacity
-                ? `Can absorb ${metrics.remainingPlanned} min more`
-                : " ";
 
           return (
             <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 min-h-[102px] border-b border-[hsl(var(--border))] pb-2">
+              <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
@@ -389,10 +382,9 @@ export function WeekCalendar({
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
-                <p className="mt-1 min-h-[1rem] text-[10px] text-muted">{dayHelper}</p>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
                   <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
                     + Add session
