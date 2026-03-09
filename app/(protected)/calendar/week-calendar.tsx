@@ -296,7 +296,7 @@ export function WeekCalendar({
             <option value="all">All states</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="text-muted">{completedCount} completed · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} completed · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
         </div>
       </header>
 
@@ -381,7 +381,7 @@ export function WeekCalendar({
 
           return (
             <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 min-h-[106px] border-b border-[hsl(var(--border))] pb-2">
+              <div className="mb-2 min-h-[102px] border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
@@ -389,12 +389,12 @@ export function WeekCalendar({
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
-                <p className="mt-1 text-[10px] text-muted">{dayHelper}</p>
+                <p className="mt-1 min-h-[1rem] text-[10px] text-muted">{dayHelper}</p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[96px] rounded-xl border border-dashed border-[hsl(var(--border))] px-2 py-3 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.45)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
                     + Add session
                   </button>
                 ) : null}
@@ -404,7 +404,7 @@ export function WeekCalendar({
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
                     state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.45)] bg-[hsl(var(--signal-ready)/0.08)]"
+                      ? "border-[hsl(var(--signal-ready)/0.5)] bg-[hsl(var(--signal-ready)/0.11)]"
                       : state === "skipped"
                         ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
                         : state === "moved"
@@ -412,7 +412,7 @@ export function WeekCalendar({
                           : state === "extra"
                             ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
                             : state === "assigned"
-                              ? "border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.06)]"
+                              ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.1)]"
                               : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
                   const stateBadge =
@@ -421,13 +421,13 @@ export function WeekCalendar({
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
                     ) : state === "assigned" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent">Assigned</span>
+                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned</span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
 
                   return (
-                    <article key={session.id} className={`rounded-xl border p-2 text-xs ${toneClass}`}>
+                    <article key={session.id} className={`rounded-xl border px-2 py-1.5 text-xs ${toneClass}`}>
                       <div className="flex items-center justify-between gap-1">
                         <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
@@ -453,9 +453,9 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <p className="mt-2 min-h-[2.5rem] font-medium leading-snug">{getSessionTitle(session)}</p>
-                      <p className="mt-1 text-muted">{session.duration} min</p>
-                      <div className="mt-2 flex min-h-[1.25rem] items-center justify-end">{stateBadge}</div>
+                      <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
+                      <p className="mt-0.5 text-muted">{session.duration} min</p>
+                      <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
                     </article>
                   );
                 })}
