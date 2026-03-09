@@ -1,34 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu";
-
-type HeaderConfig = {
-  logoSizeVariant: "default" | "large";
-};
-
-const DEFAULT_HEADER_CONFIG: HeaderConfig = {
-  logoSizeVariant: "large"
-};
-
-const HEADER_CONFIG_BY_ROUTE: Record<string, HeaderConfig> = {
-  "/plan": {
-    logoSizeVariant: "default"
-  },
-  "/calendar": {
-    logoSizeVariant: "default"
-  }
-};
-
-function getHeaderConfig(pathname: string): HeaderConfig {
-  if (pathname.startsWith("/plan") || pathname.startsWith("/calendar")) {
-    const key = pathname.startsWith("/plan") ? "/plan" : "/calendar";
-    return HEADER_CONFIG_BY_ROUTE[key];
-  }
-
-  return DEFAULT_HEADER_CONFIG;
-}
 
 export function GlobalHeader({
   raceName,
@@ -45,19 +18,14 @@ export function GlobalHeader({
     signOutAction: (formData: FormData) => void;
   };
 }) {
-  const pathname = usePathname();
-  const headerConfig = getHeaderConfig(pathname);
-
   return (
-    <div className="shell-header border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.95] backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`uppercase tracking-[0.2em] text-accent ${headerConfig.logoSizeVariant === "large" ? "text-base md:text-lg" : "text-sm"}`}>tri.ai</span>
-        </div>
+    <div className="shell-header border-b border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.9] backdrop-blur">
+      <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between gap-2 px-4 py-2 md:px-6">
+        <span className="text-sm uppercase tracking-[0.2em] text-accent">tri.ai</span>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {daysToRace !== null ? <span role="status" aria-live="polite" className="status-badge-passive"><span aria-hidden="true">◷</span>{raceName} • {daysToRace} days</span> : null}
-          <Link href="/coach" className="btn-header-cta">Ask tri.ai</Link>
+        <div className="flex items-center gap-2">
+          {daysToRace !== null ? <span role="status" aria-live="polite" className="status-badge-passive text-[11px]"><span aria-hidden="true">◷</span>{raceName} • {daysToRace} days</span> : null}
+          <Link href="/coach" className="btn-header-cta px-2.5 py-1 text-xs">Ask tri.ai</Link>
           <AccountMenu
             avatarUrl={account.avatarUrl}
             initials={account.initials}
