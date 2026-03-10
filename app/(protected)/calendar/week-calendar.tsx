@@ -521,9 +521,9 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
   const [form, setForm] = useState({ date: initialDate, sport: "run", type: "", duration: "45", notes: "" });
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
+    <TaskModal onClose={onClose} title="Add session" description="Create a planned workout for this week.">
       <form
-        className="surface-card w-full max-w-md space-y-2 rounded-2xl p-4"
+        className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
           startTransition(() => {
@@ -545,21 +545,20 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
           });
         }}
       >
-        <p className="font-semibold">Add session</p>
-        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
           {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
         </select>
-        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
           <option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
         </select>
-        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm" />
-        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm" />
-        <div className="flex justify-end gap-2">
+        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
+        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
+        <div className="flex justify-end gap-2 border-t border-[hsl(var(--border))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button disabled={isPending} className="btn-primary px-2 py-1 text-xs">Save</button>
         </div>
       </form>
-    </div>
+    </TaskModal>
   );
 }
 
@@ -567,10 +566,9 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
   const [date, setDate] = useState(session.date);
   const todayIso = new Date().toISOString().slice(0, 10);
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
-      <div className="surface-card w-full max-w-sm space-y-2 rounded-2xl p-4">
-        <p className="font-semibold">Move {getSessionTitle(session)}</p>
-        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+    <TaskSheet onClose={onClose} title={`Move ${getSessionTitle(session)}`} description="Reschedule this planned workout to another day in the week.">
+      <div className="space-y-3">
+        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
           {weekDays.map((day) => (
             <option key={day.iso} value={day.iso}>
               {day.weekday} · {day.label}
@@ -578,12 +576,12 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
             </option>
           ))}
         </select>
-        <div className="flex justify-end gap-2">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move here</button>
         </div>
       </div>
-    </div>
+    </TaskSheet>
   );
 }
 
@@ -606,14 +604,16 @@ function AssignUploadModal({
   const [isSaving, setIsSaving] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
-      <div className="surface-card w-full max-w-sm space-y-2 rounded-2xl p-4">
-        <p className="font-semibold">Assign upload to planned session</p>
-        <p className="text-xs text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min</p>
+    <TaskSheet
+      onClose={onClose}
+      title="Assign upload to planned session"
+      description={`${getDisciplineMeta(upload.sport).label} · ${upload.duration} min`}
+    >
+      <div className="space-y-3">
         {candidateSessions.length === 0 ? (
           <p className="text-xs text-muted">No planned sessions in this week. Add or move a planned session first.</p>
         ) : (
-          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
             {candidateSessions.map((session) => (
               <option key={session.id} value={session.id}>
                 {(weekDays.find((day) => day.iso === session.date)?.weekday ?? session.date)} · {getSessionTitle(session)} · {session.duration} min
@@ -621,7 +621,7 @@ function AssignUploadModal({
             ))}
           </select>
         )}
-        <div className="flex justify-end gap-2">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
             type="button"
@@ -650,23 +650,65 @@ function AssignUploadModal({
           </button>
         </div>
       </div>
-    </div>
+    </TaskSheet>
   );
 }
 
 function DetailsModal({ session, onClose }: { session: CalendarSession; onClose: () => void }) {
   const state = session.displayType === "completed_activity" ? "Extra workout" : session.status;
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
-      <div className="surface-card w-full max-w-sm space-y-1 rounded-2xl p-4 text-sm">
-        <p className="font-semibold">{getSessionTitle(session)}</p>
-        <p className="text-muted">{getDisciplineMeta(session.sport).label} · {session.duration} min</p>
+    <TaskSheet
+      onClose={onClose}
+      title={getSessionTitle(session)}
+      description={`${getDisciplineMeta(session.sport).label} · ${session.duration} min`}
+    >
+      <div className="space-y-3 text-sm">
         <p className="text-muted">State: {state}</p>
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
-        <div className="pt-2 text-right">
+        <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
         </div>
       </div>
+    </TaskSheet>
+  );
+}
+
+function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]">
+      <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+      {children}
     </div>
+  );
+}
+
+function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
+  return (
+    <TaskOverlay onClose={onClose}>
+      <aside className="absolute right-0 top-0 h-full w-full max-w-xl border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-5 py-4 shadow-2xl">
+        <header className="mb-4 border-b border-[hsl(var(--border))] pb-3 pr-10">
+          <p className="text-base font-semibold">{title}</p>
+          {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
+        </header>
+        <div className="max-h-[calc(100vh-7rem)] overflow-y-auto pr-1">{children}</div>
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs text-muted hover:text-foreground">Close</button>
+      </aside>
+    </TaskOverlay>
+  );
+}
+
+function TaskModal({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
+  return (
+    <TaskOverlay onClose={onClose}>
+      <div className="relative z-10 flex h-full items-center justify-center p-4">
+        <section className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl">
+          <header className="mb-4 border-b border-[hsl(var(--border))] pb-3">
+            <p className="text-base font-semibold">{title}</p>
+            {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
+          </header>
+          {children}
+        </section>
+      </div>
+    </TaskOverlay>
   );
 }
