@@ -81,6 +81,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     const query = await supabase
       .from("sessions")
       .select("id,date,sport,type,session_name,discipline,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
+      .eq("user_id", user.id)
       .gte("date", weekStart)
       .lt("date", weekEnd)
       .order("date", { ascending: true })
@@ -97,6 +98,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       const fallbackQuery = await supabase
         .from("sessions")
         .select("id,date,sport,type,duration_minutes,notes,created_at,status")
+        .eq("user_id", user.id)
         .gte("date", weekStart)
         .lt("date", weekEnd)
         .order("date", { ascending: true })

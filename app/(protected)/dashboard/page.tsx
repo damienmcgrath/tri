@@ -303,6 +303,7 @@ export default async function DashboardPage({
     const primary = await supabase
       .from("sessions")
       .select("id,plan_id,date,sport,type,session_name,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
+      .eq("user_id", user.id)
       .eq("plan_id", activePlanId)
       .gte("date", weekStart)
       .lt("date", weekEnd)
@@ -313,6 +314,7 @@ export default async function DashboardPage({
       const fallback = await supabase
         .from("sessions")
         .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status")
+        .eq("user_id", user.id)
         .eq("plan_id", activePlanId)
         .gte("date", weekStart)
         .lt("date", weekEnd)

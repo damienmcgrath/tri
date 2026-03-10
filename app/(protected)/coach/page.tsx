@@ -102,6 +102,7 @@ async function getDiagnosisSessions() {
   const { data, error } = await supabase
     .from("sessions")
     .select("id,date,sport,type,session_name,intent_category,status,execution_result")
+    .eq("user_id", user.id)
     .eq("status", "completed")
     .not("execution_result", "is", null)
     .order("date", { ascending: false })
