@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
@@ -62,7 +62,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) notFound();
+  if (!user) redirect("/auth/sign-in");
 
   const { data, error } = await supabase
     .from("sessions")
