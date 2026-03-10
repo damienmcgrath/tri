@@ -132,9 +132,15 @@ function SessionActionMenu({
       </button>
       {open ? (
         <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
-          <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
-            Open details
-          </button>
+          {session.displayType !== "completed_activity" && session.status === "completed" ? (
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
+              Open details
+            </Link>
+          ) : (
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
+              Open details
+            </button>
+          )}
           {session.displayType !== "completed_activity" ? (
             <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onMove(); setOpen(false); }}>
               Move
