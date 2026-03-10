@@ -149,7 +149,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("completed_activities")
-      .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
+      .select("id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
       .eq("user_id", user.id)
       .gte("start_time_utc", `${addDays(weekStart, -1)}T00:00:00.000Z`)
       .lt("start_time_utc", `${addDays(weekEnd, 1)}T00:00:00.000Z`),
