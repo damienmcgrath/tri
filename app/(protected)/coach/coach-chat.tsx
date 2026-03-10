@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { CoachDiagnosisSession } from "./types";
 
 type Message = {
   role: "user" | "assistant";
@@ -23,19 +24,7 @@ type Conversation = {
 };
 
 type IntentMatchStatus = "matched" | "partial" | "missed";
-
-type SessionDiagnosis = {
-  id: string;
-  sessionName: string;
-  plannedIntent: string;
-  executionSummary: string;
-  status: IntentMatchStatus;
-  diagnosis: string;
-  whyItMatters: string;
-  nextAction: string;
-  confidenceNote?: string;
-  evidence: string[];
-};
+type SessionDiagnosis = CoachDiagnosisSession;
 
 type TopCoachingInsight = {
   headline: string;
@@ -76,70 +65,9 @@ function formatRecencyLabel(updatedAt?: string): string {
   return `Updated ${diffDays}d ago`;
 }
 
-function normalizeInsight(insight?: string): string {
-  return insight?.trim().toLowerCase() ?? "";
-}
-
-function deriveSessionDiagnoses(summary: CoachSummary | null): SessionDiagnosis[] {
-  if (!summary || summary.completedMinutes === 0) {
-    return [];
-  }
-
-  const firstInsight = normalizeInsight(summary.insights[0]);
-  const secondInsight = normalizeInsight(summary.insights[1]);
-  const completion = summary.completionPct;
-
-  const base: SessionDiagnosis[] = [
-    {
-      id: "z2-ride",
-      sessionName: "Thu Z2 Ride",
-      plannedIntent: "Z2 endurance",
-      executionSummary: completion < 65 ? "Effort drifted above target for long stretches." : "Mostly controlled but effort crept high late.",
-      status: completion < 70 ? "missed" : "partial",
-      diagnosis: "You likely started a little too hard and carried too much pressure into the middle block.",
-      whyItMatters: "It reduces aerobic intent quality and can compromise your next quality bike session.",
-      nextAction: "Start 10–15 min easier next time and cap HR before drift begins.",
-      confidenceNote: completion < 55 ? "Moderate confidence" : undefined,
-      evidence: [
-        "Planned easy aerobic intent but output likely moved above cap.",
-        "Completion pattern suggests effort control dropped under fatigue."
-      ]
-    },
-    {
-      id: "recovery-run",
-      sessionName: "Fri Recovery Run",
-      plannedIntent: "Recovery run",
-      executionSummary: firstInsight.includes("fatigue") ? "Perceived effort stayed elevated despite recovery intent." : "Pacing looked better than midweek but still variable.",
-      status: firstInsight.includes("fatigue") ? "missed" : "partial",
-      diagnosis: "Recovery intent is being replaced by moderate work when tired.",
-      whyItMatters: "That lowers recovery value and can blunt quality later in the week.",
-      nextAction: "Keep recovery runs conversational only, or shorten duration if fatigue remains high.",
-      evidence: ["Recovery signal appears elevated.", "Dominant pattern points to intensity creep on easy days."]
-    },
-    {
-      id: "quality-session",
-      sessionName: "Key Interval Session",
-      plannedIntent: "Threshold intervals",
-      executionSummary: completion >= 85 && !secondInsight.includes("fatigue") ? "Workout completed close to prescription." : "Interval quality likely inconsistent across reps.",
-      status: completion >= 85 && !secondInsight.includes("fatigue") ? "matched" : "partial",
-      diagnosis: completion >= 85 ? "Execution quality is stable enough to hold the current structure." : "You are completing work, but execution consistency is not fully locked in.",
-      whyItMatters: completion >= 85 ? "Consistent quality supports progression without unnecessary risk." : "Inconsistent threshold execution can distort adaptation and pacing confidence.",
-      nextAction: completion >= 85 ? "Keep volume stable and progress only one quality lever next week." : "Reduce next quality session by ~10% and focus on even pacing.",
-      evidence: [
-        `Week completion is ${summary.completedMinutes}/${summary.plannedMinutes} min (${summary.completionPct}%).`,
-        summary.insights[0] ?? "Use one more completed quality session to sharpen this diagnosis."
-      ]
-    }
-  ];
-
-  return base.sort((a, b) => {
-    const rank: Record<IntentMatchStatus, number> = { missed: 0, partial: 1, matched: 2 };
-    return rank[a.status] - rank[b.status];
-  });
-}
-
-function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnosis[]): TopCoachingInsight {
-  if (!summary || sessions.length === 0) {
+function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
+  const hasEnoughDiagnosis = sessions.length >= 2;
+  if (!hasEnoughDiagnosis) {
     return {
       headline: "Start with 1–2 completed sessions to unlock intent-match coaching",
       rationale:
@@ -153,21 +81,23 @@ function deriveTopInsight(summary: CoachSummary | null, sessions: SessionDiagnos
   const missedCount = sessions.filter((session) => session.status === "missed").length;
   const partialCount = sessions.filter((session) => session.status === "partial").length;
 
-  if (missedCount >= 2) {
+  const strongestFlag = sessions.find((session) => session.status !== "matched");
+
+  if (strongestFlag?.status === "missed") {
     return {
-      headline: "You are completing sessions but missing their intended purpose",
-      rationale:
-        "Execution is drifting above prescribed intent on key easy/recovery sessions. The immediate priority is restoring intent fidelity before adding load.",
+      headline: strongestFlag.executionSummary,
+      rationale: strongestFlag.whyItMatters,
       primaryAction: { label: "Adjust this week", href: "/plan" },
       secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
       confidenceNote: "Diagnosis confidence: useful"
     };
   }
 
-  if (missedCount === 1 || partialCount >= 2) {
+  if (missedCount === 1 || partialCount >= 1) {
     return {
-      headline: "Execution quality is mixed — tighten intent on easy days",
+      headline: strongestFlag?.executionSummary ?? "Execution quality is mixed — tighten intent on easy days",
       rationale:
+        strongestFlag?.whyItMatters ??
         "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
       primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
       secondaryAction: { label: "Ask why", href: "#coaching-chat" },
@@ -195,7 +125,7 @@ function statusChip(status: IntentMatchStatus): { label: string; className: stri
   return { label: "Missed intent", className: "signal-risk" };
 }
 
-export function CoachChat() {
+export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDiagnosis[] }) {
   const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
@@ -204,16 +134,16 @@ export function CoachChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
-  const sessionDiagnoses = useMemo(() => deriveSessionDiagnoses(summary), [summary]);
+  const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
   const flaggedSessions = useMemo(
     () => sessionDiagnoses.filter((session) => session.status !== "matched").slice(0, 3),
     [sessionDiagnoses]
   );
   const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
-  const topInsight = useMemo(() => deriveTopInsight(summary, sessionDiagnoses), [summary, sessionDiagnoses]);
+  const topInsight = useMemo(() => deriveTopInsight(sessionDiagnoses), [sessionDiagnoses]);
 
   const nextActions = useMemo(() => {
-    if (!summary || sessionDiagnoses.length === 0) {
+    if (sessionDiagnoses.length < 2) {
       return [
         "Protect 2–3 key sessions this week and keep the rest deliberately easy.",
         "Use Calendar to move sessions instead of stacking missed work.",
@@ -222,16 +152,16 @@ export function CoachChat() {
     }
 
     const actions = flaggedSessions.map((session) => session.nextAction);
-    if (summary.completionPct < 75) {
+    if ((summary?.completionPct ?? 100) < 75) {
       actions.push("Keep easy days easy until execution signals stabilise.");
     } else {
       actions.push("Keep volume steady this week and improve pacing quality before progressing.");
     }
     return actions.slice(0, 4);
-  }, [summary, sessionDiagnoses, flaggedSessions]);
+  }, [summary?.completionPct, sessionDiagnoses, flaggedSessions]);
 
   const quickPrompts = useMemo(() => {
-    if (!summary || sessionDiagnoses.length === 0) {
+    if (sessionDiagnoses.length < 2) {
       return [
         "What matters most now?",
         "How should I adjust this week?",
@@ -248,7 +178,7 @@ export function CoachChat() {
       "Was this fatigue or pacing?",
       "What matters most now?"
     ];
-  }, [summary, sessionDiagnoses]);
+  }, [sessionDiagnoses]);
 
   const dataRecency = useMemo(() => {
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
@@ -385,10 +315,10 @@ export function CoachChat() {
 
         {flaggedSessions.length === 0 ? (
           <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-3">
-            <p className="text-sm text-muted">No sessions are strongly flagged yet.</p>
+            <p className="text-sm text-muted">No high-confidence session flags yet.</p>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-tertiary">
-              <li>After 1–2 more completed workouts, this section will highlight missed intent sessions.</li>
-              <li>It will show why execution drifted and what to change next time.</li>
+              <li>Once a few completed workouts have intent-match results, this section will rank the top sessions needing attention.</li>
+              <li>Each card will explain what happened, why it matters, and exactly what to do in the next similar session.</li>
             </ul>
           </div>
         ) : (
@@ -410,10 +340,6 @@ export function CoachChat() {
                     <div>
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Actual</dt>
                       <dd className="text-[hsl(var(--text-secondary))]">{session.executionSummary}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Diagnosis</dt>
-                      <dd className="text-[hsl(var(--text-secondary))]">{session.diagnosis}</dd>
                     </div>
                     <div>
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
