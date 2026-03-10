@@ -184,6 +184,7 @@ export function WeekCalendar({
   const [quickAddDate, setQuickAddDate] = useState<string | null>(null);
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
   const [detailSession, setDetailSession] = useState<CalendarSession | null>(null);
+  const [assignSource, setAssignSource] = useState<CalendarSession | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
@@ -329,7 +330,9 @@ export function WeekCalendar({
                 <p className="font-semibold">Unmatched upload</p>
                 <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {new Date(upload.created_at).toLocaleDateString()}</p>
                 <div className="mt-1 flex gap-2">
-                  {getActivityId(upload.id) ? <Link href={`/activities/${getActivityId(upload.id)}`} className="text-accent hover:underline">Assign to planned</Link> : null}
+                  {upload.source?.uploadId ? (
+                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to planned</button>
+                  ) : null}
                   <button
                     onClick={() => {
                       setExtraActivityIds((prev) => [...prev, upload.id]);
@@ -489,6 +492,21 @@ export function WeekCalendar({
 
       {quickAddDate ? <QuickAddModal initialDate={quickAddDate} weekDays={weekDays} onClose={() => setQuickAddDate(null)} /> : null}
       {moveSource ? <MoveModal session={moveSource} weekDays={weekDays} onClose={() => setMoveSource(null)} onMove={moveSession} /> : null}
+      {assignSource ? (
+        <AssignUploadModal
+          upload={assignSource}
+          weekDays={weekDays}
+          candidateSessions={localSessions.filter((session) => session.displayType !== "completed_activity")}
+          onClose={() => setAssignSource(null)}
+          onAssigned={() => {
+            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", assignSource.id)]);
+            setAssignSource(null);
+            router.refresh();
+            setToast("Upload assigned to planned session");
+          }}
+          onError={() => setToast("Could not assign upload")}
+        />
+      ) : null}
       {detailSession ? <DetailsModal session={detailSession} onClose={() => setDetailSession(null)} /> : null}
       {toast ? <p className="text-xs text-accent">{toast}</p> : null}
       {isPending ? <p className="text-xs text-muted">Saving…</p> : null}
@@ -562,6 +580,73 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move here</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignUploadModal({
+  upload,
+  weekDays,
+  candidateSessions,
+  onClose,
+  onAssigned,
+  onError
+}: {
+  upload: CalendarSession;
+  weekDays: WeekDay[];
+  candidateSessions: CalendarSession[];
+  onClose: () => void;
+  onAssigned: () => void;
+  onError: () => void;
+}) {
+  const [selectedSessionId, setSelectedSessionId] = useState(candidateSessions[0]?.id ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
+      <div className="surface-card w-full max-w-sm space-y-2 rounded-2xl p-4">
+        <p className="font-semibold">Assign upload to planned session</p>
+        <p className="text-xs text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min</p>
+        {candidateSessions.length === 0 ? (
+          <p className="text-xs text-muted">No planned sessions in this week. Add or move a planned session first.</p>
+        ) : (
+          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
+            {candidateSessions.map((session) => (
+              <option key={session.id} value={session.id}>
+                {(weekDays.find((day) => day.iso === session.date)?.weekday ?? session.date)} · {getSessionTitle(session)} · {session.duration} min
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
+          <button
+            type="button"
+            disabled={isSaving || !selectedSessionId || !upload.source?.uploadId || candidateSessions.length === 0}
+            onClick={async () => {
+              if (!upload.source?.uploadId || !selectedSessionId) return;
+              setIsSaving(true);
+              try {
+                const response = await fetch(`/api/uploads/activities/${upload.source.uploadId}/attach`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ plannedSessionId: selectedSessionId, actor: "athlete", mode: "override" })
+                });
+
+                if (!response.ok) throw new Error("failed");
+                onAssigned();
+              } catch {
+                onError();
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className="btn-primary px-2 py-1 text-xs"
+          >
+            Assign
+          </button>
         </div>
       </div>
     </div>

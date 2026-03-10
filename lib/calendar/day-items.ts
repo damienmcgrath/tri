@@ -23,6 +23,7 @@ export type CalendarSessionRecord = {
 
 export type CalendarActivityRecord = {
   id: string;
+  upload_id: string | null;
   sport_type: string;
   start_time_utc: string;
   duration_sec: number | null;
@@ -67,6 +68,7 @@ export type CalendarDisplayItem = {
 
 type ActivityItem = {
   id: string;
+  upload_id: string | null;
   date: string;
   sport: string;
   duration_min: number;
@@ -133,6 +135,7 @@ export function buildCalendarDisplayItems(input: {
       activity.id,
       {
         id: activity.id,
+        upload_id: activity.upload_id,
         date: activity.localDate,
         sport: activity.sport_type,
         duration_min: Math.round(Number(activity.duration_sec ?? 0) / 60),
@@ -231,7 +234,7 @@ export function buildCalendarDisplayItems(input: {
       workoutType: null,
       intentCategory: null,
       role: null,
-      source: { uploadId: item.id, assignedBy: "upload" },
+      source: { uploadId: item.upload_id ?? item.id, assignedBy: "upload" },
       executionResult: null,
       duration: item.duration_min,
       notes: null,
