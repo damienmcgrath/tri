@@ -26,7 +26,15 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  session_name?: string | null;
+  discipline?: string | null;
+  subtype?: string | null;
+  workout_type?: string | null;
   target: string | null;
+  intent_category?: string | null;
+  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
+  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration_minutes: number;
   day_order: number | null;
   notes: string | null;
@@ -34,7 +42,6 @@ type Session = {
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
   is_key?: boolean | null;
-  session_role?: "Key" | "Supporting" | "Recovery" | "Optional" | null;
 };
 
 function buildPlanWeeks(startDateIso: string, durationWeeks: number, planId: string) {
@@ -117,7 +124,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,target,duration_minutes,day_order,notes,distance_value,distance_unit,status,is_key,session_role")
+      .select("id,plan_id,week_id,date,sport,type,session_name,discipline,subtype,workout_type,target,duration_minutes,intent_category,session_role,source_metadata,execution_result,day_order,notes,distance_value,distance_unit,status,is_key")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
@@ -155,7 +162,15 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
         sport: session.sport,
         type: session.type,
         duration_minutes: session.duration,
+        session_name: null,
+        discipline: session.sport,
+        subtype: null,
+        workout_type: null,
         target: null,
+        intent_category: null,
+        session_role: null,
+        source_metadata: null,
+        execution_result: null,
         day_order: null,
         notes: session.notes,
         distance_value: null,

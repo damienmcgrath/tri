@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
+import { getSessionDisplayName } from "@/lib/training/session";
 import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
 import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 
@@ -17,6 +18,14 @@ type CalendarSession = {
   date: string;
   sport: string;
   type: string;
+  sessionName?: string | null;
+  discipline?: string | null;
+  subtype?: string | null;
+  workoutType?: string | null;
+  intentCategory?: string | null;
+  role?: "key" | "supporting" | "recovery" | "optional" | null;
+  source?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  executionResult?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration: number;
   notes: string | null;
   created_at: string;
@@ -32,13 +41,6 @@ type WeekDay = { iso: string; weekday: string; label: string };
 type RecentMove = { sessionId: string; fromDate: string; toDate: string };
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
-const sportFallbackTitle: Record<string, string> = {
-  swim: "Aerobic Swim",
-  bike: "Endurance Ride",
-  run: "Easy Run",
-  strength: "General Strength"
-};
-
 
 function calendarDisciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
@@ -75,17 +77,12 @@ function getActivityId(sessionId: string) {
 }
 
 function getSessionTitle(session: CalendarSession) {
-  const explicit = session.type?.trim();
-  if (explicit && explicit.toLowerCase() !== "session") {
-    return explicit;
-  }
-
-  const fallbackSubtype = sportFallbackTitle[session.sport];
-  if (fallbackSubtype) {
-    return fallbackSubtype;
-  }
-
-  return getDisciplineMeta(session.sport).label;
+  return getSessionDisplayName({
+    sessionName: session.sessionName ?? session.type,
+    discipline: session.discipline ?? session.sport,
+    subtype: session.subtype,
+    workoutType: session.workoutType
+  });
 }
 
 function getSessionState(session: CalendarSession, recentMoves: RecentMove[]) {
