@@ -58,6 +58,18 @@ type ContextualItem = {
   ctaStyle: "primary" | "secondary";
 };
 
+type StatusChip = {
+  label: string;
+  className: string;
+};
+
+type DiagnosisAwareSignal = {
+  statusChipOverride?: StatusChip;
+  statusInterpretation?: string;
+  focusOverride?: ContextualItem;
+  todayCue?: string;
+};
+
 function toHoursAndMinutes(minutes: number) {
   const safeMinutes = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safeMinutes / 60);
@@ -104,6 +116,18 @@ function getStatusChip(completionPct: number, expectedByTodayPct: number) {
   return { label: "At risk", className: "signal-risk" };
 }
 
+function getDefaultStatusInterpretation(statusLabel: string) {
+  if (statusLabel === "On track") {
+    return "Progress is aligned with expected weekly load for today.";
+  }
+
+  if (statusLabel === "Slightly behind") {
+    return "Slightly behind expected progress; prioritize consistency in the next 48 hours.";
+  }
+
+  return "Behind expected progress; protect key sessions and avoid compressing load late in the week.";
+}
+
 function weekdayName(isoDate: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00.000Z`));
 }
@@ -132,6 +156,107 @@ function getDayMeaningLabel(daySessions: Session[]) {
   }
 
   return `${plannedSessions.length} sessions`;
+}
+
+function getDiagnosisAwareSignal({
+  sessions,
+  todayIso,
+  nextPendingTodaySession,
+  fallbackFocusItem
+}: {
+  sessions: Session[];
+  todayIso: string;
+  nextPendingTodaySession: Session | null;
+  fallbackFocusItem: ContextualItem | null;
+}): DiagnosisAwareSignal {
+  const completedWithDiagnosis = sessions.filter(
+    (session) => session.status === "completed" && session.execution_result?.status
+  );
+
+  if (completedWithDiagnosis.length < 2) {
+    return { focusOverride: fallbackFocusItem ?? undefined };
+  }
+
+  const easySessions = completedWithDiagnosis.filter((session) => /easy|aerobic|base|endurance|recovery/i.test(session.intent_category ?? ""));
+  const easyOffIntent = easySessions.filter((session) => session.execution_result?.status !== "matched_intent");
+
+  const bikeSessions = completedWithDiagnosis.filter((session) => session.sport === "bike");
+  const bikeOffIntent = bikeSessions.filter((session) => session.execution_result?.status !== "matched_intent");
+
+  const recoverySessions = completedWithDiagnosis.filter((session) => /recovery/i.test(session.intent_category ?? ""));
+  const recoveryOffIntent = recoverySessions.filter((session) => session.execution_result?.status !== "matched_intent");
+
+  const keySessions = completedWithDiagnosis.filter((session) => session.is_key);
+  const keyMatched = keySessions.filter((session) => session.execution_result?.status === "matched_intent");
+
+  const nextEasyToday = nextPendingTodaySession && /easy|aerobic|base|endurance|recovery/i.test(nextPendingTodaySession.intent_category ?? "");
+  const nextRecoveryToday = nextPendingTodaySession && /recovery/i.test(nextPendingTodaySession.intent_category ?? "");
+  const upcomingBike = sessions
+    .filter((session) => session.status === "planned" && session.date >= todayIso && session.sport === "bike")
+    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+
+  if (easySessions.length >= 2 && easyOffIntent.length >= 2) {
+    return {
+      statusChipOverride: { label: "Needs adjustment", className: "signal-risk" },
+      statusInterpretation: "Needs adjustment because easy sessions are trending too hard.",
+      focusOverride: {
+        kicker: "Focus this week",
+        title: "Easy sessions are drifting too hard",
+        detail: "Recent easy work is missing intent. Keep easy days deliberately controlled so recovery and key-session quality stay protected.",
+        cta: nextEasyToday ? "Open today\'s easy session" : "Review upcoming easy sessions",
+        href: nextEasyToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
+        ctaStyle: "secondary"
+      },
+      todayCue: nextEasyToday ? "Keep this easy session truly easy." : undefined
+    };
+  }
+
+  if (recoverySessions.length >= 2 && recoveryOffIntent.length >= 2) {
+    return {
+      statusChipOverride: { label: "Needs adjustment", className: "signal-risk" },
+      statusInterpretation: "Needs adjustment because recovery quality is slipping.",
+      focusOverride: {
+        kicker: "Focus this week",
+        title: "Recovery quality is slipping",
+        detail: "Recovery-focused sessions are coming in above intended load. Hold recovery intent to avoid carrying excess fatigue into key work.",
+        cta: nextRecoveryToday ? "Open today\'s recovery session" : "Review recovery sessions",
+        href: nextRecoveryToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
+        ctaStyle: "secondary"
+      },
+      todayCue: nextRecoveryToday ? "Maintain recovery intent." : undefined
+    };
+  }
+
+  if (bikeSessions.length >= 2 && bikeOffIntent.length >= 2) {
+    return {
+      statusInterpretation: "Slightly behind execution quality on bike sessions; tighten bike consistency this week.",
+      focusOverride: {
+        kicker: "Focus this week",
+        title: "Protect bike consistency",
+        detail: `${bikeOffIntent.length} of your last ${bikeSessions.length} bike sessions were off-intent. Keep bike execution controlled before adding extra load.`,
+        cta: upcomingBike ? `Open ${weekdayName(upcomingBike.date)} bike` : "Open next bike session",
+        href: upcomingBike ? `/calendar?focus=${upcomingBike.id}` : "/calendar",
+        ctaStyle: "secondary"
+      },
+      todayCue: nextPendingTodaySession?.sport === "bike" ? "Cap effort early." : undefined
+    };
+  }
+
+  if (keySessions.length >= 2 && keyMatched.length / keySessions.length >= 0.75) {
+    return {
+      statusInterpretation: "Key session execution is strong — maintain current load progression.",
+      focusOverride: {
+        kicker: "Focus this week",
+        title: "Key session execution is strong — maintain load",
+        detail: "Recent key sessions are matching intent. Keep the same discipline on easy and recovery days to preserve this momentum.",
+        cta: "Open weekly plan",
+        href: "/calendar",
+        ctaStyle: "secondary"
+      }
+    };
+  }
+
+  return { focusOverride: fallbackFocusItem ?? undefined };
 }
 
 export default async function DashboardPage({
@@ -378,7 +503,19 @@ export default async function DashboardPage({
       }
     : null;
 
-  const contextualItems = [attentionItem, focusItem].filter((item): item is ContextualItem => Boolean(item));
+  const diagnosisAwareSignal = getDiagnosisAwareSignal({
+    sessions,
+    todayIso,
+    nextPendingTodaySession,
+    fallbackFocusItem: focusItem
+  });
+
+  const resolvedStatusChip = diagnosisAwareSignal.statusChipOverride ?? statusChip;
+  const statusInterpretation = diagnosisAwareSignal.statusInterpretation ?? getDefaultStatusInterpretation(resolvedStatusChip.label);
+  const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
+  const todayCue = diagnosisAwareSignal.todayCue;
+
+  const contextualItems = [attentionItem, resolvedFocusItem].filter((item): item is ContextualItem => Boolean(item));
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
@@ -411,8 +548,9 @@ export default async function DashboardPage({
               <p className="mt-2 text-base font-medium">{toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
               <p className="mt-1 text-sm text-muted">{completedSessionsCount} / {sessions.length} sessions completed</p>
             </div>
-            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusChip.className}`}>{statusChip.label}</span>
+            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
           </div>
+          <p className="mt-2 text-sm text-muted">{statusInterpretation}</p>
 
           <div className="mt-5 grid grid-cols-7 gap-2">
             {dailyStates.map((day) => {
@@ -450,6 +588,7 @@ export default async function DashboardPage({
             <>
               <h2 className="text-xl font-semibold">Today</h2>
               <p className="mt-1 text-sm text-muted">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length} completed`}</p>
+              {todayCue ? <p className="mt-2 text-xs text-muted">Cue: {todayCue}</p> : null}
 
               <div className="mt-4 space-y-3">
                 <div>
@@ -489,7 +628,7 @@ export default async function DashboardPage({
               <h2 className="text-xl font-semibold">Today</h2>
               <p className="mt-1 text-sm text-muted">0 remaining · {completedTodaySessions.length} completed</p>
               <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
-              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {statusChip.label === "On track" ? "on track" : "still in reach"} this week.</p>
+              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still in reach"} this week.</p>
               <div className="mt-4 space-y-2">
                 {completedTodaySessions.map((session) => (
                   <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
