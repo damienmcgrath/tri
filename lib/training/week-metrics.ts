@@ -1,4 +1,6 @@
-export type SessionStatus = "planned" | "completed" | "skipped";
+import type { SessionLifecycleState } from "@/lib/training/semantics";
+
+export type SessionStatus = SessionLifecycleState;
 
 export type WeekMetricSession = {
   id: string;
