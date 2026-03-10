@@ -1,8 +1,10 @@
+import type { SessionLifecycleState } from "@/lib/training/semantics";
+
 const SKIP_TAG_PATTERN = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i;
 const SKIP_TAG_REMOVE_PATTERN = /\n?\[skipped\s\d{4}-\d{2}-\d{2}\]/gi;
 
 export function appendSkipTag(notes: string | null | undefined, now: Date): string {
-  const currentNotes = notes ?? '';
+  const currentNotes = notes ?? "";
 
   if (SKIP_TAG_PATTERN.test(currentNotes)) {
     return currentNotes;
@@ -13,16 +15,16 @@ export function appendSkipTag(notes: string | null | undefined, now: Date): stri
 }
 
 export function clearSkipTag(notes: string | null | undefined): string | null {
-  const nextNotes = (notes ?? '').replace(SKIP_TAG_REMOVE_PATTERN, '').trim();
+  const nextNotes = (notes ?? "").replace(SKIP_TAG_REMOVE_PATTERN, "").trim();
   return nextNotes || null;
 }
 
 export function syncSkipTagForStatus(
   notes: string | null | undefined,
-  status: 'planned' | 'completed' | 'skipped',
+  status: SessionLifecycleState,
   now: Date
 ): string | null {
-  if (status === 'skipped') {
+  if (status === "skipped") {
     return appendSkipTag(notes, now);
   }
 

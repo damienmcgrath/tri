@@ -5,9 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
+import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
 import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 
-type SessionStatus = "planned" | "completed" | "skipped";
+type SessionStatus = SessionLifecycleState;
 type FilterStatus = "all" | SessionStatus | "extra" | "moved";
 type SportFilter = "all" | "swim" | "bike" | "run" | "strength";
 
@@ -95,7 +96,7 @@ function getSessionState(session: CalendarSession, recentMoves: RecentMove[]) {
     return "moved" as const;
   }
   if (session.linkedActivityCount && session.linkedActivityCount > 0 && session.status === "completed") {
-    return "assigned" as const;
+    return "assigned_from_upload" as const;
   }
   return session.status;
 }
@@ -108,7 +109,7 @@ function SessionActionMenu({
   onToggleSkip
 }: {
   session: CalendarSession;
-  state: "planned" | "completed" | "skipped" | "extra" | "moved" | "assigned";
+  state: "planned" | "completed" | "skipped" | "extra" | "moved" | "assigned_from_upload" | "unmatched_upload";
   onMove: () => void;
   onOpen: () => void;
   onToggleSkip: () => void;
@@ -356,20 +357,20 @@ export function WeekCalendar({
           const isPast = day.iso < todayIso;
           const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
           const dayLabel = isToday
-            ? "Today"
+            ? getDayStateLabel("today")
             : needsAttention
-              ? "Needs attention"
+              ? getDayStateLabel("needs_attention")
               : metrics?.fullyDone
-                ? "Complete"
+                ? getDayStateLabel("complete")
                 : metrics?.isRest
-                  ? "Rest day"
+                  ? getDayStateLabel("rest_day")
                   : metrics?.availableDay
-                    ? "Available"
+                    ? getDayStateLabel("available")
                     : metrics?.openCapacity
-                      ? "Open capacity"
+                      ? getDayStateLabel("open_capacity")
                       : isFuture && metrics?.hasPlanned
-                        ? "Planned"
-                        : "Planned";
+                        ? getDayStateLabel("planned")
+                        : getDayStateLabel("planned");
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
           return (
@@ -403,7 +404,7 @@ export function WeekCalendar({
                           ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
                           : state === "extra"
                             ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                            : state === "assigned"
+                            : state === "assigned_from_upload"
                               ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.1)]"
                               : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
@@ -412,8 +413,8 @@ export function WeekCalendar({
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
-                    ) : state === "assigned" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned</span>
+                    ) : state === "assigned_from_upload" ? (
+                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned from upload</span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );

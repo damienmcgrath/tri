@@ -66,7 +66,7 @@ describe("buildCalendarDisplayItems", () => {
     expect(items[0]).toMatchObject({
       id: "activity:a2",
       date: "2026-03-03",
-      status: "completed",
+      status: "unmatched_upload",
       displayType: "completed_activity"
     });
   });

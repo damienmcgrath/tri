@@ -3,6 +3,7 @@ import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
 import { computeWeekMinuteTotals, computeWeekSessionCounts } from "@/lib/training/week-metrics";
 import { buildCalendarDisplayItems } from "@/lib/calendar/day-items";
+import type { SessionLifecycleState } from "@/lib/training/semantics";
 
 type Session = {
   id: string;
@@ -12,7 +13,7 @@ type Session = {
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
-  status?: "planned" | "completed" | "skipped";
+  status?: SessionLifecycleState;
   is_key?: boolean | null;
 };
 

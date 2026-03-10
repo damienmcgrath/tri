@@ -1,3 +1,5 @@
+import type { SessionLifecycleState } from "@/lib/training/semantics";
+
 export type CalendarSessionRecord = {
   id: string;
   date: string;
@@ -6,7 +8,7 @@ export type CalendarSessionRecord = {
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
-  status?: "planned" | "completed" | "skipped";
+  status?: SessionLifecycleState;
   is_key?: boolean | null;
 };
 
@@ -38,7 +40,7 @@ export type CalendarDisplayItem = {
   duration: number;
   notes: string | null;
   created_at: string;
-  status: "planned" | "completed" | "skipped";
+  status: SessionLifecycleState;
   linkedActivityCount: number;
   linkedStats: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
   unassignedSameDayCount: number;
@@ -188,7 +190,7 @@ export function buildCalendarDisplayItems(input: {
       duration: item.duration_min,
       notes: null,
       created_at: item.created_at,
-      status: "completed",
+      status: "unmatched_upload",
       linkedActivityCount: 1,
       linkedStats: {
         durationMin: item.duration_min,
