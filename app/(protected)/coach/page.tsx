@@ -78,9 +78,22 @@ async function getDiagnosisSessions() {
     return [] as CoachDiagnosisSession[];
   }
 
+  const { data: plansData, error: plansError } = await supabase.from("training_plans").select("id").eq("user_id", user.id);
+
+  if (plansError) {
+    return [] as CoachDiagnosisSession[];
+  }
+
+  const planIds = (plansData ?? []).map((plan) => plan.id).filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  if (planIds.length === 0) {
+    return [] as CoachDiagnosisSession[];
+  }
+
   const { data, error } = await supabase
     .from("sessions")
     .select("id,date,sport,type,session_name,intent_category,status,execution_result")
+    .in("plan_id", planIds)
     .eq("status", "completed")
     .not("execution_result", "is", null)
     .order("date", { ascending: false })
