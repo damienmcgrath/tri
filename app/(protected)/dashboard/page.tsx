@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { getSessionDisplayName } from "@/lib/training/session";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 
@@ -10,6 +11,13 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  session_name?: string | null;
+  subtype?: string | null;
+  workout_type?: string | null;
+  intent_category?: string | null;
+  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
+  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
@@ -100,17 +108,6 @@ function weekdayName(isoDate: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00.000Z`));
 }
 
-function getSessionDisplayName(session: Pick<Session, "type" | "sport">) {
-  const rawType = session.type?.trim() ?? "";
-  const isGenericType = /^(session|workout|training)$/i.test(rawType);
-
-  if (rawType && !isGenericType) {
-    return rawType;
-  }
-
-  return getDisciplineMeta(session.sport).label;
-}
-
 function getDayMeaningLabel(daySessions: Session[]) {
   const plannedSessions = daySessions.filter((session) => session.status === "planned");
   if (plannedSessions.length === 0) return null;
@@ -174,7 +171,7 @@ export default async function DashboardPage({
   if (activePlanId) {
     const primary = await supabase
       .from("sessions")
-      .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status,is_key")
+      .select("id,plan_id,date,sport,type,session_name,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
       .eq("plan_id", activePlanId)
       .gte("date", weekStart)
       .lt("date", weekEnd)
@@ -334,7 +331,7 @@ export default async function DashboardPage({
   const attentionItem: ContextualItem | null = overdueKeySession
     ? {
         kicker: "Needs attention",
-        title: `Missed key session: ${overdueKeySession.type}`,
+        title: `Missed key session: ${getSessionDisplayName(overdueKeySession)}`,
         detail: "Missing this key session shifts too much load into the back half of the week.",
         cta: "Reschedule key session",
         href: `/calendar?focus=${overdueKeySession.id}`,

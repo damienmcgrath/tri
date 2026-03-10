@@ -1,10 +1,19 @@
-import type { SessionLifecycleState } from "@/lib/training/semantics";
+import type { ExecutionResultState, SessionLifecycleState, SessionRoleState } from "@/lib/training/semantics";
+import { normalizeSessionModel } from "@/lib/training/session";
 
 export type CalendarSessionRecord = {
   id: string;
   date: string;
   sport: string;
   type: string;
+  session_name?: string | null;
+  discipline?: string | null;
+  subtype?: string | null;
+  workout_type?: string | null;
+  intent_category?: string | null;
+  session_role?: SessionRoleState | "Key" | "Supporting" | "Recovery" | "Optional" | null;
+  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  execution_result?: { status?: ExecutionResultState | null; summary?: string | null } | null;
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
@@ -37,6 +46,14 @@ export type CalendarDisplayItem = {
   date: string;
   sport: string;
   type: string;
+  sessionName: string | null;
+  discipline: string;
+  subtype: string | null;
+  workoutType: string | null;
+  intentCategory: string | null;
+  role: SessionRoleState | null;
+  source: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  executionResult: { status?: ExecutionResultState | null; summary?: string | null } | null;
   duration: number;
   notes: string | null;
   created_at: string;
@@ -153,6 +170,19 @@ export function buildCalendarDisplayItems(input: {
   }, {});
 
   const plannedItems: CalendarDisplayItem[] = sessions.map((session) => {
+    const normalizedSession = normalizeSessionModel({
+      sessionName: session.session_name,
+      discipline: session.discipline ?? session.sport,
+      subtype: session.subtype,
+      workoutType: session.workout_type,
+      type: session.type,
+      duration_minutes: session.duration_minutes,
+      intent_category: session.intent_category,
+      session_role: session.session_role,
+      sourceMetadata: session.source_metadata,
+      execution_result: session.execution_result,
+      is_key: session.is_key
+    });
     const linked = linkedBySession.get(session.id) ?? [];
     const linkedStats = linked[0]
       ? {
@@ -168,7 +198,15 @@ export function buildCalendarDisplayItems(input: {
       date: session.date,
       sport: session.sport,
       type: session.type,
-      duration: session.duration_minutes ?? 0,
+      sessionName: normalizedSession.sessionName,
+      discipline: normalizedSession.discipline,
+      subtype: normalizedSession.subtype,
+      workoutType: normalizedSession.workoutType,
+      intentCategory: normalizedSession.intentCategory,
+      role: normalizedSession.role,
+      source: normalizedSession.source,
+      executionResult: normalizedSession.executionResult,
+      duration: normalizedSession.durationMinutes,
       notes: session.notes,
       created_at: session.created_at,
       status: linked.length > 0 ? "completed" : fallbackStatus(session, completionLedger),
@@ -187,6 +225,14 @@ export function buildCalendarDisplayItems(input: {
       date: item.date,
       sport: item.sport,
       type: "Completed activity",
+      sessionName: "Completed activity",
+      discipline: item.sport,
+      subtype: null,
+      workoutType: null,
+      intentCategory: null,
+      role: null,
+      source: { uploadId: item.id, assignedBy: "upload" },
+      executionResult: null,
       duration: item.duration_min,
       notes: null,
       created_at: item.created_at,

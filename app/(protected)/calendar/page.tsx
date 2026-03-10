@@ -3,6 +3,7 @@ import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
 import { computeWeekMinuteTotals, computeWeekSessionCounts } from "@/lib/training/week-metrics";
 import { buildCalendarDisplayItems } from "@/lib/calendar/day-items";
+import { getSessionDisplayName } from "@/lib/training/session";
 import type { SessionLifecycleState } from "@/lib/training/semantics";
 
 type Session = {
@@ -10,6 +11,14 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  session_name?: string | null;
+  discipline?: string | null;
+  subtype?: string | null;
+  workout_type?: string | null;
+  intent_category?: string | null;
+  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
+  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
@@ -71,7 +80,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   {
     const query = await supabase
       .from("sessions")
-      .select("id,date,sport,type,duration_minutes,notes,created_at,status,is_key")
+      .select("id,date,sport,type,session_name,discipline,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
       .gte("date", weekStart)
       .lt("date", weekEnd)
       .order("date", { ascending: true })
@@ -118,7 +127,15 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       notes: session.notes,
       created_at: session.created_at,
       status: undefined,
-      is_key: false
+      is_key: false,
+      session_name: null,
+      discipline: session.sport,
+      subtype: null,
+      workout_type: null,
+      intent_category: null,
+      session_role: null,
+      source_metadata: null,
+      execution_result: null
     }));
   } else if (sessionError) {
     throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
@@ -185,7 +202,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
-        executionLabel={nextTodaySession ? `Next key session: ${nextTodaySession.type}` : "No planned session today"}
+        executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : "No planned session today"}
         executionSubtext={extraSessionCount > 0 ? `${extraSessionCount} unscheduled uploads count as extra work.` : "Uploads and schedule aligned"}
         completedCount={countMetrics.completedCount}
         plannedTotalCount={countMetrics.plannedTotalCount}

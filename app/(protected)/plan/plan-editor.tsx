@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
 import {
   createSessionAction,
   deleteSessionAction,
@@ -23,7 +24,7 @@ type TrainingWeek = {
   target_minutes: number | null;
   target_tss: number | null;
 };
-type SessionRole = "Key" | "Supporting" | "Recovery" | "Optional";
+type SessionRole = "Key" | "Supporting" | "Recovery" | "Optional" | "key" | "supporting" | "recovery" | "optional";
 type Session = {
   id: string;
   plan_id: string;
@@ -31,7 +32,14 @@ type Session = {
   date: string;
   sport: string;
   type: string;
+  session_name?: string | null;
+  discipline?: string | null;
+  subtype?: string | null;
+  workout_type?: string | null;
   target: string | null;
+  intent_category?: string | null;
+  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
+  execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration_minutes: number;
   day_order: number | null;
   notes: string | null;
@@ -109,39 +117,6 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
   const mostRecentPastWeek = [...byStartDate].reverse().find((week) => week.week_start_date < todayIso);
   return mostRecentPastWeek?.id ?? byStartDate[0].id;
-}
-
-function sessionRoleLabel(session: Session) {
-  if (session.session_role) return session.session_role;
-  if (session.is_key) return "Key";
-  return null;
-}
-
-function sessionTitle(session: Session) {
-  const explicit = session.type?.trim();
-  const discipline = getDisciplineMeta(session.sport).label;
-  const subtype = session.target?.trim();
-
-  const defaultBySport: Record<string, string> = {
-    swim: "Aerobic Swim",
-    bike: "Endurance Ride",
-    run: "Easy Run",
-    strength: "General Strength",
-    other: "Training Session"
-  };
-
-  const explicitLower = explicit?.toLowerCase() ?? "";
-  const isGenericExplicit = explicitLower === "session" || explicitLower === discipline.toLowerCase();
-
-  if (explicit && !isGenericExplicit) {
-    return explicit;
-  }
-
-  if (subtype && !/^z\d/i.test(subtype) && subtype.length <= 24) {
-    return `${subtype} ${discipline}`;
-  }
-
-  return defaultBySport[session.sport] ?? discipline;
 }
 
 function disciplineChipTone(sport: string) {
@@ -238,7 +213,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   );
 
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
-  const keySessions = weekSessions.filter((session) => sessionRoleLabel(session) === "Key").length;
+  const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
 
   const disciplineTotals = ["swim", "bike", "run", "strength", "other"]
     .map((sport) => ({
@@ -252,7 +227,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         const iso = addDays(selectedWeek.week_start_date, index);
         const daySessions = weekSessions.filter((session) => session.date === iso);
         const totalDayMinutes = daySessions.reduce((sum, session) => sum + session.duration_minutes, 0);
-        const hasKeySession = daySessions.some((session) => sessionRoleLabel(session) === "Key");
+        const hasKeySession = daySessions.some((session) => getOptionalSessionRoleLabel(session) === "Key");
         return {
           iso,
           label: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
@@ -423,7 +398,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               <div className="flex-1 space-y-1.5">
                 {day.sessions.map((session) => {
                   const meta = getDisciplineMeta(session.sport);
-                  const role = sessionRoleLabel(session);
+                  const role = getOptionalSessionRoleLabel(session);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
@@ -440,7 +415,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </span>
                         {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{sessionTitle(session)}</p>
+                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
                     </button>
                   );
@@ -461,7 +436,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               </div>
               <div className="space-y-1.5">
                 {day.sessions.map((session) => {
-                  const role = sessionRoleLabel(session);
+                  const role = getOptionalSessionRoleLabel(session);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
                       <div className="flex items-center justify-between gap-2">
@@ -478,7 +453,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </span>
                         {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
                       </div>
-                      <p className="mt-1 line-clamp-2 font-semibold leading-snug">{sessionTitle(session)}</p>
+                      <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       <p className="text-muted">{session.duration_minutes} min</p>
                     </button>
                   );
