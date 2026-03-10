@@ -25,7 +25,7 @@ type CalendarSession = {
   intentCategory?: string | null;
   role?: "key" | "supporting" | "recovery" | "optional" | null;
   source?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
-  executionResult?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
+  executionResult?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null; executionScore?: number | null; execution_score?: number | null; executionScoreBand?: string | null; execution_score_band?: string | null; executionScoreSummary?: string | null; recommendedNextAction?: string | null; recommended_next_action?: string | null; executionScoreProvisional?: boolean | null; execution_score_provisional?: boolean | null } | null;
   duration: number;
   notes: string | null;
   created_at: string;
@@ -656,6 +656,14 @@ function AssignUploadModal({
 
 function DetailsModal({ session, onClose }: { session: CalendarSession; onClose: () => void }) {
   const state = session.displayType === "completed_activity" ? "Extra workout" : session.status;
+  const executionScoreRaw = session.executionResult?.executionScore ?? session.executionResult?.execution_score;
+  const executionScore = typeof executionScoreRaw === "number" ? Math.round(executionScoreRaw) : null;
+  const executionScoreBandRaw = session.executionResult?.executionScoreBand ?? session.executionResult?.execution_score_band;
+  const executionScoreBand = typeof executionScoreBandRaw === "string" ? executionScoreBandRaw : null;
+  const executionSummary = session.executionResult?.executionScoreSummary ?? session.executionResult?.summary;
+  const nextAction = session.executionResult?.recommendedNextAction ?? session.executionResult?.recommended_next_action;
+  const provisional = Boolean(session.executionResult?.executionScoreProvisional ?? session.executionResult?.execution_score_provisional);
+
   return (
     <TaskSheet
       onClose={onClose}
@@ -664,6 +672,14 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
     >
       <div className="space-y-3 text-sm">
         <p className="text-muted">State: {state}</p>
+        {executionScore !== null && executionScoreBand ? (
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+            <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
+            {executionSummary ? <p className="mt-2 text-xs text-muted">{executionSummary}</p> : null}
+            {nextAction ? <p className="mt-2 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
+          </div>
+        ) : null}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>

@@ -4,6 +4,9 @@ export type CoachDiagnosisSession = {
   plannedIntent: string;
   executionSummary: string;
   status: "matched" | "partial" | "missed";
+  executionScore: number | null;
+  executionScoreBand: "On target" | "Partial match" | "Missed intent" | null;
+  executionScoreProvisional: boolean;
   whyItMatters: string;
   nextAction: string;
   confidenceNote?: string;

@@ -19,6 +19,8 @@ describe("diagnoseCompletedSession", () => {
     });
 
     expect(diagnosis.intentMatchStatus).toBe("missed_intent");
+    expect(diagnosis.executionScoreBand).toBe("Missed intent");
+    expect(diagnosis.executionScore).toBeLessThan(65);
     expect(diagnosis.diagnosisConfidence).toBe("high");
   });
 
@@ -98,6 +100,7 @@ describe("diagnoseCompletedSession", () => {
     });
 
     expect(diagnosis.intentMatchStatus).toBe("matched_intent");
+    expect(diagnosis.executionScoreBand).toBe("On target");
     expect(diagnosis.diagnosisConfidence).toBe("medium");
   });
 
@@ -111,6 +114,8 @@ describe("diagnoseCompletedSession", () => {
     });
 
     expect(diagnosis.intentMatchStatus).toBe("partial_intent");
+    expect(diagnosis.executionScore).toBeNull();
+    expect(diagnosis.executionScoreProvisional).toBe(true);
     expect(diagnosis.diagnosisConfidence).toBe("low");
     expect(diagnosis.whyItMatters).toMatch(/Low data quality/);
   });
