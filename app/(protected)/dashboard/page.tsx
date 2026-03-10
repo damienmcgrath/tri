@@ -108,6 +108,12 @@ function weekdayName(isoDate: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00.000Z`));
 }
 
+function isMissingSessionColumnError(message: string | undefined) {
+  return /42703|schema cache|sessions\.(session_name|subtype|workout_type|intent_category|session_role|source_metadata|execution_result|is_key)/i.test(
+    message ?? ""
+  );
+}
+
 function getDayMeaningLabel(daySessions: Session[]) {
   const plannedSessions = daySessions.filter((session) => session.status === "planned");
   if (plannedSessions.length === 0) return null;
@@ -178,7 +184,7 @@ export default async function DashboardPage({
       .order("date", { ascending: true })
       .order("created_at", { ascending: true });
 
-    if (primary.error && /(is_key|42703|schema cache)/i.test(primary.error.message ?? "")) {
+    if (primary.error && isMissingSessionColumnError(primary.error.message)) {
       const fallback = await supabase
         .from("sessions")
         .select("id,plan_id,date,sport,type,duration_minutes,notes,created_at,status")
