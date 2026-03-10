@@ -19,6 +19,16 @@ type SessionRow = {
   execution_result?: Record<string, unknown> | null;
 };
 
+type LegacySessionRow = {
+  id: string;
+  date: string;
+  sport: string;
+  type: string;
+  duration?: number | null;
+  notes?: string | null;
+};
+
+
 function toIntentLabel(status: unknown) {
   if (status === "matched_intent" || status === "matched") return { label: "Matched", tone: "text-[hsl(var(--success))]" };
   if (status === "missed_intent" || status === "missed") return { label: "Missed", tone: "text-[hsl(var(--signal-risk))]" };
@@ -68,11 +78,36 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     .from("sessions")
     .select("id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,duration_minutes,status,execution_result")
     .eq("id", params.sessionId)
+    .eq("user_id", user.id)
     .maybeSingle();
 
-  if (error || !data) notFound();
+  let session: SessionRow | null = !error && data ? (data as SessionRow) : null;
 
-  const session = data as SessionRow;
+  if (!session) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("planned_sessions")
+      .select("id,date,sport,type,duration,notes")
+      .eq("id", params.sessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!legacyError && legacyData) {
+      const legacy = legacyData as LegacySessionRow;
+      session = {
+        id: legacy.id,
+        date: legacy.date,
+        sport: legacy.sport,
+        type: legacy.type,
+        session_name: legacy.type,
+        duration_minutes: legacy.duration ?? null,
+        status: "completed",
+        execution_result: null
+      };
+    }
+  }
+
+  if (!session) notFound();
+
   const diagnosis = session.execution_result;
   const intent = toIntentLabel(diagnosis?.status);
 

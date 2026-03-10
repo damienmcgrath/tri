@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { loadActivityDetails } from "@/lib/workouts/activity-details";
 import { ActivityLinkingCard } from "./activity-linking-card";
 
@@ -34,6 +35,13 @@ function derivePaceOrSpeed(sport: string, durationSec: number, distanceM: number
 }
 
 export default async function ActivityDetailsPage({ params }: { params: { activityId: string } }) {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/auth/sign-in");
+
   const payload = await loadActivityDetails(params.activityId);
   if (!payload) notFound();
 

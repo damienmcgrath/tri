@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings", "/sessions"];
+const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings", "/sessions", "/activities"];
 
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
@@ -89,5 +89,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/auth/sign-in"]
+  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/activities/:path*", "/auth/sign-in"]
 };
