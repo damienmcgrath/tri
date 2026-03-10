@@ -66,6 +66,40 @@ function durationLabel(minutes: number | null | undefined) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /(schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
+type SessionsMinimalRow = {
+  id: string;
+  date: string;
+  sport: string;
+  type: string;
+  duration_minutes?: number | null;
+  notes?: string | null;
+  status?: "planned" | "completed" | "skipped" | null;
+};
+
+function toSessionRow(row: SessionRow | SessionsMinimalRow): SessionRow {
+  return {
+    id: row.id,
+    date: row.date,
+    sport: row.sport,
+    type: row.type,
+    session_name: "session_name" in row ? row.session_name ?? row.type : row.type,
+    discipline: "discipline" in row ? row.discipline ?? row.sport : row.sport,
+    subtype: "subtype" in row ? row.subtype ?? null : null,
+    workout_type: "workout_type" in row ? row.workout_type ?? null : null,
+    intent_category: "intent_category" in row ? row.intent_category ?? null : null,
+    duration_minutes: row.duration_minutes ?? null,
+    status: row.status ?? "completed",
+    execution_result: "execution_result" in row ? row.execution_result ?? null : null
+  };
+}
+
+
 export default async function SessionReviewPage({ params }: { params: { sessionId: string } }) {
   const supabase = await createClient();
   const {
@@ -74,35 +108,80 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   if (!user) redirect("/auth/sign-in");
 
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,duration_minutes,status,execution_result")
-    .eq("id", params.sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  let session: SessionRow | null = null;
 
-  let session: SessionRow | null = !error && data ? (data as SessionRow) : null;
+  const sessionQueries = [
+    () =>
+      supabase
+        .from("sessions")
+        .select("id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,duration_minutes,status,execution_result")
+        .eq("id", params.sessionId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("sessions")
+        .select("id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,duration_minutes,status,execution_result")
+        .eq("id", params.sessionId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("sessions")
+        .select("id,date,sport,type,duration_minutes,notes,status")
+        .eq("id", params.sessionId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("sessions")
+        .select("id,date,sport,type,duration_minutes,notes,status")
+        .eq("id", params.sessionId)
+        .maybeSingle()
+  ];
+
+  for (const runQuery of sessionQueries) {
+    const { data, error } = await runQuery();
+    if (data && !error) {
+      session = toSessionRow(data as SessionRow | SessionsMinimalRow);
+      break;
+    }
+    if (error && !isMissingColumnError(error)) {
+      break;
+    }
+  }
 
   if (!session) {
-    const { data: legacyData, error: legacyError } = await supabase
-      .from("planned_sessions")
-      .select("id,date,sport,type,duration,notes")
-      .eq("id", params.sessionId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const legacyQueries = [
+      () =>
+        supabase
+          .from("planned_sessions")
+          .select("id,date,sport,type,duration,notes")
+          .eq("id", params.sessionId)
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      () => supabase.from("planned_sessions").select("id,date,sport,type,duration,notes").eq("id", params.sessionId).maybeSingle()
+    ];
 
-    if (!legacyError && legacyData) {
-      const legacy = legacyData as LegacySessionRow;
-      session = {
-        id: legacy.id,
-        date: legacy.date,
-        sport: legacy.sport,
-        type: legacy.type,
-        session_name: legacy.type,
-        duration_minutes: legacy.duration ?? null,
-        status: "completed",
-        execution_result: null
-      };
+    for (const runQuery of legacyQueries) {
+      const { data: legacyData, error: legacyError } = await runQuery();
+      if (legacyData && !legacyError) {
+        const legacy = legacyData as LegacySessionRow;
+        session = {
+          id: legacy.id,
+          date: legacy.date,
+          sport: legacy.sport,
+          type: legacy.type,
+          session_name: legacy.type,
+          discipline: legacy.sport,
+          duration_minutes: legacy.duration ?? null,
+          status: "completed",
+          execution_result: null
+        };
+        break;
+      }
+      if (legacyError && !isMissingColumnError(legacyError)) {
+        break;
+      }
     }
   }
 
