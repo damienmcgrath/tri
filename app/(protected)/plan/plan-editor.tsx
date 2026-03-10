@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
+import { getSessionIntentLabel } from "@/lib/training/semantics";
 import {
   createSessionAction,
   deleteSessionAction,
@@ -148,12 +149,92 @@ function plannerFocusFromNotes(notes: string) {
   return "";
 }
 
+function getSessionIntentCue(intentCategory?: string | null) {
+  if (!intentCategory) return null;
+
+  const normalizedIntent = intentCategory.trim().toLowerCase();
+  if (!normalizedIntent) return null;
+
+  const hasKnownIntent = [
+    "z2_endurance",
+    "recovery",
+    "threshold",
+    "aerobic_swim",
+    "technique_swim",
+    "strength_maintenance",
+    "long_endurance",
+    "tempo",
+    "intervals",
+    "easy_run",
+    "easy_bike",
+    "endurance_ride",
+    "endurance_swim"
+  ].includes(normalizedIntent);
+
+  if (hasKnownIntent) {
+    return getSessionIntentLabel(normalizedIntent as Parameters<typeof getSessionIntentLabel>[0]);
+  }
+
+  return intentCategory
+    .replace(/_/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getSessionRoleCue(role: ReturnType<typeof getOptionalSessionRoleLabel>) {
+  if (!role) return null;
+
+  const tones: Record<string, { short: string; className: string }> = {
+    Key: { short: "K", className: "border-[hsl(var(--accent-performance)/0.42)] text-accent" },
+    Supporting: { short: "S", className: "border-[hsl(var(--border))] text-muted" },
+    Recovery: { short: "R", className: "border-emerald-400/45 text-emerald-200" },
+    Optional: { short: "O", className: "border-sky-400/45 text-sky-200" }
+  };
+
+  return tones[role] ?? null;
+}
+
 function derivedWeekFocusLabel(
   weekIntent: TrainingWeek["focus"],
+  sessions: Session[],
   disciplineTotals: Array<{ sport: string; minutes: number }>,
   restDays: number
 ) {
-  if (weekIntent === "Recovery" || restDays >= 2) return "Recovery emphasis";
+  const sessionCount = sessions.length;
+  const roleCounts = sessions.reduce(
+    (counts, session) => {
+      const role = getOptionalSessionRoleLabel(session);
+      if (role === "Key") counts.key += 1;
+      if (role === "Supporting") counts.supporting += 1;
+      if (role === "Recovery") counts.recovery += 1;
+      if (role === "Optional") counts.optional += 1;
+      return counts;
+    },
+    { key: 0, supporting: 0, recovery: 0, optional: 0 }
+  );
+
+  const intentCounts = sessions.reduce((counts, session) => {
+    const intent = getSessionIntentCue(session.intent_category);
+    if (!intent) return counts;
+    counts.set(intent, (counts.get(intent) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+
+  const topIntent = [...intentCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const hasRecoveryPattern = weekIntent === "Recovery"
+    || restDays >= 2
+    || roleCounts.recovery >= Math.max(2, Math.ceil(sessionCount * 0.34));
+
+  if (hasRecoveryPattern) {
+    return roleCounts.key > 0 ? "Recovery with one controlled quality touch" : "Recovery and aerobic reset";
+  }
+
+  if (roleCounts.key >= 2 && topIntent) return `${topIntent} progression across key sessions`;
+  if (roleCounts.key === 1 && topIntent) return `${topIntent} anchored by one key session`;
+  if (roleCounts.key >= 2) return "Quality progression across multiple key sessions";
 
   const ranked = disciplineTotals
     .filter((item) => item.minutes > 0 && item.sport !== "other")
@@ -242,7 +323,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
   const restDays = weekDays.filter((day) => day.isRest).length;
   const explicitWeekFocus = plannerFocusFromNotes(weekDraft.notes);
-  const derivedWeekFocus = derivedWeekFocusLabel(weekDraft.focus, disciplineTotals, restDays);
+  const derivedWeekFocus = derivedWeekFocusLabel(weekDraft.focus, weekSessions, disciplineTotals, restDays);
   const weekFocusLabel = (explicitWeekFocus || derivedWeekFocus).trim();
   const normalizedBlock = weekDraft.focus.trim().toLowerCase();
   const normalizedFocus = weekFocusLabel.toLowerCase();
@@ -399,6 +480,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 {day.sessions.map((session) => {
                   const meta = getDisciplineMeta(session.sport);
                   const role = getOptionalSessionRoleLabel(session);
+                  const roleCue = getSessionRoleCue(role);
+                  const intentCue = getSessionIntentCue(session.intent_category);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
                       <div className="flex items-center justify-between gap-1">
@@ -413,9 +496,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{meta.label}</span>
                         </span>
-                        {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
+                        {roleCue ? (
+                          <span title={role ?? undefined} className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}>{roleCue.short}</span>
+                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
+                      {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
                       <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
                     </button>
                   );
@@ -437,6 +523,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               <div className="space-y-1.5">
                 {day.sessions.map((session) => {
                   const role = getOptionalSessionRoleLabel(session);
+                  const roleCue = getSessionRoleCue(role);
+                  const intentCue = getSessionIntentCue(session.intent_category);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
                       <div className="flex items-center justify-between gap-2">
@@ -451,9 +539,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
-                        {role ? <span className="rounded-full border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-muted">{role}</span> : null}
+                        {roleCue ? (
+                          <span title={role ?? undefined} className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}>{roleCue.short}</span>
+                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
+                      {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
                       <p className="text-muted">{session.duration_minutes} min</p>
                     </button>
                   );
