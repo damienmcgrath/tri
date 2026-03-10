@@ -132,9 +132,15 @@ function SessionActionMenu({
       </button>
       {open ? (
         <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
-          <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
-            Open details
-          </button>
+          {session.displayType !== "completed_activity" && session.status === "completed" ? (
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
+              Open details
+            </Link>
+          ) : (
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
+              Open details
+            </button>
+          )}
           {session.displayType !== "completed_activity" ? (
             <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onMove(); setOpen(false); }}>
               Move
@@ -481,6 +487,11 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
                       <p className="mt-0.5 text-muted">{session.duration} min</p>
+                      {session.displayType !== "completed_activity" && session.status === "completed" ? (
+                        <Link href={`/sessions/${session.id}`} className="mt-1 inline-block text-[11px] text-accent hover:underline">
+                          Review session
+                        </Link>
+                      ) : null}
                       <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
                     </article>
                   );

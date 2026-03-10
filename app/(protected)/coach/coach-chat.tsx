@@ -125,7 +125,7 @@ function statusChip(status: IntentMatchStatus): { label: string; className: stri
   return { label: "Missed intent", className: "signal-risk" };
 }
 
-export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDiagnosis[] }) {
+export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessions: SessionDiagnosis[]; initialPrompt?: string }) {
   const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
@@ -211,6 +211,12 @@ export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDia
   useEffect(() => {
     void loadConversations();
   }, []);
+
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim().length > 0) {
+      setInput(initialPrompt.trim());
+    }
+  }, [initialPrompt]);
 
   async function handleConversationClick(nextConversationId: string) {
     setError(null);
@@ -373,8 +379,8 @@ export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDia
                     </ul>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href="/plan" className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
-                      Adjust next session
+                    <Link href={`/sessions/${session.id}`} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                      Open session review
                     </Link>
                     <a href="#coaching-chat" className="text-xs font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
                       Ask about this workout
