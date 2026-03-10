@@ -39,6 +39,7 @@ type CalendarSession = {
 
 type WeekDay = { iso: string; weekday: string; label: string };
 type RecentMove = { sessionId: string; fromDate: string; toDate: string };
+type AdaptationIssueType = "unmatched_upload" | "skipped_reassign" | "moved_session" | "extra_workout";
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
 
@@ -96,6 +97,10 @@ function getSessionState(session: CalendarSession, recentMoves: RecentMove[]) {
     return "assigned_from_upload" as const;
   }
   return session.status;
+}
+
+function getIssueId(type: AdaptationIssueType, id: string) {
+  return `${type}:${id}`;
 }
 
 function SessionActionMenu({
@@ -180,7 +185,8 @@ export function WeekCalendar({
   const [moveSource, setMoveSource] = useState<CalendarSession | null>(null);
   const [detailSession, setDetailSession] = useState<CalendarSession | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [dismissedStripIds, setDismissedStripIds] = useState<string[]>([]);
+  const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
+  const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
@@ -243,20 +249,36 @@ export function WeekCalendar({
   );
 
   const unmatchedUploads = localSessions
-    .filter((session) => session.displayType === "completed_activity" && !dismissedStripIds.includes(session.id))
+    .filter(
+      (session) =>
+        session.displayType === "completed_activity" &&
+        !extraActivityIds.includes(session.id) &&
+        !dismissedIssues.includes(getIssueId("unmatched_upload", session.id))
+    )
     .slice(0, 2);
   const skippedToResolve = localSessions
-    .filter((session) => session.displayType !== "completed_activity" && session.status === "skipped" && !dismissedStripIds.includes(session.id))
+    .filter(
+      (session) =>
+        session.displayType !== "completed_activity" &&
+        session.status === "skipped" &&
+        !dismissedIssues.includes(getIssueId("skipped_reassign", session.id))
+    )
     .slice(0, 2);
   const movedItems = recentMoves.slice(0, 2);
   const extraItems = localSessions
-    .filter((session) => session.displayType === "completed_activity" && !dismissedStripIds.includes(`extra:${session.id}`))
-    .slice(0, 1);
+    .filter(
+      (session) =>
+        session.displayType === "completed_activity" &&
+        extraActivityIds.includes(session.id) &&
+        !dismissedIssues.includes(getIssueId("extra_workout", session.id))
+    )
+    .slice(0, 2);
 
   const hasAdaptation = unmatchedUploads.length > 0 || skippedToResolve.length > 0 || movedItems.length > 0 || extraItems.length > 0;
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const absorbDay = dayMetrics.find((day) => day.openCapacity || day.availableDay)?.day ?? weekDays[0]?.iso;
+  const absorbDayLabel = weekDays.find((day) => day.iso === absorbDay)?.weekday ?? absorbDay;
 
   function moveSession(session: CalendarSession, newDate: string) {
     if (session.date === newDate) return;
@@ -307,9 +329,17 @@ export function WeekCalendar({
                 <p className="font-semibold">Unmatched upload</p>
                 <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {new Date(upload.created_at).toLocaleDateString()}</p>
                 <div className="mt-1 flex gap-2">
-                  {getActivityId(upload.id) ? <Link href={`/activities/${getActivityId(upload.id)}`} className="text-accent hover:underline">Assign</Link> : null}
-                  <button onClick={() => setDismissedStripIds((prev) => [...prev, upload.id])} className="text-muted hover:text-foreground">Mark extra</button>
-                  <button onClick={() => setDismissedStripIds((prev) => [...prev, upload.id])} className="text-muted hover:text-foreground">Dismiss</button>
+                  {getActivityId(upload.id) ? <Link href={`/activities/${getActivityId(upload.id)}`} className="text-accent hover:underline">Assign to planned</Link> : null}
+                  <button
+                    onClick={() => {
+                      setExtraActivityIds((prev) => [...prev, upload.id]);
+                      setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)]);
+                    }}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Mark extra
+                  </button>
+                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="text-muted hover:text-foreground">Dismiss</button>
                 </div>
               </div>
             ))}
@@ -317,9 +347,10 @@ export function WeekCalendar({
               <div key={session.id} className="rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] p-2">
                 <p className="font-semibold">Skipped session</p>
                 <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
+                <p className="text-muted">Suggested day: {absorbDayLabel}</p>
                 <div className="mt-1 flex gap-2">
-                  <button onClick={() => absorbDay && moveSession(session, absorbDay)} className="text-accent hover:underline">Move</button>
-                  <button onClick={() => setDismissedStripIds((prev) => [...prev, session.id])} className="text-muted hover:text-foreground">Dismiss</button>
+                  <button onClick={() => setMoveSource(session)} className="text-accent hover:underline">Move to another day</button>
+                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("skipped_reassign", session.id)])} className="text-muted hover:text-foreground">Confirm skip</button>
                 </div>
               </div>
             ))}
@@ -338,7 +369,7 @@ export function WeekCalendar({
               <div key={`extra-${item.id}`} className="rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] p-2">
                 <p className="font-semibold">Extra workout logged</p>
                 <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
-                <button onClick={() => setDismissedStripIds((prev) => [...prev, `extra:${item.id}`])} className="mt-1 text-muted hover:text-foreground">Dismiss</button>
+                <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("extra_workout", item.id)])} className="mt-1 text-muted hover:text-foreground">Dismiss</button>
               </div>
             ))}
           </div>
@@ -389,6 +420,7 @@ export function WeekCalendar({
                   </button>
                 ) : null}
                 {daySessions.map((session) => {
+                  const movedMeta = recentMoves.find((move) => move.sessionId === session.id);
                   const state = getSessionState(session, recentMoves);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
@@ -409,7 +441,7 @@ export function WeekCalendar({
                     state === "extra" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
                     ) : state === "moved" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved</span>
+                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
                     ) : state === "assigned_from_upload" ? (
                       <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned from upload</span>
                     ) : (
@@ -514,12 +546,18 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
 
 function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSession; weekDays: WeekDay[]; onClose: () => void; onMove: (session: CalendarSession, newDate: string) => void }) {
   const [date, setDate] = useState(session.date);
+  const todayIso = new Date().toISOString().slice(0, 10);
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
       <div className="surface-card w-full max-w-sm space-y-2 rounded-2xl p-4">
         <p className="font-semibold">Move {getSessionTitle(session)}</p>
         <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1 text-sm">
-          {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
+          {weekDays.map((day) => (
+            <option key={day.iso} value={day.iso}>
+              {day.weekday} · {day.label}
+              {day.iso >= todayIso ? " · available" : ""}
+            </option>
+          ))}
         </select>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>

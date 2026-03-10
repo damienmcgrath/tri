@@ -78,4 +78,27 @@ describe("WeekCalendar", () => {
     expect(screen.queryByText("Tempo")).not.toBeInTheDocument();
     expect(screen.getByText("Completed activity")).toBeInTheDocument();
   });
+
+  it("allows marking unmatched upload as extra so it appears as extra workout item", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark extra" }));
+
+    expect(screen.getByText("Extra workout logged")).toBeInTheDocument();
+    expect(screen.queryByText("Unmatched upload")).not.toBeInTheDocument();
+  });
 });
