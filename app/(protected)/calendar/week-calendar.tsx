@@ -685,10 +685,27 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
         <p className="text-muted">State: {state}</p>
         {executionScore !== null && executionScoreBand ? (
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
+                  executionScoreBand === "On target"
+                    ? "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success))]"
+                    : executionScoreBand === "Partial match"
+                      ? "border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] text-[hsl(var(--warning))]"
+                      : "border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--danger))]"
+                }`}
+              >
+                {executionScoreBand}
+              </span>
+            </div>
             <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
-            {executionSummary ? <p className="mt-2 text-xs text-muted">{executionSummary}</p> : null}
-            {nextAction ? <p className="mt-2 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
+            {(executionSummary || nextAction) ? (
+              <div className="mt-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2">
+                {executionSummary ? <p className="text-xs text-muted">{executionSummary}</p> : null}
+                {nextAction ? <p className="mt-1 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}

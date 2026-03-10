@@ -125,6 +125,16 @@ function statusChip(status: IntentMatchStatus): { label: string; className: stri
   return { label: "Missed intent", className: "signal-risk" };
 }
 
+function executionScoreBandTone(band: SessionDiagnosis["executionScoreBand"]): string {
+  if (band === "On target") {
+    return "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success))]";
+  }
+  if (band === "Partial match") {
+    return "border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] text-[hsl(var(--warning))]";
+  }
+  return "border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--danger))]";
+}
+
 export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessions: SessionDiagnosis[]; initialPrompt?: string }) {
   const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
@@ -338,10 +348,13 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                     <p className="text-sm font-semibold text-[hsl(var(--text-primary))]">{session.sessionName}</p>
                     <div className="flex items-center gap-2">
                       {session.executionScore !== null && session.executionScoreBand ? (
-                        <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--text-secondary))]">
-                          Execution Score {session.executionScore} · {session.executionScoreBand}
-                          {session.executionScoreProvisional ? " · Provisional" : ""}
-                        </span>
+                        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-2 text-right">
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+                          <p className="mt-1 text-sm font-semibold text-[hsl(var(--text-primary))]">
+                            {session.executionScore} · {session.executionScoreBand}
+                            {session.executionScoreProvisional ? " · Provisional" : ""}
+                          </p>
+                        </div>
                       ) : null}
                       <span className={`signal-chip ${status.className}`}>{status.label}</span>
                     </div>
@@ -351,17 +364,24 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Planned</dt>
                       <dd className="text-[hsl(var(--text-secondary))]">{session.plannedIntent}</dd>
                     </div>
-                    <div>
+                    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
+                      {session.executionScoreBand ? (
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${executionScoreBandTone(session.executionScoreBand)}`}
+                        >
+                          {session.executionScoreBand}
+                        </span>
+                      ) : null}
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Actual</dt>
-                      <dd className="text-[hsl(var(--text-secondary))]">{session.executionSummary}</dd>
+                      <dd className="mt-1 text-[hsl(var(--text-secondary))]">{session.executionSummary}</dd>
                     </div>
                     <div>
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
                       <dd className="text-[hsl(var(--text-secondary))]">{session.whyItMatters}</dd>
                     </div>
-                    <div>
+                    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
                       <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Next time</dt>
-                      <dd className="font-medium text-[hsl(var(--text-primary))]">{session.nextAction}</dd>
+                      <dd className="mt-1 font-medium text-[hsl(var(--text-primary))]">{session.nextAction}</dd>
                     </div>
                     {session.confidenceNote ? (
                       <div>
