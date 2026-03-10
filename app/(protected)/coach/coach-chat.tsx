@@ -330,7 +330,15 @@ export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDia
                 <article key={session.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="text-sm font-semibold text-[hsl(var(--text-primary))]">{session.sessionName}</p>
-                    <span className={`signal-chip ${status.className}`}>{status.label}</span>
+                    <div className="flex items-center gap-2">
+                      {session.executionScore !== null && session.executionScoreBand ? (
+                        <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--text-secondary))]">
+                          Execution Score {session.executionScore} · {session.executionScoreBand}
+                          {session.executionScoreProvisional ? " · Provisional" : ""}
+                        </span>
+                      ) : null}
+                      <span className={`signal-chip ${status.className}`}>{status.label}</span>
+                    </div>
                   </div>
                   <dl className="mt-3 space-y-2 text-sm">
                     <div>

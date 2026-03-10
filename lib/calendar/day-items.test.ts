@@ -17,6 +17,7 @@ describe("buildCalendarDisplayItems", () => {
       activities: [
         {
           id: "a1",
+          upload_id: null,
           sport_type: "run",
           start_time_utc: "2026-03-02T12:00:00.000Z",
           duration_sec: 2700,
@@ -47,6 +48,7 @@ describe("buildCalendarDisplayItems", () => {
       activities: [
         {
           id: "a2",
+          upload_id: null,
           sport_type: "bike",
           start_time_utc: "2026-03-03T08:00:00.000Z",
           duration_sec: 3600,
@@ -87,6 +89,7 @@ describe("buildCalendarDisplayItems", () => {
       activities: [
         {
           id: "a3",
+          upload_id: null,
           sport_type: "run",
           start_time_utc: "2026-03-03T04:30:00.000Z",
           duration_sec: 1800,

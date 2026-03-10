@@ -29,6 +29,7 @@ function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
   const sessionName = (row.session_name ?? row.type ?? `${row.sport} session`).trim();
   const plannedIntent = (row.intent_category ?? row.type ?? `${row.sport} training`).trim();
   const executionSummary =
+    (typeof result.executionScoreSummary === "string" && result.executionScoreSummary) ||
     (typeof result.executionSummary === "string" && result.executionSummary) ||
     (typeof result.summary === "string" && result.summary) ||
     "Execution details will sharpen with additional completed sessions.";
@@ -49,6 +50,23 @@ function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
     ? result.evidence.filter((item): item is string => typeof item === "string" && item.length > 0).slice(0, 3)
     : [];
 
+  const executionScoreRaw = typeof result.executionScore === "number" ? result.executionScore : result.execution_score;
+  const executionScore = typeof executionScoreRaw === "number" ? Math.max(0, Math.min(100, Math.round(executionScoreRaw))) : null;
+  const executionScoreBandRaw = typeof result.executionScoreBand === "string" ? result.executionScoreBand : result.execution_score_band;
+  const executionScoreBand =
+    executionScoreBandRaw === "On target" || executionScoreBandRaw === "Partial match" || executionScoreBandRaw === "Missed intent"
+      ? executionScoreBandRaw
+      : executionScore === null
+        ? null
+        : executionScore >= 85
+          ? "On target"
+          : executionScore >= 65
+            ? "Partial match"
+            : "Missed intent";
+  const executionScoreProvisionalRaw =
+    typeof result.executionScoreProvisional === "boolean" ? result.executionScoreProvisional : result.execution_score_provisional;
+  const executionScoreProvisional = typeof executionScoreProvisionalRaw === "boolean" ? executionScoreProvisionalRaw : false;
+
   const confidenceRaw = typeof result.diagnosisConfidence === "string" ? result.diagnosisConfidence : result.diagnosis_confidence;
   const confidenceNote = typeof confidenceRaw === "string" ? `Diagnosis confidence: ${confidenceRaw}` : undefined;
 
@@ -60,6 +78,9 @@ function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
     plannedIntent,
     executionSummary,
     status,
+    executionScore,
+    executionScoreBand,
+    executionScoreProvisional,
     whyItMatters,
     nextAction,
     confidenceNote,

@@ -2,6 +2,7 @@ export type Sport = "swim" | "bike" | "run" | "strength" | "other";
 
 export type IntentMatchStatus = "matched_intent" | "partial_intent" | "missed_intent";
 export type DiagnosisConfidence = "high" | "medium" | "low";
+export type ExecutionScoreBand = "On target" | "Partial match" | "Missed intent";
 
 export type PlannedTargetBand = {
   hr?: { min?: number; max?: number };
@@ -46,10 +47,14 @@ export type SessionDiagnosisInput = {
 
 export type SessionDiagnosis = {
   intentMatchStatus: IntentMatchStatus;
+  executionScore: number | null;
+  executionScoreBand: ExecutionScoreBand | null;
+  executionScoreSummary: string;
   executionSummary: string;
   whyItMatters: string;
   recommendedNextAction: string;
   diagnosisConfidence: DiagnosisConfidence;
+  executionScoreProvisional: boolean;
 };
 
 type IntentBucket = "easy_endurance" | "recovery" | "threshold_quality" | "long_endurance" | "swim_strength" | "unknown";
@@ -281,6 +286,38 @@ function getConfidence(evidenceCount: number): DiagnosisConfidence {
   return "low";
 }
 
+function getExecutionScoreBand(score: number): ExecutionScoreBand {
+  if (score >= 85) return "On target";
+  if (score >= 65) return "Partial match";
+  return "Missed intent";
+}
+
+function getIssuePenalty(bucket: IntentBucket, issue: IssueKey): number {
+  const weightedPenalty: Record<IntentBucket, Partial<Record<IssueKey, number>>> = {
+    easy_endurance: { too_hard: 22, high_hr: 18, late_drift: 14, too_variable: 10, shortened: 10 },
+    recovery: { too_hard: 28, high_hr: 22, too_variable: 12, late_drift: 10 },
+    threshold_quality: { incomplete_reps: 24, under_target: 18, over_target: 16, inconsistent_execution: 14, shortened: 14 },
+    long_endurance: { started_too_hard: 20, faded_late: 20, shortened: 16, too_hard: 14 },
+    swim_strength: { incomplete_reps: 22, shortened: 18 },
+    unknown: { shortened: 18, sparse_data: 16 }
+  };
+
+  return weightedPenalty[bucket][issue] ?? 12;
+}
+
+function deriveExecutionScore(bucket: IntentBucket, draft: DiagnosisDraft): { score: number | null; band: ExecutionScoreBand | null; provisional: boolean } {
+  if (draft.evidenceCount === 0) {
+    return { score: null, band: null, provisional: true };
+  }
+
+  const uniqueIssues = [...new Set(draft.issues)];
+  const totalPenalty = uniqueIssues.reduce((sum, issue) => sum + getIssuePenalty(bucket, issue), 0);
+  const statusPenalty = draft.status === "missed_intent" ? 8 : draft.status === "partial_intent" ? 3 : 0;
+  const evidenceRelief = Math.min(4, draft.evidenceCount);
+  const score = Math.max(0, Math.min(100, Math.round(100 - totalPenalty - statusPenalty + evidenceRelief)));
+  return { score, band: getExecutionScoreBand(score), provisional: draft.evidenceCount < 2 };
+}
+
 function getSummary(status: IntentMatchStatus, issues: IssueKey[], bucket: IntentBucket): string {
   if (status === "matched_intent") {
     return "Execution stayed aligned with the planned intent.";
@@ -376,11 +413,18 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
               ? evaluateSwimStrength(input)
               : evaluateUnknown(input);
 
+  const score = deriveExecutionScore(bucket, draft);
+  const summary = getSummary(draft.status, draft.issues, bucket);
+
   return {
     intentMatchStatus: draft.status,
-    executionSummary: getSummary(draft.status, draft.issues, bucket),
+    executionScore: score.score,
+    executionScoreBand: score.band,
+    executionScoreSummary: summary,
+    executionSummary: summary,
     whyItMatters: getWhyItMatters(draft.issues),
     recommendedNextAction: getNextAction(draft.issues, bucket),
-    diagnosisConfidence: getConfidence(draft.evidenceCount)
+    diagnosisConfidence: getConfidence(draft.evidenceCount),
+    executionScoreProvisional: score.provisional
   };
 }
