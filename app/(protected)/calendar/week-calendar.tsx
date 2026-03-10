@@ -42,6 +42,7 @@ type RecentMove = { sessionId: string; fromDate: string; toDate: string };
 type AdaptationIssueType = "unmatched_upload" | "skipped_reassign" | "moved_session" | "extra_workout";
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" });
+const uploadDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", year: "numeric", timeZone: "UTC" });
 
 function calendarDisciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
@@ -328,7 +329,7 @@ export function WeekCalendar({
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="rounded-lg border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.08)] p-2">
                 <p className="font-semibold">Unmatched upload</p>
-                <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {new Date(upload.created_at).toLocaleDateString()}</p>
+                <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · uploaded {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 <div className="mt-1 flex gap-2">
                   {upload.source?.uploadId ? (
                     <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to planned</button>
