@@ -89,7 +89,11 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     sessionData = query.data as unknown[] | null;
     sessionError = query.error;
 
-    if (sessionError && sessionError.code !== "PGRST205" && /(is_key|schema cache|42703)/i.test(sessionError.message ?? "")) {
+    const isMissingColumnError =
+      sessionError?.code === "42703" ||
+      /(is_key|session_name|status|schema cache|column .* does not exist|42703)/i.test(sessionError?.message ?? "");
+
+    if (sessionError && sessionError.code !== "PGRST205" && isMissingColumnError) {
       const fallbackQuery = await supabase
         .from("sessions")
         .select("id,date,sport,type,duration_minutes,notes,created_at,status")
