@@ -365,6 +365,9 @@ export function CoachChat({ diagnosisSessions }: { diagnosisSessions: SessionDia
                     </ul>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Link href={`/sessions/${session.id}/review`} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                      Open session review
+                    </Link>
                     <Link href="/plan" className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
                       Adjust next session
                     </Link>

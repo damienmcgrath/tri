@@ -532,6 +532,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
 
 function DetailsModal({ session, onClose }: { session: CalendarSession; onClose: () => void }) {
   const state = session.displayType === "completed_activity" ? "Extra workout" : session.status;
+  const canReviewSession = session.displayType !== "completed_activity" && session.status === "completed";
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4">
       <div className="surface-card w-full max-w-sm space-y-1 rounded-2xl p-4 text-sm">
@@ -540,6 +541,11 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
         <p className="text-muted">State: {state}</p>
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="pt-2 text-right">
+          {canReviewSession ? (
+            <Link href={`/sessions/${session.id}/review`} className="mr-2 text-xs text-accent hover:underline" onClick={onClose}>
+              Open review
+            </Link>
+          ) : null}
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
         </div>
       </div>

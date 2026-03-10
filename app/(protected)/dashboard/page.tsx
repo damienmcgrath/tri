@@ -466,6 +466,7 @@ export default async function DashboardPage({
                         <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
                           <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
                           <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
+                          <Link href={`/sessions/${session.id}/review`} className="mt-1 inline-flex text-xs text-accent hover:underline">Review session</Link>
                         </div>
                       ))}
                     </div>
