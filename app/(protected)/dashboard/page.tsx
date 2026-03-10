@@ -638,7 +638,7 @@ export default async function DashboardPage({
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href="/calendar" className="btn-primary px-3 py-1.5 text-xs">Review completed sessions</Link>
+                <Link href={completedTodaySessions[0] ? `/sessions/${completedTodaySessions[0].id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">Review completed sessions</Link>
                 <Link href="/plan" className="btn-secondary px-3 py-1.5 text-xs">Open plan</Link>
               </div>
             </>

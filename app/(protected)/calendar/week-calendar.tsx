@@ -481,6 +481,11 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
                       <p className="mt-0.5 text-muted">{session.duration} min</p>
+                      {session.displayType !== "completed_activity" && session.status === "completed" ? (
+                        <Link href={`/sessions/${session.id}`} className="mt-1 inline-block text-[11px] text-accent hover:underline">
+                          Review session
+                        </Link>
+                      ) : null}
                       <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
                     </article>
                   );

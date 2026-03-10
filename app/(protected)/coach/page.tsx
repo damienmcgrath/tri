@@ -118,7 +118,7 @@ async function getDiagnosisSessions() {
     .slice(0, 6);
 }
 
-export default async function CoachPage() {
+export default async function CoachPage({ searchParams }: { searchParams?: { prompt?: string } }) {
   const diagnosisSessions = await getDiagnosisSessions();
 
   return (
@@ -128,7 +128,7 @@ export default async function CoachPage() {
         <h1 className="mt-1 text-lg font-semibold">Session execution coaching</h1>
         <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and what to change next.</p>
       </article>
-      <CoachChat diagnosisSessions={diagnosisSessions} />
+      <CoachChat diagnosisSessions={diagnosisSessions} initialPrompt={searchParams?.prompt} />
     </section>
   );
 }
