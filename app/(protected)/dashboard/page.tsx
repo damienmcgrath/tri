@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
+import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 
 type Session = {
@@ -550,18 +551,25 @@ export default async function DashboardPage({
       }
     : null;
 
-  const diagnosisAwareSignal = getDiagnosisAwareSignal({
-    sessions,
-    todayIso,
-    nextPendingTodaySession,
-    fallbackFocusItem: focusItem
-  });
+  const diagnosedSessionCount = sessions.filter((session) => session.status === "completed" && session.execution_result?.status).length;
+  const diagnosisDataState = getDiagnosisDataState(diagnosedSessionCount);
+
+  const diagnosisAwareSignal = diagnosisDataState.isSparse
+    ? { focusOverride: focusItem ?? undefined }
+    : getDiagnosisAwareSignal({
+        sessions,
+        todayIso,
+        nextPendingTodaySession,
+        fallbackFocusItem: focusItem
+      });
 
   const resolvedStatusChip = diagnosisAwareSignal.statusChipOverride ?? statusChip;
-  const statusInterpretation = diagnosisAwareSignal.statusInterpretation
-    ?? (diagnosisAwareSignal.interpretationRisk
-      ? getDiagnosisStatusInterpretation(resolvedStatusChip.label, diagnosisAwareSignal.interpretationRisk)
-      : getDefaultStatusInterpretation(resolvedStatusChip.label));
+  const statusInterpretation = diagnosisDataState.isSparse
+    ? `${getDefaultStatusInterpretation(resolvedStatusChip.label)} ${diagnosisDataState.guidanceText}`
+    : diagnosisAwareSignal.statusInterpretation
+      ?? (diagnosisAwareSignal.interpretationRisk
+        ? getDiagnosisStatusInterpretation(resolvedStatusChip.label, diagnosisAwareSignal.interpretationRisk)
+        : getDefaultStatusInterpretation(resolvedStatusChip.label));
   const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
   const todayCue = diagnosisAwareSignal.todayCue;
 
@@ -601,6 +609,7 @@ export default async function DashboardPage({
             <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
           </div>
           <p className="mt-2 text-sm text-muted">{statusInterpretation}</p>
+          {diagnosisDataState.isSparse ? <p className="mt-1 text-xs text-tertiary">{diagnosisDataState.unlockText}</p> : null}
 
           <div className="mt-5 grid grid-cols-7 gap-2">
             {dailyStates.map((day) => {
@@ -697,7 +706,7 @@ export default async function DashboardPage({
               <h2 className="text-xl font-semibold">Today</h2>
               <p className="mt-1 text-sm text-muted">No sessions scheduled</p>
               <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
-              <p className="mt-2 text-sm text-muted">Use today for recovery and reset.</p>
+              <p className="mt-2 text-sm text-muted">Use today for recovery and reset, then protect the next planned key session.</p>
               <div className="mt-4">
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
               </div>

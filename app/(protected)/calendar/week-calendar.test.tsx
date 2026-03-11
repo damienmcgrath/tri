@@ -72,7 +72,7 @@ describe("WeekCalendar", () => {
     );
 
     expect(screen.getByText("Adaptation strip")).toBeInTheDocument();
-    expect(screen.getByText("Unmatched upload")).toBeInTheDocument();
+    expect(screen.getByText(/Unmatched upload/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "extra" } });
     expect(screen.queryByText("Tempo")).not.toBeInTheDocument();
@@ -99,6 +99,6 @@ describe("WeekCalendar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mark extra" }));
 
     expect(screen.getByText("Extra workout logged")).toBeInTheDocument();
-    expect(screen.queryByText("Unmatched upload")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unmatched upload/)).not.toBeInTheDocument();
   });
 });

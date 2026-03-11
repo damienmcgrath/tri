@@ -360,11 +360,11 @@ export function WeekCalendar({
           <div className="flex flex-wrap gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="rounded-lg border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.08)] p-2">
-                <p className="font-semibold">Unmatched upload</p>
+                <p className="font-semibold">Unmatched upload (provisional)</p>
                 <p className="text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 <div className="mt-1 flex gap-2">
                   {upload.source?.uploadId ? (
-                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to planned</button>
+                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to planned session</button>
                   ) : null}
                   <button
                     onClick={() => {
@@ -375,7 +375,7 @@ export function WeekCalendar({
                   >
                     Mark extra
                   </button>
-                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="text-muted hover:text-foreground">Dismiss</button>
+                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="text-muted hover:text-foreground">Keep unresolved for now</button>
                 </div>
               </div>
             ))}
@@ -399,7 +399,7 @@ export function WeekCalendar({
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
                   <div className="mt-1 flex gap-2">
                     <button onClick={() => setDetailSession(session)} className="text-accent hover:underline">Review</button>
-                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="text-muted hover:text-foreground">Dismiss</button>
+                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="text-muted hover:text-foreground">Keep unresolved for now</button>
                   </div>
                 </div>
               );
@@ -456,6 +456,7 @@ export function WeekCalendar({
                 {daySessions.length === 0 ? (
                   <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
                     + Add session
+                    <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
                 ) : null}
                 {daySessions.map((session) => {
@@ -736,7 +737,11 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
               </div>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+            <p className="text-xs text-muted">Detailed execution scoring is still provisional. Use schedule status and session notes for now.</p>
+          </div>
+        )}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>

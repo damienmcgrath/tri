@@ -177,7 +177,8 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   });
 
   const plannedSessions = sessions.filter((item) => item.displayType === "planned_session");
-  const extraSessionCount = sessions.filter((item) => item.displayType === "completed_activity").length;
+  const unmatchedUploadCount = sessions.filter((item) => item.displayType === "completed_activity").length;
+  const plannedSessionCount = plannedSessions.length;
 
   const countMetrics = computeWeekSessionCounts(
     plannedSessions.map((session) => ({
@@ -208,12 +209,16 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
-        executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : "No planned session today"}
-        executionSubtext={extraSessionCount > 0 ? `${extraSessionCount} unscheduled uploads count as extra work.` : "Uploads and schedule aligned"}
+        executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : plannedSessionCount > 0 ? "No planned session today" : "No planned sessions this week yet"}
+        executionSubtext={unmatchedUploadCount > 0
+          ? `${unmatchedUploadCount} upload${unmatchedUploadCount > 1 ? "s" : ""} not matched yet — keep them as extra work or assign them to a planned session.`
+          : plannedSessionCount === 0
+            ? "Start by adding 1–2 sessions so uploads have clear matching targets."
+            : "Uploads and schedule aligned"}
         completedCount={countMetrics.completedCount}
         plannedTotalCount={countMetrics.plannedTotalCount}
         skippedCount={countMetrics.skippedCount}
-        extraSessionCount={extraSessionCount}
+        extraSessionCount={unmatchedUploadCount}
         plannedRemainingCount={countMetrics.plannedRemainingCount}
         plannedMinutes={minuteMetrics.plannedMinutes}
         completedMinutes={minuteMetrics.completedMinutes}

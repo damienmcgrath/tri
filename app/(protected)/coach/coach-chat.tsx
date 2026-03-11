@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CoachDiagnosisSession } from "./types";
+import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 
 type Message = {
   role: "user" | "assistant";
@@ -247,6 +248,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
   const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
   const topInsight = useMemo(() => deriveTopInsight(sessionDiagnoses), [sessionDiagnoses]);
+  const dataState = useMemo(() => getDiagnosisDataState(sessionDiagnoses.length), [sessionDiagnoses.length]);
 
   const strongestTheme = flaggedSessions[0]?.themes[0] ?? null;
 
@@ -287,10 +289,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const quickPrompts = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
       return [
-        "What matters most now?",
+        "Which session should I protect this week?",
         "How should I adjust this week?",
         "Missed workout recovery",
-        "Build a conservative week"
+        "What should stay easy vs key?"
       ];
     }
 
@@ -451,10 +453,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
         {flaggedSessions.length === 0 ? (
           <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-3">
-            <p className="text-sm text-muted">No high-confidence session flags yet.</p>
+            <p className="text-sm text-muted">{dataState.unlockText}</p>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-tertiary">
-              <li>Once a few completed workouts have intent-match results, this section will rank the top sessions needing attention.</li>
-              <li>Each card will explain what happened, why it matters, and exactly what to do in the next similar session.</li>
+              <li>{dataState.guidanceText}</li>
+              <li>Ask targeted questions now: what to protect this week, how to recover from a miss, and when to reduce load.</li>
             </ul>
           </div>
         ) : (
