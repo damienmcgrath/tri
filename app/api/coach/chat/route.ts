@@ -178,8 +178,7 @@ async function runCoachResponseFlow(params: {
       tool_choice: "auto"
     },
     signal: params.signal,
-    streamWriters: params.streamWriters,
-    emitAnswerText: true
+    emitAnswerText: false
   });
 
   const seededPreviousResponseId = params.previousResponseId;
@@ -232,12 +231,28 @@ async function runCoachResponseFlow(params: {
         instructions: COACH_SYSTEM_INSTRUCTIONS
       },
       signal: params.signal,
-      streamWriters: params.streamWriters,
-      emitAnswerText: true
+      emitAnswerText: false
     });
   }
 
-  const draftAnswer = extractOutputText({ output_text: response.outputText });
+  const finalAnswerResponse = await collectResponseStream({
+    request: {
+      model: getCoachModel(),
+      previous_response_id: response.responseId,
+      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      input: [
+        {
+          role: "user",
+          content: [{ type: "input_text", text: "Now provide the final athlete-facing answer only. Do not include tool-call traces, function arguments, raw JSON payloads, or internal reasoning." }]
+        }
+      ]
+    },
+    signal: params.signal,
+    streamWriters: params.streamWriters,
+    emitAnswerText: true
+  });
+
+  const draftAnswer = extractOutputText({ output_text: finalAnswerResponse.outputText });
 
   const formatterResponse = await collectResponseStream({
     request: {
@@ -267,7 +282,7 @@ async function runCoachResponseFlow(params: {
   return {
     answer: draftAnswer,
     structured: parsed.success ? parsed.data : safeStructuredFallback(draftAnswer),
-    responseId: response.responseId,
+    responseId: finalAnswerResponse.responseId,
     previousResponseId: seededPreviousResponseId
   };
 }

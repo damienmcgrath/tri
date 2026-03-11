@@ -175,6 +175,12 @@ describe("POST /api/coach/chat streaming", () => {
     const create = jest.fn()
       .mockResolvedValueOnce(
         makeStream([
+          { type: "response.created", response: { id: "resp-analysis" } },
+          { type: "response.output_text.delta", delta: "Internal draft" }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
           { type: "response.created", response: { id: "resp-1" } },
           { type: "response.output_text.delta", delta: "Keep " },
           { type: "response.output_text.delta", delta: "it easy." }
@@ -232,6 +238,12 @@ describe("POST /api/coach/chat streaming", () => {
       .mockResolvedValueOnce(
         makeStream([
           { type: "response.created", response: { id: "resp-2" } },
+          { type: "response.output_text.delta", delta: "Internal stitched answer." }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-final" } },
           { type: "response.output_text.delta", delta: "You are on track." }
         ])
       )
@@ -250,7 +262,7 @@ describe("POST /api/coach/chat streaming", () => {
     const res = await POST(makeRequest("http://localhost/api/coach/chat", { message: "How am I doing this week?" }));
     const events = await readSse(res as Response);
 
-    expect(events.find((event) => event.event === "message_complete")?.data).toMatchObject({ responseId: "resp-2" });
+    expect(events.find((event) => event.event === "message_complete")?.data).toMatchObject({ responseId: "resp-final" });
     expect(executeCoachTool).toHaveBeenCalledWith(
       "get_week_progress",
       {},
