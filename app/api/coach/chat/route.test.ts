@@ -182,6 +182,35 @@ describe("POST /api/coach/chat hardening", () => {
     });
   });
 
+
+  it("returns fallback guidance instead of 502 when model call fails", async () => {
+    const { supabase } = createSupabaseMock({ history: [] });
+
+    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
+      supabase,
+      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
+      reason: null
+    });
+
+    (getOpenAIClient as jest.Mock).mockReturnValue({
+      responses: {
+        create: jest.fn().mockRejectedValue(new Error("Upstream OpenAI outage"))
+      }
+    });
+
+    const req = makeRequest("http://localhost/api/coach/chat", {
+      message: "What should I do tomorrow?",
+      conversationId: null
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.headline).toBe("Coach temporarily unavailable");
+    expect(body.warnings).toContain("Live coaching model unavailable; response is fallback guidance.");
+  });
+
   it("runs tool loop and returns stable structured JSON shape", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
 

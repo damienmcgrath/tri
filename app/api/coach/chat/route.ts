@@ -57,6 +57,27 @@ function safeStructuredFallback(answer: string): CoachStructuredResponse {
   };
 }
 
+function buildServiceFallback(userMessage: string) {
+  const answer = "I can’t reach the coaching model right now. Keep your key sessions, reduce intensity by ~10-15%, and retry in a minute.";
+
+  return {
+    answer,
+    structured: {
+      headline: "Coach temporarily unavailable",
+      answer,
+      insights: [
+        `Your message was received: "${userMessage.slice(0, 140)}"`
+      ],
+      actions: [
+        { type: "follow_up" as const, label: "Retry coach chat in 1-2 minutes" }
+      ],
+      warnings: ["Live coaching model unavailable; response is fallback guidance."]
+    },
+    responseId: undefined as string | undefined
+  };
+}
+
+
 async function runCoachResponseFlow(params: {
   userMessage: string;
   priorMessages: ConversationMessageRow[];
@@ -308,50 +329,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: historyError.message }, { status: 500 });
   }
 
+  let result: Awaited<ReturnType<typeof runCoachResponseFlow>> | ReturnType<typeof buildServiceFallback>;
+
   try {
-    const result = await runCoachResponseFlow({
+    result = await runCoachResponseFlow({
       userMessage: payload.message,
       priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
       previousResponseId: payload.previousResponseId,
       supabaseConversationId: resolvedConversationId,
       toolDeps: { ctx, supabase }
-    });
-
-    const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
-      {
-        conversation_id: resolvedConversationId,
-        user_id: ctx.userId,
-        athlete_id: ctx.athleteId,
-        role: "user",
-        content: payload.message
-      },
-      {
-        conversation_id: resolvedConversationId,
-        user_id: ctx.userId,
-        athlete_id: ctx.athleteId,
-        role: "assistant",
-        content: result.answer
-      }
-    ]);
-
-    if (insertMessagesError) {
-      return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
-    }
-
-    await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", resolvedConversationId);
-
-    logCoachAudit("info", "coach.chat.response_success", {
-      ctx,
-      route: "POST /api/coach/chat",
-      success: true
-    });
-
-    return NextResponse.json({
-      conversationId: resolvedConversationId,
-      responseId: result.responseId,
-      ...result.structured
-    }, {
-      headers: rateLimitHeaders(userRateLimit)
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -361,6 +347,44 @@ export async function POST(request: Request) {
       success: false,
       reason: message
     });
-    return NextResponse.json({ error: "Coach response unavailable right now." }, { status: 502 });
+
+    result = buildServiceFallback(payload.message);
   }
+
+  const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
+    {
+      conversation_id: resolvedConversationId,
+      user_id: ctx.userId,
+      athlete_id: ctx.athleteId,
+      role: "user",
+      content: payload.message
+    },
+    {
+      conversation_id: resolvedConversationId,
+      user_id: ctx.userId,
+      athlete_id: ctx.athleteId,
+      role: "assistant",
+      content: result.answer
+    }
+  ]);
+
+  if (insertMessagesError) {
+    return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
+  }
+
+  await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", resolvedConversationId);
+
+  logCoachAudit("info", "coach.chat.response_success", {
+    ctx,
+    route: "POST /api/coach/chat",
+    success: true
+  });
+
+  return NextResponse.json({
+    conversationId: resolvedConversationId,
+    responseId: result.responseId,
+    ...result.structured
+  }, {
+    headers: rateLimitHeaders(userRateLimit)
+  });
 }
