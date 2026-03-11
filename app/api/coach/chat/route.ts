@@ -331,6 +331,97 @@ export async function GET(request: Request) {
   return NextResponse.json({ conversations: (data ?? []) as ConversationRow[] });
 }
 
+const conversationMutationSchema = z.object({
+  conversationId: z.string().uuid(),
+  title: z.string().trim().min(1).max(80).optional()
+});
+
+export async function PATCH(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  let payload: z.infer<typeof conversationMutationSchema>;
+
+  try {
+    payload = conversationMutationSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid conversation payload." }, { status: 400 });
+  }
+
+  if (!payload.title) {
+    return NextResponse.json({ error: "A title is required." }, { status: 400 });
+  }
+
+  const { supabase, ctx } = await resolveCoachAuthContext();
+
+  if (!ctx) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("ai_conversations")
+    .update({ title: payload.title, updated_at: new Date().toISOString() })
+    .eq("id", payload.conversationId)
+    .eq("user_id", ctx.userId)
+    .eq("athlete_id", ctx.athleteId)
+    .select("id,title,updated_at,last_response_id")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ conversation: data as ConversationRow });
+}
+
+export async function DELETE(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const url = new URL(request.url);
+  const conversationId = url.searchParams.get("conversationId");
+
+  if (!conversationId || !z.string().uuid().safeParse(conversationId).success) {
+    return NextResponse.json({ error: "Invalid conversation id." }, { status: 400 });
+  }
+
+  const { supabase, ctx } = await resolveCoachAuthContext();
+
+  if (!ctx) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { error: deleteMessagesError } = await supabase
+    .from("ai_messages")
+    .delete()
+    .eq("conversation_id", conversationId)
+    .eq("user_id", ctx.userId)
+    .eq("athlete_id", ctx.athleteId);
+
+  if (deleteMessagesError) {
+    return NextResponse.json({ error: deleteMessagesError.message }, { status: 500 });
+  }
+
+  const { error: deleteConversationError } = await supabase
+    .from("ai_conversations")
+    .delete()
+    .eq("id", conversationId)
+    .eq("user_id", ctx.userId)
+    .eq("athlete_id", ctx.athleteId);
+
+  if (deleteConversationError) {
+    return NextResponse.json({ error: deleteConversationError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
