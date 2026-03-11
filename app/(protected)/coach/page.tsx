@@ -1,6 +1,7 @@
 import { CoachChat } from "./coach-chat";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachDiagnosisSession } from "./types";
+import { getSessionDisplayName } from "@/lib/training/session";
 
 type SessionRow = {
   id: string;
@@ -26,19 +27,23 @@ function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
 
   const result = row.execution_result;
   const status = toMatchStatus(result.status);
-  const sessionName = (row.session_name ?? row.type ?? `${row.sport} session`).trim();
-  const plannedIntent = (row.intent_category ?? row.type ?? `${row.sport} training`).trim();
+  const sessionName = getSessionDisplayName({
+    sessionName: row.session_name ?? row.type,
+    subtype: row.type,
+    discipline: row.sport
+  });
+  const plannedIntent = (row.intent_category ?? row.type ?? "Planned session intent").trim();
   const executionSummary =
     (typeof result.executionScoreSummary === "string" && result.executionScoreSummary) ||
     (typeof result.executionSummary === "string" && result.executionSummary) ||
     (typeof result.summary === "string" && result.summary) ||
-    "Execution details will sharpen with additional completed sessions.";
+    "Execution details will sharpen after a few more completed sessions.";
   const whyItMatters =
     (typeof result.whyItMatters === "string" && result.whyItMatters) ||
     (typeof result.why_it_matters === "string" && result.why_it_matters) ||
     (status === "missed"
       ? "Missing session intent repeatedly can reduce adaptation quality and increase fatigue carryover."
-      : "Small execution drift can compound across the week if left uncorrected.");
+      : "Small execution drift can build across the week if ignored.");
   const nextAction =
     (typeof result.recommendedNextAction === "string" && result.recommendedNextAction) ||
     (typeof result.recommended_next_action === "string" && result.recommended_next_action) ||
@@ -127,7 +132,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
       <article className="surface p-4">
         <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach</p>
         <h1 className="mt-1 text-lg font-semibold">Session execution coaching</h1>
-        <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and what to change next.</p>
+        <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and your next best adjustment.</p>
       </article>
       <CoachChat diagnosisSessions={diagnosisSessions} initialPrompt={searchParams?.prompt} />
     </section>

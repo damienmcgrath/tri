@@ -118,14 +118,14 @@ function getStatusChip(completionPct: number, expectedByTodayPct: number) {
 
 function getDefaultStatusInterpretation(statusLabel: string) {
   if (statusLabel === "On track") {
-    return "Progress is aligned with expected weekly load for today.";
+    return "You are aligned with expected progress for today.";
   }
 
   if (statusLabel === "Slightly behind") {
-    return "Slightly behind expected progress; prioritize consistency in the next 48 hours.";
+    return "You are slightly behind; focus on consistency over the next 48 hours.";
   }
 
-  return "Behind expected progress; protect key sessions and avoid compressing load late in the week.";
+  return "You are behind this week; protect key sessions and avoid cramming load late.";
 }
 
 function weekdayName(isoDate: string) {
@@ -630,7 +630,7 @@ export default async function DashboardPage({
               <h2 className="text-xl font-semibold">Today</h2>
               <p className="mt-1 text-sm text-muted">0 remaining · {completedTodaySessions.length} completed</p>
               <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
-              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still in reach"} this week.</p>
+              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still within reach"} this week.</p>
               <div className="mt-4 space-y-2">
                 {completedTodaySessions.map((session) => (
                   <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
@@ -649,7 +649,7 @@ export default async function DashboardPage({
               <h2 className="text-xl font-semibold">Today</h2>
               <p className="mt-1 text-sm text-muted">No sessions scheduled</p>
               <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
-              <p className="mt-2 text-sm text-muted">Use today for recovery.</p>
+              <p className="mt-2 text-sm text-muted">Use today for recovery and reset.</p>
               <div className="mt-4">
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
               </div>

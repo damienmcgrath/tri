@@ -53,6 +53,8 @@ function getNumber(result: Record<string, unknown> | null | undefined, keys: str
   return null;
 }
 
+const reviewDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
 function pct(value: number | null) {
   if (value === null) return "—";
   return `${Math.round(value * 100)}%`;
@@ -242,12 +244,12 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       <article className="surface p-5">
         <p className="text-xs uppercase tracking-[0.14em] text-accent">Session review</p>
         <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
-        <p className="mt-1 text-sm text-muted">{new Date(`${session.date}T00:00:00.000Z`).toLocaleDateString()} · {getDisciplineMeta(session.sport).label}</p>
+        <p className="mt-1 text-sm text-muted">{reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`))} · {getDisciplineMeta(session.sport).label}</p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Discipline</p><p className="mt-1 font-semibold">{getDisciplineMeta(session.sport).label}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Duration</p><p className="mt-1 font-semibold">{durationLabel(session.duration_minutes)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Status</p><p className="mt-1 font-semibold capitalize">{session.status ?? "completed"}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Status</p><p className="mt-1 font-semibold">{session.status ? session.status[0].toUpperCase() + session.status.slice(1) : "Completed"}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Intent match</p><p className={`mt-1 font-semibold ${intent.tone}`}>{intent.label}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Execution score</p><p className="mt-1 font-semibold">{score === null ? "—" : `${Math.round(score)} / 100`}</p></div>
         </div>
@@ -299,7 +301,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
       <article className="surface p-5">
         <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-        <p className="mt-1 text-sm text-muted">Continue this in coaching chat to decide whether this week should adapt.</p>
+        <p className="mt-1 text-sm text-muted">Continue this in coaching chat to decide if this week needs an adjustment.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {[
             "Why was this session flagged?",

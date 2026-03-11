@@ -46,6 +46,18 @@ export type EnrichedSessionModel = {
 
 const GENERIC_SESSION_NAMES = new Set(["session", "workout", "training", "training session"]);
 
+function isWeakFallbackName(name: string, disciplineLabel: string) {
+  const normalized = name.trim().toLowerCase();
+  if (GENERIC_SESSION_NAMES.has(normalized)) return true;
+
+  const normalizedDiscipline = disciplineLabel.toLowerCase();
+  if (normalized === `session ${normalizedDiscipline}` || normalized === `${normalizedDiscipline} session`) {
+    return true;
+  }
+
+  return /^(session|workout|training)\s+(run|bike|swim|strength)$/.test(normalized);
+}
+
 function normalizeSessionRole(role: SessionModelInput["role"]): SessionRoleState | null {
   if (!role) return null;
   const normalized = role.toString().trim().toLowerCase();
@@ -79,8 +91,7 @@ export function getSessionDisplayName(input: SessionModelInput) {
   const disciplineLabel = getDisciplineMeta(session.discipline).label;
 
   const explicit = cleanValue(session.sessionName);
-  const explicitLower = explicit?.toLowerCase() ?? "";
-  if (explicit && !GENERIC_SESSION_NAMES.has(explicitLower)) {
+  if (explicit && !isWeakFallbackName(explicit, disciplineLabel)) {
     return explicit;
   }
 
