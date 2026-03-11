@@ -57,6 +57,8 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
   const parsed = coachToolSchemas.get_recent_sessions.parse(args);
   const since = isoDate(addDays(new Date(), -parsed.daysBack));
   const today = isoDate(new Date());
+  const sinceUtc = `${since}T00:00:00.000Z`;
+  const todayUtc = `${today}T23:59:59.999Z`;
 
   const { data: completed, error: completedError } = await deps.supabase
     .from("completed_sessions")
@@ -71,6 +73,19 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     throw new Error(`get_recent_sessions completed query failed: ${completedError.message}`);
   }
 
+  const { data: uploadedActivities, error: uploadedActivitiesError } = await deps.supabase
+    .from("completed_activities")
+    .select("id,sport_type,start_time_utc,duration_sec")
+    .eq("user_id", deps.ctx.userId)
+    .gte("start_time_utc", sinceUtc)
+    .lte("start_time_utc", todayUtc)
+    .order("start_time_utc", { ascending: false })
+    .limit(20);
+
+  if (uploadedActivitiesError) {
+    throw new Error(`get_recent_sessions uploaded activities query failed: ${uploadedActivitiesError.message}`);
+  }
+
   const { data: planned } = await deps.supabase
     .from("sessions")
     .select("id,date,sport,type,duration_minutes,status")
@@ -80,16 +95,42 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     .order("date", { ascending: false })
     .limit(20);
 
+  const legacyCompletionCount = new Map<string, number>();
+  (completed ?? []).forEach((session) => {
+    const key = `${session.date}:${session.sport}`;
+    legacyCompletionCount.set(key, (legacyCompletionCount.get(key) ?? 0) + 1);
+  });
+
+  const uploadedFallback = (uploadedActivities ?? []).flatMap((activity) => {
+    const activityDate = activity.start_time_utc.slice(0, 10);
+    const key = `${activityDate}:${activity.sport_type}`;
+    const legacyCount = legacyCompletionCount.get(key) ?? 0;
+    if (legacyCount > 0) {
+      legacyCompletionCount.set(key, legacyCount - 1);
+      return [];
+    }
+
+    return {
+      id: `activity:${activity.id}`,
+      date: activityDate,
+      sport: activity.sport_type,
+      durationMinutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null
+    };
+  });
+
   return {
     range: { since, until: today },
-    completed: (completed ?? []).map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
-        ? Number((session.metrics as { duration?: number }).duration ?? 0)
-        : null
-    })),
+    completed: [
+      ...(completed ?? []).map((session) => ({
+        id: session.id,
+        date: session.date,
+        sport: session.sport,
+        durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
+          ? Number((session.metrics as { duration?: number }).duration ?? 0)
+          : null
+      })),
+      ...uploadedFallback
+    ],
     planned: (planned ?? []).map((session) => ({
       id: session.id,
       date: session.date,
