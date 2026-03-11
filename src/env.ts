@@ -16,6 +16,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: optionalNonEmptyString(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalNonEmptyString(),
   OPENAI_API_KEY: optionalNonEmptyString(),
+  OPENAI_COACH_MODEL: optionalNonEmptyString(),
+  OPENAI_COACH_DEEP_MODEL: optionalNonEmptyString(),
   WEATHER_API_KEY: optionalNonEmptyString(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString()
@@ -36,6 +38,8 @@ export const env = envSchema.safeParse({
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_COACH_MODEL: process.env.OPENAI_COACH_MODEL,
+  OPENAI_COACH_DEEP_MODEL: process.env.OPENAI_COACH_DEEP_MODEL,
   WEATHER_API_KEY: process.env.WEATHER_API_KEY,
   UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN
