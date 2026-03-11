@@ -95,20 +95,8 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     .order("date", { ascending: false })
     .limit(20);
 
-  const legacyCompletionCount = new Map<string, number>();
-  (completed ?? []).forEach((session) => {
-    const key = `${session.date}:${session.sport}`;
-    legacyCompletionCount.set(key, (legacyCompletionCount.get(key) ?? 0) + 1);
-  });
-
-  const uploadedFallback = (uploadedActivities ?? []).flatMap((activity) => {
+  const uploadedActivitiesRealData = (uploadedActivities ?? []).map((activity) => {
     const activityDate = activity.start_time_utc.slice(0, 10);
-    const key = `${activityDate}:${activity.sport_type}`;
-    const legacyCount = legacyCompletionCount.get(key) ?? 0;
-    if (legacyCount > 0) {
-      legacyCompletionCount.set(key, legacyCount - 1);
-      return [];
-    }
 
     const parseSummary = typeof activity.parse_summary === "object" && activity.parse_summary
       ? activity.parse_summary as Record<string, unknown>
@@ -120,6 +108,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
     return {
       id: `activity:${activity.id}`,
+      source: "uploaded_activity" as const,
       date: activityDate,
       sport: activity.sport_type,
       durationMinutes: durationSec > 0 ? Math.round(durationSec / 60) : null,
@@ -134,13 +123,14 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     completed: [
       ...(completed ?? []).map((session) => ({
         id: session.id,
+        source: "legacy_completed_session" as const,
         date: session.date,
         sport: session.sport,
         durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
           ? Number((session.metrics as { duration?: number }).duration ?? 0)
           : null
       })),
-      ...uploadedFallback
+      ...uploadedActivitiesRealData
     ],
     planned: (planned ?? []).map((session) => ({
       id: session.id,
