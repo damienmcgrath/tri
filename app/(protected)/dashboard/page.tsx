@@ -65,10 +65,13 @@ type StatusChip = {
 
 type DiagnosisAwareSignal = {
   statusChipOverride?: StatusChip;
+  interpretationRisk?: ExecutionRisk;
   statusInterpretation?: string;
   focusOverride?: ContextualItem;
   todayCue?: string;
 };
+
+type ExecutionRisk = "easy_control" | "recovery_control" | "bike_consistency" | "strong_execution";
 
 function toHoursAndMinutes(minutes: number) {
   const safeMinutes = Math.max(0, Math.round(minutes));
@@ -126,6 +129,46 @@ function getDefaultStatusInterpretation(statusLabel: string) {
   }
 
   return "You are behind this week; protect key sessions and avoid cramming load late.";
+}
+
+function getDiagnosisStatusInterpretation(statusLabel: string, risk: ExecutionRisk) {
+  if (risk === "easy_control") {
+    if (statusLabel === "On track") {
+      return "On track, but easy-day control needs attention.";
+    }
+    if (statusLabel === "Slightly behind") {
+      return "Slightly behind, and easy-day control needs attention.";
+    }
+    return "At risk, and easy-day control needs immediate attention.";
+  }
+
+  if (risk === "recovery_control") {
+    if (statusLabel === "On track") {
+      return "On track, but recovery intent is slipping.";
+    }
+    if (statusLabel === "Slightly behind") {
+      return "Slightly behind, with recovery quality slipping.";
+    }
+    return "At risk, with recovery quality slipping.";
+  }
+
+  if (risk === "bike_consistency") {
+    if (statusLabel === "On track") {
+      return "On track, but bike consistency needs attention.";
+    }
+    if (statusLabel === "Slightly behind") {
+      return "Slightly behind, with bike execution needing tighter control.";
+    }
+    return "At risk, and bike execution consistency needs immediate focus.";
+  }
+
+  if (statusLabel === "On track") {
+    return "On track with strong execution — maintain current load.";
+  }
+  if (statusLabel === "Slightly behind") {
+    return "Slightly behind on volume, but execution quality is strong.";
+  }
+  return "At risk on progress; keep execution quality high while stabilizing load.";
 }
 
 function weekdayName(isoDate: string) {
@@ -189,16 +232,19 @@ function getDiagnosisAwareSignal({
   const keySessions = completedWithDiagnosis.filter((session) => session.is_key);
   const keyMatched = keySessions.filter((session) => session.execution_result?.status === "matched_intent");
 
+  const easyOffRatio = easySessions.length > 0 ? easyOffIntent.length / easySessions.length : 0;
+  const bikeOffRatio = bikeSessions.length > 0 ? bikeOffIntent.length / bikeSessions.length : 0;
+  const recoveryOffRatio = recoverySessions.length > 0 ? recoveryOffIntent.length / recoverySessions.length : 0;
+
   const nextEasyToday = nextPendingTodaySession && /easy|aerobic|base|endurance|recovery/i.test(nextPendingTodaySession.intent_category ?? "");
   const nextRecoveryToday = nextPendingTodaySession && /recovery/i.test(nextPendingTodaySession.intent_category ?? "");
   const upcomingBike = sessions
     .filter((session) => session.status === "planned" && session.date >= todayIso && session.sport === "bike")
     .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 
-  if (easySessions.length >= 2 && easyOffIntent.length >= 2) {
+  if (easySessions.length >= 2 && easyOffRatio >= 0.66) {
     return {
-      statusChipOverride: { label: "Needs adjustment", className: "signal-risk" },
-      statusInterpretation: "Needs adjustment because easy sessions are trending too hard.",
+      interpretationRisk: "easy_control",
       focusOverride: {
         kicker: "Focus this week",
         title: "Easy sessions are drifting too hard",
@@ -211,10 +257,9 @@ function getDiagnosisAwareSignal({
     };
   }
 
-  if (recoverySessions.length >= 2 && recoveryOffIntent.length >= 2) {
+  if (recoverySessions.length >= 2 && recoveryOffRatio >= 0.66) {
     return {
-      statusChipOverride: { label: "Needs adjustment", className: "signal-risk" },
-      statusInterpretation: "Needs adjustment because recovery quality is slipping.",
+      interpretationRisk: "recovery_control",
       focusOverride: {
         kicker: "Focus this week",
         title: "Recovery quality is slipping",
@@ -227,9 +272,9 @@ function getDiagnosisAwareSignal({
     };
   }
 
-  if (bikeSessions.length >= 2 && bikeOffIntent.length >= 2) {
+  if (bikeSessions.length >= 2 && bikeOffRatio >= 0.66) {
     return {
-      statusInterpretation: "Slightly behind execution quality on bike sessions; tighten bike consistency this week.",
+      interpretationRisk: "bike_consistency",
       focusOverride: {
         kicker: "Focus this week",
         title: "Protect bike consistency",
@@ -244,7 +289,7 @@ function getDiagnosisAwareSignal({
 
   if (keySessions.length >= 2 && keyMatched.length / keySessions.length >= 0.75) {
     return {
-      statusInterpretation: "Key session execution is strong — maintain current load progression.",
+      interpretationRisk: "strong_execution",
       focusOverride: {
         kicker: "Focus this week",
         title: "Key session execution is strong — maintain load",
@@ -513,7 +558,10 @@ export default async function DashboardPage({
   });
 
   const resolvedStatusChip = diagnosisAwareSignal.statusChipOverride ?? statusChip;
-  const statusInterpretation = diagnosisAwareSignal.statusInterpretation ?? getDefaultStatusInterpretation(resolvedStatusChip.label);
+  const statusInterpretation = diagnosisAwareSignal.statusInterpretation
+    ?? (diagnosisAwareSignal.interpretationRisk
+      ? getDiagnosisStatusInterpretation(resolvedStatusChip.label, diagnosisAwareSignal.interpretationRisk)
+      : getDefaultStatusInterpretation(resolvedStatusChip.label));
   const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
   const todayCue = diagnosisAwareSignal.todayCue;
 
