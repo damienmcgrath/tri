@@ -645,7 +645,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
               ))}
             </ul>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={topInsight.primaryAction.href} className="btn-primary">
+              <Link
+                href={topInsight.primaryAction.href}
+                className={topInsight.primaryAction.label === "Ask why" ? "btn-secondary" : "btn-primary"}
+              >
                 {topInsight.primaryAction.label}
               </Link>
               <a href={topInsight.secondaryAction.href} className="text-sm font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
@@ -678,7 +681,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
       <section id="coaching-chat" className="surface overflow-hidden">
         <div className="grid min-h-[560px] lg:grid-cols-[280px_1fr]">
           <aside className="border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-            <button type="button" onClick={handleNewChat} className="btn-primary w-full justify-center">
+            <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-2 text-sm">
               New conversation
             </button>
             <div className="mt-3 space-y-1">
