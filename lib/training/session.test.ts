@@ -13,6 +13,11 @@ describe("session helpers", () => {
     expect(getSessionDisplayName({ sessionName: "Session", discipline: "run" })).toBe("Run");
   });
 
+  it("treats weak explicit fallback names as generic", () => {
+    expect(getSessionDisplayName({ sessionName: "Session Run", subtype: "Easy", discipline: "run" })).toBe("Easy Run");
+    expect(getSessionDisplayName({ sessionName: "Session Bike", discipline: "bike" })).toBe("Bike");
+  });
+
   it("normalizes enriched session fields", () => {
     expect(
       normalizeSessionModel({

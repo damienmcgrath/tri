@@ -22,5 +22,5 @@ export function weekRangeLabel(weekStart: string) {
   const start = new Date(`${weekStart}T00:00:00.000Z`);
   const end = new Date(start);
   end.setUTCDate(start.getUTCDate() + 6);
-  return `${shortDateFormatter.format(start)}–${shortDateFormatter.format(end)}`;
+  return `${shortDateFormatter.format(start)} – ${shortDateFormatter.format(end)}`;
 }

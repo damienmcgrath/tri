@@ -437,7 +437,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             </div>
           ) : null}
         </div>
-        {notePreview ? <p className="mt-3 text-xs text-muted">Week note: {notePreview}</p> : null}
+        {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
       </section>
 
       {weekActionOpen ? (
