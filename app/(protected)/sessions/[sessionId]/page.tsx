@@ -28,11 +28,58 @@ type LegacySessionRow = {
   notes?: string | null;
 };
 
+type SessionStatus = "planned" | "completed" | "skipped";
+type DiagnosisStatus = "matched_intent" | "partial_intent" | "missed_intent";
+
+type ReviewViewModel = {
+  actualStatusLabel: string;
+  intent: { label: string; tone: string; detail: string };
+  executionSummary: string;
+  score: number | null;
+  scoreBand: string | null;
+  scoreInterpretation: string;
+  scoreConfidenceNote: string | null;
+  plannedIntent: string;
+  mainGap: string;
+  usefulMetrics: Array<{ label: string; value: string }>;
+  whyItMatters: string;
+  nextAction: string;
+  weekAction: string;
+};
+
+const STATUS_LABELS: Record<SessionStatus, string> = {
+  planned: "Planned",
+  completed: "Completed",
+  skipped: "Skipped"
+};
+
+const SCORE_BAND_BY_VALUE = [
+  { min: 85, label: "On target" },
+  { min: 70, label: "Partial match" },
+  { min: 0, label: "Missed intent" }
+] as const;
+
 
 function toIntentLabel(status: unknown) {
-  if (status === "matched_intent" || status === "matched") return { label: "Matched", tone: "text-[hsl(var(--success))]" };
-  if (status === "missed_intent" || status === "missed") return { label: "Missed", tone: "text-[hsl(var(--signal-risk))]" };
-  return { label: "Partial", tone: "text-[hsl(var(--warning))]" };
+  if (status === "matched_intent" || status === "matched") {
+    return {
+      label: "Matched",
+      tone: "text-[hsl(var(--success))]",
+      detail: "Execution stayed aligned with the planned training stimulus."
+    };
+  }
+  if (status === "missed_intent" || status === "missed") {
+    return {
+      label: "Missed",
+      tone: "text-[hsl(var(--signal-risk))]",
+      detail: "Execution drifted enough to reduce the intended adaptation."
+    };
+  }
+  return {
+    label: "Partial",
+    tone: "text-[hsl(var(--warning))]",
+    detail: "Some intent was met, but key parts of the target were not fully delivered."
+  };
 }
 
 function getString(result: Record<string, unknown> | null | undefined, keys: string[], fallback: string) {
@@ -66,6 +113,102 @@ function durationLabel(minutes: number | null | undefined) {
   const h = Math.floor(wholeMinutes / 60);
   const m = wholeMinutes % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function toStatusLabel(status: string | null | undefined) {
+  const normalized = (status ?? "").toLowerCase();
+  if (normalized in STATUS_LABELS) return STATUS_LABELS[normalized as SessionStatus];
+  return "Completed";
+}
+
+function toScoreBand(score: number | null, explicitBand: string | null) {
+  if (explicitBand) return explicitBand;
+  if (score === null) return null;
+  return SCORE_BAND_BY_VALUE.find((band) => score >= band.min)?.label ?? "Partial match";
+}
+
+function createReviewViewModel(session: SessionRow): ReviewViewModel {
+  const diagnosis = session.execution_result;
+  const intent = toIntentLabel(diagnosis?.status as DiagnosisStatus | undefined);
+
+  const executionSummary = getString(
+    diagnosis,
+    ["executionScoreSummary", "executionSummary", "summary"],
+    "Session completed, but objective evidence is still limited for a high-confidence execution diagnosis."
+  );
+  const whyItMatters = getString(
+    diagnosis,
+    ["whyItMatters", "why_it_matters"],
+    "Execution consistency protects adaptation quality and fatigue management across the week."
+  );
+  const nextAction = getString(
+    diagnosis,
+    ["recommendedNextAction", "recommended_next_action"],
+    "Repeat this workout intent next time with one focused execution cue."
+  );
+  const weekAction = getString(
+    diagnosis,
+    ["suggestedWeekAdjustment", "suggested_week_adjustment", "weeklyAdjustment", "weekly_adjustment", "recommendedNextAction", "recommended_next_action"],
+    "Keep the next key session as planned and protect recovery intensity between now and then."
+  );
+
+  const score = getNumber(diagnosis, ["executionScore", "execution_score"]);
+  const scoreBand = toScoreBand(score, getString(diagnosis, ["executionScoreBand", "execution_score_band"], "").trim() || null);
+  const scoreSummary = getString(diagnosis, ["executionScoreSummary", "execution_score_summary"], "");
+  const provisional = diagnosis?.executionScoreProvisional === true || diagnosis?.execution_score_provisional === true;
+
+  const scoreInterpretation =
+    score !== null
+      ? scoreSummary || `Execution scored ${Math.round(score)} / 100 (${scoreBand ?? "provisional"}).`
+      : "Execution score is unavailable because the uploaded data is not yet sufficient for credible scoring.";
+  const scoreConfidenceNote =
+    score !== null && provisional
+      ? "Provisional score: confidence will improve as interval and intensity data quality improves."
+      : score === null
+        ? "Add richer activity data (interval completion, intensity metrics, and duration quality) to unlock a reliable score."
+        : null;
+
+  const durationCompletion = getNumber(diagnosis, ["durationCompletion", "duration_completion"]);
+  const intervalCompletion = getNumber(diagnosis, ["intervalCompletionPct", "interval_completion_pct"]);
+  const timeAbove = getNumber(diagnosis, ["timeAboveTargetPct", "time_above_target_pct"]);
+  const avgHr = getNumber(diagnosis, ["avgHr", "avg_hr"]);
+  const avgPower = getNumber(diagnosis, ["avgPower", "avg_power"]);
+
+  const usefulMetrics = [
+    durationCompletion !== null ? { label: "Duration completion", value: pct(durationCompletion) } : null,
+    intervalCompletion !== null ? { label: "Interval completion", value: pct(intervalCompletion) } : null,
+    timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
+    avgHr || avgPower
+      ? {
+          label: "Avg load",
+          value: `${avgHr ? `${Math.round(avgHr)} bpm` : ""}${avgHr && avgPower ? " · " : ""}${avgPower ? `${Math.round(avgPower)} w` : ""}`
+        }
+      : null
+  ].filter((metric): metric is { label: string; value: string } => metric !== null);
+
+  const plannedIntent = session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} training intent`;
+  const mainGap =
+    intent.label === "Matched"
+      ? "Execution stayed aligned with the intended stimulus. Keep the same structure on the next similar session."
+      : intent.label === "Partial"
+        ? "The session delivered useful work, but execution drift reduced the specificity of the intended adaptation."
+        : "Execution was far enough from target that the planned adaptation was likely diluted.";
+
+  return {
+    actualStatusLabel: toStatusLabel(session.status),
+    intent,
+    executionSummary,
+    score,
+    scoreBand,
+    scoreInterpretation,
+    scoreConfidenceNote,
+    plannedIntent,
+    mainGap,
+    usefulMetrics,
+    whyItMatters,
+    nextAction,
+    weekAction
+  };
 }
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
@@ -189,8 +332,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   if (!session) notFound();
 
-  const diagnosis = session.execution_result;
-  const intent = toIntentLabel(diagnosis?.status);
+  const reviewVm = createReviewViewModel(session);
 
   const sessionTitle = getSessionDisplayName({
     sessionName: session.session_name ?? session.type,
@@ -199,43 +341,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     workoutType: session.workout_type,
     intentCategory: session.intent_category
   });
-
-  const executionSummary = getString(
-    diagnosis,
-    ["executionScoreSummary", "executionSummary", "summary"],
-    "Execution summary will appear as workout data quality improves."
-  );
-  const whyItMatters = getString(
-    diagnosis,
-    ["whyItMatters", "why_it_matters"],
-    "Execution consistency protects adaptation quality and fatigue management across the week."
-  );
-  const nextAction = getString(
-    diagnosis,
-    ["recommendedNextAction", "recommended_next_action"],
-    "Repeat this workout intent next time with one focused execution cue."
-  );
-  const weekAction = getString(
-    diagnosis,
-    ["suggestedWeekAdjustment", "suggested_week_adjustment", "weeklyAdjustment", "weekly_adjustment", "recommendedNextAction", "recommended_next_action"],
-    "Keep the next key session as planned and protect recovery intensity between now and then."
-  );
-
-  const score = getNumber(diagnosis, ["executionScore", "execution_score"]);
-  const durationCompletion = getNumber(diagnosis, ["durationCompletion", "duration_completion"]);
-  const intervalCompletion = getNumber(diagnosis, ["intervalCompletionPct", "interval_completion_pct"]);
-  const timeAbove = getNumber(diagnosis, ["timeAboveTargetPct", "time_above_target_pct"]);
-  const avgHr = getNumber(diagnosis, ["avgHr", "avg_hr"]);
-  const avgPower = getNumber(diagnosis, ["avgPower", "avg_power"]);
-
-  const plannedIntent = session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} training intent`;
-
-  const mainGap =
-    intent.label === "Matched"
-      ? "Execution stayed aligned with the intended stimulus. Keep the same structure on the next similar session."
-      : intent.label === "Partial"
-        ? "You completed useful work but drifted away from the original objective enough to reduce training specificity."
-        : "The workout outcome was meaningfully different from the target intent, so adaptation impact was reduced.";
 
   return (
     <section className="space-y-4">
@@ -249,10 +354,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Discipline</p><p className="mt-1 font-semibold">{getDisciplineMeta(session.sport).label}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Duration</p><p className="mt-1 font-semibold">{durationLabel(session.duration_minutes)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Status</p><p className="mt-1 font-semibold">{session.status ? session.status[0].toUpperCase() + session.status.slice(1) : "Completed"}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Intent match</p><p className={`mt-1 font-semibold ${intent.tone}`}>{intent.label}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Execution score</p><p className="mt-1 font-semibold">{score === null ? "—" : `${Math.round(score)} / 100`}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Status</p><p className="mt-1 font-semibold">{reviewVm.actualStatusLabel}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Intent result</p><p className={`mt-1 font-semibold ${reviewVm.intent.tone}`}>{reviewVm.intent.label}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Execution score</p><p className="mt-1 font-semibold">{reviewVm.score === null ? "Not enough evidence yet" : `${Math.round(reviewVm.score)} / 100`}</p></div>
         </div>
+        <p className="mt-3 text-sm text-muted">{reviewVm.intent.detail}</p>
       </article>
 
       <article className="surface p-5">
@@ -260,24 +366,37 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-[hsl(var(--border))] p-3">
             <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned intent</p>
-            <p className="mt-2 text-sm">{plannedIntent}</p>
+            <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
           </div>
           <div className="rounded-xl border border-[hsl(var(--border))] p-3">
             <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Actual execution</p>
-            <p className="mt-2 text-sm text-muted">{executionSummary}</p>
+            <p className="mt-2 text-sm text-muted">{reviewVm.executionSummary}</p>
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Duration completion</p><p className="mt-1 font-semibold">{pct(durationCompletion)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Interval completion</p><p className="mt-1 font-semibold">{pct(intervalCompletion)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Time above target</p><p className="mt-1 font-semibold">{pct(timeAbove)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Avg HR / Power</p><p className="mt-1 font-semibold">{avgHr ? `${Math.round(avgHr)} bpm` : "—"}{avgPower ? ` · ${Math.round(avgPower)} w` : ""}</p></div>
+        <div className="mt-3 rounded-xl border border-[hsl(var(--border))] p-3">
+          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution score detail</p>
+          <p className="mt-2 text-sm">
+            {reviewVm.score === null ? "Execution Score unavailable" : `${Math.round(reviewVm.score)} / 100 · ${reviewVm.scoreBand ?? "Provisional"}`}
+          </p>
+          <p className="mt-1 text-sm text-muted">{reviewVm.scoreInterpretation}</p>
+          {reviewVm.scoreConfidenceNote ? <p className="mt-1 text-xs text-tertiary">{reviewVm.scoreConfidenceNote}</p> : null}
         </div>
+
+        {reviewVm.usefulMetrics.length > 0 ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {reviewVm.usefulMetrics.map((metric) => (
+              <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+                <p className="text-xs text-muted">{metric.label}</p>
+                <p className="mt-1 font-semibold">{metric.value}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
           <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Main gap</p>
-          <p className="mt-2 text-sm text-muted">{mainGap}</p>
+          <p className="mt-2 text-sm text-muted">{reviewVm.mainGap}</p>
         </div>
       </article>
 
@@ -286,27 +405,27 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         <dl className="mt-3 space-y-3 text-sm">
           <div>
             <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
-            <dd className="mt-1 text-muted">{whyItMatters}</dd>
+            <dd className="mt-1 text-muted">{reviewVm.whyItMatters}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Do differently next time</dt>
-            <dd className="mt-1">{nextAction}</dd>
+            <dd className="mt-1">{reviewVm.nextAction}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Suggested action for this week</dt>
-            <dd className="mt-1 text-muted">{weekAction}</dd>
+            <dd className="mt-1 text-muted">{reviewVm.weekAction}</dd>
           </div>
         </dl>
       </article>
 
       <article className="surface p-5">
         <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-        <p className="mt-1 text-sm text-muted">Continue this in coaching chat to decide if this week needs an adjustment.</p>
+        <p className="mt-1 text-sm text-muted">Continue this in coaching chat to validate the diagnosis and decide whether this week needs an adjustment.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {[
-            "Why was this session flagged?",
-            "Should I repeat this workout?",
-            "How should I adjust the rest of the week?"
+            `What evidence drove the ${reviewVm.intent.label.toLowerCase()} intent call?`,
+            "Should I repeat this workout or modify it?",
+            "How should I adjust the rest of the week based on this review?"
           ].map((prompt) => (
             <Link
               key={prompt}
