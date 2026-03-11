@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { buildWorkoutSummary, CompletedSessionLite, PlannedSessionLite } from "@/lib/coach/workout-summary";
-import { getClientIp, isSameOrigin } from "@/lib/security/request";
+import { z } from "zod";
+import { resolveCoachAuthContext } from "@/lib/coach/auth";
+import { COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
+import { executeCoachTool } from "@/lib/coach/tool-handlers";
+import { coachToolSchemas, coachTools, type CoachToolName } from "@/lib/coach/tools";
+import { coachChatRequestSchema, coachStructuredResponseSchema, type CoachStructuredResponse } from "@/lib/coach/types";
+import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
-
-type ChatRequestBody = {
-  message?: string;
-  conversationId?: string;
-};
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
+import { logCoachAudit } from "@/lib/coach/audit";
 
 type ConversationRow = {
   id: string;
@@ -21,108 +22,150 @@ type ConversationMessageRow = {
   created_at: string;
 };
 
-function getDateDaysAgo(daysAgo: number) {
-  const now = new Date();
-  const utc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  utc.setUTCDate(utc.getUTCDate() - daysAgo);
-  return utc.toISOString().slice(0, 10);
+
+function isCoachToolName(name: string): name is CoachToolName {
+  return Object.prototype.hasOwnProperty.call(coachToolSchemas, name);
 }
 
-
-function isPlannedSessionTableMissing(error: { code?: string; message?: string } | null) {
-  if (!error) {
-    return false;
+function parseToolArgs(argumentsJson: string) {
+  if (!argumentsJson || argumentsJson.trim().length === 0) {
+    return {};
   }
 
-  if (error.code === "PGRST205") {
-    return true;
+  try {
+    return JSON.parse(argumentsJson) as Record<string, unknown>;
+  } catch {
+    throw new Error("Model provided invalid JSON tool arguments.");
   }
-
-  return /could not find the table 'public\.planned_sessions' in the schema cache/i.test(error.message ?? "");
 }
 
-function buildFallbackCoachResponse(input: { message: string; summary: ReturnType<typeof buildWorkoutSummary> }) {
-  const intro = `You asked: "${input.message}".`;
-  const overview = `In the recent window, you completed ${input.summary.completedMinutes} min out of ${input.summary.plannedMinutes} planned (${input.summary.completionPct}%).`;
-  const focus =
-    input.summary.dominantSport === "none"
-      ? "There is not enough completed workout data to detect a dominant sport yet."
-      : `Your biggest completed load is ${input.summary.dominantSport}.`;
-
-  const recommendations = [
-    "Prioritize 2-3 key sessions this week and protect them in your calendar.",
-    "Keep one easy recovery day after your highest-load workout.",
-    "If fatigue feels high, reduce duration by 15-20% before reducing frequency."
-  ];
-
-  return [intro, overview, focus, ...input.summary.insights, "", "Suggested next actions:", ...recommendations].join("\n");
+function extractOutputText(response: { output_text?: string }) {
+  const text = response.output_text?.trim();
+  if (!text) {
+    throw new Error("Model returned an empty response.");
+  }
+  return text;
 }
 
-async function getModelResponse(params: {
-  message: string;
-  summary: ReturnType<typeof buildWorkoutSummary>;
-  history: ConversationMessageRow[];
-  apiKey: string;
+function safeStructuredFallback(answer: string): CoachStructuredResponse {
+  return {
+    headline: "Coach recommendation",
+    answer,
+    insights: [],
+    actions: [],
+    warnings: []
+  };
+}
+
+async function runCoachResponseFlow(params: {
+  userMessage: string;
+  priorMessages: ConversationMessageRow[];
+  previousResponseId?: string;
+  supabaseConversationId: string;
+  toolDeps: Parameters<typeof executeCoachTool>[2];
 }) {
-  const systemPrompt = `You are TriCoach AI, a concise triathlon coach.
+  const client = getOpenAIClient();
+  const history = params.priorMessages.slice(-10).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join("\n");
 
-Rules:
-- Keep responses practical and actionable.
-- Avoid medical diagnosis.
-- Use supportive language.
-- If the user asks for schedule changes, suggest changes as proposals, not automatic directives.`;
-
-  const summaryContext = `Recent workload summary:
-- Planned minutes: ${params.summary.plannedMinutes}
-- Completed minutes: ${params.summary.completedMinutes}
-- Completion: ${params.summary.completionPct}%
-- Dominant sport: ${params.summary.dominantSport}
-- Insights: ${params.summary.insights.join(" | ")}`;
-
-  const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "system", content: summaryContext },
-    ...params.history.map((item) => ({ role: item.role, content: item.content }))
-  ];
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    signal: AbortSignal.timeout(15000),
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.4,
-      messages
-    })
+  let response = await client.responses.create({
+    model: getCoachModel(),
+    instructions: COACH_SYSTEM_INSTRUCTIONS,
+    previous_response_id: params.previousResponseId,
+    input: [
+      {
+        role: "user",
+        content: [{ type: "input_text", text: `Conversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n\nAthlete message: ${params.userMessage}` }]
+      }
+    ],
+    tools: coachTools,
+    tool_choice: "auto",
+    stream: false
   });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI request failed: ${response.status}`);
+  for (let i = 0; i < 6; i += 1) {
+    const toolCalls = response.output.filter((item): item is { type: "function_call"; call_id: string; name: string; arguments: string } => item.type === "function_call");
+
+    if (toolCalls.length === 0) {
+      break;
+    }
+
+    const toolOutputs: Array<{ type: "function_call_output"; call_id: string; output: string }> = [];
+
+    for (const call of toolCalls) {
+      if (!isCoachToolName(call.name)) {
+        logCoachAudit("warn", "coach.tool.unknown", {
+          ctx: params.toolDeps.ctx,
+          route: "POST /api/coach/chat",
+          toolName: call.name,
+          success: false,
+          reason: "Tool name not registered"
+        });
+
+        toolOutputs.push({
+          type: "function_call_output",
+          call_id: call.call_id,
+          output: JSON.stringify({ error: `Unsupported tool: ${call.name}` })
+        });
+
+        continue;
+      }
+
+      const toolName: CoachToolName = call.name;
+      const parsedArgs = parseToolArgs(call.arguments);
+
+      try {
+        const output = await executeCoachTool(toolName, parsedArgs, params.toolDeps);
+        toolOutputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown tool error";
+        toolOutputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify({ error: message }) });
+      }
+    }
+
+    response = await client.responses.create({
+      model: getCoachModel(),
+      previous_response_id: response.id,
+      input: toolOutputs,
+      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      stream: false
+    });
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+  const draftAnswer = extractOutputText(response);
+
+  const formatterResponse = await client.responses.create({
+    model: getCoachModel(),
+    instructions: COACH_STRUCTURING_INSTRUCTIONS,
+    input: [
+      {
+        role: "user",
+        content: [{ type: "input_text", text: `Return strict JSON only.\n\n${draftAnswer}` }]
+      }
+    ],
+    stream: false
+  });
+
+  const structuredJson = extractOutputText(formatterResponse);
+  const parsed = z.string().transform((text, ctx) => {
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Formatter response was not JSON." });
+      return z.NEVER;
+    }
+  }).pipe(coachStructuredResponseSchema).safeParse(structuredJson);
+
+  return {
+    answer: draftAnswer,
+    structured: parsed.success ? parsed.data : safeStructuredFallback(draftAnswer),
+    responseId: response.id
   };
-
-  return data.choices?.[0]?.message?.content?.trim() ?? "I could not generate a response right now.";
-}
-
-async function getUserAndClient() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  return { supabase, user };
 }
 
 export async function GET(request: Request) {
-  const { supabase, user } = await getUserAndClient();
+  const { supabase, ctx } = await resolveCoachAuthContext();
 
-  if (!user) {
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -130,10 +173,14 @@ export async function GET(request: Request) {
   const conversationId = url.searchParams.get("conversationId");
 
   if (conversationId) {
+    if (!z.string().uuid().safeParse(conversationId).success) {
+      return NextResponse.json({ error: "Invalid conversation id." }, { status: 400 });
+    }
     const { data, error } = await supabase
       .from("ai_messages")
       .select("role,content,created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", ctx.userId)
+      .eq("athlete_id", ctx.athleteId)
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
@@ -147,7 +194,8 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("ai_conversations")
     .select("id,title,updated_at")
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.userId)
+    .eq("athlete_id", ctx.athleteId)
     .order("updated_at", { ascending: false })
     .limit(12);
 
@@ -163,16 +211,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
-  const body = (await request.json()) as ChatRequestBody;
-
-  if (!body.message || body.message.trim().length < 3) {
-    return NextResponse.json({ error: "Please enter a longer message." }, { status: 400 });
-  }
-
-  if (body.message.length > 2000) {
-    return NextResponse.json({ error: "Please keep messages under 2000 characters." }, { status: 400 });
-  }
-
   const ip = getClientIp(request);
   const ipRateLimit = checkRateLimit("chat-ip", ip, { maxRequests: 40, windowMs: 60_000 });
 
@@ -183,13 +221,27 @@ export async function POST(request: Request) {
     });
   }
 
-  const { supabase, user } = await getUserAndClient();
+  let payload: z.infer<typeof coachChatRequestSchema>;
 
-  if (!user) {
+  try {
+    payload = coachChatRequestSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid chat payload." }, { status: 400 });
+  }
+
+  const { supabase, ctx, reason } = await resolveCoachAuthContext();
+
+  if (!ctx) {
+    if (reason === "missing-athlete-profile") {
+      logCoachAudit("warn", "coach.chat.auth_missing_profile", { route: "POST /api/coach/chat" });
+      return NextResponse.json({ error: "Athlete profile is required before using coach chat." }, { status: 403 });
+    }
+
+    logCoachAudit("warn", "coach.chat.unauthorized", { route: "POST /api/coach/chat" });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRateLimit = checkRateLimit("chat-user", user.id, { maxRequests: 20, windowMs: 60_000 });
+  const userRateLimit = checkRateLimit("chat-user", ctx.userId, { maxRequests: 20, windowMs: 60_000 });
 
   if (!userRateLimit.allowed) {
     return NextResponse.json({ error: "Chat limit reached. Please wait a minute and retry." }, {
@@ -198,57 +250,35 @@ export async function POST(request: Request) {
     });
   }
 
-  const sinceDate = getDateDaysAgo(14);
-  const today = getDateDaysAgo(0);
-
-  const { data: plannedData, error: plannedError } = await supabase
-    .from("planned_sessions")
-    .select("sport,duration")
-    .gte("date", sinceDate)
-    .lte("date", today)
-    .order("date", { ascending: false });
-
-  const { data: completedData, error: completedError } = await supabase
-    .from("completed_sessions")
-    .select("sport,metrics")
-    .gte("date", sinceDate)
-    .lte("date", today)
-    .order("date", { ascending: false });
-
-  if (completedError || (plannedError && !isPlannedSessionTableMissing(plannedError))) {
-    return NextResponse.json(
-      {
-        error: plannedError?.message ?? completedError?.message ?? "Failed to load workout data."
-      },
-      { status: 500 }
-    );
-  }
-
-  const summary = buildWorkoutSummary(
-    ((plannedError ? [] : plannedData) ?? []) as PlannedSessionLite[],
-    (completedData ?? []) as CompletedSessionLite[]
-  );
-
-  let conversationId = body.conversationId;
+  let conversationId = payload.conversationId;
 
   if (conversationId) {
-    const { data: existingConversation, error: lookupError } = await supabase
+    if (!z.string().uuid().safeParse(conversationId).success) {
+      return NextResponse.json({ error: "Invalid conversation id." }, { status: 400 });
+    }
+    const { data: existingConversation } = await supabase
       .from("ai_conversations")
       .select("id")
       .eq("id", conversationId)
-      .eq("user_id", user.id)
+      .eq("user_id", ctx.userId)
+      .eq("athlete_id", ctx.athleteId)
       .maybeSingle();
 
-    if (lookupError || !existingConversation) {
-      conversationId = undefined;
+    if (!existingConversation) {
+      logCoachAudit("warn", "coach.chat.invalid_conversation_access", {
+        ctx,
+        route: "POST /api/coach/chat",
+        success: false,
+        reason: "Conversation not owned by athlete"
+      });
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
     }
   }
 
   if (!conversationId) {
-    const title = body.message.trim().slice(0, 60);
     const { data: createdConversation, error: conversationError } = await supabase
       .from("ai_conversations")
-      .insert({ user_id: user.id, title })
+      .insert({ user_id: ctx.userId, athlete_id: ctx.athleteId, title: payload.message.slice(0, 60) })
       .select("id")
       .single();
 
@@ -259,13 +289,18 @@ export async function POST(request: Request) {
     conversationId = createdConversation.id;
   }
 
-  const userMessage = body.message.trim();
+  const resolvedConversationId = conversationId;
+
+  if (!resolvedConversationId) {
+    return NextResponse.json({ error: "Failed to resolve conversation." }, { status: 500 });
+  }
 
   const { data: recentMessages, error: historyError } = await supabase
     .from("ai_messages")
     .select("role,content,created_at")
-    .eq("user_id", user.id)
-    .eq("conversation_id", conversationId)
+    .eq("user_id", ctx.userId)
+    .eq("athlete_id", ctx.athleteId)
+    .eq("conversation_id", resolvedConversationId)
     .order("created_at", { ascending: false })
     .limit(12);
 
@@ -273,41 +308,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: historyError.message }, { status: 500 });
   }
 
-  const orderedHistory = [...((recentMessages ?? []) as ConversationMessageRow[])].reverse();
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  let answer = "";
-
   try {
-    answer = apiKey
-      ? await getModelResponse({ message: userMessage, summary, history: [...orderedHistory, { role: "user", content: userMessage, created_at: new Date().toISOString() }], apiKey })
-      : buildFallbackCoachResponse({ message: userMessage, summary });
-  } catch {
-    answer = buildFallbackCoachResponse({ message: userMessage, summary });
-  }
+    const result = await runCoachResponseFlow({
+      userMessage: payload.message,
+      priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
+      previousResponseId: payload.previousResponseId,
+      supabaseConversationId: resolvedConversationId,
+      toolDeps: { ctx, supabase }
+    });
 
-  const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
-    {
-      conversation_id: conversationId,
-      user_id: user.id,
-      role: "user",
-      content: userMessage
-    },
-    {
-      conversation_id: conversationId,
-      user_id: user.id,
-      role: "assistant",
-      content: answer
+    const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
+      {
+        conversation_id: resolvedConversationId,
+        user_id: ctx.userId,
+        athlete_id: ctx.athleteId,
+        role: "user",
+        content: payload.message
+      },
+      {
+        conversation_id: resolvedConversationId,
+        user_id: ctx.userId,
+        athlete_id: ctx.athleteId,
+        role: "assistant",
+        content: result.answer
+      }
+    ]);
+
+    if (insertMessagesError) {
+      return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
     }
-  ]);
 
-  if (insertMessagesError) {
-    return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
+    await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", resolvedConversationId);
+
+    logCoachAudit("info", "coach.chat.response_success", {
+      ctx,
+      route: "POST /api/coach/chat",
+      success: true
+    });
+
+    return NextResponse.json({
+      conversationId: resolvedConversationId,
+      responseId: result.responseId,
+      ...result.structured
+    }, {
+      headers: rateLimitHeaders(userRateLimit)
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logCoachAudit("error", "coach.chat.response_failure", {
+      ctx,
+      route: "POST /api/coach/chat",
+      success: false,
+      reason: message
+    });
+    return NextResponse.json({ error: "Coach response unavailable right now." }, { status: 502 });
   }
-
-  await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-
-  return NextResponse.json({ answer, summary, conversationId }, {
-    headers: rateLimitHeaders(userRateLimit)
-  });
 }

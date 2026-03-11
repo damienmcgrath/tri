@@ -17,7 +17,9 @@ const serverSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: optionalNonEmptyString(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalNonEmptyString(),
   SUPABASE_SERVICE_ROLE_KEY: optionalNonEmptyString(),
-  OPENAI_API_KEY: optionalNonEmptyString()
+  OPENAI_API_KEY: optionalNonEmptyString(),
+  OPENAI_COACH_MODEL: optionalNonEmptyString(),
+  OPENAI_COACH_DEEP_MODEL: optionalNonEmptyString()
 }).superRefine((data, ctx) => {
   if (!data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY && !data.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     ctx.addIssue({
@@ -36,5 +38,7 @@ export const env = serverSchema.parse({
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_COACH_MODEL: process.env.OPENAI_COACH_MODEL,
+  OPENAI_COACH_DEEP_MODEL: process.env.OPENAI_COACH_DEEP_MODEL
 });

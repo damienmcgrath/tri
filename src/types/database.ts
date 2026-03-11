@@ -6,6 +6,7 @@ export type Database = {
       ai_conversations: {
         Row: {
           id: string;
+          athlete_id: string;
           user_id: string;
           title: string;
           created_at: string;
@@ -13,6 +14,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          athlete_id?: string;
           user_id: string;
           title: string;
           created_at?: string;
@@ -24,6 +26,7 @@ export type Database = {
         Row: {
           id: string;
           conversation_id: string;
+          athlete_id: string;
           user_id: string;
           role: "user" | "assistant";
           content: string;
@@ -32,6 +35,7 @@ export type Database = {
         Insert: {
           id?: string;
           conversation_id: string;
+          athlete_id?: string;
           user_id: string;
           role: "user" | "assistant";
           content: string;
@@ -42,6 +46,7 @@ export type Database = {
       training_plans: {
         Row: {
           id: string;
+          athlete_id: string;
           user_id: string;
           name: string;
           start_date: string;
@@ -51,6 +56,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          athlete_id?: string;
           user_id: string;
           name: string;
           start_date: string;
@@ -64,6 +70,7 @@ export type Database = {
         Row: {
           id: string;
           plan_id: string;
+          athlete_id: string;
           user_id: string;
           date: string;
           sport: "swim" | "bike" | "run" | "strength" | "other";
@@ -76,6 +83,7 @@ export type Database = {
         Insert: {
           id?: string;
           plan_id: string;
+          athlete_id?: string;
           user_id: string;
           date: string;
           sport: "swim" | "bike" | "run" | "strength" | "other";
@@ -90,6 +98,7 @@ export type Database = {
       completed_sessions: {
         Row: {
           id: string;
+          athlete_id: string;
           user_id: string;
           garmin_id: string | null;
           date: string;
@@ -103,6 +112,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          athlete_id?: string;
           user_id: string;
           garmin_id: string | null;
           date: string;
@@ -116,9 +126,41 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["completed_sessions"]["Insert"]>;
       };
+      coach_plan_change_proposals: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          user_id: string;
+          target_session_id: string | null;
+          title: string;
+          rationale: string;
+          change_summary: string;
+          proposed_date: string | null;
+          proposed_duration_minutes: number | null;
+          status: "pending" | "approved" | "rejected";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          user_id: string;
+          target_session_id?: string | null;
+          title: string;
+          rationale: string;
+          change_summary: string;
+          proposed_date?: string | null;
+          proposed_duration_minutes?: number | null;
+          status?: "pending" | "approved" | "rejected";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["coach_plan_change_proposals"]["Insert"]>;
+      };
       recovery_logs: {
         Row: {
           id: string;
+          athlete_id: string;
           user_id: string;
           date: string;
           sleep_hours: number | null;
@@ -128,6 +170,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          athlete_id?: string;
           user_id: string;
           date: string;
           sleep_hours?: number | null;

@@ -1,0 +1,287 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CoachAuthContext } from "@/lib/coach/types";
+import {
+  coachToolSchemas,
+  type CoachToolName
+} from "@/lib/coach/tools";
+import { logCoachAudit } from "@/lib/coach/audit";
+
+type ToolDeps = {
+  supabase: SupabaseClient;
+  ctx: CoachAuthContext;
+};
+
+function addDays(date: Date, days: number) {
+  const clone = new Date(date);
+  clone.setUTCDate(clone.getUTCDate() + days);
+  return clone;
+}
+
+function isoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+async function getAthleteSnapshot({ supabase, ctx }: ToolDeps) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name,race_name,race_date")
+    .eq("id", ctx.athleteId)
+    .maybeSingle();
+
+  const { data: activePlan } = await supabase
+    .from("training_plans")
+    .select("id,name,start_date,duration_weeks")
+    .eq("athlete_id", ctx.athleteId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    athlete: {
+      displayName: profile?.display_name ?? null,
+      raceName: profile?.race_name ?? null,
+      raceDate: profile?.race_date ?? null
+    },
+    activePlan: activePlan
+      ? {
+        id: activePlan.id,
+        name: activePlan.name,
+        startDate: activePlan.start_date,
+        durationWeeks: activePlan.duration_weeks
+      }
+      : null
+  };
+}
+
+async function getRecentSessions(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.get_recent_sessions.parse(args);
+  const since = isoDate(addDays(new Date(), -parsed.daysBack));
+  const today = isoDate(new Date());
+
+  const { data: completed, error: completedError } = await deps.supabase
+    .from("completed_sessions")
+    .select("id,date,sport,metrics")
+    .eq("athlete_id", deps.ctx.athleteId)
+    .gte("date", since)
+    .lte("date", today)
+    .order("date", { ascending: false })
+    .limit(20);
+
+  if (completedError) {
+    throw new Error(`get_recent_sessions completed query failed: ${completedError.message}`);
+  }
+
+  const { data: planned } = await deps.supabase
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes,status")
+    .eq("athlete_id", deps.ctx.athleteId)
+    .gte("date", since)
+    .lte("date", today)
+    .order("date", { ascending: false })
+    .limit(20);
+
+  return {
+    range: { since, until: today },
+    completed: (completed ?? []).map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
+        ? Number((session.metrics as { duration?: number }).duration ?? 0)
+        : null
+    })),
+    planned: (planned ?? []).map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      type: session.type,
+      durationMinutes: session.duration_minutes,
+      status: session.status
+    }))
+  };
+}
+
+async function getUpcomingSessions(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.get_upcoming_sessions.parse(args);
+  const today = isoDate(new Date());
+  const until = isoDate(addDays(new Date(), parsed.daysAhead));
+
+  const { data, error } = await deps.supabase
+    .from("sessions")
+    .select("id,date,sport,type,duration_minutes,status,notes")
+    .eq("athlete_id", deps.ctx.athleteId)
+    .gte("date", today)
+    .lte("date", until)
+    .order("date", { ascending: true })
+    .limit(25);
+
+  if (error) {
+    throw new Error(`get_upcoming_sessions query failed: ${error.message}`);
+  }
+
+  return {
+    range: { from: today, to: until },
+    sessions: (data ?? []).map((session) => ({
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      type: session.type,
+      durationMinutes: session.duration_minutes,
+      status: session.status,
+      notes: session.notes ?? null
+    }))
+  };
+}
+
+async function getWeekProgress({ supabase, ctx }: ToolDeps) {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const weekStart = isoDate(addDays(now, mondayOffset));
+  const weekEnd = isoDate(addDays(now, mondayOffset + 6));
+
+  const { data: planned, error: plannedError } = await supabase
+    .from("sessions")
+    .select("id,status,duration_minutes")
+    .eq("athlete_id", ctx.athleteId)
+    .gte("date", weekStart)
+    .lte("date", weekEnd);
+
+  if (plannedError) {
+    throw new Error(`get_week_progress planned query failed: ${plannedError.message}`);
+  }
+
+  const { data: completed, error: completedError } = await supabase
+    .from("completed_sessions")
+    .select("id")
+    .eq("athlete_id", ctx.athleteId)
+    .gte("date", weekStart)
+    .lte("date", weekEnd);
+
+  if (completedError) {
+    throw new Error(`get_week_progress completed query failed: ${completedError.message}`);
+  }
+
+  const plannedMinutes = (planned ?? []).reduce((sum, row) => sum + (row.duration_minutes ?? 0), 0);
+
+  return {
+    weekStart,
+    weekEnd,
+    plannedSessionCount: planned?.length ?? 0,
+    completedSessionCount: completed?.length ?? 0,
+    plannedMinutes,
+    completionRatio: planned && planned.length > 0 ? Number(((completed?.length ?? 0) / planned.length).toFixed(2)) : null
+  };
+}
+
+async function createPlanChangeProposal(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.create_plan_change_proposal.parse(args);
+
+  if (parsed.targetSessionId) {
+    const { data: targetSession, error } = await deps.supabase
+      .from("sessions")
+      .select("id")
+      .eq("id", parsed.targetSessionId)
+      .eq("athlete_id", deps.ctx.athleteId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`create_plan_change_proposal target lookup failed: ${error.message}`);
+    }
+
+    if (!targetSession) {
+      throw new Error("create_plan_change_proposal target session not owned by current athlete.");
+    }
+  }
+
+  const { data, error } = await deps.supabase
+    .from("coach_plan_change_proposals")
+    .insert({
+      athlete_id: deps.ctx.athleteId,
+      user_id: deps.ctx.userId,
+      title: parsed.title,
+      rationale: parsed.rationale,
+      target_session_id: parsed.targetSessionId ?? null,
+      proposed_date: parsed.proposedDate ?? null,
+      proposed_duration_minutes: parsed.proposedDurationMinutes ?? null,
+      change_summary: parsed.changeSummary,
+      status: "pending"
+    })
+    .select("id,title,rationale,status,proposed_date,proposed_duration_minutes")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`create_plan_change_proposal insert failed: ${error?.message ?? "unknown"}`);
+  }
+
+  logCoachAudit("info", "coach.proposal.created", {
+    ctx: deps.ctx,
+    toolName: "create_plan_change_proposal",
+    success: true,
+    proposalId: data.id
+  });
+
+  return {
+    id: data.id,
+    title: data.title,
+    rationale: data.rationale,
+    status: data.status,
+    proposedDate: data.proposed_date,
+    proposedDurationMinutes: data.proposed_duration_minutes
+  };
+}
+
+export async function executeCoachTool(name: CoachToolName, args: unknown, deps: ToolDeps) {
+  logCoachAudit("info", "coach.tool.execute", {
+    ctx: deps.ctx,
+    toolName: name,
+    args
+  });
+
+  try {
+    let result: unknown;
+
+    switch (name) {
+      case "get_athlete_snapshot":
+        coachToolSchemas.get_athlete_snapshot.parse(args);
+        result = await getAthleteSnapshot(deps);
+        break;
+      case "get_recent_sessions":
+        result = await getRecentSessions(args, deps);
+        break;
+      case "get_upcoming_sessions":
+        result = await getUpcomingSessions(args, deps);
+        break;
+      case "get_week_progress":
+        coachToolSchemas.get_week_progress.parse(args);
+        result = await getWeekProgress(deps);
+        break;
+      case "create_plan_change_proposal":
+        result = await createPlanChangeProposal(args, deps);
+        break;
+      default:
+        throw new Error(`Unsupported tool: ${String(name)}`);
+    }
+
+    logCoachAudit("info", "coach.tool.success", {
+      ctx: deps.ctx,
+      toolName: name,
+      success: true,
+      resultCount: Array.isArray(result) ? result.length : undefined
+    });
+
+    return result;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown tool error";
+
+    logCoachAudit("warn", "coach.tool.failure", {
+      ctx: deps.ctx,
+      toolName: name,
+      success: false,
+      reason,
+      args
+    });
+
+    throw error;
+  }
+}
