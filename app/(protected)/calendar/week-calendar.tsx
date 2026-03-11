@@ -532,19 +532,14 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
-                      <p className="mt-0.5 text-muted">{session.duration} min</p>
+                      <p className="mt-1 min-h-[2.2rem] font-medium leading-snug">{getSessionTitle(session)}</p>
+                      <p className="mt-0 text-muted">{session.duration} min</p>
                       {showCompletedFooter ? (
-                        <div className="mt-1.5 flex items-center justify-between border-t border-[hsl(var(--signal-ready)/0.24)] pt-1.5 text-[10px]">
+                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
                           <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>
-                          {state === "assigned_from_upload" ? (
-                            <span className="rounded-full border border-[hsl(var(--signal-ready)/0.2)] bg-[hsl(var(--surface-subtle)/0.25)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.8)]">
-                              Upload matched
-                            </span>
-                          ) : null}
                         </div>
                       ) : (
                         <div className="mt-1 flex items-center justify-end">{stateBadge}</div>

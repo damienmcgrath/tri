@@ -137,7 +137,7 @@ describe("WeekCalendar", () => {
     expect(screen.queryByText("Open review")).not.toBeInTheDocument();
   });
 
-  it("shows compact upload matched qualifier in completed footer", () => {
+  it("keeps completed footer minimal without showing upload-match copy on card face", () => {
     render(
       <WeekCalendar
         weekDays={weekDays}
@@ -172,7 +172,7 @@ describe("WeekCalendar", () => {
     expect(reviewCard).not.toBeNull();
     const cardScope = within(reviewCard as HTMLElement);
     expect(cardScope.getByText("Completed")).toBeInTheDocument();
-    expect(cardScope.getByText("Upload matched")).toBeInTheDocument();
+    expect(cardScope.queryByText("Upload matched")).not.toBeInTheDocument();
     expect(screen.queryByText("Assigned from upload")).not.toBeInTheDocument();
   });
 
