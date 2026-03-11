@@ -346,6 +346,13 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
     return formatRecencyLabel(activeConversation?.updated_at ?? conversations[0]?.updated_at);
   }, [conversationId, conversations]);
   const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === conversationId) ?? null, [conversations, conversationId]);
+  const condensedRationale = useMemo(() => {
+    const compact = topInsight.rationale.replace(/\s+/g, " ").trim();
+    if (compact.length <= 170) {
+      return compact;
+    }
+    return `${compact.slice(0, 167).trimEnd()}…`;
+  }, [topInsight.rationale]);
 
   async function loadConversations() {
     try {
@@ -634,17 +641,17 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
         <div className="border-b border-[hsl(var(--border))] pb-4">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
           <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-muted">{topInsight.rationale}</p>
+          <p className="mt-1.5 max-w-3xl text-sm text-muted">{condensedRationale}</p>
         </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        <div className="mt-3 grid gap-3.5 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">What to do next</p>
-            <ul className="mt-2 space-y-1.5">
+            <ul className="mt-1.5 space-y-1">
               {nextActions.slice(0, 2).map((action) => (
                 <li key={action} className="text-sm text-[hsl(var(--text-secondary))]">• {action}</li>
               ))}
             </ul>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               <Link
                 href={topInsight.primaryAction.href}
                 className={topInsight.primaryAction.label === "Ask why" ? "btn-secondary" : "btn-primary"}
@@ -656,15 +663,15 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
               </a>
             </div>
           </div>
-          <div className="rounded-xl bg-[hsl(var(--surface-subtle))] p-3">
+          <div className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
               <span className="text-xs text-tertiary">{flaggedSessions.length}</span>
             </div>
             {flaggedSessions.length === 0 ? (
-              <p className="mt-2 text-xs text-muted">{dataState.unlockText}</p>
+              <p className="mt-1.5 text-xs text-muted">{dataState.unlockText}</p>
             ) : (
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-1.5 space-y-1">
                 {flaggedSessions.slice(0, 2).map((session) => (
                   <li key={session.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="truncate text-[hsl(var(--text-secondary))]">{session.sessionName}</span>
@@ -673,7 +680,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                 ))}
               </ul>
             )}
-            {matchedSessions.length > 0 ? <p className="mt-2 text-xs text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
+            {matchedSessions.length > 0 ? <p className="mt-1.5 text-xs text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
           </div>
         </div>
       </section>
@@ -684,18 +691,18 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-2 text-sm">
               New conversation
             </button>
-            <div className="mt-3 space-y-1">
+            <div className="mt-2.5 space-y-1.5">
               {conversations.map((conversation, index) => {
                 const isActive = conversation.id === conversationId;
 
                 return (
-                  <div key={conversation.id} className={`rounded-xl border px-2 py-2 ${isActive ? "border-[hsl(var(--ai-accent-core)/0.4)] bg-[hsl(var(--ai-accent-core)/0.1)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+                  <div key={conversation.id} className={`rounded-xl border px-2.5 py-2 ${isActive ? "border-[hsl(var(--ai-accent-core)/0.5)] bg-[hsl(var(--ai-accent-core)/0.14)] shadow-[inset_2px_0_0_hsl(var(--ai-accent-core))]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
                     <div className="flex items-start justify-between gap-1">
-                      <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left">
-                        <p className={`truncate text-sm font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"}`}>
+                      <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
+                        <p className={`truncate pr-1 text-sm font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"}`}>
                           {conversationTitle(conversation, index)}
                         </p>
-                        <p className="mt-0.5 text-xs text-tertiary">{formatRecencyLabel(conversation.updated_at)}</p>
+                        <p className="mt-1 text-[11px] text-tertiary">{formatRecencyLabel(conversation.updated_at)}</p>
                       </button>
                       <details className="relative">
                         <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
@@ -721,10 +728,14 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             </div>
           </div>
         </div>
-        <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2 text-xs text-[hsl(var(--text-secondary))]">
-          <p className="font-medium text-[hsl(var(--text-primary))]">Current coaching context</p>
-          <p className="mt-0.5">Insight: {topInsight.headline} · Focus this week: {nextActions[0] ?? "Stabilise execution quality."}</p>
-          <p className="mt-0.5">Flagged sessions: {flaggedSessions.length} · Diagnosis context: {dataState.guidanceText}</p>
+        <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">Current coaching context</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-[hsl(var(--text-secondary))]">
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Insight: {topInsight.headline}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Focus: {nextActions[0] ?? "Stabilise execution quality."}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Flagged: {flaggedSessions.length}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Data: {sessionDiagnoses.length} diagnosed sessions</span>
+          </div>
         </div>
 
         <div
@@ -734,7 +745,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
             shouldAutoScrollRef.current = distanceToBottom < 40;
           }}
-          className="max-h-[360px] flex-1 space-y-3 overflow-y-auto px-4 py-4"
+          className="max-h-[360px] flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
         >
           {messages.map((message, index) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -772,17 +783,17 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
+        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2.5">
           <label htmlFor="coach-input" className="sr-only">
             Ask your triathlon coach
           </label>
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-1.5 flex flex-wrap gap-1">
             {quickPrompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
                 onClick={() => setInput(prompt)}
-                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
               >
                 {prompt}
               </button>
