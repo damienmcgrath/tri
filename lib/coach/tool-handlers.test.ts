@@ -56,7 +56,12 @@ describe("executeCoachTool hardening", () => {
             avg_hr: 141,
             avg_power: null,
             calories: 510,
-            parse_summary: { lapCount: 24 }
+            moving_duration_sec: 3500,
+            elapsed_duration_sec: 3600,
+            pool_length_m: 25,
+            laps_count: 24,
+            avg_pace_per_100m_sec: 150,
+            metrics_v2: { schemaVersion: 1 }
           }
         ],
         error: null
@@ -73,7 +78,12 @@ describe("executeCoachTool hardening", () => {
           avg_hr: 141,
           avg_power: null,
           calories: 510,
-          parse_summary: { lapCount: 24 }
+          moving_duration_sec: 3500,
+          elapsed_duration_sec: 3600,
+          pool_length_m: 25,
+          laps_count: 24,
+          avg_pace_per_100m_sec: 150,
+          metrics_v2: { schemaVersion: 1 }
         }
       ],
       error: null
@@ -113,12 +123,89 @@ describe("executeCoachTool hardening", () => {
           avgHr: 141,
           avgPower: null,
           calories: 510,
-          parseSummary: { lapCount: 24 },
-          avgPaceSecPerKm: 1500,
+          movingDurationMinutes: 58,
+          elapsedDurationMinutes: 60,
+          poolLengthMeters: 25,
+          lapsCount: 24,
+          avgPacePer100mSec: 150,
+          metricsV2: { schemaVersion: 1 },
+          avgPaceSecPerKm: null,
           avgPaceSecPer100m: 150,
-          source: "upload"
+          source: "uploaded_activity"
         }
       ]
+    });
+  });
+
+  it("returns explicit activity details payload", async () => {
+    const activityBuilder = createQueryBuilder({
+      maybeSingle: {
+        data: {
+          id: "11111111-1111-4111-8111-111111111111",
+          sport_type: "run",
+          start_time_utc: "2026-03-10T07:10:00.000Z",
+          end_time_utc: "2026-03-10T08:00:00.000Z",
+          duration_sec: 3000,
+          distance_m: 10000,
+          avg_hr: 152,
+          avg_power: 250,
+          calories: 700,
+          moving_duration_sec: 2950,
+          elapsed_duration_sec: 3000,
+          pool_length_m: null,
+          laps_count: null,
+          avg_pace_per_100m_sec: 30,
+          best_pace_per_100m_sec: null,
+          avg_stroke_rate_spm: null,
+          avg_swolf: null,
+          avg_cadence: 86,
+          max_hr: 170,
+          max_power: 330,
+          elevation_gain_m: 120,
+          elevation_loss_m: 120,
+          activity_vendor: "garmin",
+          activity_type_raw: "running",
+          activity_subtype_raw: null,
+          metrics_v2: { schemaVersion: 1 }
+        },
+        error: null
+      }
+    });
+
+    const linksBuilder = createQueryBuilder({
+      maybeSingle: {
+        data: {
+          planned_session_id: "session-1",
+          confirmation_status: "suggested",
+          confidence: 0.88
+        },
+        error: null
+      }
+    });
+
+    const supabase = {
+      from: jest.fn((table: string) => {
+        if (table === "completed_activities") return activityBuilder;
+        if (table === "session_activity_links") return linksBuilder;
+        throw new Error(`Unexpected table: ${table}`);
+      })
+    } as unknown as { from: jest.Mock };
+
+    const result = await executeCoachTool(
+      "get_activity_details",
+      { activityId: "11111111-1111-4111-8111-111111111111" },
+      { supabase: supabase as never, ctx }
+    );
+
+    expect(result).toMatchObject({
+      source: "uploaded_activity",
+      linkedSession: {
+        planned_session_id: "session-1"
+      },
+      activity: {
+        id: "11111111-1111-4111-8111-111111111111",
+        sport_type: "run"
+      }
     });
   });
 
