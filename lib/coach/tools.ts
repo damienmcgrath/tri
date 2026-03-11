@@ -26,7 +26,7 @@ export const coachTools = [
     type: "function" as const,
     name: "get_athlete_snapshot",
     description: "Return high-level athlete profile and current training-plan snapshot.",
-    strict: true,
+    strict: false,
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -37,7 +37,7 @@ export const coachTools = [
     type: "function" as const,
     name: "get_recent_sessions",
     description: "Return recent completed sessions and recently planned sessions for coaching context.",
-    strict: true,
+    strict: false,
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -50,7 +50,7 @@ export const coachTools = [
     type: "function" as const,
     name: "get_upcoming_sessions",
     description: "Return upcoming planned sessions.",
-    strict: true,
+    strict: false,
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -63,7 +63,7 @@ export const coachTools = [
     type: "function" as const,
     name: "get_week_progress",
     description: "Return this week's planned vs completed volume summary.",
-    strict: true,
+    strict: false,
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -74,7 +74,7 @@ export const coachTools = [
     type: "function" as const,
     name: "create_plan_change_proposal",
     description: "Create a proposal record for plan changes. Never edits sessions directly.",
-    strict: true,
+    strict: false,
     parameters: {
       type: "object",
       additionalProperties: false,
