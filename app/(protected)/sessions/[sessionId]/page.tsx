@@ -32,14 +32,18 @@ type SessionStatus = "planned" | "completed" | "skipped";
 type DiagnosisStatus = "matched_intent" | "partial_intent" | "missed_intent";
 
 type ReviewViewModel = {
-  actualStatusLabel: string;
+  reviewStatusLabel: string;
+  reviewStatusDetail: string;
+  isReviewable: boolean;
   intent: { label: string; tone: string; detail: string };
   executionSummary: string;
   score: number | null;
   scoreBand: string | null;
+  scoreHeadline: string;
   scoreInterpretation: string;
   scoreConfidenceNote: string | null;
   plannedIntent: string;
+  actualSummary: string;
   mainGap: string;
   usefulMetrics: Array<{ label: string; value: string }>;
   whyItMatters: string;
@@ -123,6 +127,43 @@ function toStatusLabel(status: string | null | undefined) {
   return "Completed";
 }
 
+function toReviewStatus(status: string | null | undefined, diagnosis: Record<string, unknown> | null | undefined) {
+  const normalized = (status ?? "").toLowerCase();
+  const hasDiagnosticSignals = Boolean(diagnosis) && Object.keys(diagnosis ?? {}).length > 0;
+  if (normalized === "completed" || normalized === "skipped") {
+    return {
+      label: toStatusLabel(status),
+      detail:
+        normalized === "completed"
+          ? "Session data is complete enough to review execution quality."
+          : "Session was skipped, so this review focuses on decision quality and next-step planning.",
+      isReviewable: true
+    };
+  }
+
+  if (normalized === "planned") {
+    return hasDiagnosticSignals
+      ? {
+          label: "Uploaded, awaiting completion sync",
+          detail: "Workout files are present, but calendar status has not been finalized yet.",
+          isReviewable: true
+        }
+      : {
+          label: "Not reviewable yet",
+          detail: "Complete or upload this workout before execution analysis can be trusted.",
+          isReviewable: false
+        };
+  }
+
+  return {
+    label: hasDiagnosticSignals ? "Review in progress" : "Not reviewable yet",
+    detail: hasDiagnosticSignals
+      ? "Some execution data is available while final session sync is still in progress."
+      : "No reliable execution evidence has been synced for review yet.",
+    isReviewable: hasDiagnosticSignals
+  };
+}
+
 function toScoreBand(score: number | null, explicitBand: string | null) {
   if (explicitBand) return explicitBand;
   if (score === null) return null;
@@ -132,6 +173,7 @@ function toScoreBand(score: number | null, explicitBand: string | null) {
 function createReviewViewModel(session: SessionRow): ReviewViewModel {
   const diagnosis = session.execution_result;
   const intent = toIntentLabel(diagnosis?.status as DiagnosisStatus | undefined);
+  const reviewStatus = toReviewStatus(session.status, diagnosis);
 
   const executionSummary = getString(
     diagnosis,
@@ -170,6 +212,13 @@ function createReviewViewModel(session: SessionRow): ReviewViewModel {
         ? "Add richer activity data (interval completion, intensity metrics, and duration quality) to unlock a reliable score."
         : null;
 
+  const scoreHeadline =
+    score !== null
+      ? `${Math.round(score)} · ${scoreBand ?? "Partial match"}`
+      : reviewStatus.isReviewable
+        ? "Provisional · Evidence still building"
+        : "Pending · Complete workout to score";
+
   const durationCompletion = getNumber(diagnosis, ["durationCompletion", "duration_completion"]);
   const intervalCompletion = getNumber(diagnosis, ["intervalCompletionPct", "interval_completion_pct"]);
   const timeAbove = getNumber(diagnosis, ["timeAboveTargetPct", "time_above_target_pct"]);
@@ -204,6 +253,12 @@ function createReviewViewModel(session: SessionRow): ReviewViewModel {
   ].filter((metric): metric is { label: string; value: string } => metric !== null);
 
   const plannedIntent = session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} training intent`;
+  const actualSummary =
+    intent.label === "Matched"
+      ? "Execution stayed close to the planned stimulus with only minor drift."
+      : intent.label === "Partial"
+        ? "Execution delivered some of the stimulus, but consistency across key targets was uneven."
+        : "Execution diverged from the planned stimulus enough to blunt the intended adaptation.";
   const mainGap =
     intent.label === "Matched"
       ? "Execution stayed aligned with the intended stimulus. Keep the same structure on the next similar session."
@@ -212,14 +267,18 @@ function createReviewViewModel(session: SessionRow): ReviewViewModel {
         : "Execution was far enough from target that the planned adaptation was likely diluted.";
 
   return {
-    actualStatusLabel: toStatusLabel(session.status),
+    reviewStatusLabel: reviewStatus.label,
+    reviewStatusDetail: reviewStatus.detail,
+    isReviewable: reviewStatus.isReviewable,
     intent,
     executionSummary,
     score,
     scoreBand,
+    scoreHeadline,
     scoreInterpretation,
     scoreConfidenceNote,
     plannedIntent,
+    actualSummary,
     mainGap,
     usefulMetrics,
     whyItMatters,
@@ -373,11 +432,12 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Discipline</p><p className="mt-1 font-semibold">{getDisciplineMeta(session.sport).label}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Duration</p><p className="mt-1 font-semibold">{durationLabel(session.duration_minutes)}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Status</p><p className="mt-1 font-semibold">{reviewVm.actualStatusLabel}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Review status</p><p className="mt-1 font-semibold">{reviewVm.reviewStatusLabel}</p></div>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Intent result</p><p className={`mt-1 font-semibold ${reviewVm.intent.tone}`}>{reviewVm.intent.label}</p></div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Execution score</p><p className="mt-1 font-semibold">{reviewVm.score === null ? "Not enough evidence yet" : `${Math.round(reviewVm.score)} / 100`}</p></div>
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"><p className="text-xs text-muted">Execution Score</p><p className="mt-1 font-semibold">{reviewVm.scoreHeadline}</p></div>
         </div>
         <p className="mt-3 text-sm text-muted">{reviewVm.intent.detail}</p>
+        <p className="mt-1 text-sm text-muted">{reviewVm.reviewStatusDetail}</p>
       </article>
 
       <article className="surface p-5">
@@ -390,6 +450,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           <div className="rounded-xl border border-[hsl(var(--border))] p-3">
             <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Actual execution</p>
             <p className="mt-2 text-sm text-muted">{reviewVm.executionSummary}</p>
+            <p className="mt-2 text-sm">{reviewVm.actualSummary}</p>
           </div>
         </div>
 
@@ -448,9 +509,9 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         <p className="mt-1 text-sm text-muted">Continue this in coaching chat to validate the diagnosis and decide whether this week needs an adjustment.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {[
-            `What evidence drove the ${reviewVm.intent.label.toLowerCase()} intent call?`,
-            "Should I repeat this workout or modify it?",
-            "How should I adjust the rest of the week based on this review?"
+            "Why was this session flagged the way it was?",
+            "Should I repeat this workout?",
+            "How should I adjust the rest of the week?"
           ].map((prompt) => (
             <Link
               key={prompt}
