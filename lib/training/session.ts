@@ -96,7 +96,7 @@ export function getSessionDisplayName(input: SessionModelInput) {
   }
 
   const subtype = cleanValue(session.subtype);
-  if (subtype) {
+  if (subtype && !isWeakFallbackName(subtype, disciplineLabel)) {
     const subtypeLower = subtype.toLowerCase();
     if (subtypeLower.includes(disciplineLabel.toLowerCase())) {
       return subtype;

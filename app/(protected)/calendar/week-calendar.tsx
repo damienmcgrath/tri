@@ -86,10 +86,11 @@ function getActivityId(sessionId: string) {
 
 function getSessionTitle(session: CalendarSession) {
   return getSessionDisplayName({
-    sessionName: session.sessionName ?? session.type,
+    sessionName: session.sessionName,
     discipline: session.discipline ?? session.sport,
     subtype: session.subtype,
-    workoutType: session.workoutType
+    workoutType: session.workoutType,
+    type: session.type
   });
 }
 
@@ -130,7 +131,7 @@ function SessionActionMenu({
   const activityId = getActivityId(session.id);
 
   return (
-    <div className="relative">
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
         className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
@@ -493,8 +494,25 @@ export function WeekCalendar({
                       <SessionStatusChip status={session.status} compact />
                     );
 
+                  const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
+
                   return (
-                    <article key={session.id} className={`rounded-xl border px-2 py-1.5 text-xs ${toneClass}`}>
+                    <article
+                      key={session.id}
+                      className={`rounded-xl border px-2 py-1.5 text-xs ${toneClass} ${reviewableCompleted ? "cursor-pointer" : ""}`}
+                      onClick={() => {
+                        if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!reviewableCompleted) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          router.push(`/sessions/${session.id}`);
+                        }
+                      }}
+                      role={reviewableCompleted ? "link" : undefined}
+                      tabIndex={reviewableCompleted ? 0 : undefined}
+                    >
                       <div className="flex items-center justify-between gap-1">
                         <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
@@ -522,11 +540,6 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
                       <p className="mt-0.5 text-muted">{session.duration} min</p>
-                      {session.displayType !== "completed_activity" && session.status === "completed" ? (
-                        <Link href={`/sessions/${session.id}`} className="mt-1 inline-block text-[11px] text-accent hover:underline">
-                          Open review
-                        </Link>
-                      ) : null}
                       <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
                     </article>
                   );
