@@ -483,23 +483,17 @@ export function WeekCalendar({
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
-                    ) : state === "assigned_from_upload" ? (
-                      <span className="inline-flex items-center gap-1">
-                        <SessionStatusChip status="completed" compact />
-                        <span className="rounded-full border border-[hsl(var(--signal-ready)/0.22)] bg-[hsl(var(--surface-subtle)/0.32)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-ready)/0.82)]">
-                          Assigned from upload
-                        </span>
-                      </span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
+                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload";
 
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs ${toneClass} ${reviewableCompleted ? "cursor-pointer" : ""}`}
+                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -540,7 +534,21 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
                       <p className="mt-0.5 text-muted">{session.duration} min</p>
-                      <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
+                      {showCompletedFooter ? (
+                        <div className="mt-1.5 flex items-center justify-between border-t border-[hsl(var(--signal-ready)/0.24)] pt-1.5 text-[10px]">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
+                            <span aria-hidden="true">✓</span>
+                            Completed
+                          </span>
+                          {state === "assigned_from_upload" ? (
+                            <span className="rounded-full border border-[hsl(var(--signal-ready)/0.2)] bg-[hsl(var(--surface-subtle)/0.25)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.8)]">
+                              Upload matched
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center justify-end">{stateBadge}</div>
+                      )}
                     </article>
                   );
                 })}
