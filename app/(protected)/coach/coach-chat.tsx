@@ -34,6 +34,13 @@ type TopCoachingInsight = {
   confidenceNote: string | null;
 };
 
+type DiagnosisTheme = "easy_drift" | "recovery_slip" | "threshold_inconsistent" | "endurance_strong" | "general";
+
+type RankedSession = SessionDiagnosis & {
+  rankingScore: number;
+  themes: DiagnosisTheme[];
+};
+
 const defaultAssistantMessage: Message = {
   role: "assistant",
   content:
@@ -78,12 +85,58 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
     };
   }
 
-  const missedCount = sessions.filter((session) => session.status === "missed").length;
-  const partialCount = sessions.filter((session) => session.status === "partial").length;
+  const rankedSessions = rankFlaggedSessions(sessions);
+  const strongestFlag = rankedSessions[0];
 
-  const strongestFlag = sessions.find((session) => session.status !== "matched");
+  if (!strongestFlag) {
+    const strongEnduranceSignal = sessions.some((session) => inferThemes(session).includes("endurance_strong"));
 
-  if (strongestFlag?.status === "missed") {
+    return {
+      headline: strongEnduranceSignal ? "Endurance execution is strong — stay the course" : "Execution quality is strong — stay the course",
+      rationale:
+        "Recent completed sessions are aligning with intended purpose. Maintain current structure and only progress if recovery remains stable.",
+      primaryAction: { label: "Review recommendation", href: "/plan" },
+      secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
+      confidenceNote: null
+    };
+  }
+
+  const missedCount = rankedSessions.filter((session) => session.status === "missed").length;
+  const partialCount = rankedSessions.filter((session) => session.status === "partial").length;
+
+  if (strongestFlag.themes.includes("easy_drift")) {
+    return {
+      headline: "Easy sessions are drifting too hard",
+      rationale:
+        "Diagnosis is repeatedly detecting intensity drift away from easy intent. Protecting low-intensity execution now improves recovery and quality-session readiness.",
+      primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
+      secondaryAction: { label: "How to keep Z2 easy", href: "#coaching-chat" },
+      confidenceNote: "Diagnosis confidence: useful"
+    };
+  }
+
+  if (strongestFlag.themes.includes("recovery_slip")) {
+    return {
+      headline: "Recovery quality is slipping",
+      rationale: strongestFlag.whyItMatters,
+      primaryAction: { label: "Protect recovery", href: "/plan" },
+      secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
+      confidenceNote: strongestFlag.confidenceNote ?? null
+    };
+  }
+
+  if (strongestFlag.themes.includes("threshold_inconsistent")) {
+    return {
+      headline: "Threshold execution is inconsistent",
+      rationale:
+        "Quality-session diagnosis shows uneven control versus planned intent. Tightening pacing before adding load will improve adaptation quality.",
+      primaryAction: { label: "Adjust this week", href: "/plan" },
+      secondaryAction: { label: "Ask why", href: "#coaching-chat" },
+      confidenceNote: strongestFlag.confidenceNote ?? null
+    };
+  }
+
+  if (strongestFlag.status === "missed") {
     return {
       headline: strongestFlag.executionSummary,
       rationale: strongestFlag.whyItMatters,
@@ -93,7 +146,7 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
     };
   }
 
-  if (missedCount === 1 || partialCount >= 1) {
+  if (missedCount >= 1 || partialCount >= 1) {
     return {
       headline: strongestFlag?.executionSummary ?? "Execution quality is mixed — tighten intent on easy days",
       rationale:
@@ -108,11 +161,57 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
   return {
     headline: "Execution quality is strong — stay the course",
     rationale:
-      "Most completed sessions appear aligned with intended purpose. Keep the current structure and only make small progression decisions if recovery remains stable.",
+      "Recent completed sessions are aligning with intended purpose. Maintain current structure and only progress if recovery remains stable.",
     primaryAction: { label: "Review recommendation", href: "/plan" },
     secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
     confidenceNote: null
   };
+}
+
+function inferThemes(session: SessionDiagnosis): DiagnosisTheme[] {
+  const searchable = [session.plannedIntent, session.executionSummary, session.nextAction, session.whyItMatters, ...session.evidence]
+    .join(" ")
+    .toLowerCase();
+  const themes = new Set<DiagnosisTheme>();
+
+  if (/(easy|z1|z2|recovery ride|recovery run|too hard|high intensity)/.test(searchable)) {
+    themes.add("easy_drift");
+  }
+
+  if (/(recover|fatigue|fresh|sleep|rest|carryover)/.test(searchable)) {
+    themes.add("recovery_slip");
+  }
+
+  if (/(threshold|tempo|interval|vo2|quality)/.test(searchable)) {
+    themes.add("threshold_inconsistent");
+  }
+
+  if (session.status === "matched" && /(endurance|long|aerobic|z2)/.test(searchable)) {
+    themes.add("endurance_strong");
+  }
+
+  if (themes.size === 0) {
+    themes.add("general");
+  }
+
+  return [...themes];
+}
+
+function rankFlaggedSessions(sessions: SessionDiagnosis[]): RankedSession[] {
+  return sessions
+    .filter((session) => session.status !== "matched")
+    .map((session) => {
+      const themes = inferThemes(session);
+      const statusWeight = session.status === "missed" ? 40 : 20;
+      const scorePenalty = session.executionScore === null ? 0 : Math.max(0, 30 - Math.round(session.executionScore / 3));
+      const bandWeight = session.executionScoreBand === "Missed intent" ? 20 : session.executionScoreBand === "Partial match" ? 10 : 0;
+      const evidenceWeight = Math.min(session.evidence.length * 3, 9);
+      const rankingScore = statusWeight + scorePenalty + bandWeight + evidenceWeight + session.importance;
+
+      return { ...session, rankingScore, themes };
+    })
+    .sort((a, b) => b.rankingScore - a.rankingScore)
+    .slice(0, 3);
 }
 
 function statusChip(status: IntentMatchStatus): { label: string; className: string } {
@@ -145,12 +244,11 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
-  const flaggedSessions = useMemo(
-    () => sessionDiagnoses.filter((session) => session.status !== "matched").slice(0, 3),
-    [sessionDiagnoses]
-  );
+  const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
   const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
   const topInsight = useMemo(() => deriveTopInsight(sessionDiagnoses), [sessionDiagnoses]);
+
+  const strongestTheme = flaggedSessions[0]?.themes[0] ?? null;
 
   const nextActions = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
@@ -161,14 +259,30 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
       ];
     }
 
-    const actions = flaggedSessions.map((session) => session.nextAction);
-    if ((summary?.completionPct ?? 100) < 75) {
-      actions.push("Keep easy days easy until execution signals stabilise.");
-    } else {
-      actions.push("Keep volume steady this week and improve pacing quality before progressing.");
+    const actions = new Set<string>();
+
+    if (strongestTheme === "easy_drift") {
+      actions.add("Keep easy days truly easy for the next 2 sessions.");
     }
-    return actions.slice(0, 4);
-  }, [summary?.completionPct, sessionDiagnoses, flaggedSessions]);
+    if (strongestTheme === "recovery_slip") {
+      actions.add("Protect recovery before the weekend long ride.");
+    }
+    if (strongestTheme === "threshold_inconsistent") {
+      actions.add("Reduce the next quality session by ~10% and prioritise control.");
+    }
+
+    flaggedSessions.forEach((session) => actions.add(session.nextAction));
+
+    if (flaggedSessions.length === 0) {
+      actions.add("Repeat current aerobic intent before progressing load.");
+    }
+
+    if ((summary?.completionPct ?? 100) < 75) {
+      actions.add("Keep volume steady until session execution quality stabilises.");
+    }
+
+    return [...actions].slice(0, 4);
+  }, [summary?.completionPct, sessionDiagnoses, flaggedSessions, strongestTheme]);
 
   const quickPrompts = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
@@ -180,15 +294,21 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
       ];
     }
 
-    return [
-      "Why was this session flagged?",
-      "How do I keep Z2 truly easy?",
-      "Should I repeat this workout?",
-      "Adjust the rest of my week",
-      "Was this fatigue or pacing?",
-      "What matters most now?"
-    ];
-  }, [sessionDiagnoses]);
+    const prompts = ["Why was this session flagged?", "Should I repeat this workout?", "How should I adjust the rest of the week?"];
+
+    if (strongestTheme === "easy_drift") {
+      prompts.splice(1, 0, "How do I keep Z2 truly easy?");
+    }
+    if (strongestTheme === "recovery_slip") {
+      prompts.splice(1, 0, "How do I protect recovery this week?");
+    }
+    if (strongestTheme === "threshold_inconsistent") {
+      prompts.splice(1, 0, "Was this fatigue or pacing?");
+    }
+
+    prompts.push("What matters most now?");
+    return prompts;
+  }, [sessionDiagnoses, strongestTheme]);
 
   const dataRecency = useMemo(() => {
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
