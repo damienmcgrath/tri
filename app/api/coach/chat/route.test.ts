@@ -135,6 +135,53 @@ describe("POST /api/coach/chat hardening", () => {
     expect((supabase.from as jest.Mock).mock.calls[0][0]).toBe("ai_conversations");
   });
 
+
+  it("accepts null conversationId payloads from the client", async () => {
+    const { supabase } = createSupabaseMock({ history: [] });
+
+    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
+      supabase,
+      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
+      reason: null
+    });
+
+    (getOpenAIClient as jest.Mock).mockReturnValue({
+      responses: {
+        create: jest.fn()
+          .mockResolvedValueOnce({
+            id: "resp-1",
+            output: [],
+            output_text: "Keep intensity controlled this week."
+          })
+          .mockResolvedValueOnce({
+            id: "resp-2",
+            output: [],
+            output_text: JSON.stringify({
+              headline: "Stay controlled",
+              answer: "Keep intensity controlled this week.",
+              insights: [],
+              actions: [],
+              warnings: []
+            })
+          })
+      }
+    });
+
+    const req = makeRequest("http://localhost/api/coach/chat", {
+      message: "How should I adjust this week?",
+      conversationId: null
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toMatchObject({
+      conversationId: "conv1",
+      headline: "Stay controlled"
+    });
+  });
+
   it("runs tool loop and returns stable structured JSON shape", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
 
