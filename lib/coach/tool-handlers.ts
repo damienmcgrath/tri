@@ -75,7 +75,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: uploadedActivities, error: uploadedActivitiesError } = await deps.supabase
     .from("completed_activities")
-    .select("id,sport_type,start_time_utc,duration_sec")
+    .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,parse_summary")
     .eq("user_id", deps.ctx.userId)
     .gte("start_time_utc", sinceUtc)
     .lte("start_time_utc", todayUtc)
@@ -114,7 +114,13 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       id: `activity:${activity.id}`,
       date: activityDate,
       sport: activity.sport_type,
-      durationMinutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null
+      durationMinutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+      distanceMeters: activity.distance_m ? Number(activity.distance_m) : null,
+      avgHr: activity.avg_hr ?? null,
+      avgPower: activity.avg_power ?? null,
+      calories: activity.calories ?? null,
+      parseSummary: activity.parse_summary ?? null,
+      source: "upload"
     };
   });
 
@@ -127,7 +133,23 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
         sport: session.sport,
         durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
           ? Number((session.metrics as { duration?: number }).duration ?? 0)
-          : null
+          : null,
+        distanceMeters: typeof session.metrics === "object" && session.metrics && "distance" in session.metrics
+          ? Number((session.metrics as { distance?: number }).distance ?? 0)
+          : null,
+        avgHr: typeof session.metrics === "object" && session.metrics && "avg_hr" in session.metrics
+          ? Number((session.metrics as { avg_hr?: number }).avg_hr ?? 0)
+          : null,
+        avgPower: typeof session.metrics === "object" && session.metrics && "avg_power" in session.metrics
+          ? Number((session.metrics as { avg_power?: number }).avg_power ?? 0)
+          : null,
+        calories: typeof session.metrics === "object" && session.metrics && "calories" in session.metrics
+          ? Number((session.metrics as { calories?: number }).calories ?? 0)
+          : null,
+        parseSummary: typeof session.metrics === "object" && session.metrics && "parse_summary" in session.metrics
+          ? (session.metrics as { parse_summary?: unknown }).parse_summary ?? null
+          : null,
+        source: "legacy"
       })),
       ...uploadedFallback
     ],

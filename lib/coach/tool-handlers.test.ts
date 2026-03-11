@@ -51,7 +51,12 @@ describe("executeCoachTool hardening", () => {
             id: "activity-1",
             sport_type: "swim",
             start_time_utc: "2026-03-10T07:10:00.000Z",
-            duration_sec: 3600
+            duration_sec: 3600,
+            distance_m: 2400,
+            avg_hr: 141,
+            avg_power: null,
+            calories: 510,
+            parse_summary: { lapCount: 24 }
           }
         ],
         error: null
@@ -63,7 +68,12 @@ describe("executeCoachTool hardening", () => {
           id: "activity-1",
           sport_type: "swim",
           start_time_utc: "2026-03-10T07:10:00.000Z",
-          duration_sec: 3600
+          duration_sec: 3600,
+          distance_m: 2400,
+          avg_hr: 141,
+          avg_power: null,
+          calories: 510,
+          parse_summary: { lapCount: 24 }
         }
       ],
       error: null
@@ -98,7 +108,13 @@ describe("executeCoachTool hardening", () => {
           id: "activity:activity-1",
           date: "2026-03-10",
           sport: "swim",
-          durationMinutes: 60
+          durationMinutes: 60,
+          distanceMeters: 2400,
+          avgHr: 141,
+          avgPower: null,
+          calories: 510,
+          parseSummary: { lapCount: 24 },
+          source: "upload"
         }
       ]
     });
