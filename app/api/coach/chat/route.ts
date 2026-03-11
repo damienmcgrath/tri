@@ -57,21 +57,17 @@ function safeStructuredFallback(answer: string): CoachStructuredResponse {
   };
 }
 
-function buildServiceFallback(userMessage: string) {
-  const answer = "I can’t reach the coaching model right now. Keep your key sessions, reduce intensity by ~10-15%, and retry in a minute.";
+function buildServiceFallback() {
+  const answer = "I can’t reach the coaching model right now. Please try again soon.";
 
   return {
     answer,
     structured: {
-      headline: "Coach temporarily unavailable",
+      headline: answer,
       answer,
-      insights: [
-        `Your message was received: "${userMessage.slice(0, 140)}"`
-      ],
-      actions: [
-        { type: "follow_up" as const, label: "Retry coach chat in 1-2 minutes" }
-      ],
-      warnings: ["Live coaching model unavailable; response is fallback guidance."]
+      insights: [],
+      actions: [],
+      warnings: []
     },
     responseId: undefined as string | undefined
   };
@@ -348,7 +344,7 @@ export async function POST(request: Request) {
       reason: message
     });
 
-    result = buildServiceFallback(payload.message);
+    result = buildServiceFallback();
   }
 
   const { error: insertMessagesError } = await supabase.from("ai_messages").insert([

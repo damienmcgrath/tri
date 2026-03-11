@@ -207,8 +207,8 @@ describe("POST /api/coach/chat hardening", () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.headline).toBe("Coach temporarily unavailable");
-    expect(body.warnings).toContain("Live coaching model unavailable; response is fallback guidance.");
+    expect(body.answer).toBe("I can’t reach the coaching model right now. Please try again soon.");
+    expect(body.headline).toBe("I can’t reach the coaching model right now. Please try again soon.");
   });
 
   it("runs tool loop and returns stable structured JSON shape", async () => {
