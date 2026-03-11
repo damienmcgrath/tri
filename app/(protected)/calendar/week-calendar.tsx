@@ -40,6 +40,7 @@ type CalendarSession = {
 type WeekDay = { iso: string; weekday: string; label: string };
 type RecentMove = { sessionId: string; fromDate: string; toDate: string };
 type AdaptationIssueType = "unmatched_upload" | "skipped_reassign" | "moved_session" | "extra_workout";
+const MOVE_TAG_PATTERN = /\[moved\sfrom\s(\d{4}-\d{2}-\d{2})\]/i;
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const uploadDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -74,6 +75,11 @@ function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
 
+function getMovedFromDate(notes: string | null) {
+  const match = (notes ?? "").match(MOVE_TAG_PATTERN);
+  return match?.[1] ?? null;
+}
+
 function getActivityId(sessionId: string) {
   return sessionId.startsWith("activity:") ? sessionId.replace("activity:", "") : null;
 }
@@ -87,9 +93,12 @@ function getSessionTitle(session: CalendarSession) {
   });
 }
 
-function getSessionState(session: CalendarSession, recentMoves: RecentMove[]) {
+function getSessionState(session: CalendarSession, recentMoves: RecentMove[], extraActivityIds: string[]) {
   if (session.displayType === "completed_activity") {
-    return "extra" as const;
+    if (extraActivityIds.includes(session.id)) {
+      return "extra" as const;
+    }
+    return "unmatched_upload" as const;
   }
   if (recentMoves.some((move) => move.sessionId === session.id)) {
     return "moved" as const;
@@ -200,6 +209,21 @@ export function WeekCalendar({
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
 
   useEffect(() => setLocalSessions(sessions), [sessions]);
+  const persistedMoves = useMemo(
+    () =>
+      localSessions
+        .filter((session) => session.displayType !== "completed_activity")
+        .map((session) => {
+          const fromDate = getMovedFromDate(session.notes);
+          return fromDate ? ({ sessionId: session.id, fromDate, toDate: session.date } as RecentMove) : null;
+        })
+        .filter((move): move is RecentMove => Boolean(move)),
+    [localSessions]
+  );
+  const trackedMoves = useMemo(
+    () => [...recentMoves, ...persistedMoves.filter((move) => !recentMoves.some((item) => item.sessionId === move.sessionId))],
+    [persistedMoves, recentMoves]
+  );
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
@@ -220,11 +244,11 @@ export function WeekCalendar({
   const filteredSessions = useMemo(() => {
     return localSessions.filter((session) => {
       const sportMatch = sportFilter === "all" || session.sport === sportFilter;
-      const state = getSessionState(session, recentMoves);
+      const state = getSessionState(session, trackedMoves, extraActivityIds);
       const statusMatch = statusFilter === "all" || state === statusFilter;
       return sportMatch && statusMatch;
     });
-  }, [localSessions, sportFilter, statusFilter, recentMoves]);
+  }, [extraActivityIds, localSessions, sportFilter, statusFilter, trackedMoves]);
 
   const visibleIds = useMemo(() => new Set(filteredSessions.map((session) => session.id)), [filteredSessions]);
 
@@ -272,7 +296,9 @@ export function WeekCalendar({
         !dismissedIssues.includes(getIssueId("skipped_reassign", session.id))
     )
     .slice(0, 2);
-  const movedItems = recentMoves.slice(0, 2);
+  const movedItems = trackedMoves
+    .filter((move) => !dismissedIssues.includes(getIssueId("moved_session", move.sessionId)))
+    .slice(0, 2);
   const extraItems = localSessions
     .filter(
       (session) =>
@@ -330,7 +356,7 @@ export function WeekCalendar({
 
       {hasAdaptation ? (
         <section className="surface-subtle space-y-2 px-3 py-2">
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">Adjustments to review</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Adaptation strip</p>
           <div className="flex flex-wrap gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="rounded-lg border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.08)] p-2">
@@ -371,7 +397,10 @@ export function WeekCalendar({
                 <div key={`move-${move.sessionId}`} className="rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] p-2">
                   <p className="font-semibold">Moved session</p>
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
-                  <button onClick={() => setDetailSession(session)} className="mt-1 text-accent hover:underline">Review</button>
+                  <div className="mt-1 flex gap-2">
+                    <button onClick={() => setDetailSession(session)} className="text-accent hover:underline">Review</button>
+                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="text-muted hover:text-foreground">Dismiss</button>
+                  </div>
                 </div>
               );
             })}
@@ -430,8 +459,8 @@ export function WeekCalendar({
                   </button>
                 ) : null}
                 {daySessions.map((session) => {
-                  const movedMeta = recentMoves.find((move) => move.sessionId === session.id);
-                  const state = getSessionState(session, recentMoves);
+                  const movedMeta = trackedMoves.find((move) => move.sessionId === session.id) ?? (getMovedFromDate(session.notes) ? { fromDate: getMovedFromDate(session.notes) } : null);
+                  const state = getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
