@@ -21,6 +21,17 @@ function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function derivePace(durationSec: number | null | undefined, distanceM: number | null | undefined) {
+  if (!durationSec || !distanceM || durationSec <= 0 || distanceM <= 0) {
+    return { avgPaceSecPerKm: null, avgPaceSecPer100m: null };
+  }
+
+  return {
+    avgPaceSecPerKm: Number((durationSec / (distanceM / 1000)).toFixed(2)),
+    avgPaceSecPer100m: Number((durationSec / (distanceM / 100)).toFixed(2))
+  };
+}
+
 async function getAthleteSnapshot({ supabase, ctx }: ToolDeps) {
   const { data: profile } = await supabase
     .from("profiles")
@@ -75,7 +86,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: uploadedActivities, error: uploadedActivitiesError } = await deps.supabase
     .from("completed_activities")
-    .select("id,sport_type,start_time_utc,duration_sec,distance_m,parse_summary")
+    .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,parse_summary")
     .eq("user_id", deps.ctx.userId)
     .gte("start_time_utc", sinceUtc)
     .lte("start_time_utc", todayUtc)
@@ -103,33 +114,63 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       : null;
     const movingDurationSec = Number(parseSummary?.movingDurationSec ?? parseSummary?.moving_duration_sec ?? 0);
     const elapsedDurationSec = Number(parseSummary?.elapsedDurationSec ?? parseSummary?.elapsed_duration_sec ?? activity.duration_sec ?? 0);
-    const durationSec = movingDurationSec > 0 ? movingDurationSec : elapsedDurationSec;
     const poolLengthMeters = Number(parseSummary?.poolLengthMeters ?? parseSummary?.pool_length_meters ?? 0);
+
+    const durationSec = activity.duration_sec ? Number(activity.duration_sec) : null;
+    const distanceMeters = activity.distance_m ? Number(activity.distance_m) : null;
+    const pace = derivePace(durationSec, distanceMeters);
 
     return {
       id: `activity:${activity.id}`,
       source: "uploaded_activity" as const,
       date: activityDate,
       sport: activity.sport_type,
-      durationMinutes: durationSec > 0 ? Math.round(durationSec / 60) : null,
-      elapsedDurationMinutes: elapsedDurationSec > 0 ? Math.round(elapsedDurationSec / 60) : null,
-      distanceMeters: typeof activity.distance_m === "number" ? activity.distance_m : null,
-      poolLengthMeters: poolLengthMeters > 0 ? poolLengthMeters : null
+      durationMinutes: durationSec ? Math.round(durationSec / 60) : null,
+      distanceMeters,
+      avgHr: activity.avg_hr ?? null,
+      avgPower: activity.avg_power ?? null,
+      calories: activity.calories ?? null,
+      parseSummary: activity.parse_summary ?? null,
+      avgPaceSecPerKm: pace.avgPaceSecPerKm,
+      avgPaceSecPer100m: pace.avgPaceSecPer100m,
     };
   });
 
   return {
     range: { since, until: today },
     completed: [
-      ...(completed ?? []).map((session) => ({
-        id: session.id,
-        source: "legacy_completed_session" as const,
-        date: session.date,
-        sport: session.sport,
-        durationMinutes: typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
+      ...(completed ?? []).map((session) => {
+        const durationMinutes = typeof session.metrics === "object" && session.metrics && "duration" in session.metrics
           ? Number((session.metrics as { duration?: number }).duration ?? 0)
-          : null
-      })),
+          : null;
+        const distanceMeters = typeof session.metrics === "object" && session.metrics && "distance" in session.metrics
+          ? Number((session.metrics as { distance?: number }).distance ?? 0)
+          : null;
+        const pace = derivePace(durationMinutes ? durationMinutes * 60 : null, distanceMeters);
+
+        return {
+          id: session.id,
+          date: session.date,
+          sport: session.sport,
+          durationMinutes,
+          distanceMeters,
+          avgHr: typeof session.metrics === "object" && session.metrics && "avg_hr" in session.metrics
+            ? Number((session.metrics as { avg_hr?: number }).avg_hr ?? 0)
+            : null,
+          avgPower: typeof session.metrics === "object" && session.metrics && "avg_power" in session.metrics
+            ? Number((session.metrics as { avg_power?: number }).avg_power ?? 0)
+            : null,
+          calories: typeof session.metrics === "object" && session.metrics && "calories" in session.metrics
+            ? Number((session.metrics as { calories?: number }).calories ?? 0)
+            : null,
+          parseSummary: typeof session.metrics === "object" && session.metrics && "parse_summary" in session.metrics
+            ? (session.metrics as { parse_summary?: unknown }).parse_summary ?? null
+            : null,
+          avgPaceSecPerKm: pace.avgPaceSecPerKm,
+          avgPaceSecPer100m: pace.avgPaceSecPer100m,
+          source: "legacy"
+        };
+      }),
       ...uploadedActivitiesRealData
     ],
     planned: (planned ?? []).map((session) => ({
