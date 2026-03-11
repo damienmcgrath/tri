@@ -14,6 +14,17 @@ export type ParsedActivity = {
   parseSummary?: Record<string, unknown>;
 };
 
+function buildPaceSummary(durationSec: number, distanceM: number) {
+  if (durationSec <= 0 || distanceM <= 0) {
+    return {};
+  }
+
+  return {
+    avgPaceSecPerKm: Number((durationSec / (distanceM / 1000)).toFixed(2)),
+    avgPaceSecPer100m: Number((durationSec / (distanceM / 100)).toFixed(2))
+  };
+}
+
 const tcxParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", parseTagValue: true, trimValues: true });
 
 function asArray<T>(value: T | T[] | undefined): T[] {
@@ -62,7 +73,10 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     avgHr: session.avg_heart_rate ? Number(session.avg_heart_rate) : null,
     avgPower: session.avg_power ? Number(session.avg_power) : null,
     calories: session.total_calories ? Number(session.total_calories) : null,
-    parseSummary: { records: Array.isArray(fit?.records) ? fit.records.length : 0 }
+    parseSummary: {
+      records: Array.isArray(fit?.records) ? fit.records.length : 0,
+      ...buildPaceSummary(durationSec, Number(session.total_distance ?? 0))
+    }
   };
 }
 
@@ -90,6 +104,9 @@ export function parseTcxFile(xml: string): ParsedActivity {
     avgHr,
     avgPower: null,
     calories,
-    parseSummary: { lapCount: laps.length }
+    parseSummary: {
+      lapCount: laps.length,
+      ...buildPaceSummary(durationSec, distanceM)
+    }
   };
 }
