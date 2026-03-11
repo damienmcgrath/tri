@@ -651,14 +651,17 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                 <li key={action} className="text-sm text-[hsl(var(--text-secondary))]">• {action}</li>
               ))}
             </ul>
-            <div className="mt-2.5 flex flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <Link
                 href={topInsight.primaryAction.href}
                 className={topInsight.primaryAction.label === "Ask why" ? "btn-secondary" : "btn-primary"}
               >
                 {topInsight.primaryAction.label}
               </Link>
-              <a href={topInsight.secondaryAction.href} className="text-sm font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
+              <a
+                href={topInsight.secondaryAction.href}
+                className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+              >
                 {topInsight.secondaryAction.label}
               </a>
             </div>
@@ -686,12 +689,12 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
       </section>
 
       <section id="coaching-chat" className="surface overflow-hidden">
-        <div className="grid min-h-[560px] lg:grid-cols-[280px_1fr]">
-          <aside className="border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+        <div className="grid h-[68vh] min-h-[560px] max-h-[780px] lg:grid-cols-[280px_1fr]">
+          <aside className="flex min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
             <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-2 text-sm">
               New conversation
             </button>
-            <div className="mt-2.5 space-y-1.5">
+            <div className="mt-2.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
               {conversations.map((conversation, index) => {
                 const isActive = conversation.id === conversationId;
 
@@ -718,7 +721,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             </div>
           </aside>
 
-          <div className="flex flex-col">
+          <div className="flex min-h-0 flex-col">
         <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -745,7 +748,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
             shouldAutoScrollRef.current = distanceToBottom < 40;
           }}
-          className="max-h-[360px] flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
+          className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
         >
           {messages.map((message, index) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
