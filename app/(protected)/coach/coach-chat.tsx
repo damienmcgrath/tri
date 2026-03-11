@@ -24,6 +24,18 @@ type Conversation = {
   updated_at: string;
 };
 
+type StreamCompletePayload = {
+  conversationId: string;
+  responseId?: string;
+  structured: {
+    headline: string;
+    answer: string;
+    insights: string[];
+    actions: Array<{ type: string; label: string; payload?: Record<string, unknown> }>;
+    warnings: string[];
+  };
+};
+
 type IntentMatchStatus = "matched" | "partial" | "missed";
 type SessionDiagnosis = CoachDiagnosisSession;
 
@@ -386,7 +398,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
     setError(null);
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }, { role: "assistant", content: "" }]);
     setInput("");
 
     try {
@@ -396,25 +408,90 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
         body: JSON.stringify({ message: trimmed, conversationId })
       });
 
-      const data = (await response.json()) as {
-        answer?: string;
-        error?: string;
-        summary?: CoachSummary;
-        conversationId?: string;
-      };
-
-      if (!response.ok || !data.answer) {
+      if (!response.ok || !response.body) {
+        const data = (await response.json().catch(() => ({ error: "Could not get a coaching response." }))) as { error?: string };
         throw new Error(data.error ?? "Could not get a coaching response.");
       }
 
-      if (data.conversationId) {
-        setConversationId(data.conversationId);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const updateAssistant = (delta: string) => {
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIndex = next.length - 1;
+          if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
+            next[lastIndex] = { ...next[lastIndex], content: `${next[lastIndex].content}${delta}` };
+          }
+          return next;
+        });
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+
+        for (const frame of frames) {
+          const eventLine = frame.split("\n").find((line) => line.startsWith("event:"));
+          const dataLine = frame.split("\n").find((line) => line.startsWith("data:"));
+          if (!eventLine || !dataLine) {
+            continue;
+          }
+
+          const eventName = eventLine.slice(6).trim();
+          const data = JSON.parse(dataLine.slice(5).trim()) as Record<string, unknown>;
+
+          if (eventName === "message_start" && typeof data.conversationId === "string") {
+            setConversationId(data.conversationId);
+            continue;
+          }
+
+          if (eventName === "message_delta" && typeof data.chunk === "string") {
+            updateAssistant(data.chunk);
+            continue;
+          }
+
+          if (eventName === "error") {
+            throw new Error(typeof data.error === "string" ? data.error : "Could not get a coaching response.");
+          }
+
+          if (eventName === "message_complete") {
+            const completion = data as unknown as StreamCompletePayload;
+            if (completion.conversationId) {
+              setConversationId(completion.conversationId);
+            }
+            if (completion.structured) {
+              setSummary(null);
+              setMessages((prev) => {
+                const next = [...prev];
+                const lastIndex = next.length - 1;
+                if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
+                  next[lastIndex] = { ...next[lastIndex], content: completion.structured.answer ?? next[lastIndex].content };
+                }
+                return next;
+              });
+            }
+          }
+        }
       }
 
-      setSummary(data.summary ?? null);
-      setMessages((prev) => [...prev, { role: "assistant", content: data.answer! }]);
       await loadConversations();
     } catch (submitError) {
+      setMessages((prev) => {
+        const next = [...prev];
+        const lastIndex = next.length - 1;
+        if (lastIndex >= 0 && next[lastIndex]?.role === "assistant" && next[lastIndex].content.trim().length === 0) {
+          next.pop();
+        }
+        return next;
+      });
       setError(submitError instanceof Error ? submitError.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
@@ -596,16 +673,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                     : "border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] text-[hsl(var(--text-secondary))]"
                 }`}
               >
-                {message.content}
+                {message.content}{isLoading && message.role === "assistant" && index === messages.length - 1 ? " ▍" : ""}
               </div>
             </div>
           ))}
-          {isLoading ? (
-            <div className="space-y-2">
-              <div className="h-4 w-4/5 animate-pulse rounded bg-[hsl(var(--bg-card))]" />
-              <div className="h-4 w-2/3 animate-pulse rounded bg-[hsl(var(--bg-card))]" />
-            </div>
-          ) : null}
         </div>
 
         <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
