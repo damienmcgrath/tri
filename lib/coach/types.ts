@@ -2,8 +2,7 @@ import { z } from "zod";
 
 export const coachChatRequestSchema = z.object({
   message: z.string().trim().min(3).max(2000),
-  conversationId: z.preprocess((value) => (value === null ? undefined : value), z.string().uuid().optional()),
-  previousResponseId: z.preprocess((value) => (value === null ? undefined : value), z.string().min(1).max(200).optional())
+  conversationId: z.preprocess((value) => (value === null ? undefined : value), z.string().uuid().optional())
 });
 
 export type CoachChatRequest = z.infer<typeof coachChatRequestSchema>;
