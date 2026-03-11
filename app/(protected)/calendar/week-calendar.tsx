@@ -532,7 +532,7 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <p className="mt-1 min-h-[2.2rem] font-medium leading-snug">{getSessionTitle(session)}</p>
+                      <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{getSessionTitle(session)}</p>
                       <p className="mt-0 text-muted">{session.duration} min</p>
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
