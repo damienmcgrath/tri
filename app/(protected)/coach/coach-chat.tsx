@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CoachDiagnosisSession } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 
 type Message = {
+  id: string;
   role: "user" | "assistant";
   content: string;
+  pending?: boolean;
+  failed?: boolean;
+  retryText?: string;
 };
 
 type CoachSummary = {
@@ -55,10 +59,19 @@ type RankedSession = SessionDiagnosis & {
 };
 
 const defaultAssistantMessage: Message = {
+  id: "coach-default",
   role: "assistant",
   content:
     "I can diagnose whether completed sessions matched their intended purpose, then help you decide exactly how to adjust the rest of your week."
 };
+
+function createMessageId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function formatRecencyLabel(updatedAt?: string): string {
   if (!updatedAt) {
@@ -255,6 +268,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const activeRequestRef = useRef<AbortController | null>(null);
 
   const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
   const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
@@ -328,14 +345,14 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
     return formatRecencyLabel(activeConversation?.updated_at ?? conversations[0]?.updated_at);
   }, [conversationId, conversations]);
-
-  const meaningfulRecentThreads = useMemo(
-    () =>
-      conversations
-        .filter((conversation) => conversation.title.trim().length > 0)
-        .slice(0, 4),
-    [conversations]
-  );
+  const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === conversationId) ?? null, [conversations, conversationId]);
+  const condensedRationale = useMemo(() => {
+    const compact = topInsight.rationale.replace(/\s+/g, " ").trim();
+    if (compact.length <= 170) {
+      return compact;
+    }
+    return `${compact.slice(0, 167).trimEnd()}…`;
+  }, [topInsight.rationale]);
 
   async function loadConversations() {
     try {
@@ -362,6 +379,16 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
     }
   }, [initialPrompt]);
 
+  useEffect(() => {
+    const viewport = messagesViewportRef.current;
+
+    if (!viewport || !shouldAutoScrollRef.current) {
+      return;
+    }
+
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: isLoading ? "auto" : "smooth" });
+  }, [messages, isLoading]);
+
   async function handleConversationClick(nextConversationId: string) {
     setError(null);
 
@@ -381,31 +408,109 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   }
 
   function handleNewChat() {
+    activeRequestRef.current?.abort();
     setConversationId(null);
     setMessages([defaultAssistantMessage]);
     setSummary(null);
     setError(null);
+    setPendingMessageId(null);
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-
-    const trimmed = input.trim();
-
-    if (trimmed.length < 3 || isLoading) {
+  function handleStopStreaming() {
+    if (!activeRequestRef.current || !pendingMessageId) {
       return;
     }
 
+    activeRequestRef.current.abort();
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === pendingMessageId
+          ? {
+              ...message,
+              pending: false,
+              failed: true,
+              retryText: message.retryText,
+              content: message.content.trim().length > 0 ? message.content : "Response stopped."
+            }
+          : message
+      )
+    );
+    setPendingMessageId(null);
+  }
+
+  function conversationTitle(conversation: Conversation, index: number) {
+    const trimmed = conversation.title.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+    return `Conversation ${conversations.length - index}`;
+  }
+
+  async function handleRenameConversation(conversation: Conversation, index: number) {
+    const nextTitle = window.prompt("Rename conversation", conversationTitle(conversation, index));
+
+    if (!nextTitle || nextTitle.trim().length === 0) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/coach/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: conversation.id, title: nextTitle.trim() })
+      });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not rename conversation.");
+      }
+
+      await loadConversations();
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : "Could not rename conversation.");
+    }
+  }
+
+  async function handleDeleteConversation(conversationIdToDelete: string) {
+    const confirmed = window.confirm("Delete this conversation? This cannot be undone.");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/coach/chat?conversationId=${conversationIdToDelete}`, { method: "DELETE" });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not delete conversation.");
+      }
+
+      if (conversationIdToDelete === conversationId) {
+        handleNewChat();
+      }
+
+      await loadConversations();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Could not delete conversation.");
+    }
+  }
+
+  async function streamAssistantReply(trimmed: string) {
     setError(null);
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }, { role: "assistant", content: "" }]);
-    setInput("");
+    const userMessageId = createMessageId();
+    const assistantMessageId = createMessageId();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setPendingMessageId(assistantMessageId);
+    setMessages((prev) => [...prev, { id: userMessageId, role: "user", content: trimmed }, { id: assistantMessageId, role: "assistant", content: "", pending: true, retryText: trimmed }]);
 
     try {
       const response = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, conversationId })
+        body: JSON.stringify({ message: trimmed, conversationId }),
+        signal: controller.signal
       });
 
       if (!response.ok || !response.body) {
@@ -419,12 +524,11 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
       const updateAssistant = (delta: string) => {
         setMessages((prev) => {
-          const next = [...prev];
-          const lastIndex = next.length - 1;
-          if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
-            next[lastIndex] = { ...next[lastIndex], content: `${next[lastIndex].content}${delta}` };
-          }
-          return next;
+          return prev.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, content: `${message.content}${delta}`, pending: true, failed: false }
+              : message
+          );
         });
       };
 
@@ -470,12 +574,16 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             if (completion.structured) {
               setSummary(null);
               setMessages((prev) => {
-                const next = [...prev];
-                const lastIndex = next.length - 1;
-                if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
-                  next[lastIndex] = { ...next[lastIndex], content: completion.structured.answer ?? next[lastIndex].content };
-                }
-                return next;
+                return prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? {
+                        ...message,
+                        content: completion.structured.answer ?? message.content,
+                        pending: false,
+                        failed: false
+                      }
+                    : message
+                );
               });
             }
           }
@@ -484,212 +592,211 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
       await loadConversations();
     } catch (submitError) {
-      setMessages((prev) => {
-        const next = [...prev];
-        const lastIndex = next.length - 1;
-        if (lastIndex >= 0 && next[lastIndex]?.role === "assistant" && next[lastIndex].content.trim().length === 0) {
-          next.pop();
-        }
-        return next;
-      });
-      setError(submitError instanceof Error ? submitError.message : "Something went wrong.");
+      const message = submitError instanceof Error ? submitError.message : "Something went wrong.";
+      setMessages((prev) =>
+        prev.map((entry) =>
+          entry.id === assistantMessageId
+            ? {
+                ...entry,
+                pending: false,
+                failed: true,
+                retryText: trimmed,
+                content: entry.content.trim().length > 0 ? entry.content : `Could not get a coaching response. ${message}`
+              }
+            : entry
+        )
+      );
     } finally {
+      setPendingMessageId(null);
+      activeRequestRef.current = null;
       setIsLoading(false);
     }
   }
 
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+
+    const trimmed = input.trim();
+
+    if (trimmed.length < 3 || isLoading) {
+      return;
+    }
+
+    setInput("");
+    await streamAssistantReply(trimmed);
+  }
+
+  function handleRetry(message: Message) {
+    const retryText = message.retryText?.trim();
+    if (!retryText || isLoading) {
+      return;
+    }
+
+    void streamAssistantReply(retryText);
+  }
+
   return (
     <div className="space-y-5">
-      <section className="surface p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Top coaching insight</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
-        <p className="mt-3 max-w-3xl text-sm text-muted">{topInsight.rationale}</p>
-        {topInsight.confidenceNote ? (
-          <p className="mt-3 inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-xs text-[hsl(var(--text-secondary))]">
-            {topInsight.confidenceNote}
-          </p>
-        ) : null}
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Link href={topInsight.primaryAction.href} className="btn-primary">
-            {topInsight.primaryAction.label}
-          </Link>
-          <a
-            href={topInsight.secondaryAction.href}
-            className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.35)] hover:text-[hsl(var(--text-primary))]"
-          >
-            {topInsight.secondaryAction.label}
-          </a>
-        </div>
-      </section>
-
-      <section id="sessions-needing-attention" className="surface-subtle p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Sessions needing attention</h3>
-          <span className="text-xs text-tertiary">{dataRecency}</span>
-        </div>
-
-        {flaggedSessions.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-3">
-            <p className="text-sm text-muted">{dataState.unlockText}</p>
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-tertiary">
-              <li>{dataState.guidanceText}</li>
-              <li>Ask targeted questions now: what to protect this week, how to recover from a miss, and when to reduce load.</li>
-            </ul>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {flaggedSessions.map((session) => {
-              const status = statusChip(session.status);
-
-              return (
-                <article key={session.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-[hsl(var(--text-primary))]">{session.sessionName}</p>
-                    <div className="flex items-center gap-2">
-                      {session.executionScore !== null && session.executionScoreBand ? (
-                        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-2 text-right">
-                          <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
-                          <p className="mt-1 text-sm font-semibold text-[hsl(var(--text-primary))]">
-                            {session.executionScore} · {session.executionScoreBand}
-                            {session.executionScoreProvisional ? " · Provisional" : ""}
-                          </p>
-                        </div>
-                      ) : null}
-                      <span className={`signal-chip ${status.className}`}>{status.label}</span>
-                    </div>
-                  </div>
-                  <dl className="mt-3 space-y-2 text-sm">
-                    <div>
-                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Planned</dt>
-                      <dd className="text-[hsl(var(--text-secondary))]">{session.plannedIntent}</dd>
-                    </div>
-                    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
-                      {session.executionScoreBand ? (
-                        <span
-                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${executionScoreBandTone(session.executionScoreBand)}`}
-                        >
-                          {session.executionScoreBand}
-                        </span>
-                      ) : null}
-                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Actual</dt>
-                      <dd className="mt-1 text-[hsl(var(--text-secondary))]">{session.executionSummary}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
-                      <dd className="text-[hsl(var(--text-secondary))]">{session.whyItMatters}</dd>
-                    </div>
-                    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
-                      <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Next time</dt>
-                      <dd className="mt-1 font-medium text-[hsl(var(--text-primary))]">{session.nextAction}</dd>
-                    </div>
-                    {session.confidenceNote ? (
-                      <div>
-                        <dt className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Confidence</dt>
-                        <dd className="text-[hsl(var(--text-secondary))]">{session.confidenceNote}</dd>
-                      </div>
-                    ) : null}
-                  </dl>
-                  <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-3">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Why this was flagged</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted">
-                      {session.evidence.map((signal) => (
-                        <li key={signal}>{signal}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href={`/sessions/${session.id}`} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
-                      Open session review
-                    </Link>
-                    <a href="#coaching-chat" className="text-xs font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
-                      Ask about this workout
-                    </a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-
-        {matchedSessions.length > 0 ? (
-          <p className="mt-3 text-xs text-tertiary">{matchedSessions.length} completed session(s) matched intended purpose and were not flagged.</p>
-        ) : null}
-      </section>
-
       <section className="surface p-5">
-        <h3 className="text-sm font-semibold text-[hsl(var(--text-primary))]">What to do next</h3>
-        <ul className="mt-3 space-y-2">
-          {nextActions.map((action) => (
-            <li key={action} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-2 text-sm text-[hsl(var(--text-secondary))]">
-              {action}
-            </li>
-          ))}
-        </ul>
+        <div className="border-b border-[hsl(var(--border))] pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
+          <p className="mt-1.5 max-w-3xl text-sm text-muted">{condensedRationale}</p>
+        </div>
+        <div className="mt-3 grid gap-3.5 lg:grid-cols-[1.25fr_0.75fr]">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">What to do next</p>
+            <ul className="mt-1.5 space-y-1">
+              {nextActions.slice(0, 2).map((action) => (
+                <li key={action} className="text-sm text-[hsl(var(--text-secondary))]">• {action}</li>
+              ))}
+            </ul>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <Link
+                href={topInsight.primaryAction.href}
+                className={topInsight.primaryAction.label === "Ask why" ? "btn-secondary" : "btn-primary"}
+              >
+                {topInsight.primaryAction.label}
+              </Link>
+              <a
+                href={topInsight.secondaryAction.href}
+                className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+              >
+                {topInsight.secondaryAction.label}
+              </a>
+            </div>
+          </div>
+          <div className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
+              <span className="text-xs text-tertiary">{flaggedSessions.length}</span>
+            </div>
+            {flaggedSessions.length === 0 ? (
+              <p className="mt-1.5 text-xs text-muted">{dataState.unlockText}</p>
+            ) : (
+              <ul className="mt-1.5 space-y-1">
+                {flaggedSessions.slice(0, 2).map((session) => (
+                  <li key={session.id} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate text-[hsl(var(--text-secondary))]">{session.sessionName}</span>
+                    <span className={`signal-chip ${statusChip(session.status).className}`}>{statusChip(session.status).label}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {matchedSessions.length > 0 ? <p className="mt-1.5 text-xs text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
+          </div>
+        </div>
       </section>
 
       <section id="coaching-chat" className="surface overflow-hidden">
+        <div className="grid h-[68vh] min-h-[560px] max-h-[780px] lg:grid-cols-[280px_1fr]">
+          <aside className="flex min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+            <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-2 text-sm">
+              New conversation
+            </button>
+            <div className="mt-2.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+              {conversations.map((conversation, index) => {
+                const isActive = conversation.id === conversationId;
+
+                return (
+                  <div key={conversation.id} className={`rounded-xl border px-2.5 py-2 ${isActive ? "border-[hsl(var(--ai-accent-core)/0.5)] bg-[hsl(var(--ai-accent-core)/0.14)] shadow-[inset_2px_0_0_hsl(var(--ai-accent-core))]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+                    <div className="flex items-start justify-between gap-1">
+                      <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
+                        <p className={`truncate pr-1 text-sm font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"}`}>
+                          {conversationTitle(conversation, index)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-tertiary">{formatRecencyLabel(conversation.updated_at)}</p>
+                      </button>
+                      <details className="relative">
+                        <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
+                        <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
+                          <button type="button" onClick={() => void handleRenameConversation(conversation, index)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
+                          <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="flex min-h-0 flex-col">
         <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coaching chat</p>
-              <h3 className="mt-0.5 text-base font-semibold">Refine today&apos;s diagnosis</h3>
-              <p className="mt-0.5 text-sm text-muted">Ask what caused a mismatch, how to execute better, and whether this week should adapt.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Active conversation</p>
+              <h3 className="mt-0.5 text-base font-semibold">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
+              <p className="mt-0.5 text-sm text-muted">{dataRecency}</p>
             </div>
-            <button type="button" onClick={handleNewChat} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
-              New conversation
-            </button>
+          </div>
+        </div>
+        <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">Current coaching context</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-[hsl(var(--text-secondary))]">
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Insight: {topInsight.headline}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Focus: {nextActions[0] ?? "Stabilise execution quality."}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Flagged: {flaggedSessions.length}</span>
+            <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Data: {sessionDiagnoses.length} diagnosed sessions</span>
           </div>
         </div>
 
-        {meaningfulRecentThreads.length > 0 ? (
-          <div className="border-b border-[hsl(var(--border))] px-4 py-2">
-            <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent threads</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {meaningfulRecentThreads.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  onClick={() => void handleConversationClick(conversation.id)}
-                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                    conversationId === conversation.id
-                      ? "border-[hsl(var(--ai-accent-core)/0.4)] bg-[hsl(var(--ai-accent-core)/0.12)] text-[hsl(var(--text-primary))]"
-                      : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]"
-                  }`}
-                >
-                  {conversation.title.trim()} · {formatRecencyLabel(conversation.updated_at)}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="max-h-[320px] space-y-2 overflow-y-auto p-4">
+        <div
+          ref={messagesViewportRef}
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            shouldAutoScrollRef.current = distanceToBottom < 40;
+          }}
+          className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
+        >
           {messages.map((message, index) => (
-            <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${
+                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
                   message.role === "user"
                     ? "bg-[hsl(var(--ai-accent-core))] text-white"
-                    : "border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] text-[hsl(var(--text-secondary))]"
+                    : message.failed
+                      ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
+                      : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))]"
                 }`}
               >
-                {message.content}{isLoading && message.role === "assistant" && index === messages.length - 1 ? " ▍" : ""}
+                {message.pending && message.content.trim().length === 0 ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
+                    <span className="ml-1">Coach is thinking</span>
+                  </span>
+                ) : (
+                  <>
+                    {message.content}
+                    {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
+                  </>
+                )}
+                {message.failed && message.role === "assistant" && message.retryText ? (
+                  <div className="mt-2">
+                    <button type="button" onClick={() => handleRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-3">
+        <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-3 py-2.5">
           <label htmlFor="coach-input" className="sr-only">
             Ask your triathlon coach
           </label>
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-1.5 flex flex-wrap gap-1">
             {quickPrompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
                 onClick={() => setInput(prompt)}
-                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
               >
                 {prompt}
               </button>
@@ -702,13 +809,21 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
               onChange={(event) => setInput(event.target.value)}
               placeholder="Ask how to execute better and what to adjust next..."
               className="input-base"
+              disabled={isLoading}
             />
             <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">
               Send
             </button>
+            {isLoading ? (
+              <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
+                Stop
+              </button>
+            ) : null}
           </div>
           {error ? <p className="mt-2 text-sm text-rose-400">{error}</p> : null}
         </form>
+          </div>
+        </div>
       </section>
     </div>
   );
