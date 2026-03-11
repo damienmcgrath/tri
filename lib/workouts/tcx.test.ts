@@ -31,6 +31,11 @@ describe('TCX parsing and normalization', () => {
     expect(activity.distanceM).toBe(10100);
     expect(activity.avgHr).toBe(152);
     expect(activity.sportType).toBe('run');
+    expect(activity.parseSummary).toMatchObject({
+      lapCount: 2,
+      avgPaceSecPerKm: 362.38,
+      avgPaceSecPer100m: 36.24
+    });
   });
 
   test('given malformed TCX, then parsing throws', () => {

@@ -114,6 +114,8 @@ describe("executeCoachTool hardening", () => {
           avgPower: null,
           calories: 510,
           parseSummary: { lapCount: 24 },
+          avgPaceSecPerKm: 1500,
+          avgPaceSecPer100m: 150,
           source: "upload"
         }
       ]
