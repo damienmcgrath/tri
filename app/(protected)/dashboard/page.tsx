@@ -122,54 +122,54 @@ function getStatusChip(completionPct: number, expectedByTodayPct: number) {
 
 function getDefaultStatusInterpretation(statusLabel: string) {
   if (statusLabel === "On track") {
-    return "You are aligned with expected progress for today.";
+    return "On track — keep session order and keep easy work controlled.";
   }
 
   if (statusLabel === "Slightly behind") {
-    return "You are slightly behind; focus on consistency over the next 48 hours.";
+    return "Slightly behind — protect key sessions and avoid stacking missed work.";
   }
 
-  return "You are behind this week; protect key sessions and avoid cramming load late.";
+  return "At risk — complete the next key session and keep weekend load unchanged.";
 }
 
 function getDiagnosisStatusInterpretation(statusLabel: string, risk: ExecutionRisk) {
   if (risk === "easy_control") {
     if (statusLabel === "On track") {
-      return "On track, but easy-day control needs attention.";
+      return "On track — easy days are drifting too hard.";
     }
     if (statusLabel === "Slightly behind") {
-      return "Slightly behind, and easy-day control needs attention.";
+      return "Slightly behind — keep easy work truly easy.";
     }
-    return "At risk, and easy-day control needs immediate attention.";
+    return "At risk — rein in easy-day intensity now.";
   }
 
   if (risk === "recovery_control") {
     if (statusLabel === "On track") {
-      return "On track, but recovery intent is slipping.";
+      return "On track — recovery sessions are running too hard.";
     }
     if (statusLabel === "Slightly behind") {
-      return "Slightly behind, with recovery quality slipping.";
+      return "Slightly behind — hold recovery intent this week.";
     }
-    return "At risk, with recovery quality slipping.";
+    return "At risk — protect recovery quality before adding load.";
   }
 
   if (risk === "bike_consistency") {
     if (statusLabel === "On track") {
-      return "On track, but bike consistency needs attention.";
+      return "On track — bike execution needs tighter control.";
     }
     if (statusLabel === "Slightly behind") {
-      return "Slightly behind, with bike execution needing tighter control.";
+      return "Slightly behind — bike sessions need better execution.";
     }
-    return "At risk, and bike execution consistency needs immediate focus.";
+    return "At risk — stabilize bike execution before adding work.";
   }
 
   if (statusLabel === "On track") {
-    return "On track with strong execution — maintain current load.";
+    return "On track — execution is strong, hold the current load.";
   }
   if (statusLabel === "Slightly behind") {
-    return "Slightly behind on volume, but execution quality is strong.";
+    return "Slightly behind, but execution quality is strong.";
   }
-  return "At risk on progress; keep execution quality high while stabilizing load.";
+  return "At risk on progress — keep quality high while stabilizing load.";
 }
 
 function weekdayName(isoDate: string) {
@@ -249,7 +249,7 @@ function getDiagnosisAwareSignal({
       focusOverride: {
         kicker: "Focus this week",
         title: "Easy sessions are drifting too hard",
-        detail: "Recent easy work is missing intent. Keep easy days deliberately controlled so recovery and key-session quality stay protected.",
+        detail: "Hold easy sessions below target strain so key work stays high quality.",
         cta: nextEasyToday ? "Open today\'s easy session" : "Review upcoming easy sessions",
         href: nextEasyToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
         ctaStyle: "secondary"
@@ -264,7 +264,7 @@ function getDiagnosisAwareSignal({
       focusOverride: {
         kicker: "Focus this week",
         title: "Recovery quality is slipping",
-        detail: "Recovery-focused sessions are coming in above intended load. Hold recovery intent to avoid carrying excess fatigue into key work.",
+        detail: "Keep recovery sessions genuinely light to protect your next key day.",
         cta: nextRecoveryToday ? "Open today\'s recovery session" : "Review recovery sessions",
         href: nextRecoveryToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
         ctaStyle: "secondary"
@@ -279,7 +279,7 @@ function getDiagnosisAwareSignal({
       focusOverride: {
         kicker: "Focus this week",
         title: "Protect bike consistency",
-        detail: `${bikeOffIntent.length} of your last ${bikeSessions.length} bike sessions were off-intent. Keep bike execution controlled before adding extra load.`,
+        detail: `${bikeOffIntent.length} of last ${bikeSessions.length} bike sessions missed intent. Lock in execution before adding load.`,
         cta: upcomingBike ? `Open ${weekdayName(upcomingBike.date)} bike` : "Open next bike session",
         href: upcomingBike ? `/calendar?focus=${upcomingBike.id}` : "/calendar",
         ctaStyle: "secondary"
@@ -294,7 +294,7 @@ function getDiagnosisAwareSignal({
       focusOverride: {
         kicker: "Focus this week",
         title: "Key session execution is strong — maintain load",
-        detail: "Recent key sessions are matching intent. Keep the same discipline on easy and recovery days to preserve this momentum.",
+        detail: "Key sessions are landing. Keep easy and recovery days controlled to sustain momentum.",
         cta: "Open weekly plan",
         href: "/calendar",
         ctaStyle: "secondary"
@@ -520,7 +520,7 @@ export default async function DashboardPage({
       ? {
           kicker: "Needs attention",
           title: "You are behind this week",
-          detail: `${toHoursAndMinutes(behindByMinutes)} behind expected progress for today based on your planned time.`,
+          detail: `${toHoursAndMinutes(behindByMinutes)} behind expected progress today.`,
           cta: "Open weekly plan",
           href: "/calendar",
           ctaStyle: "primary"
@@ -529,7 +529,7 @@ export default async function DashboardPage({
         ? {
             kicker: "Needs attention",
             title: `${missedSessionsCount} missed session${missedSessionsCount > 1 ? "s" : ""}`,
-            detail: `${toHoursAndMinutes(missedMinutes)} is still uncompleted from earlier this week.`,
+            detail: `${toHoursAndMinutes(missedMinutes)} still open from earlier this week.`,
             cta: "Review missed work",
             href: "/calendar",
             ctaStyle: "primary"
@@ -541,8 +541,8 @@ export default async function DashboardPage({
         kicker: "Focus this week",
         title: `Protect ${biggestGap.label.toLowerCase()} consistency`,
         detail: nextGapSession
-          ? `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()} and keep weekend load unchanged.`
-          : `You are ${biggestGap.gap} min behind planned ${biggestGap.label.toLowerCase()} time. Best recovery path: complete the next planned ${biggestGap.label.toLowerCase()} workout and keep weekend load unchanged.`,
+          ? `${biggestGap.gap} min behind on ${biggestGap.label.toLowerCase()} load. Complete ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()} and keep weekend unchanged.`
+          : `${biggestGap.gap} min behind on ${biggestGap.label.toLowerCase()} load. Complete the next planned ${biggestGap.label.toLowerCase()} workout and keep weekend unchanged.`,
         cta: nextGapSession
           ? `Open ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()}`
           : `Open next ${biggestGap.label.toLowerCase()} workout`,
