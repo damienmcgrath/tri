@@ -61,7 +61,10 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   }
 
   const start = new Date(session.start_time);
-  const durationSec = Math.round(Number(session.total_elapsed_time ?? session.total_timer_time ?? 0));
+  const movingDurationSec = Math.round(Number(session.total_timer_time ?? 0));
+  const elapsedDurationSec = Math.round(Number(session.total_elapsed_time ?? movingDurationSec ?? 0));
+  const durationSec = movingDurationSec > 0 ? movingDurationSec : elapsedDurationSec;
+  const poolLengthMeters = Number(session.pool_length ?? 0);
   const end = new Date(start.getTime() + durationSec * 1000);
 
   return {
@@ -75,7 +78,9 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     calories: session.total_calories ? Number(session.total_calories) : null,
     parseSummary: {
       records: Array.isArray(fit?.records) ? fit.records.length : 0,
-      ...buildPaceSummary(durationSec, Number(session.total_distance ?? 0))
+      movingDurationSec: movingDurationSec > 0 ? movingDurationSec : undefined,
+      elapsedDurationSec: elapsedDurationSec > 0 ? elapsedDurationSec : undefined,
+      poolLengthMeters: poolLengthMeters > 0 ? poolLengthMeters : undefined
     }
   };
 }

@@ -106,20 +106,15 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     .order("date", { ascending: false })
     .limit(20);
 
-  const legacyCompletionCount = new Map<string, number>();
-  (completed ?? []).forEach((session) => {
-    const key = `${session.date}:${session.sport}`;
-    legacyCompletionCount.set(key, (legacyCompletionCount.get(key) ?? 0) + 1);
-  });
-
-  const uploadedFallback = (uploadedActivities ?? []).flatMap((activity) => {
+  const uploadedActivitiesRealData = (uploadedActivities ?? []).map((activity) => {
     const activityDate = activity.start_time_utc.slice(0, 10);
-    const key = `${activityDate}:${activity.sport_type}`;
-    const legacyCount = legacyCompletionCount.get(key) ?? 0;
-    if (legacyCount > 0) {
-      legacyCompletionCount.set(key, legacyCount - 1);
-      return [];
-    }
+
+    const parseSummary = typeof activity.parse_summary === "object" && activity.parse_summary
+      ? activity.parse_summary as Record<string, unknown>
+      : null;
+    const movingDurationSec = Number(parseSummary?.movingDurationSec ?? parseSummary?.moving_duration_sec ?? 0);
+    const elapsedDurationSec = Number(parseSummary?.elapsedDurationSec ?? parseSummary?.elapsed_duration_sec ?? activity.duration_sec ?? 0);
+    const poolLengthMeters = Number(parseSummary?.poolLengthMeters ?? parseSummary?.pool_length_meters ?? 0);
 
     const durationSec = activity.duration_sec ? Number(activity.duration_sec) : null;
     const distanceMeters = activity.distance_m ? Number(activity.distance_m) : null;
@@ -127,6 +122,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
     return {
       id: `activity:${activity.id}`,
+      source: "uploaded_activity" as const,
       date: activityDate,
       sport: activity.sport_type,
       durationMinutes: durationSec ? Math.round(durationSec / 60) : null,
@@ -137,7 +133,6 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       parseSummary: activity.parse_summary ?? null,
       avgPaceSecPerKm: pace.avgPaceSecPerKm,
       avgPaceSecPer100m: pace.avgPaceSecPer100m,
-      source: "upload"
     };
   });
 
@@ -176,7 +171,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
           source: "legacy"
         };
       }),
-      ...uploadedFallback
+      ...uploadedActivitiesRealData
     ],
     planned: (planned ?? []).map((session) => ({
       id: session.id,

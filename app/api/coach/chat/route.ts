@@ -74,35 +74,117 @@ function buildServiceFallback() {
   };
 }
 
+type StreamedResponseResult = {
+  responseId: string;
+  outputText: string;
+  toolCalls: Array<{ callId: string; name: string; argumentsJson: string }>;
+};
+
+type StreamWriters = {
+  onAnswerDelta?: (chunk: string) => void;
+};
+
+function sseEvent(event: string, data: Record<string, unknown>) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+async function collectResponseStream(params: {
+  request: Parameters<ReturnType<typeof getOpenAIClient>["responses"]["create"]>[0];
+  signal: AbortSignal;
+  streamWriters?: StreamWriters;
+  emitAnswerText: boolean;
+}) {
+  const client = getOpenAIClient();
+  const stream = await client.responses.create({ ...params.request, stream: true }, { signal: params.signal });
+
+  let responseId = "";
+  let outputText = "";
+  const toolCallMap = new Map<string, { callId: string; name: string; argumentsJson: string }>();
+
+  for await (const event of stream) {
+    if (event.type === "response.created") {
+      responseId = event.response.id;
+      continue;
+    }
+
+    if (event.type === "response.output_text.delta") {
+      outputText += event.delta;
+      if (params.emitAnswerText) {
+        params.streamWriters?.onAnswerDelta?.(event.delta);
+      }
+      continue;
+    }
+
+    if (event.type === "response.output_item.added" && event.item.type === "function_call") {
+      toolCallMap.set(event.item.call_id, {
+        callId: event.item.call_id,
+        name: event.item.name,
+        argumentsJson: event.item.arguments ?? ""
+      });
+      continue;
+    }
+
+    if (event.type === "response.function_call_arguments.delta") {
+      const existing = toolCallMap.get(event.item_id);
+      if (existing) {
+        existing.argumentsJson += event.delta;
+      }
+      continue;
+    }
+
+    if (event.type === "response.output_item.done" && event.item.type === "function_call") {
+      toolCallMap.set(event.item.call_id, {
+        callId: event.item.call_id,
+        name: event.item.name,
+        argumentsJson: event.item.arguments ?? ""
+      });
+    }
+  }
+
+  if (!responseId) {
+    throw new Error("Model response stream completed without response id.");
+  }
+
+  return {
+    responseId,
+    outputText,
+    toolCalls: [...toolCallMap.values()]
+  } satisfies StreamedResponseResult;
+}
+
 async function runCoachResponseFlow(params: {
   userMessage: string;
   priorMessages: ConversationMessageRow[];
   previousResponseId?: string;
   supabaseConversationId: string;
   toolDeps: Parameters<typeof executeCoachTool>[2];
+  signal: AbortSignal;
+  streamWriters?: StreamWriters;
 }) {
-  const client = getOpenAIClient();
   const history = params.priorMessages.slice(-10).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join("\n");
 
-  let response = await client.responses.create({
-    model: getCoachModel(),
-    instructions: COACH_SYSTEM_INSTRUCTIONS,
-    previous_response_id: params.previousResponseId,
-    input: [
-      {
-        role: "user",
-        content: [{ type: "input_text", text: `Conversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n\nAthlete message: ${params.userMessage}` }]
-      }
-    ],
-    tools: coachTools,
-    tool_choice: "auto",
-    stream: false
+  let response = await collectResponseStream({
+    request: {
+      model: getCoachModel(),
+      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      previous_response_id: params.previousResponseId,
+      input: [
+        {
+          role: "user",
+          content: [{ type: "input_text", text: `Conversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n\nAthlete message: ${params.userMessage}` }]
+        }
+      ],
+      tools: coachTools,
+      tool_choice: "auto"
+    },
+    signal: params.signal,
+    emitAnswerText: false
   });
 
   const seededPreviousResponseId = params.previousResponseId;
 
   for (let i = 0; i < 6; i += 1) {
-    const toolCalls = response.output.filter((item): item is { type: "function_call"; call_id: string; name: string; arguments: string } => item.type === "function_call");
+    const toolCalls = response.toolCalls;
 
     if (toolCalls.length === 0) {
       break;
@@ -122,7 +204,7 @@ async function runCoachResponseFlow(params: {
 
         toolOutputs.push({
           type: "function_call_output",
-          call_id: call.call_id,
+          call_id: call.callId,
           output: JSON.stringify({ error: `Unsupported tool: ${call.name}` })
         });
 
@@ -130,41 +212,64 @@ async function runCoachResponseFlow(params: {
       }
 
       const toolName: CoachToolName = call.name;
-      const parsedArgs = parseToolArgs(call.arguments);
+      const parsedArgs = parseToolArgs(call.argumentsJson);
 
       try {
         const output = await executeCoachTool(toolName, parsedArgs, params.toolDeps);
-        toolOutputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) });
+        toolOutputs.push({ type: "function_call_output", call_id: call.callId, output: JSON.stringify(output) });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown tool error";
-        toolOutputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify({ error: message }) });
+        toolOutputs.push({ type: "function_call_output", call_id: call.callId, output: JSON.stringify({ error: message }) });
       }
     }
 
-    response = await client.responses.create({
-      model: getCoachModel(),
-      previous_response_id: response.id,
-      input: toolOutputs,
-      instructions: COACH_SYSTEM_INSTRUCTIONS,
-      stream: false
+    response = await collectResponseStream({
+      request: {
+        model: getCoachModel(),
+        previous_response_id: response.responseId,
+        input: toolOutputs,
+        instructions: COACH_SYSTEM_INSTRUCTIONS
+      },
+      signal: params.signal,
+      emitAnswerText: false
     });
   }
 
-  const draftAnswer = extractOutputText(response);
-
-  const formatterResponse = await client.responses.create({
-    model: getCoachModel(),
-    instructions: COACH_STRUCTURING_INSTRUCTIONS,
-    input: [
-      {
-        role: "user",
-        content: [{ type: "input_text", text: `Return strict JSON only.\n\n${draftAnswer}` }]
-      }
-    ],
-    stream: false
+  const finalAnswerResponse = await collectResponseStream({
+    request: {
+      model: getCoachModel(),
+      previous_response_id: response.responseId,
+      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      input: [
+        {
+          role: "user",
+          content: [{ type: "input_text", text: "Now provide the final athlete-facing answer only. Do not include tool-call traces, function arguments, raw JSON payloads, or internal reasoning." }]
+        }
+      ]
+    },
+    signal: params.signal,
+    streamWriters: params.streamWriters,
+    emitAnswerText: true
   });
 
-  const structuredJson = extractOutputText(formatterResponse);
+  const draftAnswer = extractOutputText({ output_text: finalAnswerResponse.outputText });
+
+  const formatterResponse = await collectResponseStream({
+    request: {
+      model: getCoachModel(),
+      instructions: COACH_STRUCTURING_INSTRUCTIONS,
+      input: [
+        {
+          role: "user",
+          content: [{ type: "input_text", text: `Return strict JSON only.\n\n${draftAnswer}` }]
+        }
+      ]
+    },
+    signal: params.signal,
+    emitAnswerText: false
+  });
+
+  const structuredJson = extractOutputText({ output_text: formatterResponse.outputText });
   const parsed = z.string().transform((text, ctx) => {
     try {
       return JSON.parse(text) as unknown;
@@ -177,7 +282,7 @@ async function runCoachResponseFlow(params: {
   return {
     answer: draftAnswer,
     structured: parsed.success ? parsed.data : safeStructuredFallback(draftAnswer),
-    responseId: response.id,
+    responseId: finalAnswerResponse.responseId,
     previousResponseId: seededPreviousResponseId
   };
 }
@@ -332,70 +437,99 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: historyError.message }, { status: 500 });
   }
 
-  let result: Awaited<ReturnType<typeof runCoachResponseFlow>> | ReturnType<typeof buildServiceFallback>;
+  const stream = new ReadableStream({
+    start: (controller) => {
+      const encoder = new TextEncoder();
+      const pushEvent = (event: string, data: Record<string, unknown>) => controller.enqueue(encoder.encode(sseEvent(event, data)));
 
-  try {
-    result = await runCoachResponseFlow({
-      userMessage: payload.message,
-      priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
-      previousResponseId: conversationLastResponseId,
-      supabaseConversationId: resolvedConversationId,
-      toolDeps: { ctx, supabase }
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    logCoachAudit("error", "coach.chat.response_failure", {
-      ctx,
-      route: "POST /api/coach/chat",
-      success: false,
-      reason: message
-    });
+      pushEvent("message_start", { conversationId: resolvedConversationId });
 
-    result = buildServiceFallback();
-  }
+      void (async () => {
+        let result: Awaited<ReturnType<typeof runCoachResponseFlow>> | ReturnType<typeof buildServiceFallback>;
 
-  const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
-    {
-      conversation_id: resolvedConversationId,
-      user_id: ctx.userId,
-      athlete_id: ctx.athleteId,
-      role: "user",
-      content: payload.message,
-      previous_response_id: result.previousResponseId ?? null,
-      model: getCoachModel()
-    },
-    {
-      conversation_id: resolvedConversationId,
-      user_id: ctx.userId,
-      athlete_id: ctx.athleteId,
-      role: "assistant",
-      content: result.answer,
-      response_id: result.responseId ?? null,
-      previous_response_id: result.previousResponseId ?? null,
-      model: getCoachModel()
+        try {
+          result = await runCoachResponseFlow({
+            userMessage: payload.message,
+            priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
+            previousResponseId: conversationLastResponseId,
+            supabaseConversationId: resolvedConversationId,
+            toolDeps: { ctx, supabase },
+            signal: request.signal,
+            streamWriters: {
+              onAnswerDelta: (chunk) => pushEvent("message_delta", { chunk })
+            }
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown error";
+          logCoachAudit("error", "coach.chat.response_failure", {
+            ctx,
+            route: "POST /api/coach/chat",
+            success: false,
+            reason: message
+          });
+
+          result = buildServiceFallback();
+        }
+
+        const { error: insertMessagesError } = await supabase.from("ai_messages").insert([
+          {
+            conversation_id: resolvedConversationId,
+            user_id: ctx.userId,
+            athlete_id: ctx.athleteId,
+            role: "user",
+            content: payload.message,
+            previous_response_id: result.previousResponseId ?? null,
+            model: getCoachModel()
+          },
+          {
+            conversation_id: resolvedConversationId,
+            user_id: ctx.userId,
+            athlete_id: ctx.athleteId,
+            role: "assistant",
+            content: result.answer,
+            response_id: result.responseId ?? null,
+            previous_response_id: result.previousResponseId ?? null,
+            model: getCoachModel()
+          }
+        ]);
+
+        if (insertMessagesError) {
+          pushEvent("error", { error: insertMessagesError.message });
+          controller.close();
+          return;
+        }
+
+        await supabase
+          .from("ai_conversations")
+          .update({ updated_at: new Date().toISOString(), last_response_id: result.responseId ?? null })
+          .eq("id", resolvedConversationId);
+
+        logCoachAudit("info", "coach.chat.response_success", {
+          ctx,
+          route: "POST /api/coach/chat",
+          success: true
+        });
+
+        pushEvent("message_complete", {
+          conversationId: resolvedConversationId,
+          responseId: result.responseId,
+          structured: result.structured
+        });
+        controller.close();
+      })().catch((error) => {
+        const message = error instanceof Error ? error.message : "Unexpected streaming failure";
+        pushEvent("error", { error: message });
+        controller.close();
+      });
     }
-  ]);
-
-  if (insertMessagesError) {
-    return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
-  }
-
-  await supabase
-    .from("ai_conversations")
-    .update({ updated_at: new Date().toISOString(), last_response_id: result.responseId ?? null })
-    .eq("id", resolvedConversationId);
-
-  logCoachAudit("info", "coach.chat.response_success", {
-    ctx,
-    route: "POST /api/coach/chat",
-    success: true
   });
 
-  return NextResponse.json({
-    conversationId: resolvedConversationId,
-    responseId: result.responseId,
-    ...result.structured
-  }, {
-    headers: rateLimitHeaders(userRateLimit)
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      ...rateLimitHeaders(userRateLimit)
+    }
   });
 }

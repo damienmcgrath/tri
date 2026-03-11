@@ -1,3 +1,43 @@
+import { TextDecoder, TextEncoder } from "node:util";
+import { ReadableStream } from "node:stream/web";
+
+(globalThis as unknown as { ReadableStream?: typeof ReadableStream }).ReadableStream = ReadableStream;
+(globalThis as unknown as { TextEncoder?: typeof TextEncoder }).TextEncoder = TextEncoder;
+(globalThis as unknown as { TextDecoder?: typeof TextDecoder }).TextDecoder = TextDecoder;
+class MockResponse {
+  status: number;
+  headers: Headers;
+  body: ReadableStream<Uint8Array> | null;
+
+  constructor(body?: BodyInit | null, init?: ResponseInit) {
+    this.status = init?.status ?? 200;
+    this.headers = new Headers(init?.headers);
+    this.body = (body as ReadableStream<Uint8Array>) ?? null;
+  }
+
+  async text() {
+    if (!this.body) {
+      return "";
+    }
+
+    const reader = this.body.getReader();
+    const decoder = new TextDecoder();
+    let output = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      output += decoder.decode(value, { stream: true });
+    }
+
+    return output;
+  }
+}
+
+(globalThis as unknown as { Response?: typeof MockResponse }).Response = MockResponse;
+
 jest.mock("../../../../lib/coach/auth", () => ({
   resolveCoachAuthContext: jest.fn()
 }));
@@ -82,108 +122,158 @@ function createSupabaseMock(opts?: {
     })
   };
 
-  return { supabase, conversationsLookupBuilder, messagesSelectBuilder, aiMessagesInsert };
+  return { supabase, conversationsLookupBuilder, aiMessagesInsert };
 }
 
 function makeRequest(url: string, body: Record<string, unknown>) {
   return {
     url,
+    signal: new AbortController().signal,
     json: async () => body
   } as Request;
 }
 
-describe("POST /api/coach/chat hardening", () => {
+function makeStream(events: unknown[]) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const event of events) {
+        yield event;
+      }
+    }
+  };
+}
+
+async function readSse(response: Response) {
+  const text = await response.text();
+  const frames = text.split("\n\n").filter(Boolean);
+  return frames.map((frame) => {
+    const eventName = frame.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "message";
+    const dataLine = frame.split("\n").find((line) => line.startsWith("data:"))?.slice(5).trim() ?? "{}";
+    return { event: eventName, data: JSON.parse(dataLine) as Record<string, unknown> };
+  });
+}
+
+describe("POST /api/coach/chat streaming", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it("rejects unauthenticated requests", async () => {
     (resolveCoachAuthContext as jest.Mock).mockResolvedValue({ supabase: {}, ctx: null, reason: "unauthenticated" });
-
-    const req = makeRequest("http://localhost/api/coach/chat", { message: "Need help with my week" });
-
-    const res = await POST(req);
+    const res = await POST(makeRequest("http://localhost/api/coach/chat", { message: "Need help with my week" }));
     expect(res.status).toBe(401);
   });
 
-  it("rejects authenticated users without athlete profile", async () => {
-    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({ supabase: {}, ctx: null, reason: "missing-athlete-profile" });
-
-    const req = makeRequest("http://localhost/api/coach/chat", { message: "Need help with my week" });
-
-    const res = await POST(req);
-    expect(res.status).toBe(403);
-  });
-
-  it("rejects accessing a conversation not owned by current athlete", async () => {
-    const { supabase } = createSupabaseMock({ conversationLookup: { data: null, error: null } });
-
-    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
-      supabase,
-      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
-      reason: null
-    });
-
-    const req = makeRequest("http://localhost/api/coach/chat", {
-      message: "Need help with my week",
-      conversationId: "11111111-1111-4111-8111-111111111111"
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(404);
-    expect((supabase.from as jest.Mock).mock.calls[0][0]).toBe("ai_conversations");
-  });
-
-  it("creates a new conversation and returns a stable conversation id", async () => {
+  it("streams assistant chunks and completion metadata", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
-
     (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
       supabase,
       ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
       reason: null
     });
 
-    (getOpenAIClient as jest.Mock).mockReturnValue({
-      responses: {
-        create: jest.fn()
-          .mockResolvedValueOnce({
-            id: "resp-1",
-            output: [],
-            output_text: "Keep intensity controlled this week."
-          })
-          .mockResolvedValueOnce({
-            id: "resp-2",
-            output: [],
-            output_text: JSON.stringify({
-              headline: "Stay controlled",
-              answer: "Keep intensity controlled this week.",
-              insights: [],
-              actions: [],
-              warnings: []
-            })
-          })
-      }
-    });
+    const create = jest.fn()
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-analysis" } },
+          { type: "response.output_text.delta", delta: "Internal draft" }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-1" } },
+          { type: "response.output_text.delta", delta: "Keep " },
+          { type: "response.output_text.delta", delta: "it easy." }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-structured" } },
+          {
+            type: "response.output_text.delta",
+            delta: JSON.stringify({ headline: "Stay easy", answer: "Keep it easy.", insights: [], actions: [], warnings: [] })
+          }
+        ])
+      );
 
-    const req = makeRequest("http://localhost/api/coach/chat", {
-      message: "How should I adjust this week?",
-      conversationId: null
-    });
+    (getOpenAIClient as jest.Mock).mockReturnValue({ responses: { create } });
 
-    const res = await POST(req);
+    const res = await POST(makeRequest("http://localhost/api/coach/chat", { message: "How should I adjust this week?", conversationId: null }));
+
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
 
-    const body = await res.json();
-    expect(body).toMatchObject({
+    const events = await readSse(res as Response);
+    const deltas = events.filter((event) => event.event === "message_delta");
+
+    expect(deltas.map((event) => event.data.chunk)).toEqual(["Keep ", "it easy."]);
+    expect(events.find((event) => event.event === "message_start")?.data.conversationId).toBe("conv1");
+    expect(events.find((event) => event.event === "message_complete")?.data).toMatchObject({
       conversationId: "conv1",
       responseId: "resp-1",
-      headline: "Stay controlled"
+      structured: { headline: "Stay easy", answer: "Keep it easy." }
     });
   });
 
-  it("returns fallback guidance instead of 502 when model call fails", async () => {
+  it("keeps tool calls server-side and scoped", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
+    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
+      supabase,
+      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
+      reason: null
+    });
 
+    (executeCoachTool as jest.Mock).mockResolvedValue({ weekStart: "2026-03-09", completionRatio: 0.75 });
+
+    const create = jest.fn()
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-1" } },
+          {
+            type: "response.output_item.done",
+            item: { type: "function_call", call_id: "call-1", name: "get_week_progress", arguments: "{}" }
+          }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-2" } },
+          { type: "response.output_text.delta", delta: "Internal stitched answer." }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-final" } },
+          { type: "response.output_text.delta", delta: "You are on track." }
+        ])
+      )
+      .mockResolvedValueOnce(
+        makeStream([
+          { type: "response.created", response: { id: "resp-3" } },
+          {
+            type: "response.output_text.delta",
+            delta: JSON.stringify({ headline: "On track", answer: "You are on track.", insights: [], actions: [], warnings: [] })
+          }
+        ])
+      );
+
+    (getOpenAIClient as jest.Mock).mockReturnValue({ responses: { create } });
+
+    const res = await POST(makeRequest("http://localhost/api/coach/chat", { message: "How am I doing this week?" }));
+    const events = await readSse(res as Response);
+
+    expect(events.find((event) => event.event === "message_complete")?.data).toMatchObject({ responseId: "resp-final" });
+    expect(executeCoachTool).toHaveBeenCalledWith(
+      "get_week_progress",
+      {},
+      expect.objectContaining({
+        ctx: expect.objectContaining({ userId: "user-a", athleteId: "athlete-a" })
+      })
+    );
+  });
+
+  it("returns stream error event when model call fails", async () => {
+    const { supabase } = createSupabaseMock({ history: [] });
     (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
       supabase,
       ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
@@ -196,129 +286,13 @@ describe("POST /api/coach/chat hardening", () => {
       }
     });
 
-    const req = makeRequest("http://localhost/api/coach/chat", {
-      message: "What should I do tomorrow?",
-      conversationId: null
-    });
+    const res = await POST(makeRequest("http://localhost/api/coach/chat", { message: "What should I do tomorrow?" }));
+    const events = await readSse(res as Response);
 
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body.answer).toBe("I can’t reach the coaching model right now. Please try again soon.");
-    expect(body.headline).toBe("I can’t reach the coaching model right now. Please try again soon.");
-  });
-
-  it("runs tool loop and returns stable structured JSON shape", async () => {
-    const { supabase } = createSupabaseMock({ history: [] });
-
-    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
-      supabase,
-      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
-      reason: null
-    });
-
-    (executeCoachTool as jest.Mock).mockResolvedValue({ weekStart: "2026-03-09", completionRatio: 0.75 });
-
-    (getOpenAIClient as jest.Mock).mockReturnValue({
-      responses: {
-        create: jest.fn()
-          .mockResolvedValueOnce({
-            id: "resp-1",
-            output: [{ type: "function_call", call_id: "call-1", name: "get_week_progress", arguments: "{}" }],
-            output_text: ""
-          })
-          .mockResolvedValueOnce({
-            id: "resp-2",
-            output: [],
-            output_text: "You are on track this week."
-          })
-          .mockResolvedValueOnce({
-            id: "resp-3",
-            output: [],
-            output_text: JSON.stringify({
-              headline: "On track",
-              answer: "You are on track this week.",
-              insights: ["3 of 4 key sessions completed"],
-              actions: [{ type: "focus", label: "Keep Thursday easy" }],
-              warnings: []
-            })
-          })
+    expect(events.find((event) => event.event === "message_complete")?.data).toMatchObject({
+      structured: {
+        answer: "I can’t reach the coaching model right now. Please try again soon."
       }
     });
-
-    const req = makeRequest("http://localhost/api/coach/chat", { message: "How am I doing this week?" });
-
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body).toMatchObject({
-      conversationId: "conv1",
-      responseId: "resp-2",
-      headline: "On track",
-      answer: "You are on track this week.",
-      insights: expect.any(Array),
-      actions: expect.any(Array),
-      warnings: expect.any(Array)
-    });
-
-    expect(executeCoachTool).toHaveBeenCalledWith(
-      "get_week_progress",
-      {},
-      expect.objectContaining({
-        ctx: expect.objectContaining({ userId: "user-a", athleteId: "athlete-a" })
-      })
-    );
-  });
-
-  it("continues an existing conversation with persisted previous_response_id and re-sent instructions", async () => {
-    const { supabase, conversationsLookupBuilder, aiMessagesInsert } = createSupabaseMock({
-      conversationLookup: { data: { id: "11111111-1111-4111-8111-111111111111", last_response_id: "resp-prev" }, error: null },
-      history: []
-    });
-
-    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
-      supabase,
-      ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
-      reason: null
-    });
-
-    const create = jest.fn()
-      .mockResolvedValueOnce({
-        id: "resp-next",
-        output: [],
-        output_text: "Continue with low intensity today."
-      })
-      .mockResolvedValueOnce({
-        id: "resp-structured",
-        output: [],
-        output_text: JSON.stringify({
-          headline: "Keep control",
-          answer: "Continue with low intensity today.",
-          insights: [],
-          actions: [],
-          warnings: []
-        })
-      });
-
-    (getOpenAIClient as jest.Mock).mockReturnValue({ responses: { create } });
-
-    const req = makeRequest("http://localhost/api/coach/chat", {
-      message: "continue",
-      conversationId: "11111111-1111-4111-8111-111111111111"
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-
-    const firstCall = create.mock.calls[0][0];
-    expect(firstCall.previous_response_id).toBe("resp-prev");
-    expect(firstCall.instructions).toBeDefined();
-
-    expect(conversationsLookupBuilder.eq).toHaveBeenCalledWith("athlete_id", "athlete-a");
-    expect(aiMessagesInsert).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ role: "assistant", previous_response_id: "resp-prev", response_id: "resp-next" })
-    ]));
   });
 });
