@@ -51,7 +51,9 @@ describe("executeCoachTool hardening", () => {
             id: "activity-1",
             sport_type: "swim",
             start_time_utc: "2026-03-10T07:10:00.000Z",
-            duration_sec: 3600
+            duration_sec: 3600,
+            distance_m: 2840,
+            parse_summary: { movingDurationSec: 3300, elapsedDurationSec: 3600, poolLengthMeters: 20 }
           }
         ],
         error: null
@@ -63,7 +65,9 @@ describe("executeCoachTool hardening", () => {
           id: "activity-1",
           sport_type: "swim",
           start_time_utc: "2026-03-10T07:10:00.000Z",
-          duration_sec: 3600
+          duration_sec: 3600,
+          distance_m: 2840,
+          parse_summary: { movingDurationSec: 3300, elapsedDurationSec: 3600, poolLengthMeters: 20 }
         }
       ],
       error: null
@@ -98,7 +102,10 @@ describe("executeCoachTool hardening", () => {
           id: "activity:activity-1",
           date: "2026-03-10",
           sport: "swim",
-          durationMinutes: 60
+          durationMinutes: 55,
+          elapsedDurationMinutes: 60,
+          distanceMeters: 2840,
+          poolLengthMeters: 20
         }
       ]
     });

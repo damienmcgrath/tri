@@ -75,7 +75,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: uploadedActivities, error: uploadedActivitiesError } = await deps.supabase
     .from("completed_activities")
-    .select("id,sport_type,start_time_utc,duration_sec")
+    .select("id,sport_type,start_time_utc,duration_sec,distance_m,parse_summary")
     .eq("user_id", deps.ctx.userId)
     .gte("start_time_utc", sinceUtc)
     .lte("start_time_utc", todayUtc)
@@ -110,11 +110,22 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       return [];
     }
 
+    const parseSummary = typeof activity.parse_summary === "object" && activity.parse_summary
+      ? activity.parse_summary as Record<string, unknown>
+      : null;
+    const movingDurationSec = Number(parseSummary?.movingDurationSec ?? parseSummary?.moving_duration_sec ?? 0);
+    const elapsedDurationSec = Number(parseSummary?.elapsedDurationSec ?? parseSummary?.elapsed_duration_sec ?? activity.duration_sec ?? 0);
+    const durationSec = movingDurationSec > 0 ? movingDurationSec : elapsedDurationSec;
+    const poolLengthMeters = Number(parseSummary?.poolLengthMeters ?? parseSummary?.pool_length_meters ?? 0);
+
     return {
       id: `activity:${activity.id}`,
       date: activityDate,
       sport: activity.sport_type,
-      durationMinutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null
+      durationMinutes: durationSec > 0 ? Math.round(durationSec / 60) : null,
+      elapsedDurationMinutes: elapsedDurationSec > 0 ? Math.round(elapsedDurationSec / 60) : null,
+      distanceMeters: typeof activity.distance_m === "number" ? activity.distance_m : null,
+      poolLengthMeters: poolLengthMeters > 0 ? poolLengthMeters : null
     };
   });
 

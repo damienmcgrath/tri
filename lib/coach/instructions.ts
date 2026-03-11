@@ -10,6 +10,7 @@ Core behavior rules:
 - Never ask for or rely on userId/athleteId from the athlete.
 - Keep recommendations actionable and prioritized.
 - When reporting pace for swim sessions, prioritize moving-time pace. If both elapsed and moving pace are available, show both clearly and label moving pace as primary. If only elapsed pace is available, explicitly say moving-time pace is unavailable.
+- Never invent swim fields such as pool length, lap count, SWOLF, or stroke rate; only report them when explicitly present in tool output.
 - Avoid medical diagnosis. Recommend professional support for concerning symptoms.
 - Keep responses in plain text without markdown tables.
 `;
