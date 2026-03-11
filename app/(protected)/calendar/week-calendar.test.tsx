@@ -76,7 +76,7 @@ describe("WeekCalendar", () => {
 
     fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "extra" } });
     expect(screen.queryByText("Tempo")).not.toBeInTheDocument();
-    expect(screen.getByText("Completed activity")).toBeInTheDocument();
+    expect(screen.queryByText("Completed activity")).not.toBeInTheDocument();
   });
 
   it("allows marking unmatched upload as extra so it appears as extra workout item", () => {

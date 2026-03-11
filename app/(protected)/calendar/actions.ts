@@ -52,9 +52,31 @@ export async function moveSessionAction(input: { sessionId: string; newDate: str
   const parsed = moveSessionSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
 
+  const { data: session, error: sessionError } = await supabase
+    .from("planned_sessions")
+    .select("date,notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (sessionError) {
+    throw new Error(sessionError.message ?? "Could not load session before moving.");
+  }
+
+  if (!session) {
+    throw new Error("Session not found.");
+  }
+
+  if (session.date === parsed.newDate) {
+    return;
+  }
+
+  const withoutExistingMoveTag = (session.notes ?? "").replace(/\n?\[moved\sfrom\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+  const nextNotes = `${withoutExistingMoveTag}\n[Moved from ${session.date}]`.trim();
+
   const { error } = await supabase
     .from("planned_sessions")
-    .update({ date: parsed.newDate })
+    .update({ date: parsed.newDate, notes: nextNotes })
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id);
 
