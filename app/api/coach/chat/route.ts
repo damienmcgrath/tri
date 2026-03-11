@@ -14,6 +14,7 @@ type ConversationRow = {
   id: string;
   title: string;
   updated_at: string;
+  last_response_id: string | null;
 };
 
 type ConversationMessageRow = {
@@ -21,7 +22,6 @@ type ConversationMessageRow = {
   content: string;
   created_at: string;
 };
-
 
 function isCoachToolName(name: string): name is CoachToolName {
   return Object.prototype.hasOwnProperty.call(coachToolSchemas, name);
@@ -69,10 +69,10 @@ function buildServiceFallback() {
       actions: [],
       warnings: []
     },
-    responseId: undefined as string | undefined
+    responseId: undefined as string | undefined,
+    previousResponseId: undefined as string | undefined
   };
 }
-
 
 async function runCoachResponseFlow(params: {
   userMessage: string;
@@ -98,6 +98,8 @@ async function runCoachResponseFlow(params: {
     tool_choice: "auto",
     stream: false
   });
+
+  const seededPreviousResponseId = params.previousResponseId;
 
   for (let i = 0; i < 6; i += 1) {
     const toolCalls = response.output.filter((item): item is { type: "function_call"; call_id: string; name: string; arguments: string } => item.type === "function_call");
@@ -175,7 +177,8 @@ async function runCoachResponseFlow(params: {
   return {
     answer: draftAnswer,
     structured: parsed.success ? parsed.data : safeStructuredFallback(draftAnswer),
-    responseId: response.id
+    responseId: response.id,
+    previousResponseId: seededPreviousResponseId
   };
 }
 
@@ -210,7 +213,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("ai_conversations")
-    .select("id,title,updated_at")
+    .select("id,title,updated_at,last_response_id")
     .eq("user_id", ctx.userId)
     .eq("athlete_id", ctx.athleteId)
     .order("updated_at", { ascending: false })
@@ -268,6 +271,7 @@ export async function POST(request: Request) {
   }
 
   let conversationId = payload.conversationId;
+  let conversationLastResponseId: string | undefined;
 
   if (conversationId) {
     if (!z.string().uuid().safeParse(conversationId).success) {
@@ -275,7 +279,7 @@ export async function POST(request: Request) {
     }
     const { data: existingConversation } = await supabase
       .from("ai_conversations")
-      .select("id")
+      .select("id,last_response_id")
       .eq("id", conversationId)
       .eq("user_id", ctx.userId)
       .eq("athlete_id", ctx.athleteId)
@@ -290,13 +294,15 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
     }
+
+    conversationLastResponseId = existingConversation.last_response_id ?? undefined;
   }
 
   if (!conversationId) {
     const { data: createdConversation, error: conversationError } = await supabase
       .from("ai_conversations")
       .insert({ user_id: ctx.userId, athlete_id: ctx.athleteId, title: payload.message.slice(0, 60) })
-      .select("id")
+      .select("id,last_response_id")
       .single();
 
     if (conversationError || !createdConversation) {
@@ -304,6 +310,7 @@ export async function POST(request: Request) {
     }
 
     conversationId = createdConversation.id;
+    conversationLastResponseId = createdConversation.last_response_id ?? undefined;
   }
 
   const resolvedConversationId = conversationId;
@@ -331,7 +338,7 @@ export async function POST(request: Request) {
     result = await runCoachResponseFlow({
       userMessage: payload.message,
       priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
-      previousResponseId: payload.previousResponseId,
+      previousResponseId: conversationLastResponseId,
       supabaseConversationId: resolvedConversationId,
       toolDeps: { ctx, supabase }
     });
@@ -353,14 +360,19 @@ export async function POST(request: Request) {
       user_id: ctx.userId,
       athlete_id: ctx.athleteId,
       role: "user",
-      content: payload.message
+      content: payload.message,
+      previous_response_id: result.previousResponseId ?? null,
+      model: getCoachModel()
     },
     {
       conversation_id: resolvedConversationId,
       user_id: ctx.userId,
       athlete_id: ctx.athleteId,
       role: "assistant",
-      content: result.answer
+      content: result.answer,
+      response_id: result.responseId ?? null,
+      previous_response_id: result.previousResponseId ?? null,
+      model: getCoachModel()
     }
   ]);
 
@@ -368,7 +380,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertMessagesError.message }, { status: 500 });
   }
 
-  await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", resolvedConversationId);
+  await supabase
+    .from("ai_conversations")
+    .update({ updated_at: new Date().toISOString(), last_response_id: result.responseId ?? null })
+    .eq("id", resolvedConversationId);
 
   logCoachAudit("info", "coach.chat.response_success", {
     ctx,

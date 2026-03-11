@@ -21,7 +21,6 @@ jest.mock("../../../../lib/security/rate-limit", () => ({
   rateLimitHeaders: jest.fn(() => ({}))
 }));
 
-
 jest.mock("next/server", () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
@@ -57,9 +56,10 @@ function createSupabaseMock(opts?: {
   createdConversationId?: string;
   history?: unknown[];
 }) {
-  const conversationsLookupBuilder = createBuilder({ maybeSingle: opts?.conversationLookup ?? { data: { id: "conv1" }, error: null } });
-  const conversationsInsertBuilder = createBuilder({ single: { data: { id: opts?.createdConversationId ?? "conv1" }, error: null } });
+  const conversationsLookupBuilder = createBuilder({ maybeSingle: opts?.conversationLookup ?? { data: { id: "conv1", last_response_id: null }, error: null } });
+  const conversationsInsertBuilder = createBuilder({ single: { data: { id: opts?.createdConversationId ?? "conv1", last_response_id: null }, error: null } });
   const messagesSelectBuilder = createBuilder({ limit: { data: opts?.history ?? [], error: null } });
+  const aiMessagesInsert = jest.fn().mockResolvedValue({ error: null });
 
   const supabase = {
     from: jest.fn((table: string) => {
@@ -74,7 +74,7 @@ function createSupabaseMock(opts?: {
       if (table === "ai_messages") {
         return {
           select: jest.fn(() => messagesSelectBuilder),
-          insert: jest.fn().mockResolvedValue({ error: null })
+          insert: aiMessagesInsert
         };
       }
 
@@ -82,9 +82,8 @@ function createSupabaseMock(opts?: {
     })
   };
 
-  return { supabase, conversationsLookupBuilder, messagesSelectBuilder };
+  return { supabase, conversationsLookupBuilder, messagesSelectBuilder, aiMessagesInsert };
 }
-
 
 function makeRequest(url: string, body: Record<string, unknown>) {
   return {
@@ -126,17 +125,16 @@ describe("POST /api/coach/chat hardening", () => {
     });
 
     const req = makeRequest("http://localhost/api/coach/chat", {
-        message: "Need help with my week",
-        conversationId: "11111111-1111-4111-8111-111111111111"
-      });
+      message: "Need help with my week",
+      conversationId: "11111111-1111-4111-8111-111111111111"
+    });
 
     const res = await POST(req);
     expect(res.status).toBe(404);
     expect((supabase.from as jest.Mock).mock.calls[0][0]).toBe("ai_conversations");
   });
 
-
-  it("accepts null conversationId payloads from the client", async () => {
+  it("creates a new conversation and returns a stable conversation id", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
 
     (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
@@ -178,10 +176,10 @@ describe("POST /api/coach/chat hardening", () => {
     const body = await res.json();
     expect(body).toMatchObject({
       conversationId: "conv1",
+      responseId: "resp-1",
       headline: "Stay controlled"
     });
   });
-
 
   it("returns fallback guidance instead of 502 when model call fails", async () => {
     const { supabase } = createSupabaseMock({ history: [] });
@@ -272,25 +270,55 @@ describe("POST /api/coach/chat hardening", () => {
         ctx: expect.objectContaining({ userId: "user-a", athleteId: "athlete-a" })
       })
     );
+  });
 
-    const lookupConversationReq = makeRequest("http://localhost/api/coach/chat", {
-        message: "continue",
-        conversationId: "11111111-1111-4111-8111-111111111111"
-      });
-
-    const { supabase: supabaseWithLookup, conversationsLookupBuilder } = createSupabaseMock({
-      conversationLookup: { data: { id: "11111111-1111-4111-8111-111111111111" }, error: null },
+  it("continues an existing conversation with persisted previous_response_id and re-sent instructions", async () => {
+    const { supabase, conversationsLookupBuilder, aiMessagesInsert } = createSupabaseMock({
+      conversationLookup: { data: { id: "11111111-1111-4111-8111-111111111111", last_response_id: "resp-prev" }, error: null },
       history: []
     });
 
-    (resolveCoachAuthContext as jest.Mock).mockResolvedValueOnce({
-      supabase: supabaseWithLookup,
+    (resolveCoachAuthContext as jest.Mock).mockResolvedValue({
+      supabase,
       ctx: { userId: "user-a", athleteId: "athlete-a", email: "a@example.com" },
       reason: null
     });
 
-    await POST(lookupConversationReq);
+    const create = jest.fn()
+      .mockResolvedValueOnce({
+        id: "resp-next",
+        output: [],
+        output_text: "Continue with low intensity today."
+      })
+      .mockResolvedValueOnce({
+        id: "resp-structured",
+        output: [],
+        output_text: JSON.stringify({
+          headline: "Keep control",
+          answer: "Continue with low intensity today.",
+          insights: [],
+          actions: [],
+          warnings: []
+        })
+      });
+
+    (getOpenAIClient as jest.Mock).mockReturnValue({ responses: { create } });
+
+    const req = makeRequest("http://localhost/api/coach/chat", {
+      message: "continue",
+      conversationId: "11111111-1111-4111-8111-111111111111"
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const firstCall = create.mock.calls[0][0];
+    expect(firstCall.previous_response_id).toBe("resp-prev");
+    expect(firstCall.instructions).toBeDefined();
 
     expect(conversationsLookupBuilder.eq).toHaveBeenCalledWith("athlete_id", "athlete-a");
+    expect(aiMessagesInsert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ role: "assistant", previous_response_id: "resp-prev", response_id: "resp-next" })
+    ]));
   });
 });

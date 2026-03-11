@@ -26,6 +26,15 @@ Model selection is centralized in `lib/openai.ts`:
 
 Use `getCoachModel()` for normal routes and `getCoachModel({ deep: true })` when opting into deep analysis.
 
+
+## Conversation continuity (Responses API)
+
+Coach chat continuity is persisted server-side using `ai_conversations.last_response_id` and passed to OpenAI as `previous_response_id` on follow-up turns.
+
+Important: we **re-send `COACH_SYSTEM_INSTRUCTIONS` on every call** (initial + tool follow-ups), instead of assuming prior instructions persist. This keeps behavior deterministic and auditable.
+
+See `docs/coach-conversation-persistence.md` for schema fields and request/response contract details.
+
 ## Why OpenAI never touches DB directly
 
 OpenAI receives prompts and tool outputs only. It has no DB credentials and cannot run arbitrary SQL.
