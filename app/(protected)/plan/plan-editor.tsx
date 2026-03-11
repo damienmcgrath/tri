@@ -186,14 +186,26 @@ function getSessionIntentCue(intentCategory?: string | null) {
 function getSessionRoleCue(role: ReturnType<typeof getOptionalSessionRoleLabel>) {
   if (!role) return null;
 
-  const tones: Record<string, { short: string; className: string }> = {
-    Key: { short: "K", className: "border-[hsl(var(--accent-performance)/0.42)] text-accent" },
-    Supporting: { short: "S", className: "border-[hsl(var(--border))] text-muted" },
-    Recovery: { short: "R", className: "border-emerald-400/45 text-emerald-200" },
-    Optional: { short: "O", className: "border-sky-400/45 text-sky-200" }
+  const tones: Record<string, { marker: string; className: string }> = {
+    Key: { marker: "◆", className: "border-[hsl(var(--accent-performance)/0.42)] bg-[hsl(var(--accent-performance)/0.13)] text-accent" },
+    Supporting: { marker: "•", className: "border-[hsl(var(--border))] bg-[hsl(var(--bg))] text-muted" },
+    Recovery: { marker: "○", className: "border-emerald-400/45 bg-emerald-500/10 text-emerald-200" },
+    Optional: { marker: "+", className: "border-sky-400/45 bg-sky-500/10 text-sky-200" }
   };
 
   return tones[role] ?? null;
+}
+
+function sessionRoleSortWeight(role: ReturnType<typeof getOptionalSessionRoleLabel>) {
+  if (role === "Key") return 4;
+  if (role === "Recovery") return 3;
+  if (role === "Supporting") return 2;
+  if (role === "Optional") return 1;
+  return 0;
+}
+
+function normalizeFocusText(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function derivedWeekFocusLabel(
@@ -222,7 +234,7 @@ function derivedWeekFocusLabel(
     return counts;
   }, new Map<string, number>());
 
-  const topIntent = [...intentCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const [topIntent, topIntentCount = 0] = [...intentCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
 
   const hasRecoveryPattern = weekIntent === "Recovery"
     || restDays >= 2
@@ -235,6 +247,10 @@ function derivedWeekFocusLabel(
   if (roleCounts.key >= 2 && topIntent) return `${topIntent} progression across key sessions`;
   if (roleCounts.key === 1 && topIntent) return `${topIntent} anchored by one key session`;
   if (roleCounts.key >= 2) return "Quality progression across multiple key sessions";
+
+  if (topIntent && topIntentCount >= 2) {
+    return `${topIntent} emphasis through the week`;
+  }
 
   const ranked = disciplineTotals
     .filter((item) => item.minutes > 0 && item.sport !== "other")
@@ -308,7 +324,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         const iso = addDays(selectedWeek.week_start_date, index);
         const daySessions = weekSessions.filter((session) => session.date === iso);
         const totalDayMinutes = daySessions.reduce((sum, session) => sum + session.duration_minutes, 0);
-        const hasKeySession = daySessions.some((session) => getOptionalSessionRoleLabel(session) === "Key");
+        const roleCounts = daySessions.reduce(
+          (counts, session) => {
+            const role = getOptionalSessionRoleLabel(session);
+            if (role === "Key") counts.key += 1;
+            if (role === "Recovery") counts.recovery += 1;
+            if (role === "Optional") counts.optional += 1;
+            return counts;
+          },
+          { key: 0, recovery: 0, optional: 0 }
+        );
         return {
           iso,
           label: weekdayFormatter.format(new Date(`${iso}T00:00:00.000Z`)),
@@ -316,7 +341,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           sessions: daySessions,
           totalMinutes: totalDayMinutes,
           isRest: daySessions.length === 0,
-          hasKeySession
+          roleCounts
         };
       })
     : [];
@@ -325,9 +350,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const explicitWeekFocus = plannerFocusFromNotes(weekDraft.notes);
   const derivedWeekFocus = derivedWeekFocusLabel(weekDraft.focus, weekSessions, disciplineTotals, restDays);
   const weekFocusLabel = (explicitWeekFocus || derivedWeekFocus).trim();
-  const normalizedBlock = weekDraft.focus.trim().toLowerCase();
-  const normalizedFocus = weekFocusLabel.toLowerCase();
-  const displayWeekFocus = weekFocusLabel && normalizedFocus !== normalizedBlock ? weekFocusLabel : "";
+  const normalizedBlock = normalizeFocusText(weekDraft.focus);
+  const normalizedFocus = normalizeFocusText(weekFocusLabel);
+  const displayWeekFocus = weekFocusLabel && normalizedFocus && !normalizedFocus.includes(normalizedBlock) ? weekFocusLabel : "";
+  const weekFocusSource = explicitWeekFocus ? "Planner focus" : displayWeekFocus ? "Derived focus" : "";
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
@@ -422,7 +448,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           </div>
           {displayWeekFocus ? (
             <div className="md:col-span-2">
-              <p className="text-xs uppercase tracking-wide text-muted">Week focus</p>
+              <p className="text-xs uppercase tracking-wide text-muted">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
               <p className="mt-1 text-sm">{displayWeekFocus}</p>
             </div>
           ) : null}
@@ -473,7 +499,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 <div className="text-right">
                   <p className="text-xs text-muted">{day.totalMinutes} min</p>
                   {day.isRest ? <p className="text-[11px] text-muted/90">Rest</p> : null}
-                  {!day.isRest && day.hasKeySession ? <p className="text-[11px] text-accent">Key day</p> : null}
+                  {!day.isRest && day.roleCounts.key > 0 ? <p className="text-[11px] text-accent">Key day</p> : null}
+                  {!day.isRest && day.roleCounts.key === 0 && day.roleCounts.recovery > 0 ? <p className="text-[11px] text-emerald-200">Recovery-biased</p> : null}
                 </div>
               </div>
               <div className="flex-1 space-y-1.5">
@@ -483,7 +510,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-1">
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
@@ -497,12 +524,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span>{meta.label}</span>
                         </span>
                         {roleCue ? (
-                          <span title={role ?? undefined} className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}>{roleCue.short}</span>
+                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                         ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
-                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
+                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
                     </button>
                   );
                 })}
@@ -518,7 +545,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <section key={day.iso} className={`group/day p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
               <div className="mb-1.5 flex items-center justify-between border-b border-[hsl(var(--border))] pb-1.5">
                 <p className="text-sm font-semibold">{day.label} · {day.date}</p>
-                <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.hasKeySession ? " · Key day" : ""}</p>
+                <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.roleCounts.key > 0 ? " · Key day" : day.roleCounts.recovery > 0 ? " · Recovery-biased" : ""}</p>
               </div>
               <div className="space-y-1.5">
                 {day.sessions.map((session) => {
@@ -526,7 +553,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs">
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-2">
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
@@ -540,12 +567,12 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
                         {roleCue ? (
-                          <span title={role ?? undefined} className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}>{roleCue.short}</span>
+                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                         ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
-                      <p className="text-muted">{session.duration_minutes} min</p>
+                      <p className="text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
                     </button>
                   );
                 })}
