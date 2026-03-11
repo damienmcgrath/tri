@@ -86,10 +86,11 @@ function getActivityId(sessionId: string) {
 
 function getSessionTitle(session: CalendarSession) {
   return getSessionDisplayName({
-    sessionName: session.sessionName ?? session.type,
+    sessionName: session.sessionName,
     discipline: session.discipline ?? session.sport,
     subtype: session.subtype,
-    workoutType: session.workoutType
+    workoutType: session.workoutType,
+    type: session.type
   });
 }
 
@@ -130,7 +131,7 @@ function SessionActionMenu({
   const activityId = getActivityId(session.id);
 
   return (
-    <div className="relative">
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
         className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
@@ -466,15 +467,15 @@ export function WeekCalendar({
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
                     state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.5)] bg-[hsl(var(--signal-ready)/0.11)]"
+                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
                       : state === "skipped"
                         ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
                         : state === "moved"
                           ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                          : state === "extra"
-                            ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                            : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.1)]"
+                        : state === "extra"
+                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
+                          : state === "assigned_from_upload"
+                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
                               : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
                   const stateBadge =
@@ -482,14 +483,30 @@ export function WeekCalendar({
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
-                    ) : state === "assigned_from_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned from upload</span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
 
+                  const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
+                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload";
+
                   return (
-                    <article key={session.id} className={`rounded-xl border px-2 py-1.5 text-xs ${toneClass}`}>
+                    <article
+                      key={session.id}
+                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      onClick={() => {
+                        if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!reviewableCompleted) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          router.push(`/sessions/${session.id}`);
+                        }
+                      }}
+                      role={reviewableCompleted ? "link" : undefined}
+                      tabIndex={reviewableCompleted ? 0 : undefined}
+                    >
                       <div className="flex items-center justify-between gap-1">
                         <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
@@ -515,14 +532,18 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <p className="mt-1.5 min-h-[2.35rem] font-medium leading-snug">{getSessionTitle(session)}</p>
-                      <p className="mt-0.5 text-muted">{session.duration} min</p>
-                      {session.displayType !== "completed_activity" && session.status === "completed" ? (
-                        <Link href={`/sessions/${session.id}`} className="mt-1 inline-block text-[11px] text-accent hover:underline">
-                          Open review
-                        </Link>
-                      ) : null}
-                      <div className="mt-1.5 flex min-h-[1.2rem] items-center justify-end">{stateBadge}</div>
+                      <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{getSessionTitle(session)}</p>
+                      <p className="mt-0 text-muted">{session.duration} min</p>
+                      {showCompletedFooter ? (
+                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
+                            <span aria-hidden="true">✓</span>
+                            Completed
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center justify-end">{stateBadge}</div>
+                      )}
                     </article>
                   );
                 })}

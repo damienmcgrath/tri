@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { WeekCalendar } from "./week-calendar";
 
 jest.mock("next/navigation", () => ({
@@ -101,4 +101,79 @@ describe("WeekCalendar", () => {
     expect(screen.getByText("Extra workout logged")).toBeInTheDocument();
     expect(screen.queryByText(/Unmatched upload/)).not.toBeInTheDocument();
   });
+
+  it("uses discipline fallback for weak generic completed titles and hides inline open review text", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={[
+          {
+            id: "s2",
+            date: "2026-03-03",
+            sport: "bike",
+            type: "Session Bike",
+            duration: 50,
+            notes: null,
+            created_at: "2026-03-03T08:00:00.000Z",
+            status: "completed" as const,
+            displayType: "planned_session" as const,
+            is_key: false
+          }
+        ]}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={0}
+        plannedRemainingCount={0}
+        plannedMinutes={50}
+        completedMinutes={50}
+        remainingMinutes={0}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: /Bike/i })).toBeInTheDocument();
+    expect(screen.queryByText("Session Bike")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open review")).not.toBeInTheDocument();
+  });
+
+  it("keeps completed footer minimal without showing upload-match copy on card face", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={[
+          {
+            id: "s3",
+            date: "2026-03-03",
+            sport: "run",
+            type: "Tempo",
+            duration: 42,
+            notes: null,
+            created_at: "2026-03-03T08:00:00.000Z",
+            status: "completed" as const,
+            linkedActivityCount: 1,
+            displayType: "planned_session" as const,
+            is_key: false
+          }
+        ]}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={0}
+        plannedRemainingCount={0}
+        plannedMinutes={42}
+        completedMinutes={42}
+        remainingMinutes={0}
+      />
+    );
+
+    const reviewCard = screen.getByRole("link", { name: /Tempo/i }).closest("article");
+    expect(reviewCard).not.toBeNull();
+    const cardScope = within(reviewCard as HTMLElement);
+    expect(cardScope.getByText("Completed")).toBeInTheDocument();
+    expect(cardScope.queryByText("Upload matched")).not.toBeInTheDocument();
+    expect(screen.queryByText("Assigned from upload")).not.toBeInTheDocument();
+  });
+
 });
