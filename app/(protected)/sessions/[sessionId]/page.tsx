@@ -45,6 +45,8 @@ type ReviewViewModel = {
   whyItMatters: string;
   nextAction: string;
   weekAction: string;
+  knownSummary: string;
+  provisionalSummary: string;
 };
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
@@ -174,6 +176,21 @@ function createReviewViewModel(session: SessionRow): ReviewViewModel {
   const avgHr = getNumber(diagnosis, ["avgHr", "avg_hr"]);
   const avgPower = getNumber(diagnosis, ["avgPower", "avg_power"]);
 
+  const knownSignals = [
+    score !== null ? "execution score" : null,
+    durationCompletion !== null ? "duration completion" : null,
+    intervalCompletion !== null ? "interval completion" : null,
+    timeAbove !== null ? "time-above-target" : null,
+    (avgHr || avgPower) ? "load metrics" : null
+  ].filter((item): item is string => Boolean(item));
+
+  const knownSummary = knownSignals.length > 0
+    ? `Known so far: ${knownSignals.join(", ")}.`
+    : "Known so far: session completion and intended workout context.";
+  const provisionalSummary = provisional || score === null || knownSignals.length < 3
+    ? "Still provisional: diagnosis confidence will improve with richer interval/intensity upload data from similar sessions."
+    : "Diagnosis confidence is now less provisional; continue validating over the next similar session.";
+
   const usefulMetrics = [
     durationCompletion !== null ? { label: "Duration completion", value: pct(durationCompletion) } : null,
     intervalCompletion !== null ? { label: "Interval completion", value: pct(intervalCompletion) } : null,
@@ -207,7 +224,9 @@ function createReviewViewModel(session: SessionRow): ReviewViewModel {
     usefulMetrics,
     whyItMatters,
     nextAction,
-    weekAction
+    weekAction,
+    knownSummary,
+    provisionalSummary
   };
 }
 
@@ -381,6 +400,12 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           </p>
           <p className="mt-1 text-sm text-muted">{reviewVm.scoreInterpretation}</p>
           {reviewVm.scoreConfidenceNote ? <p className="mt-1 text-xs text-tertiary">{reviewVm.scoreConfidenceNote}</p> : null}
+        </div>
+
+        <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Diagnosis confidence</p>
+          <p className="mt-2 text-sm text-muted">{reviewVm.knownSummary}</p>
+          <p className="mt-1 text-sm text-muted">{reviewVm.provisionalSummary}</p>
         </div>
 
         {reviewVm.usefulMetrics.length > 0 ? (
