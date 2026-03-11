@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CoachDiagnosisSession } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 
 type Message = {
+  id: string;
   role: "user" | "assistant";
   content: string;
+  pending?: boolean;
+  failed?: boolean;
+  retryText?: string;
 };
 
 type CoachSummary = {
@@ -55,10 +59,19 @@ type RankedSession = SessionDiagnosis & {
 };
 
 const defaultAssistantMessage: Message = {
+  id: "coach-default",
   role: "assistant",
   content:
     "I can diagnose whether completed sessions matched their intended purpose, then help you decide exactly how to adjust the rest of your week."
 };
+
+function createMessageId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function formatRecencyLabel(updatedAt?: string): string {
   if (!updatedAt) {
@@ -255,6 +268,10 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const activeRequestRef = useRef<AbortController | null>(null);
 
   const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
   const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
@@ -355,6 +372,16 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
     }
   }, [initialPrompt]);
 
+  useEffect(() => {
+    const viewport = messagesViewportRef.current;
+
+    if (!viewport || !shouldAutoScrollRef.current) {
+      return;
+    }
+
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: isLoading ? "auto" : "smooth" });
+  }, [messages, isLoading]);
+
   async function handleConversationClick(nextConversationId: string) {
     setError(null);
 
@@ -374,10 +401,34 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   }
 
   function handleNewChat() {
+    activeRequestRef.current?.abort();
     setConversationId(null);
     setMessages([defaultAssistantMessage]);
     setSummary(null);
     setError(null);
+    setPendingMessageId(null);
+  }
+
+  function handleStopStreaming() {
+    if (!activeRequestRef.current || !pendingMessageId) {
+      return;
+    }
+
+    activeRequestRef.current.abort();
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === pendingMessageId
+          ? {
+              ...message,
+              pending: false,
+              failed: true,
+              retryText: message.retryText,
+              content: message.content.trim().length > 0 ? message.content : "Response stopped."
+            }
+          : message
+      )
+    );
+    setPendingMessageId(null);
   }
 
   function conversationTitle(conversation: Conversation, index: number) {
@@ -437,25 +488,22 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
     }
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-
-    const trimmed = input.trim();
-
-    if (trimmed.length < 3 || isLoading) {
-      return;
-    }
-
+  async function streamAssistantReply(trimmed: string) {
     setError(null);
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }, { role: "assistant", content: "" }]);
-    setInput("");
+    const userMessageId = createMessageId();
+    const assistantMessageId = createMessageId();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setPendingMessageId(assistantMessageId);
+    setMessages((prev) => [...prev, { id: userMessageId, role: "user", content: trimmed }, { id: assistantMessageId, role: "assistant", content: "", pending: true, retryText: trimmed }]);
 
     try {
       const response = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, conversationId })
+        body: JSON.stringify({ message: trimmed, conversationId }),
+        signal: controller.signal
       });
 
       if (!response.ok || !response.body) {
@@ -469,12 +517,11 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
       const updateAssistant = (delta: string) => {
         setMessages((prev) => {
-          const next = [...prev];
-          const lastIndex = next.length - 1;
-          if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
-            next[lastIndex] = { ...next[lastIndex], content: `${next[lastIndex].content}${delta}` };
-          }
-          return next;
+          return prev.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, content: `${message.content}${delta}`, pending: true, failed: false }
+              : message
+          );
         });
       };
 
@@ -520,12 +567,16 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             if (completion.structured) {
               setSummary(null);
               setMessages((prev) => {
-                const next = [...prev];
-                const lastIndex = next.length - 1;
-                if (lastIndex >= 0 && next[lastIndex]?.role === "assistant") {
-                  next[lastIndex] = { ...next[lastIndex], content: completion.structured.answer ?? next[lastIndex].content };
-                }
-                return next;
+                return prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? {
+                        ...message,
+                        content: completion.structured.answer ?? message.content,
+                        pending: false,
+                        failed: false
+                      }
+                    : message
+                );
               });
             }
           }
@@ -534,18 +585,47 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
 
       await loadConversations();
     } catch (submitError) {
-      setMessages((prev) => {
-        const next = [...prev];
-        const lastIndex = next.length - 1;
-        if (lastIndex >= 0 && next[lastIndex]?.role === "assistant" && next[lastIndex].content.trim().length === 0) {
-          next.pop();
-        }
-        return next;
-      });
-      setError(submitError instanceof Error ? submitError.message : "Something went wrong.");
+      const message = submitError instanceof Error ? submitError.message : "Something went wrong.";
+      setMessages((prev) =>
+        prev.map((entry) =>
+          entry.id === assistantMessageId
+            ? {
+                ...entry,
+                pending: false,
+                failed: true,
+                retryText: trimmed,
+                content: entry.content.trim().length > 0 ? entry.content : `Could not get a coaching response. ${message}`
+              }
+            : entry
+        )
+      );
     } finally {
+      setPendingMessageId(null);
+      activeRequestRef.current = null;
       setIsLoading(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+
+    const trimmed = input.trim();
+
+    if (trimmed.length < 3 || isLoading) {
+      return;
+    }
+
+    setInput("");
+    await streamAssistantReply(trimmed);
+  }
+
+  function handleRetry(message: Message) {
+    const retryText = message.retryText?.trim();
+    if (!retryText || isLoading) {
+      return;
+    }
+
+    void streamAssistantReply(retryText);
   }
 
   return (
@@ -644,17 +724,46 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
           <p className="mt-0.5">Flagged sessions: {flaggedSessions.length} · Diagnosis context: {dataState.guidanceText}</p>
         </div>
 
-        <div className="max-h-[360px] flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div
+          ref={messagesViewportRef}
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            shouldAutoScrollRef.current = distanceToBottom < 40;
+          }}
+          className="max-h-[360px] flex-1 space-y-3 overflow-y-auto px-4 py-4"
+        >
           {messages.map((message, index) => (
-            <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
                   message.role === "user"
                     ? "bg-[hsl(var(--ai-accent-core))] text-white"
-                    : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))]"
+                    : message.failed
+                      ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
+                      : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))]"
                 }`}
               >
-                {message.content}{isLoading && message.role === "assistant" && index === messages.length - 1 ? " ▍" : ""}
+                {message.pending && message.content.trim().length === 0 ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
+                    <span className="ml-1">Coach is thinking</span>
+                  </span>
+                ) : (
+                  <>
+                    {message.content}
+                    {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
+                  </>
+                )}
+                {message.failed && message.role === "assistant" && message.retryText ? (
+                  <div className="mt-2">
+                    <button type="button" onClick={() => handleRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
@@ -683,10 +792,16 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
               onChange={(event) => setInput(event.target.value)}
               placeholder="Ask how to execute better and what to adjust next..."
               className="input-base"
+              disabled={isLoading}
             />
             <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">
               Send
             </button>
+            {isLoading ? (
+              <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
+                Stop
+              </button>
+            ) : null}
           </div>
           {error ? <p className="mt-2 text-sm text-rose-400">{error}</p> : null}
         </form>
