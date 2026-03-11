@@ -466,15 +466,15 @@ export function WeekCalendar({
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
                     state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.5)] bg-[hsl(var(--signal-ready)/0.11)]"
+                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
                       : state === "skipped"
                         ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
                         : state === "moved"
                           ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                          : state === "extra"
-                            ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                            : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.1)]"
+                        : state === "extra"
+                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
+                          : state === "assigned_from_upload"
+                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
                               : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
                   const stateBadge =
@@ -483,7 +483,12 @@ export function WeekCalendar({
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
                     ) : state === "assigned_from_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.4)] px-1.5 py-0.5 text-[10px] text-accent/95">Assigned from upload</span>
+                      <span className="inline-flex items-center gap-1">
+                        <SessionStatusChip status="completed" compact />
+                        <span className="rounded-full border border-[hsl(var(--signal-ready)/0.22)] bg-[hsl(var(--surface-subtle)/0.32)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-ready)/0.82)]">
+                          Assigned from upload
+                        </span>
+                      </span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
