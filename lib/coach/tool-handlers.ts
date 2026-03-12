@@ -86,7 +86,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: uploadedActivities, error: uploadedActivitiesError } = await deps.supabase
     .from("completed_activities")
-    .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,parse_summary")
+    .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,metrics_v2")
     .eq("user_id", deps.ctx.userId)
     .gte("start_time_utc", sinceUtc)
     .lte("start_time_utc", todayUtc)
@@ -109,30 +109,33 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
   const uploadedActivitiesRealData = (uploadedActivities ?? []).map((activity) => {
     const activityDate = activity.start_time_utc.slice(0, 10);
 
-    const parseSummary = typeof activity.parse_summary === "object" && activity.parse_summary
-      ? activity.parse_summary as Record<string, unknown>
-      : null;
-    const movingDurationSec = Number(parseSummary?.movingDurationSec ?? parseSummary?.moving_duration_sec ?? 0);
-    const elapsedDurationSec = Number(parseSummary?.elapsedDurationSec ?? parseSummary?.elapsed_duration_sec ?? activity.duration_sec ?? 0);
-    const poolLengthMeters = Number(parseSummary?.poolLengthMeters ?? parseSummary?.pool_length_meters ?? 0);
-
-    const durationSec = activity.duration_sec ? Number(activity.duration_sec) : null;
+    const movingDurationSec = activity.moving_duration_sec ? Number(activity.moving_duration_sec) : null;
+    const elapsedDurationSec = activity.elapsed_duration_sec ? Number(activity.elapsed_duration_sec) : null;
     const distanceMeters = activity.distance_m ? Number(activity.distance_m) : null;
-    const pace = derivePace(durationSec, distanceMeters);
+    const poolLengthMeters = activity.pool_length_m ? Number(activity.pool_length_m) : null;
+    const lapsCount = activity.laps_count ? Number(activity.laps_count) : null;
+    const avgPacePer100mSec = activity.sport_type === "swim" && activity.avg_pace_per_100m_sec
+      ? Number(activity.avg_pace_per_100m_sec)
+      : null;
 
     return {
       id: `activity:${activity.id}`,
       source: "uploaded_activity" as const,
       date: activityDate,
       sport: activity.sport_type,
-      durationMinutes: durationSec ? Math.round(durationSec / 60) : null,
+      durationMinutes: activity.duration_sec ? Math.round(Number(activity.duration_sec) / 60) : null,
+      movingDurationMinutes: movingDurationSec ? Math.round(movingDurationSec / 60) : null,
+      elapsedDurationMinutes: elapsedDurationSec ? Math.round(elapsedDurationSec / 60) : null,
       distanceMeters,
+      poolLengthMeters,
+      lapsCount,
+      avgPacePer100mSec,
       avgHr: activity.avg_hr ?? null,
       avgPower: activity.avg_power ?? null,
       calories: activity.calories ?? null,
-      parseSummary: activity.parse_summary ?? null,
-      avgPaceSecPerKm: pace.avgPaceSecPerKm,
-      avgPaceSecPer100m: pace.avgPaceSecPer100m,
+      metricsV2: activity.metrics_v2 ?? null,
+      avgPaceSecPerKm: null,
+      avgPaceSecPer100m: avgPacePer100mSec,
     };
   });
 
@@ -163,12 +166,9 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
           calories: typeof session.metrics === "object" && session.metrics && "calories" in session.metrics
             ? Number((session.metrics as { calories?: number }).calories ?? 0)
             : null,
-          parseSummary: typeof session.metrics === "object" && session.metrics && "parse_summary" in session.metrics
-            ? (session.metrics as { parse_summary?: unknown }).parse_summary ?? null
-            : null,
           avgPaceSecPerKm: pace.avgPaceSecPerKm,
           avgPaceSecPer100m: pace.avgPaceSecPer100m,
-          source: "legacy"
+          source: "legacy_completed_session"
         };
       }),
       ...uploadedActivitiesRealData
@@ -181,6 +181,41 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       durationMinutes: session.duration_minutes,
       status: session.status
     }))
+  };
+}
+
+
+async function getActivityDetails(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.get_activity_details.parse(args);
+
+  const { data: activity, error } = await deps.supabase
+    .from("completed_activities")
+    .select("id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,best_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,metrics_v2")
+    .eq("id", parsed.activityId)
+    .eq("user_id", deps.ctx.userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`get_activity_details query failed: ${error.message}`);
+  }
+
+  if (!activity) {
+    throw new Error("get_activity_details activity not found.");
+  }
+
+  const { data: linkedSession } = await deps.supabase
+    .from("session_activity_links")
+    .select("planned_session_id,confirmation_status,confidence")
+    .eq("user_id", deps.ctx.userId)
+    .eq("completed_activity_id", activity.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    source: "uploaded_activity",
+    activity,
+    linkedSession: linkedSession ?? null
   };
 }
 
@@ -338,6 +373,9 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
       case "get_week_progress":
         coachToolSchemas.get_week_progress.parse(args);
         result = await getWeekProgress(deps);
+        break;
+      case "get_activity_details":
+        result = await getActivityDetails(args, deps);
         break;
       case "create_plan_change_proposal":
         result = await createPlanChangeProposal(args, deps);
