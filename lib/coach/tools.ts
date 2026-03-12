@@ -4,6 +4,7 @@ export const getAthleteSnapshotArgsSchema = z.object({}).strict();
 export const getRecentSessionsArgsSchema = z.object({ daysBack: z.number().int().min(1).max(60).default(14) }).strict();
 export const getUpcomingSessionsArgsSchema = z.object({ daysAhead: z.number().int().min(1).max(30).default(7) }).strict();
 export const getWeekProgressArgsSchema = z.object({}).strict();
+export const getActivityDetailsArgsSchema = z.object({ activityId: z.string().uuid() }).strict();
 export const createPlanChangeProposalArgsSchema = z.object({
   title: z.string().trim().min(3).max(160),
   rationale: z.string().trim().min(5).max(1000),
@@ -18,6 +19,7 @@ export const coachToolSchemas = {
   get_recent_sessions: getRecentSessionsArgsSchema,
   get_upcoming_sessions: getUpcomingSessionsArgsSchema,
   get_week_progress: getWeekProgressArgsSchema,
+  get_activity_details: getActivityDetailsArgsSchema,
   create_plan_change_proposal: createPlanChangeProposalArgsSchema
 } as const;
 
@@ -68,6 +70,20 @@ export const coachTools = [
       type: "object",
       additionalProperties: false,
       properties: {}
+    }
+  },
+  {
+    type: "function" as const,
+    name: "get_activity_details",
+    description: "Return explicit source-backed metrics for one uploaded activity.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["activityId"],
+      properties: {
+        activityId: { type: "string", format: "uuid" }
+      }
     }
   },
   {

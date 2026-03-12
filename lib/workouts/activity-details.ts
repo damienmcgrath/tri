@@ -13,8 +13,24 @@ export type ActivityDetails = {
   avg_hr: number | null;
   avg_power: number | null;
   calories: number | null;
+  moving_duration_sec: number | null;
+  elapsed_duration_sec: number | null;
+  pool_length_m: number | null;
+  laps_count: number | null;
+  avg_pace_per_100m_sec: number | null;
+  avg_stroke_rate_spm: number | null;
+  avg_swolf: number | null;
+  avg_cadence: number | null;
+  max_hr: number | null;
+  max_power: number | null;
+  elevation_gain_m: number | null;
+  elevation_loss_m: number | null;
+  activity_vendor: string | null;
+  activity_type_raw: string | null;
+  activity_subtype_raw: string | null;
   source: string;
   parse_summary: { laps?: Array<Record<string, unknown>> } | null;
+  metrics_v2: Record<string, unknown> | null;
   notes: string | null;
   is_unplanned: boolean;
   is_race: boolean;
@@ -56,7 +72,7 @@ export async function loadActivityDetails(activityId: string): Promise<ActivityD
 
   const { data: activity } = await supabase
     .from("completed_activities")
-    .select("id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,source,parse_summary,notes,is_unplanned,is_race")
+    .select("id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,notes,is_unplanned,is_race")
     .eq("id", activityId)
     .eq("user_id", user.id)
     .maybeSingle();
