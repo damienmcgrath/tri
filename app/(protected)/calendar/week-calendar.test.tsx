@@ -54,7 +54,7 @@ const sessions = [
 ];
 
 describe("WeekCalendar", () => {
-  it("shows adaptation strip for unmatched uploads and filters by extra state", () => {
+  it("shows needs-attention queue for uploads needing review and filters by extra state", () => {
     render(
       <WeekCalendar
         weekDays={weekDays}
@@ -71,8 +71,8 @@ describe("WeekCalendar", () => {
       />
     );
 
-    expect(screen.getByText("Adaptation strip")).toBeInTheDocument();
-    expect(screen.getByText(/Unmatched upload/)).toBeInTheDocument();
+    expect(screen.getAllByText("Needs attention").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Upload needs review/).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "extra" } });
     expect(screen.queryByText("Tempo")).not.toBeInTheDocument();
@@ -99,7 +99,31 @@ describe("WeekCalendar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mark extra" }));
 
     expect(screen.getByText("Extra workout logged")).toBeInTheDocument();
-    expect(screen.queryByText(/Unmatched upload/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Upload needs review/)).not.toBeInTheDocument();
+  });
+
+  it("opens the upload review drawer from the unresolved day card", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
+
+    expect(screen.getAllByText("Upload needs review").length).toBeGreaterThan(0);
+    expect(screen.getByText("Uploaded workout")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assign to session" })).toBeInTheDocument();
   });
 
   it("uses discipline fallback for weak generic completed titles and hides inline open review text", () => {
