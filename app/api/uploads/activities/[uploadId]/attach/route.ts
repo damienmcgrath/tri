@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -59,11 +60,14 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
 
   await supabase
     .from("completed_activities")
-    .update({ schedule_status: "scheduled" })
+    .update({ schedule_status: "scheduled", is_unplanned: false })
     .eq("id", activity.id)
     .eq("user_id", user.id);
 
   await supabase.from("activity_uploads").update({ status: "matched", error_message: null }).eq("id", params.uploadId).eq("user_id", user.id);
+
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
 
   return NextResponse.json({ ok: true });
 }

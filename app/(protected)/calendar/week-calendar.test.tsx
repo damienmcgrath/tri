@@ -47,6 +47,7 @@ const sessions = [
     created_at: "2026-03-02T08:00:00.000Z",
     status: "completed" as const,
     displayType: "completed_activity" as const,
+    source: { uploadId: "upload-1", assignedBy: "upload" as const },
     linkedActivityCount: 1,
     linkedStats: { durationMin: 35, distanceKm: 7, avgHr: 150, avgPower: null },
     is_key: false
@@ -54,6 +55,14 @@ const sessions = [
 ];
 
 describe("WeekCalendar", () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
   it("shows needs-attention queue for uploads needing review and filters by extra state", () => {
     render(
       <WeekCalendar
@@ -119,11 +128,109 @@ describe("WeekCalendar", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assign to session" }));
 
     expect(screen.getAllByText("Upload needs review").length).toBeGreaterThan(0);
-    expect(screen.getByText("Uploaded workout")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Assign to session" })).toBeInTheDocument();
+    expect(screen.getAllByText("Uploaded workout").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Assign to session" }).length).toBeGreaterThan(0);
+  });
+
+  it("prefers a same-day same-sport session when opening upload assignment from the sidebar", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={[
+          {
+            id: "s-early",
+            date: "2026-03-02",
+            sport: "bike",
+            type: "Bike endurance",
+            duration: 60,
+            notes: null,
+            created_at: "2026-03-01T00:00:00.000Z",
+            status: "planned" as const,
+            displayType: "planned_session" as const,
+            is_key: false
+          },
+          {
+            id: "s-target",
+            date: "2026-03-02",
+            sport: "run",
+            type: "Tempo",
+            duration: 40,
+            notes: null,
+            created_at: "2026-03-01T01:00:00.000Z",
+            status: "planned" as const,
+            displayType: "planned_session" as const,
+            is_key: false
+          },
+          sessions[1]
+        ]}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={2}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={2}
+        plannedMinutes={100}
+        completedMinutes={35}
+        remainingMinutes={65}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Assign to session" }));
+
+    const selects = screen.getAllByRole("combobox");
+    const assignmentSelect = selects[selects.length - 1] as HTMLSelectElement;
+    expect(assignmentSelect.value).toBe("s-target");
+  });
+
+  it("keeps the matched planned session visible after assigning an upload from the sidebar", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={[
+          {
+            id: "s1",
+            date: "2026-03-02",
+            sport: "run",
+            type: "Tempo",
+            duration: 45,
+            notes: null,
+            created_at: "2026-03-01T00:00:00.000Z",
+            status: "planned" as const,
+            displayType: "planned_session" as const,
+            is_key: false
+          },
+          {
+            ...sessions[1],
+            source: { uploadId: "upload-1", assignedBy: "upload" as const }
+          }
+        ]}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Assign to session" }));
+
+    const assignButtons = screen.getAllByRole("button", { name: "Assign to session" });
+    fireEvent.click(assignButtons[assignButtons.length - 1]);
+
+    expect(await screen.findByText("Upload assigned to session")).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: "Assign to session" })).toHaveLength(0);
+    const tempoCard = screen.getByRole("link", { name: /Tempo/i }).closest("article");
+    expect(tempoCard).not.toBeNull();
+    expect(within(tempoCard as HTMLElement).getByText("Completed")).toBeInTheDocument();
   });
 
   it("uses discipline fallback for weak generic completed titles and hides inline open review text", () => {

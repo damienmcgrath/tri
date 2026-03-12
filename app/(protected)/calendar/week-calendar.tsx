@@ -94,6 +94,31 @@ function getSessionTitle(session: CalendarSession) {
   });
 }
 
+function getSuggestedSessionId(upload: CalendarSession, candidateSessions: CalendarSession[]) {
+  if (candidateSessions.length === 0) return "";
+
+  const scoredCandidates = candidateSessions.map((session, index) => {
+    let score = 0;
+
+    if (session.date === upload.date) score += 5;
+    if (session.sport === upload.sport) score += 4;
+    if (session.status === "planned") score += 2;
+    if (session.status === "skipped") score -= 1;
+
+    const durationDelta = Math.abs(session.duration - upload.duration);
+    score -= durationDelta / 30;
+
+    return { sessionId: session.id, score, index };
+  });
+
+  scoredCandidates.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return left.index - right.index;
+  });
+
+  return scoredCandidates[0]?.sessionId ?? candidateSessions[0]?.id ?? "";
+}
+
 function getSessionState(session: CalendarSession, recentMoves: RecentMove[], extraActivityIds: string[]) {
   if (session.displayType === "completed_activity") {
     if (extraActivityIds.includes(session.id)) {
@@ -589,8 +614,21 @@ export function WeekCalendar({
           weekDays={weekDays}
           candidateSessions={localSessions.filter((session) => session.displayType !== "completed_activity")}
           onClose={() => setAssignSource(null)}
-          onAssigned={() => {
-            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", assignSource.id)]);
+          onAssigned={(selectedSessionId) => {
+            setLocalSessions((prev) =>
+              prev
+                .filter((session) => session.id !== assignSource.id)
+                .map((session) =>
+                  session.id === selectedSessionId
+                    ? {
+                        ...session,
+                        status: "completed",
+                        linkedActivityCount: Math.max(session.linkedActivityCount ?? 0, 0) + 1
+                      }
+                    : session
+                )
+            );
+            setDismissedIssues((prev) => prev.filter((issueId) => issueId !== getIssueId("unmatched_upload", assignSource.id)));
             setAssignSource(null);
             router.refresh();
             setToast("Upload assigned to session");
@@ -687,11 +725,15 @@ function AssignUploadModal({
   weekDays: WeekDay[];
   candidateSessions: CalendarSession[];
   onClose: () => void;
-  onAssigned: () => void;
+  onAssigned: (selectedSessionId: string) => void;
   onError: () => void;
 }) {
-  const [selectedSessionId, setSelectedSessionId] = useState(candidateSessions[0]?.id ?? "");
+  const [selectedSessionId, setSelectedSessionId] = useState(() => getSuggestedSessionId(upload, candidateSessions));
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setSelectedSessionId(getSuggestedSessionId(upload, candidateSessions));
+  }, [candidateSessions, upload]);
 
   return (
     <TaskSheet
@@ -734,7 +776,7 @@ function AssignUploadModal({
                 });
 
                 if (!response.ok) throw new Error("failed");
-                onAssigned();
+                onAssigned(selectedSessionId);
               } catch {
                 onError();
               } finally {
