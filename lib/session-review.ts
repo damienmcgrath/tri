@@ -1,4 +1,5 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { parsePersistedExecutionReview } from "@/lib/execution-review";
 
 export type SessionReviewRow = {
   id: string;
@@ -38,6 +39,8 @@ export type ReviewViewModel = {
   scoreInterpretation: string;
   scoreConfidenceNote: string | null;
   scoreTone: Tone;
+  executionCostLabel: string | null;
+  confidenceLabel: string | null;
   plannedIntent: string;
   actualExecutionSummary: string;
   mainGap: string;
@@ -45,6 +48,9 @@ export type ReviewViewModel = {
   whyItMatters: string;
   nextAction: string;
   weekAction: string;
+  uncertaintyTitle: string | null;
+  uncertaintyDetail: string | null;
+  missingEvidence: string[];
   unlockTitle: string;
   unlockDetail: string;
   followUpIntro: string;
@@ -327,6 +333,7 @@ export function toneToBadgeClass(tone: Tone) {
 
 export function createReviewViewModel(session: SessionReviewRow): ReviewViewModel {
   const diagnosis = session.execution_result;
+  const v2Review = parsePersistedExecutionReview(diagnosis);
   const hasLinkedActivity = session.has_linked_activity === true;
   const hasDiagnosticSignals = Boolean(diagnosis) && Object.keys(diagnosis ?? {}).length > 0;
   const isExtra = session.is_extra === true;
@@ -354,12 +361,20 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
 
   const executionSummary = getString(diagnosis, ["executionSummary", "executionScoreSummary", "summary"]);
   const whyItMatters = getString(
-    diagnosis,
+    v2Review?.verdict?.explanation
+      ? {
+        whyItMatters: v2Review.verdict.explanation.whyItMatters
+      }
+      : diagnosis,
     ["whyItMatters", "why_it_matters"],
     defaultWhyItMatters
   );
   const nextAction = getString(
-    diagnosis,
+    v2Review?.verdict?.explanation
+      ? {
+        recommendedNextAction: v2Review.verdict.explanation.whatToDoNextTime
+      }
+      : diagnosis,
     ["recommendedNextAction", "recommended_next_action"],
     defaultNextAction
   );
@@ -469,12 +484,32 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
 
   const plannedIntent = isExtra ? "No planned intent. Review this as additional weekly load." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
   const weekAction = getString(
-    diagnosis,
+    v2Review?.verdict?.explanation
+      ? { suggestedWeekAdjustment: v2Review.verdict.explanation.whatToDoThisWeek }
+      : diagnosis,
     ["suggestedWeekAdjustment", "suggested_week_adjustment", "weeklyAdjustment", "weekly_adjustment"],
     isExtra
       ? "Keep or trim the next session based on whether this extra load was replacing something planned or adding on top."
       : deriveWeekAction({ intentLabel: intent.label, bucket, isReviewable: reviewState.isReviewable })
   );
+  const executionCostLabel = v2Review?.verdict?.sessionVerdict.executionCost
+    ? v2Review.verdict.sessionVerdict.executionCost.replace("_", " ")
+    : typeof diagnosis?.executionCost === "string"
+      ? diagnosis.executionCost.replace("_", " ")
+      : null;
+  const confidenceLabel = v2Review?.verdict?.sessionVerdict.confidence ?? (getString(diagnosis, ["diagnosisConfidence", "diagnosis_confidence"]) || null);
+  const uncertaintyTitle =
+    v2Review?.verdict?.uncertainty.label === "confident_read"
+      ? null
+      : v2Review?.verdict?.uncertainty.label === "insufficient_data"
+        ? "Insufficient data"
+        : v2Review?.verdict?.uncertainty.label === "early_read"
+          ? "Early read"
+          : null;
+  const uncertaintyDetail = v2Review?.verdict?.uncertainty.label && v2Review.verdict.uncertainty.label !== "confident_read"
+    ? v2Review.verdict.uncertainty.detail
+    : null;
+  const missingEvidence = v2Review?.verdict?.uncertainty.missingEvidence ?? (Array.isArray(diagnosis?.missingEvidence) ? diagnosis.missingEvidence.filter((item): item is string => typeof item === "string") : []);
 
   const unlockTitle = isExtra ? "Weekly context" : reviewState.isReviewable ? "Review evidence" : "What unlocks review";
   const unlockDetail = isExtra
@@ -523,6 +558,8 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     scoreInterpretation,
     scoreConfidenceNote,
     scoreTone,
+    executionCostLabel,
+    confidenceLabel,
     plannedIntent,
     actualExecutionSummary,
     mainGap,
@@ -530,6 +567,9 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     whyItMatters,
     nextAction,
     weekAction,
+    uncertaintyTitle,
+    uncertaintyDetail,
+    missingEvidence,
     unlockTitle,
     unlockDetail,
     followUpIntro: isExtra

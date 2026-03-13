@@ -41,6 +41,7 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
 
 type SessionsMinimalRow = {
   id: string;
+  athlete_id?: string;
   user_id?: string;
   date: string;
   sport: string;
@@ -189,27 +190,27 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     () =>
       supabase
         .from("sessions")
-        .select("id,user_id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,target,duration_minutes,status,execution_result")
+        .select("id,athlete_id,user_id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,target,duration_minutes,session_role,status,execution_result")
         .eq("id", params.sessionId)
         .eq("user_id", user.id)
         .maybeSingle(),
     () =>
       supabase
         .from("sessions")
-        .select("id,user_id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,target,duration_minutes,status,execution_result")
+        .select("id,athlete_id,user_id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,target,duration_minutes,session_role,status,execution_result")
         .eq("id", params.sessionId)
         .maybeSingle(),
     () =>
       supabase
         .from("sessions")
-        .select("id,user_id,date,sport,type,target,duration_minutes,notes,status")
+        .select("id,athlete_id,user_id,date,sport,type,target,duration_minutes,notes,status")
         .eq("id", params.sessionId)
         .eq("user_id", user.id)
         .maybeSingle(),
     () =>
       supabase
         .from("sessions")
-        .select("id,user_id,date,sport,type,target,duration_minutes,notes,status")
+        .select("id,athlete_id,user_id,date,sport,type,target,duration_minutes,notes,status")
         .eq("id", params.sessionId)
         .maybeSingle()
   ];
@@ -323,12 +324,15 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         session.execution_result = buildExecutionResultForSession(
           {
             id: session.id,
+            athlete_id: (session as SessionRow & { athlete_id?: string }).athlete_id ?? user.id,
             user_id: session.user_id ?? user.id,
             sport: session.sport,
             type: session.type,
             duration_minutes: session.duration_minutes ?? null,
             target: session.target ?? null,
             intent_category: session.intent_category ?? null,
+            session_name: session.session_name ?? session.type,
+            session_role: (session as SessionRow & { session_role?: string | null }).session_role ?? null,
             status: session.status ?? "planned"
           },
           linkedActivityDetails
@@ -354,6 +358,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   const disciplineLabel = getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
+  const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
 
   return (
     <section className="space-y-4">
@@ -371,67 +376,77 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface-subtle)),hsl(var(--surface)))] p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary">
-                {reviewVm.sessionStatusLabel}
-              </span>
-              <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
-                {reviewVm.intent.label}
-              </span>
-            </div>
-            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]">{reviewVm.reviewModeDetail}</p>
-            <p className="mt-2 text-sm text-muted">{reviewVm.sessionStatusDetail}</p>
+        <div className="mt-4 border-t border-[hsl(var(--border))] pt-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary">
+              {reviewVm.sessionStatusLabel}
+            </span>
+            <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+              {reviewVm.intent.label}
+            </span>
           </div>
 
-          <div className={`grid gap-3 ${reviewVm.isReviewable ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Discipline</p>
-              <p className="mt-2 text-base font-semibold">{disciplineLabel}</p>
-              <p className="mt-1 text-sm text-muted">{sessionDateLabel}</p>
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <div>
+              <h2 className={`text-3xl font-semibold leading-tight ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
+                {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
+              </h2>
+              <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]">{reviewVm.actualExecutionSummary}</p>
+              <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
             </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{reviewVm.isReviewable ? "Intent result" : "Session status"}</p>
-              <p className={`mt-2 text-base font-semibold ${toneToTextClass(reviewVm.intent.tone)}`}>{reviewVm.intent.label}</p>
-              <p className="mt-1 text-sm text-muted">{reviewVm.intent.detail}</p>
+
+            <div className="border-l border-[hsl(var(--border))] pl-5">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What to do next</p>
+              <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
+              <p className="mt-4 text-xs uppercase tracking-[0.14em] text-tertiary">This week</p>
+              <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
             </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className={`rounded-full border px-3 py-1.5 text-xs ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+              {reviewVm.intent.label}
+            </span>
+            {reviewVm.isReviewable && reviewVm.scoreConfidenceNote ? (
+              <span className="rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-3 py-1.5 text-xs text-[hsl(var(--warning))]">
+                Provisional
+              </span>
+            ) : null}
             {reviewVm.isReviewable ? (
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
-                <p className={`mt-2 text-base font-semibold ${toneToTextClass(reviewVm.scoreTone)}`}>{reviewVm.scoreHeadline}</p>
-                <p className="mt-1 text-sm text-muted">{reviewVm.scoreInterpretation}</p>
-              </div>
+              <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">
+                Cost: {reviewVm.executionCostLabel ?? "Unknown"}
+              </span>
+            ) : null}
+            {reviewVm.confidenceLabel ? (
+              <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">
+                Confidence: {reviewVm.confidenceLabel}
+              </span>
             ) : null}
           </div>
         </div>
       </article>
 
-      <article className="surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold">{reviewVm.isReviewable ? "Planned vs actual" : "Review unlock"}</h2>
-          {reviewVm.scoreConfidenceNote ? <p className="text-xs text-tertiary">{reviewVm.scoreConfidenceNote}</p> : null}
-        </div>
-
+      <section className="surface p-5">
         {reviewVm.isReviewable ? (
-          <>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned intent</p>
-                <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
-              </div>
-              <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Actual execution</p>
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-5">
+              {hasSpecificPlannedIntent ? (
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned</p>
+                  <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
+                </div>
+              ) : null}
+              <div className={hasSpecificPlannedIntent ? "border-t border-[hsl(var(--border))] pt-5" : ""}>
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What happened</p>
                 <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
               </div>
-            </div>
-
-            <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <div className="border-t border-[hsl(var(--border))] pt-5">
                 <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Main gap</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
               </div>
+            </div>
 
+            <div className="space-y-5 border-l border-[hsl(var(--border))] pl-5">
               {reviewVm.usefulMetrics.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {reviewVm.usefulMetrics.map((metric) => (
@@ -447,56 +462,51 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                   <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
                 </div>
               )}
+              <div className="border-t border-[hsl(var(--border))] pt-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
+                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
+              </div>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="mt-3 grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+          <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
+            <div>
               <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned intent</p>
               <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
             </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <div className="border-l border-[hsl(var(--border))] pl-5">
               <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.unlockTitle}</p>
               <p className="mt-2 text-sm">{reviewVm.unlockDetail}</p>
             </div>
           </div>
         )}
-      </article>
+      </section>
 
-      <article className="surface p-5">
-        <h2 className="text-lg font-semibold">Coaching takeaway</h2>
-        {reviewVm.isReviewable ? (
-          <dl className="mt-3 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-              <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</dt>
-              <dd className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</dd>
-            </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-              <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Do differently next time</dt>
-              <dd className="mt-2 text-sm">{reviewVm.nextAction}</dd>
-            </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-              <dt className="text-xs uppercase tracking-[0.14em] text-tertiary">Suggested action for this week</dt>
-              <dd className="mt-2 text-sm text-muted">{reviewVm.weekAction}</dd>
-            </div>
-          </dl>
-        ) : (
-          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr]">
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Next step</p>
-              <p className="mt-2 text-sm">{reviewVm.nextAction}</p>
-            </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">This week</p>
-              <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
-            </div>
+      {reviewVm.uncertaintyDetail ? (
+        <section className="rounded-2xl border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-5 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--warning))]">{reviewVm.uncertaintyTitle ?? "Uncertainty"}</p>
+            <p className="mt-2 text-sm">{reviewVm.uncertaintyDetail}</p>
+            {reviewVm.missingEvidence.length > 0 ? (
+              <p className="mt-2 text-sm text-muted">Missing evidence: {reviewVm.missingEvidence.join(", ")}.</p>
+            ) : null}
           </div>
-        )}
-      </article>
+        </section>
+      ) : null}
 
-      <article className="surface p-5">
-        <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-        <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
+      <section className="border-t border-[hsl(var(--border))] pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
+            <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
+          </div>
+          <Link
+            href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
+            className="btn-secondary px-3 py-1.5 text-xs"
+          >
+            Ask coach
+          </Link>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {reviewVm.followUpPrompts.map((prompt) => (
             <Link
@@ -508,7 +518,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             </Link>
           ))}
         </div>
-      </article>
+      </section>
     </section>
   );
 }

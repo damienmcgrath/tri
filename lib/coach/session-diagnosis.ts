@@ -55,6 +55,8 @@ export type SessionDiagnosis = {
   recommendedNextAction: string;
   diagnosisConfidence: DiagnosisConfidence;
   executionScoreProvisional: boolean;
+  detectedIssues: IssueKey[];
+  evidenceCount: number;
 };
 
 type IntentBucket = "easy_endurance" | "recovery" | "threshold_quality" | "long_endurance" | "swim_strength" | "unknown";
@@ -449,6 +451,8 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
     whyItMatters: getWhyItMatters(draft.status, draft.issues, bucket),
     recommendedNextAction: getNextAction(draft.status, draft.issues, bucket),
     diagnosisConfidence: getConfidence(draft.evidenceCount),
-    executionScoreProvisional: score.provisional
+    executionScoreProvisional: score.provisional,
+    detectedIssues: [...new Set(draft.issues)],
+    evidenceCount: draft.evidenceCount
   };
 }
