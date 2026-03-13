@@ -7,7 +7,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
-import { clearSkippedAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
+import { clearSkippedAction, confirmSkippedAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
+import { hasConfirmedSkipTag } from "@/lib/plans/skip-notes";
 
 type SessionStatus = SessionLifecycleState;
 type FilterStatus = "all" | SessionStatus | "extra" | "moved";
@@ -34,6 +35,7 @@ type CalendarSession = {
   linkedStats?: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
   unassignedSameDayCount?: number;
   is_key?: boolean;
+  isUnplanned?: boolean;
   displayType?: "planned_session" | "completed_activity";
 };
 
@@ -121,7 +123,7 @@ function getSuggestedSessionId(upload: CalendarSession, candidateSessions: Calen
 
 function getSessionState(session: CalendarSession, recentMoves: RecentMove[], extraActivityIds: string[]) {
   if (session.displayType === "completed_activity") {
-    if (extraActivityIds.includes(session.id)) {
+    if (session.isUnplanned || extraActivityIds.includes(session.id)) {
       return "extra" as const;
     }
     return "unmatched_upload" as const;
@@ -144,13 +146,15 @@ function SessionActionMenu({
   state,
   onMove,
   onOpen,
-  onToggleSkip
+  onToggleSkip,
+  onAssign
 }: {
   session: CalendarSession;
   state: "planned" | "completed" | "skipped" | "extra" | "moved" | "assigned_from_upload" | "unmatched_upload";
   onMove: () => void;
   onOpen: () => void;
   onToggleSkip: () => void;
+  onAssign: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const activityId = getActivityId(session.id);
@@ -167,7 +171,11 @@ function SessionActionMenu({
       </button>
       {open ? (
         <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
-          {session.displayType !== "completed_activity" && session.status === "completed" ? (
+          {session.displayType === "completed_activity" && activityId ? (
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+              Open details
+            </Link>
+          ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
             <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
               Open details
             </Link>
@@ -186,8 +194,10 @@ function SessionActionMenu({
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
-          {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/activities/${activityId}`}>Assign to session</Link>
+          {session.displayType === "completed_activity" ? (
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
+              Assign to session
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -231,6 +241,7 @@ export function WeekCalendar({
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
+  const isOverlayOpen = Boolean(quickAddDate || moveSource || detailSession || assignSource);
 
   useEffect(() => setLocalSessions(sessions), [sessions]);
   const persistedMoves = useMemo(
@@ -253,6 +264,21 @@ export function WeekCalendar({
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!isOverlayOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isOverlayOpen]);
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const activeWeekStart = weekDays[0]?.iso ?? currentWeekStart;
@@ -308,6 +334,7 @@ export function WeekCalendar({
     .filter(
       (session) =>
         session.displayType === "completed_activity" &&
+        !session.isUnplanned &&
         !extraActivityIds.includes(session.id) &&
         !dismissedIssues.includes(getIssueId("unmatched_upload", session.id))
     )
@@ -317,6 +344,7 @@ export function WeekCalendar({
       (session) =>
         session.displayType !== "completed_activity" &&
         session.status === "skipped" &&
+        !hasConfirmedSkipTag(session.notes) &&
         !dismissedIssues.includes(getIssueId("skipped_reassign", session.id))
     )
     .slice(0, 2);
@@ -327,7 +355,7 @@ export function WeekCalendar({
     .filter(
       (session) =>
         session.displayType === "completed_activity" &&
-        extraActivityIds.includes(session.id) &&
+        (session.isUnplanned || extraActivityIds.includes(session.id)) &&
         !dismissedIssues.includes(getIssueId("extra_workout", session.id))
     )
     .slice(0, 2);
@@ -399,8 +427,28 @@ export function WeekCalendar({
                   ) : null}
                   <button
                     onClick={() => {
-                      setExtraActivityIds((prev) => [...prev, upload.id]);
-                      setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)]);
+                      const activityId = getActivityId(upload.id);
+                      if (!activityId) {
+                        setToast("Could not mark activity as extra");
+                        return;
+                      }
+
+                      startTransition(() => {
+                        void (async () => {
+                          try {
+                            await markActivityExtraAction({ activityId });
+                            setLocalSessions((prev) =>
+                              prev.map((session) => (session.id === upload.id ? { ...session, isUnplanned: true } : session))
+                            );
+                            setExtraActivityIds((prev) => [...prev, upload.id]);
+                            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)]);
+                            setToast("Marked as extra workout");
+                            router.refresh();
+                          } catch {
+                            setToast("Could not mark activity as extra");
+                          }
+                        })();
+                      });
                     }}
                     className="text-muted hover:text-foreground"
                   >
@@ -419,7 +467,32 @@ export function WeekCalendar({
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 md:justify-end">
                   <button onClick={() => setMoveSource(session)} className="text-accent hover:underline">Move to another day</button>
-                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("skipped_reassign", session.id)])} className="text-muted hover:text-foreground">Confirm skip</button>
+                  <button
+                    onClick={() => {
+                      startTransition(() => {
+                        void (async () => {
+                          try {
+                            await confirmSkippedAction({ sessionId: session.id });
+                            setLocalSessions((prev) =>
+                              prev.map((item) =>
+                                item.id === session.id
+                                  ? { ...item, notes: item.notes ? `${item.notes}\n[Skip confirmed ${new Date().toISOString().slice(0, 10)}]` : `[Skip confirmed ${new Date().toISOString().slice(0, 10)}]` }
+                                  : item
+                              )
+                            );
+                            setDismissedIssues((prev) => [...prev, getIssueId("skipped_reassign", session.id)]);
+                            setToast("Skip confirmed");
+                            router.refresh();
+                          } catch {
+                            setToast("Could not confirm skip");
+                          }
+                        })();
+                      });
+                    }}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Confirm skip
+                  </button>
                 </div>
               </div>
             ))}
@@ -558,6 +631,7 @@ export function WeekCalendar({
                           state={state}
                           onMove={() => setMoveSource(session)}
                           onOpen={() => setDetailSession(session)}
+                          onAssign={() => setAssignSource(session)}
                           onToggleSkip={() => {
                             startTransition(() => {
                               void (async () => {
@@ -851,8 +925,8 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 top-14 z-40 bg-black/55 backdrop-blur-[2px]">
-      <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
+      <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>
   );
@@ -861,7 +935,7 @@ function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose
 function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl">
+      <aside className="relative ml-auto flex min-h-screen w-full max-w-xl flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl">
         <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -885,7 +959,7 @@ function TaskSheet({ children, title, description, onClose }: { children: React.
 function TaskModal({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <div className="relative z-10 flex h-full items-center justify-center p-4">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <section className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl">
           <header className="mb-4 border-b border-[hsl(var(--border))] pb-3">
             <p className="text-base font-semibold">{title}</p>

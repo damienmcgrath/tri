@@ -17,6 +17,7 @@ export type SessionReviewRow = {
   status?: "planned" | "completed" | "skipped" | null;
   execution_result?: Record<string, unknown> | null;
   has_linked_activity?: boolean;
+  is_extra?: boolean;
 };
 
 type SessionStatus = "planned" | "completed" | "skipped";
@@ -172,6 +173,26 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
   };
 }
 
+function toExtraReviewState(hasDiagnosticSignals: boolean) {
+  if (hasDiagnosticSignals) {
+    return {
+      reviewModeLabel: "Extra session review",
+      reviewModeDetail: "This unplanned workout is reviewed against weekly context rather than a planned session target.",
+      sessionStatusLabel: "Extra workout",
+      sessionStatusDetail: "Completed unplanned session with enough execution evidence to review its impact.",
+      isReviewable: true
+    };
+  }
+
+  return {
+    reviewModeLabel: "Extra session review",
+    reviewModeDetail: "This unplanned workout has limited evidence, so the review stays directional.",
+    sessionStatusLabel: "Extra workout",
+    sessionStatusDetail: "Completed unplanned session without enough detail for a stronger execution review.",
+    isReviewable: false
+  };
+}
+
 function toIntentBucket(intentCategory: string | null | undefined, sport: string) {
   const text = `${intentCategory ?? ""}`.toLowerCase();
   if (/recovery/.test(text)) return "recovery";
@@ -314,17 +335,23 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const diagnosis = session.execution_result;
   const v2Review = parsePersistedExecutionReview(diagnosis);
   const hasLinkedActivity = session.has_linked_activity === true;
-  const reviewState = toReviewState(session.status, diagnosis, hasLinkedActivity);
+  const hasDiagnosticSignals = Boolean(diagnosis) && Object.keys(diagnosis ?? {}).length > 0;
+  const isExtra = session.is_extra === true;
+  const reviewState = isExtra ? toExtraReviewState(hasDiagnosticSignals) : toReviewState(session.status, diagnosis, hasLinkedActivity);
   const intent = toIntent(diagnosis?.status, reviewState.isReviewable, hasLinkedActivity);
   const bucket = toIntentBucket(session.intent_category, session.sport);
 
-  const defaultWhyItMatters = reviewState.isReviewable
+  const defaultWhyItMatters = isExtra
+    ? "Unplanned sessions still change the training week, so the key question is whether this added useful stimulus or unnecessary load."
+    : reviewState.isReviewable
     ? intent.label === "Matched intent"
       ? "Matching the planned session intent preserves the adaptation you wanted from the day and supports the rest of the week."
       : "Execution consistency protects the intended training effect and helps the rest of the week land as planned."
     : "A useful review starts with a completed session, because that is what makes coaching advice trustworthy.";
 
-  const defaultNextAction = reviewState.isReviewable
+  const defaultNextAction = isExtra
+    ? "Decide whether this should count as added load, a replacement for missed work, or a reason to trim the next session."
+    : reviewState.isReviewable
     ? intent.label === "Matched intent"
       ? "Good control. Keep the same execution approach next time."
       : "Start the next similar session with one clear execution cue and protect it early."
@@ -371,7 +398,9 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const hrDrift = firstHalfHr && lastHalfHr ? lastHalfHr / firstHalfHr : null;
   const paceFade = firstHalfPace && lastHalfPace ? lastHalfPace / firstHalfPace : null;
 
-  const actualExecutionSummary = summarizeActualExecution({
+  const actualExecutionSummary = isExtra
+    ? executionSummary || "This extra session added training load outside the original plan."
+    : summarizeActualExecution({
     bucket,
     intentLabel: intent.label,
     executionSummary,
@@ -384,7 +413,11 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     paceFade
   });
 
-  const mainGap = deriveMainGap({
+  const mainGap = isExtra
+    ? reviewState.isReviewable
+      ? "There is no planned target to compare against, so the main question is whether this extra load helped the week or created recovery cost."
+      : "Without richer data, treat this extra session as additive load and judge it by how it affects the next 48 hours."
+    : deriveMainGap({
     isReviewable: reviewState.isReviewable,
     bucket,
     intentLabel: intent.label,
@@ -449,13 +482,15 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
       : null
   ].filter((metric): metric is { label: string; value: string } => metric !== null);
 
-  const plannedIntent = session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
+  const plannedIntent = isExtra ? "No planned intent. Review this as additional weekly load." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
   const weekAction = getString(
     v2Review?.verdict?.explanation
       ? { suggestedWeekAdjustment: v2Review.verdict.explanation.whatToDoThisWeek }
       : diagnosis,
     ["suggestedWeekAdjustment", "suggested_week_adjustment", "weeklyAdjustment", "weekly_adjustment"],
-    deriveWeekAction({ intentLabel: intent.label, bucket, isReviewable: reviewState.isReviewable })
+    isExtra
+      ? "Keep or trim the next session based on whether this extra load was replacing something planned or adding on top."
+      : deriveWeekAction({ intentLabel: intent.label, bucket, isReviewable: reviewState.isReviewable })
   );
   const executionCostLabel = v2Review?.verdict?.sessionVerdict.executionCost
     ? v2Review.verdict.sessionVerdict.executionCost.replace("_", " ")
@@ -476,8 +511,12 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     : null;
   const missingEvidence = v2Review?.verdict?.uncertainty.missingEvidence ?? (Array.isArray(diagnosis?.missingEvidence) ? diagnosis.missingEvidence.filter((item): item is string => typeof item === "string") : []);
 
-  const unlockTitle = reviewState.isReviewable ? "Review evidence" : "What unlocks review";
-  const unlockDetail = reviewState.isReviewable
+  const unlockTitle = isExtra ? "Weekly context" : reviewState.isReviewable ? "Review evidence" : "What unlocks review";
+  const unlockDetail = isExtra
+    ? reviewState.isReviewable
+      ? "Use this review to judge whether the extra session was supportive, neutral, or risky for the rest of the week."
+      : "This extra session can still be useful, but stronger interval and intensity detail would make the review more reliable."
+    : reviewState.isReviewable
     ? usefulMetrics.length > 0
       ? "This review is grounded in the available duration, interval, and intensity evidence from the uploaded session."
       : "This review is directional for now because the uploaded session includes limited measurable evidence."
@@ -485,7 +524,14 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
       ? "The workout is already attached to this planned session. Review unlocks once execution analysis catches up for the linked activity."
     : "Complete or sync the workout to unlock planned vs actual analysis, intent result, and a trustworthy Execution Score.";
 
-  const followUpPrompts = reviewState.isReviewable
+  const followUpPrompts = isExtra
+    ? [
+        "Did this extra session help or hurt the week?",
+        "Should I reduce my next session?",
+        "Was this replacing missed work or adding load?",
+        "How should I adjust the rest of the week?"
+      ]
+    : reviewState.isReviewable
     ? [
         "Why was this session flagged?",
         "Should I repeat this workout?",
@@ -526,7 +572,9 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     missingEvidence,
     unlockTitle,
     unlockDetail,
-    followUpIntro: reviewState.isReviewable
+    followUpIntro: isExtra
+      ? "Use coach follow-up to decide whether this extra session should change the rest of the week."
+      : reviewState.isReviewable
       ? "Use coach follow-up to understand the flag, decide whether to repeat the session, and protect the rest of the week."
       : "Coach follow-up becomes more useful once the workout is completed, but you can still ask how to handle the week from here.",
     followUpPrompts

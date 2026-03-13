@@ -17,6 +17,22 @@ type LegacySessionRow = {
   notes?: string | null;
 };
 
+type ActivityReviewRow = {
+  id: string;
+  user_id: string;
+  upload_id: string | null;
+  sport_type: string;
+  start_time_utc: string;
+  duration_sec: number | null;
+  distance_m: number | null;
+  avg_hr: number | null;
+  avg_power: number | null;
+  avg_pace_per_100m_sec?: number | null;
+  laps_count?: number | null;
+  parse_summary?: Record<string, unknown> | null;
+  metrics_v2?: Record<string, unknown> | null;
+};
+
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
   if (!error) return false;
   if (error.code === "42703") return true;
@@ -58,6 +74,61 @@ function toSessionRow(row: SessionRow | SessionsMinimalRow): SessionRow {
 
 const reviewDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
+function isMissingActivityColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /(schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
+async function loadActivityReviewRow(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+}) {
+  const { supabase, userId, activityId } = params;
+
+  const queries = [
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .eq("id", activityId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
+        .eq("id", activityId)
+        .maybeSingle()
+  ];
+
+  for (const runQuery of queries) {
+    const { data, error } = await runQuery();
+    if (data && !error) {
+      return data as ActivityReviewRow;
+    }
+    if (error && !isMissingActivityColumnError(error)) {
+      break;
+    }
+  }
+
+  return null;
+}
+
 export default async function SessionReviewPage({ params }: { params: { sessionId: string } }) {
   const supabase = await createClient();
   const {
@@ -67,8 +138,55 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   if (!user) redirect("/auth/sign-in");
 
   let session: SessionRow | null = null;
+  const activityRouteMatch = params.sessionId.match(/^activity:(.+)$/);
+  const activityId = activityRouteMatch?.[1] ?? null;
 
-  const sessionQueries = [
+  if (activityId) {
+    const activity = await loadActivityReviewRow({ supabase, userId: user.id, activityId });
+    if (!activity) redirect(`/activities/${activityId}`);
+
+    const syntheticSession: SessionRow = {
+      id: params.sessionId,
+      user_id: user.id,
+      date: new Date(activity.start_time_utc).toISOString().slice(0, 10),
+      sport: activity.sport_type,
+      type: "Extra workout",
+      session_name: "Extra workout",
+      discipline: activity.sport_type,
+      target: null,
+      duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+      status: "completed",
+      execution_result: buildExecutionResultForSession(
+        {
+          id: params.sessionId,
+          user_id: user.id,
+          sport: activity.sport_type,
+          type: "Extra workout",
+          duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+          target: null,
+          intent_category: "extra workout",
+          status: "completed"
+        },
+        {
+          id: activity.id,
+          sport_type: activity.sport_type,
+          duration_sec: activity.duration_sec,
+          distance_m: activity.distance_m,
+          avg_hr: activity.avg_hr,
+          avg_power: activity.avg_power,
+          avg_pace_per_100m_sec: activity.avg_pace_per_100m_sec ?? null,
+          laps_count: activity.laps_count ?? null,
+          parse_summary: activity.parse_summary ?? null,
+          metrics_v2: activity.metrics_v2 ?? null
+        }
+      ),
+      has_linked_activity: true
+    };
+
+    session = syntheticSession;
+  }
+
+  const sessionQueries = activityId ? [] : [
     () =>
       supabase
         .from("sessions")
@@ -108,7 +226,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     }
   }
 
-  if (!session) {
+  if (!session && !activityId) {
     const legacyQueries = [
       () =>
         supabase
@@ -147,9 +265,9 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   if (!session) notFound();
 
-  let hasLinkedActivity = false;
-  let linkedActivityId: string | null = null;
-  const linkQueries = [
+  let hasLinkedActivity = Boolean(activityId);
+  let linkedActivityId: string | null = activityId;
+  const linkQueries = activityId ? [] : [
     () =>
       supabase
         .from("session_activity_links")

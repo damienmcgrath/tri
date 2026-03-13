@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
+import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -16,6 +16,14 @@ const swapSessionSchema = z.object({
 });
 
 const markSkippedSchema = z.object({
+  sessionId: z.string().uuid()
+});
+
+const markActivityExtraSchema = z.object({
+  activityId: z.string().uuid()
+});
+
+const confirmSkippedSchema = z.object({
   sessionId: z.string().uuid()
 });
 
@@ -46,6 +54,117 @@ async function getAuthedClient() {
   }
 
   return { supabase, user };
+}
+
+function isMissingCompletedActivityColumnError(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false;
+  return error.code === "42703" || /(is_unplanned|schedule_status|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
+async function updateCompletedActivityExtraState(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+}) {
+  const { supabase, userId, activityId } = params;
+  const fullUpdate = await supabase
+    .from("completed_activities")
+    .update({ is_unplanned: true, schedule_status: "unscheduled" })
+    .eq("id", activityId)
+    .eq("user_id", userId);
+
+  if (!fullUpdate.error) {
+    return;
+  }
+
+  if (!isMissingCompletedActivityColumnError(fullUpdate.error)) {
+    throw new Error(fullUpdate.error.message ?? "Could not mark activity as extra.");
+  }
+
+  let appliedAnyFallback = false;
+
+  for (const payload of [{ is_unplanned: true }, { schedule_status: "unscheduled" as const }]) {
+    const fallbackUpdate = await supabase
+      .from("completed_activities")
+      .update(payload)
+      .eq("id", activityId)
+      .eq("user_id", userId);
+
+    if (!fallbackUpdate.error) {
+      appliedAnyFallback = true;
+      continue;
+    }
+
+    if (!isMissingCompletedActivityColumnError(fallbackUpdate.error)) {
+      throw new Error(fallbackUpdate.error.message ?? "Could not mark activity as extra.");
+    }
+  }
+
+  if (!appliedAnyFallback) {
+    throw new Error(fullUpdate.error.message ?? "Could not mark activity as extra.");
+  }
+}
+
+async function persistExtraActivityMarker(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+}) {
+  const { supabase, userId, activityId } = params;
+
+  const { data: existingLinks, error: loadLinksError } = await supabase
+    .from("session_activity_links")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("completed_activity_id", activityId);
+
+  if (loadLinksError) {
+    throw new Error(loadLinksError.message ?? "Could not load existing activity links.");
+  }
+
+  if (!existingLinks || existingLinks.length === 0) {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("session_activity_links")
+    .update({
+      confirmation_status: "rejected",
+      matched_by: userId,
+      matched_at: new Date().toISOString(),
+      match_method: "unmatched"
+    })
+    .eq("user_id", userId)
+    .eq("completed_activity_id", activityId);
+
+  if (updateError) {
+    throw new Error(updateError.message ?? "Could not persist extra workout state.");
+  }
+}
+
+async function updateUploadStatusForActivity(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+  status: "uploaded" | "parsed" | "matched" | "error";
+}) {
+  const { supabase, userId, activityId, status } = params;
+  const { data: activity, error: loadError } = await supabase
+    .from("completed_activities")
+    .select("upload_id")
+    .eq("id", activityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (loadError || !activity?.upload_id) {
+    return;
+  }
+
+  await supabase
+    .from("activity_uploads")
+    .update({ status, error_message: null })
+    .eq("id", activity.upload_id)
+    .eq("user_id", userId);
 }
 
 export async function moveSessionAction(input: { sessionId: string; newDate: string }) {
@@ -146,21 +265,54 @@ export async function markSkippedAction(input: { sessionId: string }) {
   const { supabase, user } = await getAuthedClient();
 
   const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!sessionError) {
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    const nextNotes = appendSkipTag(session.notes, new Date());
+
+    const { error } = await supabase
+      .from("sessions")
+      .update({ notes: nextNotes, status: "skipped" })
+      .eq("id", parsed.sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      throw new Error(error.message ?? "Could not mark session as skipped.");
+    }
+
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    return;
+  }
+
+  if (sessionError.code !== "PGRST205") {
+    throw new Error(sessionError.message ?? "Could not update session.");
+  }
+
+  const { data: legacySession, error: legacySessionError } = await supabase
     .from("planned_sessions")
     .select("notes")
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (sessionError) {
-    throw new Error(sessionError.message ?? "Could not update session.");
+  if (legacySessionError) {
+    throw new Error(legacySessionError.message ?? "Could not update session.");
   }
 
-  if (!session) {
+  if (!legacySession) {
     throw new Error("Session not found.");
   }
 
-  const nextNotes = appendSkipTag(session.notes, new Date());
+  const nextNotes = appendSkipTag(legacySession.notes, new Date());
 
   const { error } = await supabase
     .from("planned_sessions")
@@ -182,21 +334,54 @@ export async function clearSkippedAction(input: { sessionId: string }) {
   const { supabase, user } = await getAuthedClient();
 
   const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!sessionError) {
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    const nextNotes = clearSkipTag(session.notes);
+
+    const { error } = await supabase
+      .from("sessions")
+      .update({ notes: nextNotes, status: "planned" })
+      .eq("id", parsed.sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      throw new Error(error.message ?? "Could not clear skipped status.");
+    }
+
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    return;
+  }
+
+  if (sessionError.code !== "PGRST205") {
+    throw new Error(sessionError.message ?? "Could not update session.");
+  }
+
+  const { data: legacySession, error: legacySessionError } = await supabase
     .from("planned_sessions")
     .select("notes")
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (sessionError) {
-    throw new Error(sessionError.message ?? "Could not update session.");
+  if (legacySessionError) {
+    throw new Error(legacySessionError.message ?? "Could not update session.");
   }
 
-  if (!session) {
+  if (!legacySession) {
     throw new Error("Session not found.");
   }
 
-  const nextNotes = clearSkipTag(session.notes);
+  const nextNotes = clearSkipTag(legacySession.notes);
 
   const { error } = await supabase
     .from("planned_sessions")
@@ -210,6 +395,86 @@ export async function clearSkippedAction(input: { sessionId: string }) {
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+}
+
+export async function confirmSkippedAction(input: { sessionId: string }) {
+  const parsed = confirmSkippedSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("notes,status")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!sessionError) {
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    const nextNotes = appendConfirmedSkipTag(session.notes, new Date());
+
+    const { error } = await supabase
+      .from("sessions")
+      .update({ notes: nextNotes, status: session.status ?? "skipped" })
+      .eq("id", parsed.sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      throw new Error(error.message ?? "Could not confirm skipped session.");
+    }
+
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    return;
+  }
+
+  if (sessionError.code !== "PGRST205") {
+    throw new Error(sessionError.message ?? "Could not confirm skipped session.");
+  }
+
+  const { data: legacySession, error: legacySessionError } = await supabase
+    .from("planned_sessions")
+    .select("notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (legacySessionError) {
+    throw new Error(legacySessionError.message ?? "Could not confirm skipped session.");
+  }
+
+  if (!legacySession) {
+    throw new Error("Session not found.");
+  }
+
+  const nextNotes = appendConfirmedSkipTag(legacySession.notes, new Date());
+
+  const { error } = await supabase
+    .from("planned_sessions")
+    .update({ notes: nextNotes })
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message ?? "Could not confirm skipped session.");
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+}
+
+export async function markActivityExtraAction(input: { activityId: string }) {
+  const parsed = markActivityExtraSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+  await updateCompletedActivityExtraState({ supabase, userId: user.id, activityId: parsed.activityId });
+  await persistExtraActivityMarker({ supabase, userId: user.id, activityId: parsed.activityId });
+  await updateUploadStatusForActivity({ supabase, userId: user.id, activityId: parsed.activityId, status: "matched" });
+
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath(`/activities/${parsed.activityId}`);
 }
 
 

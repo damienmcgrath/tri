@@ -62,6 +62,11 @@ function toCandidateStartTime(session: { date: string; start_time_utc?: string |
   return session.start_time_utc ?? `${session.date}T06:00:00.000Z`;
 }
 
+function isMissingActivityDetailsColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return error.code === "42703" || /(notes|is_unplanned|is_race|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
 export async function loadActivityDetails(activityId: string): Promise<ActivityDetailsPayload | null> {
   const supabase = await createClient();
   const {
@@ -70,12 +75,40 @@ export async function loadActivityDetails(activityId: string): Promise<ActivityD
 
   if (!user) return null;
 
-  const { data: activity } = await supabase
-    .from("completed_activities")
-    .select("id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,notes,is_unplanned,is_race")
-    .eq("id", activityId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const selectVariants = [
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,notes,is_unplanned,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,is_unplanned,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2"
+  ] as const;
+
+  let activity: ActivityDetails | null = null;
+
+  for (const selectClause of selectVariants) {
+    const query = await supabase
+      .from("completed_activities")
+      .select(selectClause)
+      .eq("id", activityId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!query.error) {
+      if (!query.data) return null;
+
+      const record = query.data as unknown as Record<string, unknown>;
+      activity = {
+        ...(record as unknown as ActivityDetails),
+        notes: typeof record.notes === "string" ? record.notes : null,
+        is_unplanned: typeof record.is_unplanned === "boolean" ? record.is_unplanned : false,
+        is_race: typeof record.is_race === "boolean" ? record.is_race : false
+      };
+      break;
+    }
+
+    if (!isMissingActivityDetailsColumnError(query.error)) {
+      return null;
+    }
+  }
 
   if (!activity) return null;
 
