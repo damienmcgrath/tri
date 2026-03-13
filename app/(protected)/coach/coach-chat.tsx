@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { CoachDiagnosisSession } from "./types";
+import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 
 type Message = {
@@ -62,7 +63,7 @@ const defaultAssistantMessage: Message = {
   id: "coach-default",
   role: "assistant",
   content:
-    "I can diagnose whether completed sessions matched their intended purpose, then help you decide exactly how to adjust the rest of your week."
+    "I can use execution scores and intent-match review to explain what happened in completed sessions, then help you decide exactly what to adjust next."
 };
 
 function createMessageId() {
@@ -98,13 +99,36 @@ function formatRecencyLabel(updatedAt?: string): string {
   return `Updated ${diffDays}d ago`;
 }
 
-function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function deriveTopInsight(sessions: SessionDiagnosis[], briefingContext: CoachBriefingContext): TopCoachingInsight {
   const hasEnoughDiagnosis = sessions.length >= 2;
   if (!hasEnoughDiagnosis) {
+    const latestScored = [...sessions].find((session) => session.executionScoreBand);
+    if (briefingContext.reviewedSessionCount > 0 || briefingContext.pendingReviewCount > 0 || briefingContext.linkedSessionCount > 0) {
+      return {
+        headline:
+          briefingContext.reviewedSessionCount > 0
+            ? `${briefingContext.reviewedSessionCount} session review${briefingContext.reviewedSessionCount > 1 ? "s" : ""} ready`
+            : `${briefingContext.linkedSessionCount} linked session${briefingContext.linkedSessionCount > 1 ? "s" : ""} waiting for review`,
+        rationale:
+          briefingContext.reviewedSessionCount > 0
+            ? `Coach already has ${briefingContext.reviewedSessionCount} reviewed session${briefingContext.reviewedSessionCount > 1 ? "s" : ""} to work from${briefingContext.pendingReviewCount > 0 ? `, with ${briefingContext.pendingReviewCount} more linked and still processing` : ""}. Use this as an execution snapshot while the review set grows.`
+            : `You have ${briefingContext.uploadedSessionCount} uploaded activit${briefingContext.uploadedSessionCount === 1 ? "y" : "ies"} and ${briefingContext.linkedSessionCount} linked session${briefingContext.linkedSessionCount > 1 ? "s" : ""}. Coach briefing should focus on what is already connected, not ask you to start from scratch.`,
+        primaryAction: { label: "Ask why", href: "#coaching-chat" },
+        secondaryAction: { label: "Review weekly plan", href: "/plan" },
+        confidenceNote: briefingContext.pendingReviewCount > 0 ? `${briefingContext.pendingReviewCount} pending review` : "Early review set"
+      };
+    }
+
     return {
-      headline: "Start with 1–2 completed sessions to unlock intent-match coaching",
+      headline: latestScored ? `Latest review: ${scoreHeadline(latestScored)}` : "Start with 1–2 completed sessions to unlock intent-match coaching",
       rationale:
-        "You can already ask about missed-session recovery, schedule adjustments, and conservative load planning. As soon as more workouts are completed, session-quality diagnosis becomes specific.",
+        latestScored
+          ? `${latestScored.sessionName} is already giving an execution-quality signal. One more reviewed session will make weekly coaching much more specific.`
+          : "You can already ask about missed-session recovery, schedule adjustments, and conservative load planning. As soon as more workouts are completed, session-quality diagnosis becomes specific.",
       primaryAction: { label: "Ask why", href: "#coaching-chat" },
       secondaryAction: { label: "Review weekly plan", href: "/plan" },
       confidenceNote: "Provisional insight"
@@ -113,6 +137,10 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   const rankedSessions = rankFlaggedSessions(sessions);
   const strongestFlag = rankedSessions[0];
+  const onTargetCount = sessions.filter((session) => session.executionScoreBand === "On target").length;
+  const partialCountAll = sessions.filter((session) => session.executionScoreBand === "Partial match").length;
+  const missedCountAll = sessions.filter((session) => session.executionScoreBand === "Missed intent").length;
+  const provisionalCount = sessions.filter((session) => session.executionScoreProvisional).length;
 
   if (!strongestFlag) {
     const strongEnduranceSignal = sessions.some((session) => inferThemes(session).includes("endurance_strong"));
@@ -132,7 +160,7 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   if (strongestFlag.themes.includes("easy_drift")) {
     return {
-      headline: "Easy sessions are drifting too hard",
+      headline: `Easy sessions are drifting too hard${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
       rationale:
         "Diagnosis is repeatedly detecting intensity drift away from easy intent. Protecting low-intensity execution now improves recovery and quality-session readiness.",
       primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
@@ -143,7 +171,7 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   if (strongestFlag.themes.includes("recovery_slip")) {
     return {
-      headline: "Recovery quality is slipping",
+      headline: `Recovery quality is slipping${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
       rationale: strongestFlag.whyItMatters,
       primaryAction: { label: "Protect recovery", href: "/plan" },
       secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
@@ -153,7 +181,7 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   if (strongestFlag.themes.includes("threshold_inconsistent")) {
     return {
-      headline: "Threshold execution is inconsistent",
+      headline: `Threshold execution is inconsistent${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
       rationale:
         "Quality-session diagnosis shows uneven control versus planned intent. Tightening pacing before adding load will improve adaptation quality.",
       primaryAction: { label: "Adjust this week", href: "/plan" },
@@ -164,8 +192,14 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   if (strongestFlag.status === "missed") {
     return {
-      headline: strongestFlag.executionSummary,
-      rationale: strongestFlag.whyItMatters,
+      headline:
+        missedCountAll > 1
+          ? `Execution is off-target in ${pluralize(missedCountAll, "session")} this week`
+          : `${strongestFlag.sessionName} needs attention this week`,
+      rationale:
+        missedCountAll > 1
+          ? `${pluralize(onTargetCount, "review")} are on target, but ${pluralize(missedCountAll, "session")} missed intent. Start by addressing ${strongestFlag.sessionName}, then keep the rest of the week steady.`
+          : `${pluralize(onTargetCount, "review")} are on target, but ${strongestFlag.sessionName} missed intent${provisionalCount > 0 ? ` and most scores are still provisional` : ""}.`,
       primaryAction: { label: "Adjust this week", href: "/plan" },
       secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
       confidenceNote: "Diagnosis confidence: useful"
@@ -174,10 +208,14 @@ function deriveTopInsight(sessions: SessionDiagnosis[]): TopCoachingInsight {
 
   if (missedCount >= 1 || partialCount >= 1) {
     return {
-      headline: strongestFlag?.executionSummary ?? "Execution quality is mixed — tighten intent on easy days",
+      headline:
+        onTargetCount > 0
+          ? `Execution is mostly on target, with ${pluralize(partialCountAll + missedCountAll, "session")} needing attention`
+          : "Execution quality is mixed — tighten session control this week",
       rationale:
-        strongestFlag?.whyItMatters ??
-        "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
+        strongestFlag
+          ? `${pluralize(onTargetCount, "review")} are on target, but ${strongestFlag.sessionName} came up short${provisionalCount > 0 ? `. Most reviews are still early reads, so keep the signal in mind without over-correcting the week.` : "."}`
+          : "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
       primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
       secondaryAction: { label: "Ask why", href: "#coaching-chat" },
       confidenceNote: null
@@ -250,6 +288,16 @@ function statusChip(status: IntentMatchStatus): { label: string; className: stri
   return { label: "Missed intent", className: "signal-risk" };
 }
 
+function scoreHeadline(session: Pick<SessionDiagnosis, "executionScore" | "executionScoreBand" | "executionScoreProvisional">) {
+  if (!session.executionScoreBand) {
+    return session.executionScoreProvisional ? "Provisional review" : "Awaiting score";
+  }
+  if (session.executionScoreProvisional || session.executionScore === null) {
+    return `Provisional · ${session.executionScoreBand}`;
+  }
+  return `${session.executionScore} · ${session.executionScoreBand}`;
+}
+
 function executionScoreBandTone(band: SessionDiagnosis["executionScoreBand"]): string {
   if (band === "On target") {
     return "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success))]";
@@ -260,7 +308,16 @@ function executionScoreBandTone(band: SessionDiagnosis["executionScoreBand"]): s
   return "border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--danger))]";
 }
 
-export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessions: SessionDiagnosis[]; initialPrompt?: string }) {
+export function CoachChat({
+  diagnosisSessions,
+  briefingContext,
+  initialPrompt
+}: {
+  diagnosisSessions: SessionDiagnosis[];
+  briefingContext: CoachBriefingContext;
+  initialPrompt?: string;
+}) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
@@ -269,6 +326,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [hasRequestedReviewBackfill, setHasRequestedReviewBackfill] = useState(false);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -276,8 +334,41 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
   const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
   const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
-  const topInsight = useMemo(() => deriveTopInsight(sessionDiagnoses), [sessionDiagnoses]);
+  const topInsight = useMemo(() => deriveTopInsight(sessionDiagnoses, briefingContext), [sessionDiagnoses, briefingContext]);
   const dataState = useMemo(() => getDiagnosisDataState(sessionDiagnoses.length), [sessionDiagnoses.length]);
+  const latestScoredSession = useMemo(
+    () => sessionDiagnoses.find((session) => session.executionScoreBand || session.executionScore !== null) ?? null,
+    [sessionDiagnoses]
+  );
+  const scoreTrendSummary = useMemo(() => {
+    if (sessionDiagnoses.length === 0) return "No reviewed sessions yet.";
+    const onTarget = sessionDiagnoses.filter((session) => session.executionScoreBand === "On target").length;
+    const partial = sessionDiagnoses.filter((session) => session.executionScoreBand === "Partial match").length;
+    const missed = sessionDiagnoses.filter((session) => session.executionScoreBand === "Missed intent").length;
+    const provisional = sessionDiagnoses.filter((session) => session.executionScoreProvisional).length;
+    const pieces = [
+      onTarget > 0 ? `${onTarget} on target` : null,
+      partial > 0 ? `${partial} partial` : null,
+      missed > 0 ? `${missed} missed` : null
+    ].filter((value): value is string => Boolean(value));
+    const trend = pieces.length > 0 ? pieces.join(", ") : "scores still building";
+    return provisional > 0 ? `Execution trend: ${trend}. ${provisional} provisional.` : `Execution trend: ${trend}.`;
+  }, [sessionDiagnoses]);
+  const emptyAttentionText = useMemo(() => {
+    if (briefingContext.pendingReviewCount > 0) {
+      return `${briefingContext.pendingReviewCount} linked session${briefingContext.pendingReviewCount > 1 ? "s are" : " is"} waiting for review analysis. Coach can already see the uploads; it is waiting for scored session reviews.`;
+    }
+
+    if (briefingContext.linkedSessionCount > 0) {
+      return `${briefingContext.linkedSessionCount} linked session${briefingContext.linkedSessionCount > 1 ? "s are" : " is"} connected, but no session reviews are ready yet.`;
+    }
+
+    if (briefingContext.uploadedSessionCount > 0) {
+      return `${briefingContext.uploadedSessionCount} uploaded activit${briefingContext.uploadedSessionCount === 1 ? "y is" : "ies are"} available. Link them to planned sessions to unlock review guidance.`;
+    }
+
+    return dataState.unlockText;
+  }, [briefingContext, dataState.unlockText]);
 
   const strongestTheme = flaggedSessions[0]?.themes[0] ?? null;
 
@@ -318,6 +409,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   const quickPrompts = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
       return [
+        "What does my execution score mean?",
         "Which session should I protect this week?",
         "How should I adjust this week?",
         "Missed workout recovery",
@@ -325,7 +417,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
       ];
     }
 
-    const prompts = ["Why was this session flagged?", "Should I repeat this workout?", "How should I adjust the rest of the week?"];
+    const prompts = ["Why was this session flagged?", "What would move this to On target?", "Should I repeat this workout?", "How should I adjust the rest of the week?"];
 
     if (strongestTheme === "easy_drift") {
       prompts.splice(1, 0, "How do I keep Z2 truly easy?");
@@ -372,6 +464,39 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
   useEffect(() => {
     void loadConversations();
   }, []);
+
+  useEffect(() => {
+    if (hasRequestedReviewBackfill || briefingContext.pendingReviewCount <= 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function requestReviewBackfill() {
+      setHasRequestedReviewBackfill(true);
+
+      try {
+        const response = await fetch("/api/coach/review-backfill", { method: "POST" });
+        const data = (await response.json()) as { updated?: number; error?: string };
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        if ((data.updated ?? 0) > 0) {
+          router.refresh();
+        }
+      } catch {
+        // Keep Coach usable even if background backfill fails.
+      }
+    }
+
+    void requestReviewBackfill();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [briefingContext.pendingReviewCount, hasRequestedReviewBackfill, router]);
 
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim().length > 0) {
@@ -665,24 +790,50 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
                 {topInsight.secondaryAction.label}
               </a>
             </div>
+            <p className="mt-2 text-xs text-tertiary">{scoreTrendSummary}</p>
+            <p className="mt-2 text-[11px] text-tertiary">
+              {briefingContext.uploadedSessionCount} uploaded · {briefingContext.linkedSessionCount} linked · {briefingContext.reviewedSessionCount} reviewed
+              {briefingContext.pendingReviewCount > 0 ? ` · ${briefingContext.pendingReviewCount} pending review` : ""}
+            </p>
           </div>
-          <div className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
+          <div id="sessions-needing-attention" className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
               <span className="text-xs text-tertiary">{flaggedSessions.length}</span>
             </div>
             {flaggedSessions.length === 0 ? (
-              <p className="mt-1.5 text-xs text-muted">{dataState.unlockText}</p>
+              <p className="mt-1.5 text-xs text-muted">{emptyAttentionText}</p>
             ) : (
               <ul className="mt-1.5 space-y-1">
                 {flaggedSessions.slice(0, 2).map((session) => (
-                  <li key={session.id} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="truncate text-[hsl(var(--text-secondary))]">{session.sessionName}</span>
-                    <span className={`signal-chip ${statusChip(session.status).className}`}>{statusChip(session.status).label}</span>
+                  <li key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2 py-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <Link href={`/sessions/${session.id}`} className="truncate text-[hsl(var(--text-secondary))] underline-offset-2 hover:text-[hsl(var(--text-primary))] hover:underline">
+                        {session.sessionName}
+                      </Link>
+                      <span className={`signal-chip ${statusChip(session.status).className}`}>{statusChip(session.status).label}</span>
+                    </div>
+                    {session.executionScoreBand ? (
+                      <div className="mt-1">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${executionScoreBandTone(session.executionScoreBand)}`}>
+                          {scoreHeadline(session)}
+                        </span>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
+            {latestScoredSession ? (
+              <p className="mt-1.5 text-xs text-tertiary">
+                Latest reviewed session:{" "}
+                <Link href={`/sessions/${latestScoredSession.id}`} className="underline-offset-2 hover:text-[hsl(var(--text-primary))] hover:underline">
+                  {latestScoredSession.sessionName}
+                </Link>
+                {" · "}
+                {scoreHeadline(latestScoredSession)}
+              </p>
+            ) : null}
             {matchedSessions.length > 0 ? <p className="mt-1.5 text-xs text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
           </div>
         </div>
@@ -738,6 +889,7 @@ export function CoachChat({ diagnosisSessions, initialPrompt }: { diagnosisSessi
             <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Focus: {nextActions[0] ?? "Stabilise execution quality."}</span>
             <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Flagged: {flaggedSessions.length}</span>
             <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Data: {sessionDiagnoses.length} diagnosed sessions</span>
+            {latestScoredSession ? <span className="rounded-full bg-[hsl(var(--surface-1))] px-2 py-0.5">Latest score: {scoreHeadline(latestScoredSession)}</span> : null}
           </div>
         </div>
 

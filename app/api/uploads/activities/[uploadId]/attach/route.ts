@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSameOrigin } from "@/lib/security/request";
+import { syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 
 const schema = z.object({
   plannedSessionId: z.string().uuid(),
@@ -65,9 +66,16 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
     .eq("user_id", user.id);
 
   await supabase.from("activity_uploads").update({ status: "matched", error_message: null }).eq("id", params.uploadId).eq("user_id", user.id);
+  await syncSessionExecutionFromActivityLink({
+    supabase,
+    userId: user.id,
+    sessionId: body.data.plannedSessionId,
+    activityId: activity.id
+  });
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath(`/sessions/${body.data.plannedSessionId}`);
 
   return NextResponse.json({ ok: true });
 }

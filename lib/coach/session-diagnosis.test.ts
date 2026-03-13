@@ -102,6 +102,8 @@ describe("diagnoseCompletedSession", () => {
     expect(diagnosis.intentMatchStatus).toBe("matched_intent");
     expect(diagnosis.executionScoreBand).toBe("On target");
     expect(diagnosis.diagnosisConfidence).toBe("medium");
+    expect(diagnosis.whyItMatters).toMatch(/Matching the planned session intent|supports the rest of the week/i);
+    expect(diagnosis.recommendedNextAction).toMatch(/Good control|execution approach/i);
   });
 
   test("degrades gracefully with unknown intent and sparse data", () => {
