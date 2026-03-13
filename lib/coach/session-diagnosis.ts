@@ -349,7 +349,19 @@ function getSummary(status: IntentMatchStatus, issues: IssueKey[], bucket: Inten
     : `Session partially matched intent: ${topIssue}.`;
 }
 
-function getWhyItMatters(issues: IssueKey[]): string {
+function getWhyItMatters(status: IntentMatchStatus, issues: IssueKey[], bucket: IntentBucket): string {
+  if (status === "matched_intent") {
+    if (bucket === "recovery") {
+      return "Well-controlled recovery sessions help the next quality work land without unnecessary fatigue carryover.";
+    }
+
+    if (bucket === "threshold_quality") {
+      return "Hitting the planned quality stimulus is what makes these sessions worth carrying through the week.";
+    }
+
+    return "Matching the planned session intent preserves the adaptation you wanted from the day and supports the rest of the week.";
+  }
+
   if (issues.includes("faded_late") || issues.includes("started_too_hard")) {
     return "Pacing errors in longer sessions can compromise durability and race-day execution.";
   }
@@ -369,7 +381,19 @@ function getWhyItMatters(issues: IssueKey[]): string {
   return "Execution drift from intent can lower the training value of the session.";
 }
 
-function getNextAction(issues: IssueKey[], bucket: IntentBucket): string {
+function getNextAction(status: IntentMatchStatus, issues: IssueKey[], bucket: IntentBucket): string {
+  if (status === "matched_intent") {
+    if (bucket === "recovery") {
+      return "Good control. Keep the same easy-day discipline on the next recovery session.";
+    }
+
+    if (bucket === "threshold_quality") {
+      return "Good control. Keep the same pacing and execution structure on the next quality session.";
+    }
+
+    return "Good control. Keep the same execution approach next time.";
+  }
+
   if (issues.includes("too_hard") || issues.includes("high_hr")) {
     return "On the next similar session, cap intensity early and keep the first third deliberately easy.";
   }
@@ -422,8 +446,8 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
     executionScoreBand: score.band,
     executionScoreSummary: summary,
     executionSummary: summary,
-    whyItMatters: getWhyItMatters(draft.issues),
-    recommendedNextAction: getNextAction(draft.issues, bucket),
+    whyItMatters: getWhyItMatters(draft.status, draft.issues, bucket),
+    recommendedNextAction: getNextAction(draft.status, draft.issues, bucket),
     diagnosisConfidence: getConfidence(draft.evidenceCount),
     executionScoreProvisional: score.provisional
   };

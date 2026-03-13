@@ -13,3 +13,10 @@ export type CoachDiagnosisSession = {
   evidence: string[];
   importance: number;
 };
+
+export type CoachBriefingContext = {
+  uploadedSessionCount: number;
+  linkedSessionCount: number;
+  reviewedSessionCount: number;
+  pendingReviewCount: number;
+};

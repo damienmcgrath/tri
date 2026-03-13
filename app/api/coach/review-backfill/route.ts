@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { isSameOrigin } from "@/lib/security/request";
+import { backfillPendingSessionExecutions } from "@/lib/workouts/session-execution";
+
+function isMissingSessionReviewSchema(message: string) {
+  return /schema cache|42703|column .* does not exist|sessions\.(session_name|discipline|subtype|workout_type|intent_category|session_role|source_metadata|execution_result)/i.test(
+    message
+  );
+}
+
+export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const result = await backfillPendingSessionExecutions({
+      supabase,
+      userId: user.id,
+      limit: 20
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not backfill session reviews.";
+    if (isMissingSessionReviewSchema(message)) {
+      return NextResponse.json(
+        { error: "Session review columns are missing in the database. Run the latest Supabase migrations, then retry review backfill." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

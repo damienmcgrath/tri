@@ -1,6 +1,6 @@
 import { CoachChat } from "./coach-chat";
 import { createClient } from "@/lib/supabase/server";
-import type { CoachDiagnosisSession } from "./types";
+import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getSessionDisplayName } from "@/lib/training/session";
 
 type SessionRow = {
@@ -124,8 +124,53 @@ async function getDiagnosisSessions() {
     .slice(0, 6);
 }
 
+async function getBriefingContext(): Promise<CoachBriefingContext> {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      uploadedSessionCount: 0,
+      linkedSessionCount: 0,
+      reviewedSessionCount: 0,
+      pendingReviewCount: 0
+    };
+  }
+
+  const [{ data: activities }, { data: links }, { data: reviewedSessions }] = await Promise.all([
+    supabase.from("completed_activities").select("id").eq("user_id", user.id),
+    supabase
+      .from("session_activity_links")
+      .select("planned_session_id,confirmation_status")
+      .eq("user_id", user.id),
+    supabase
+      .from("sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .not("execution_result", "is", null)
+  ]);
+
+  const confirmedLinkedSessionIds = new Set(
+    (links ?? [])
+      .filter((link) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link) => link.planned_session_id as string)
+  );
+
+  const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
+  const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId)).length;
+
+  return {
+    uploadedSessionCount: (activities ?? []).length,
+    linkedSessionCount: confirmedLinkedSessionIds.size,
+    reviewedSessionCount: reviewedSessionIds.size,
+    pendingReviewCount
+  };
+}
+
 export default async function CoachPage({ searchParams }: { searchParams?: { prompt?: string } }) {
-  const diagnosisSessions = await getDiagnosisSessions();
+  const [diagnosisSessions, briefingContext] = await Promise.all([getDiagnosisSessions(), getBriefingContext()]);
 
   return (
     <section className="space-y-4">
@@ -134,7 +179,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
         <h1 className="mt-1 text-lg font-semibold">Session execution coaching</h1>
         <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and your next best adjustment.</p>
       </article>
-      <CoachChat diagnosisSessions={diagnosisSessions} initialPrompt={searchParams?.prompt} />
+      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} />
     </section>
   );
 }
