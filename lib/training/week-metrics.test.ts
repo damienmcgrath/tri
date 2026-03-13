@@ -25,6 +25,21 @@ describe("week metrics", () => {
     });
   });
 
+  it("adds extra completed work into counts and minutes", () => {
+    expect(computeWeekSessionCounts(sessions, { completedCount: 2 })).toEqual({
+      completedCount: 3,
+      skippedCount: 1,
+      plannedRemainingCount: 2,
+      plannedTotalCount: 6
+    });
+
+    expect(computeWeekMinuteTotals(sessions, { completedMinutes: 50 })).toEqual({
+      plannedMinutes: 225,
+      completedMinutes: 95,
+      remainingMinutes: 130
+    });
+  });
+
   it("returns key sessions remaining in chronological order", () => {
     expect(getKeySessionsRemaining(sessions, "2026-02-24").map((s) => s.id)).toEqual(["2", "4"]);
   });

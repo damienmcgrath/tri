@@ -4,6 +4,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
+import { buildCalendarDisplayItems } from "@/lib/calendar/day-items";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 
 type Session = {
@@ -33,6 +34,7 @@ type CompletedSession = {
 
 type CompletedActivity = {
   id: string;
+  upload_id: string | null;
   sport_type: string;
   start_time_utc: string;
   duration_sec: number;
@@ -79,6 +81,53 @@ function toHoursAndMinutes(minutes: number) {
   const hours = Math.floor(safeMinutes / 60);
   const mins = safeMinutes % 60;
   return `${hours}h ${mins}m`;
+}
+
+function getTodaySummaryLabel({
+  remainingCount,
+  scheduledCompletedCount,
+  extraCompletedCount
+}: {
+  remainingCount: number;
+  scheduledCompletedCount: number;
+  extraCompletedCount: number;
+}) {
+  const parts = [`${remainingCount} remaining`, `${scheduledCompletedCount} completed`];
+  if (extraCompletedCount > 0) {
+    parts.push(`${extraCompletedCount} extra`);
+  }
+  return parts.join(" · ");
+}
+
+function localIsoDate(utcIso: string, timeZone: string) {
+  const date = new Date(utcIso);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+async function loadUploadStatuses(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  uploadIds: string[];
+}) {
+  const { supabase, userId, uploadIds } = params;
+  if (uploadIds.length === 0) return new Map<string, string>();
+
+  const { data, error } = await supabase
+    .from("activity_uploads")
+    .select("id,status")
+    .eq("user_id", userId)
+    .in("id", uploadIds);
+
+  if (error) {
+    throw new Error(error.message ?? "Failed to load upload statuses for dashboard.");
+  }
+
+  return new Map((data ?? []).map((upload: { id: string; status: string }) => [upload.id, upload.status]));
 }
 
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
@@ -323,7 +372,11 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const timeZone =
+    (user.user_metadata && typeof user.user_metadata.timezone === "string" && user.user_metadata.timezone) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "UTC";
+  const todayIso = localIsoDate(new Date().toISOString(), timeZone);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -331,10 +384,10 @@ export default async function DashboardPage({
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("completed_activities")
-      .select("id,sport_type,start_time_utc,duration_sec,schedule_status,is_unplanned")
+      .select("id,upload_id,sport_type,start_time_utc,duration_sec,schedule_status,is_unplanned")
       .eq("user_id", user.id)
-      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
-      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
+      .gte("start_time_utc", `${addDays(weekStart, -1)}T00:00:00.000Z`)
+      .lt("start_time_utc", `${addDays(weekEnd, 1)}T00:00:00.000Z`),
     supabase.from("session_activity_links").select("completed_activity_id,planned_session_id,confirmation_status").eq("user_id", user.id)
   ]);
 
@@ -382,6 +435,13 @@ export default async function DashboardPage({
   }, {});
 
   const uploadedActivities = (completedActivities ?? []) as CompletedActivity[];
+  const uploadStatusById = await loadUploadStatuses({
+    supabase,
+    userId: user.id,
+    uploadIds: uploadedActivities
+      .map((activity) => activity.upload_id)
+      .filter((uploadId): uploadId is string => Boolean(uploadId))
+  });
   const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null; confirmation_status?: "suggested" | "confirmed" | "rejected" | null }>;
   const confirmedLinks = links.filter((item) => item.confirmation_status === "confirmed" || !item.confirmation_status);
   const linkedSessionIds = new Set(confirmedLinks.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
@@ -410,12 +470,31 @@ export default async function DashboardPage({
     is_key: Boolean((session as { is_key?: boolean }).is_key)
   }));
 
+  const calendarItems = buildCalendarDisplayItems({
+    sessions: ((sessionsData ?? []) as Session[]).map((session) => ({
+      ...session,
+      duration_minutes: session.duration_minutes ?? 0
+    })) as Parameters<typeof buildCalendarDisplayItems>[0]["sessions"],
+    activities: uploadedActivities.map((activity) => ({
+      ...activity,
+      upload_status: activity.upload_id ? (uploadStatusById.get(activity.upload_id) ?? "parsed") : "parsed"
+    })) as Parameters<typeof buildCalendarDisplayItems>[0]["activities"],
+    links: links as Parameters<typeof buildCalendarDisplayItems>[0]["links"],
+    legacyCompleted: (completedData ?? []) as Parameters<typeof buildCalendarDisplayItems>[0]["legacyCompleted"],
+    timeZone,
+    weekStart,
+    weekEndExclusive: weekEnd
+  });
+  const extraActivityItems = calendarItems.filter((item) => item.displayType === "completed_activity" && item.isUnplanned);
+
   const hasActivePlan = Boolean(activePlanId);
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const pendingTodaySessions = todaySessions.filter((session) => session.status === "planned");
   const completedTodaySessions = todaySessions.filter((session) => session.status === "completed");
   const nextPendingTodaySession = pendingTodaySessions[0] ?? null;
-  const todayCompletedMinutes = completedTodaySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
+  const extraTodayActivities = extraActivityItems.filter((item) => item.date === todayIso);
+  const completedTodayCount = completedTodaySessions.length + extraTodayActivities.length;
+  const todayCompletedMinutes = completedTodaySessions.reduce((sum, session) => sum + getCompletedMinutes(session), 0) + extraTodayActivities.reduce((sum, item) => sum + item.duration, 0);
 
   const weekMetricSessions = sessions.map((session) => ({
     id: session.id,
@@ -426,9 +505,12 @@ export default async function DashboardPage({
     isKey: session.is_key
   }));
 
-  const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
+  const extraCompletedCount = extraActivityItems.length;
+  const extraCompletedMinutes = extraActivityItems.reduce((sum, item) => sum + item.duration, 0);
+  const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions, { completedMinutes: extraCompletedMinutes });
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const completedSessionsCount = sessions.filter((session) => session.status === "completed").length;
+  const completedSessionsCount = sessions.filter((session) => session.status === "completed").length + extraCompletedCount;
+  const totalSessionsCount = sessions.length + extraCompletedCount;
   const missedSessions = sessions.filter((session) => session.status === "planned" && session.date < todayIso);
   const missedSessionsCount = missedSessions.length;
   const missedMinutes = missedSessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
@@ -443,11 +525,16 @@ export default async function DashboardPage({
   const dailyStates = Array.from({ length: 7 }).map((_, index) => {
     const iso = addDays(weekStart, index);
     const daySessions = sessions.filter((session) => session.date === iso);
+    const extraActivitiesOnDay = extraActivityItems.filter((item) => item.date === iso);
     const plannedCount = daySessions.filter((session) => session.status === "planned").length;
     const plannedMinutes = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const remainingMinutesOnDay = daySessions.filter((session) => session.status === "planned").reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-    const completedMinutesOnDay = daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0);
+    const completedMinutesOnDay =
+      daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0)
+      + extraActivitiesOnDay.reduce((sum, activity) => sum + activity.duration, 0);
     const trainingMeaning = getDayMeaningLabel(daySessions);
+    const hasCompletedWorkOnDay = completedMinutesOnDay > 0;
+    const hasAnyWorkOnDay = daySessions.length > 0 || extraActivitiesOnDay.length > 0;
 
     const label = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
 
@@ -460,7 +547,7 @@ export default async function DashboardPage({
         tone = "today-remaining";
         stateLabel = "Today";
         microLabel = `${remainingMinutesOnDay}m left`;
-      } else if (daySessions.length > 0) {
+      } else if (hasCompletedWorkOnDay) {
         tone = "today-complete";
         stateLabel = "Completed";
         microLabel = `${completedMinutesOnDay}m done`;
@@ -470,7 +557,7 @@ export default async function DashboardPage({
         tone = "missed";
         stateLabel = "Missed";
         microLabel = `${remainingMinutesOnDay || plannedMinutes}m missed`;
-      } else if (daySessions.length > 0) {
+      } else if (hasCompletedWorkOnDay) {
         tone = "completed";
         stateLabel = "Completed";
         microLabel = `${completedMinutesOnDay || plannedMinutes}m done`;
@@ -479,6 +566,10 @@ export default async function DashboardPage({
       tone = "upcoming";
       stateLabel = trainingMeaning ? `${trainingMeaning} · ${plannedMinutes}m` : `${plannedMinutes}m planned`;
       microLabel = trainingMeaning ? "" : `${plannedMinutes}m planned`;
+    } else if (!hasAnyWorkOnDay) {
+      tone = "rest";
+      stateLabel = "Rest";
+      microLabel = "Rest";
     }
 
     return { iso, label, tone, stateLabel, microLabel };
@@ -604,7 +695,7 @@ export default async function DashboardPage({
             <div>
               <p className="text-5xl font-semibold leading-none">{completionPct}%</p>
               <p className="mt-2 text-base font-medium">{toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
-              <p className="mt-1 text-sm text-muted">{completedSessionsCount} / {sessions.length} sessions completed</p>
+              <p className="mt-1 text-sm text-muted">{completedSessionsCount} / {totalSessionsCount} sessions completed</p>
             </div>
             <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
           </div>
@@ -646,7 +737,11 @@ export default async function DashboardPage({
           {pendingTodaySessions.length > 0 ? (
             <>
               <h2 className="text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-muted">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length} completed`}</p>
+              <p className="mt-1 text-sm text-muted">{getTodaySummaryLabel({
+                remainingCount: pendingTodaySessions.length,
+                scheduledCompletedCount: completedTodaySessions.length,
+                extraCompletedCount: extraTodayActivities.length
+              })}</p>
               {todayCue ? <p className="mt-2 text-xs text-muted">Cue: {todayCue}</p> : null}
 
               <div className="mt-4 space-y-3">
@@ -662,14 +757,20 @@ export default async function DashboardPage({
                   </div>
                 </div>
 
-                {completedTodaySessions.length > 0 ? (
+                {completedTodayCount > 0 ? (
                   <div>
                     <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">Completed today</p>
                     <div className="space-y-2">
                       {completedTodaySessions.map((session) => (
                         <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
                           <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                          <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
+                          <p className="text-xs text-muted">{getCompletedMinutes(session)} min • Done</p>
+                        </div>
+                      ))}
+                      {extraTodayActivities.map((activity) => (
+                        <div key={activity.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
+                          <p className="text-sm font-medium">Extra {getDisciplineMeta(activity.sport).label.toLowerCase()} workout</p>
+                          <p className="text-xs text-muted">{activity.duration} min • Done</p>
                         </div>
                       ))}
                     </div>
@@ -682,22 +783,32 @@ export default async function DashboardPage({
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
               </div>
             </>
-          ) : completedTodaySessions.length > 0 ? (
+          ) : completedTodayCount > 0 ? (
             <>
               <h2 className="text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-muted">0 remaining · {completedTodaySessions.length} completed</p>
+              <p className="mt-1 text-sm text-muted">{getTodaySummaryLabel({
+                remainingCount: 0,
+                scheduledCompletedCount: completedTodaySessions.length,
+                extraCompletedCount: extraTodayActivities.length
+              })}</p>
               <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
-              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still within reach"} this week.</p>
+              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete.{extraTodayActivities.length > 0 ? " Extra work logged today is included below." : ""} You are {resolvedStatusChip.label === "On track" ? "on track" : "still within reach"} this week.</p>
               <div className="mt-4 space-y-2">
                 {completedTodaySessions.map((session) => (
                   <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
                     <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                    <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
+                    <p className="text-xs text-muted">{getCompletedMinutes(session)} min • Done</p>
+                  </div>
+                ))}
+                {extraTodayActivities.map((activity) => (
+                  <div key={activity.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
+                    <p className="text-sm font-medium">Extra {getDisciplineMeta(activity.sport).label.toLowerCase()} workout</p>
+                    <p className="text-xs text-muted">{activity.duration} min • Done</p>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href={completedTodaySessions[0] ? `/sessions/${completedTodaySessions[0].id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">Review completed sessions</Link>
+                <Link href={completedTodaySessions[0] ? `/sessions/${completedTodaySessions[0].id}` : extraTodayActivities[0] ? `/activities/${extraTodayActivities[0].id.replace(/^activity:/, "")}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">Review completed sessions</Link>
                 <Link href="/plan" className="btn-secondary px-3 py-1.5 text-xs">Open plan</Link>
               </div>
             </>
