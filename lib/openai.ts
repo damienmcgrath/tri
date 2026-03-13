@@ -1,3 +1,4 @@
+import "openai/shims/node";
 import OpenAI from "openai";
 
 let cachedClient: OpenAI | null = null;

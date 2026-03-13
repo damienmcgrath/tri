@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ActivityUploadsPanel } from "./activity-uploads-panel";
+import { ReviewBackfillButton } from "./review-backfill-button";
 
 type UploadRow = {
   id: string;
@@ -122,6 +123,8 @@ export default async function IntegrationsPage() {
         <h1 className="mt-2 text-2xl font-semibold">Garmin file uploads</h1>
         <p className="mt-1 text-sm text-muted">Upload .fit or .tcx activities, then review and attach them to planned sessions.</p>
       </header>
+
+      <ReviewBackfillButton />
 
       <article className="surface p-5">
         <ActivityUploadsPanel initialUploads={uploads} plannedSessions={plannedSessions} />

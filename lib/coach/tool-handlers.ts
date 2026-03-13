@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CoachAuthContext } from "@/lib/coach/types";
+import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
+import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import {
   coachToolSchemas,
   type CoachToolName
@@ -33,34 +35,9 @@ function derivePace(durationSec: number | null | undefined, distanceM: number | 
 }
 
 async function getAthleteSnapshot({ supabase, ctx }: ToolDeps) {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name,race_name,race_date")
-    .eq("id", ctx.athleteId)
-    .maybeSingle();
-
-  const { data: activePlan } = await supabase
-    .from("training_plans")
-    .select("id,name,start_date,duration_weeks")
-    .eq("athlete_id", ctx.athleteId)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  const snapshot = await getAthleteContextSnapshot(supabase, ctx.athleteId);
   return {
-    athlete: {
-      displayName: profile?.display_name ?? null,
-      raceName: profile?.race_name ?? null,
-      raceDate: profile?.race_date ?? null
-    },
-    activePlan: activePlan
-      ? {
-        id: activePlan.id,
-        name: activePlan.name,
-        startDate: activePlan.start_date,
-        durationWeeks: activePlan.duration_weeks
-      }
-      : null
+    athleteContext: snapshot
   };
 }
 
@@ -99,7 +76,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: planned } = await deps.supabase
     .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status")
+    .select("id,date,sport,type,duration_minutes,status,execution_result")
     .eq("athlete_id", deps.ctx.athleteId)
     .gte("date", since)
     .lte("date", today)
@@ -173,14 +150,24 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       }),
       ...uploadedActivitiesRealData
     ],
-    planned: (planned ?? []).map((session) => ({
-      id: session.id,
-      date: session.date,
-      sport: session.sport,
-      type: session.type,
-      durationMinutes: session.duration_minutes,
-      status: session.status
-    }))
+    planned: (planned ?? []).map((session) => {
+      const review = parsePersistedExecutionReview((session as { execution_result?: Record<string, unknown> | null }).execution_result ?? null);
+      return {
+        id: session.id,
+        date: session.date,
+        sport: session.sport,
+        type: session.type,
+        durationMinutes: session.duration_minutes,
+        status: session.status,
+        reviewCitation: review
+          ? {
+            headline: review.verdict?.sessionVerdict.headline ?? review.executionScoreSummary,
+            intentMatch: review.deterministic.rulesSummary.intentMatch,
+            evidence: review.evidence
+          }
+          : null
+      };
+    })
   };
 }
 
@@ -292,6 +279,26 @@ async function getWeekProgress({ supabase, ctx }: ToolDeps) {
   };
 }
 
+async function getWeeklyBrief({ supabase, ctx }: ToolDeps) {
+  const weekStart = getCurrentWeekStart();
+  const weekEnd = isoDate(addDays(new Date(`${weekStart}T00:00:00.000Z`), 6));
+  const athleteContext = await getAthleteContextSnapshot(supabase, ctx.athleteId);
+  const brief = await buildWeeklyExecutionBrief({
+    supabase,
+    athleteId: ctx.athleteId,
+    weekStart,
+    weekEnd,
+    athleteContext
+  });
+
+  return {
+    weekStart,
+    weekEnd,
+    athleteContextCue: athleteContext.observed.recurringPatterns[0] ?? athleteContext.declared.limiters[0] ?? null,
+    brief
+  };
+}
+
 async function createPlanChangeProposal(args: unknown, deps: ToolDeps) {
   const parsed = coachToolSchemas.create_plan_change_proposal.parse(args);
 
@@ -373,6 +380,10 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
       case "get_week_progress":
         coachToolSchemas.get_week_progress.parse(args);
         result = await getWeekProgress(deps);
+        break;
+      case "get_weekly_brief":
+        coachToolSchemas.get_weekly_brief.parse(args);
+        result = await getWeeklyBrief(deps);
         break;
       case "get_activity_details":
         result = await getActivityDetails(args, deps);

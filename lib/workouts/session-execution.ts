@@ -1,14 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis, type SessionDiagnosisInput, type SplitMetrics } from "@/lib/coach/session-diagnosis";
+import { getAthleteContextSnapshot } from "@/lib/athlete-context";
+import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
 
 type SessionExecutionSessionRow = {
   id: string;
+  athlete_id?: string;
   user_id: string;
   sport: string;
   type: string;
   duration_minutes: number | null;
   target?: string | null;
   intent_category?: string | null;
+  session_name?: string | null;
+  session_role?: string | null;
   status?: "planned" | "completed" | "skipped" | null;
 };
 
@@ -25,12 +30,7 @@ type SessionExecutionActivityRow = {
   metrics_v2?: Record<string, unknown> | null;
 };
 
-type PersistedExecutionResult = SessionDiagnosis & {
-  status: SessionDiagnosis["intentMatchStatus"];
-  summary: string;
-  suggestedWeekAdjustment: string;
-  linkedActivityId: string;
-};
+type PersistedExecutionResult = PersistedExecutionReview;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -185,22 +185,61 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
 }
 
 export function buildExecutionResultForSession(session: SessionExecutionSessionRow, activity: SessionExecutionActivityRow): PersistedExecutionResult {
-  const diagnosis = diagnoseCompletedSession(buildDiagnosisInput(session, activity));
+  const diagnosisInput = buildDiagnosisInput(session, activity);
+  const { diagnosis, evidence } = buildExecutionEvidence({
+    athleteId: session.athlete_id ?? session.user_id,
+    sessionId: session.id,
+    sessionTitle: session.session_name ?? session.type,
+    sessionRole: session.session_role,
+    diagnosisInput
+  });
 
-  return {
-    ...diagnosis,
-    status: diagnosis.intentMatchStatus,
-    summary: diagnosis.executionScoreSummary,
-    suggestedWeekAdjustment: deriveWeekAdjustment(diagnosis),
-    linkedActivityId: activity.id
-  };
+  return toPersistedExecutionReview({
+    linkedActivityId: activity.id,
+    evidence,
+    verdict: {
+      sessionVerdict: {
+        headline: diagnosis.intentMatchStatus === "matched_intent" ? "Intent landed" : diagnosis.intentMatchStatus === "missed_intent" ? "Intent came up short" : "Intent partially landed",
+        summary: diagnosis.executionScoreSummary,
+        intentMatch: evidence.rulesSummary.intentMatch,
+        executionCost: evidence.rulesSummary.executionCost,
+        confidence: diagnosis.diagnosisConfidence,
+        nextCall:
+          diagnosis.intentMatchStatus === "matched_intent"
+            ? "move_on"
+            : diagnosis.intentMatchStatus === "missed_intent"
+              ? "repeat_session"
+              : "proceed_with_caution"
+      },
+      explanation: {
+        whatHappened: diagnosis.executionSummary,
+        whyItMatters: diagnosis.whyItMatters,
+        whatToDoNextTime: diagnosis.recommendedNextAction,
+        whatToDoThisWeek: deriveWeekAdjustment(diagnosis)
+      },
+      uncertainty: {
+        label: diagnosis.diagnosisConfidence === "high" ? "confident_read" : diagnosis.evidenceCount > 0 ? "early_read" : "insufficient_data",
+        detail:
+          diagnosis.diagnosisConfidence === "high"
+            ? "This read is grounded in enough execution evidence to use with confidence."
+            : "This is a useful early read, but some execution detail is still missing.",
+        missingEvidence: evidence.missingEvidence
+      },
+      citedEvidence: [
+        {
+          claim: diagnosis.executionScoreSummary,
+          support: evidence.detectedIssues.flatMap((issue) => issue.supportingMetrics).slice(0, 4)
+        }
+      ]
+    }
+  });
 }
 
 async function loadSessionAndActivity(supabase: SupabaseClient, userId: string, sessionId: string, activityId: string) {
   const [{ data: session, error: sessionError }, { data: activity, error: activityError }] = await Promise.all([
     supabase
       .from("sessions")
-      .select("id,user_id,sport,type,duration_minutes,target,intent_category,status")
+      .select("id,athlete_id,user_id,sport,type,duration_minutes,target,intent_category,session_name,session_role,status")
       .eq("id", sessionId)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -230,7 +269,31 @@ export async function syncSessionExecutionFromActivityLink(args: {
   activityId: string;
 }) {
   const { session, activity } = await loadSessionAndActivity(args.supabase, args.userId, args.sessionId, args.activityId);
-  const executionResult = buildExecutionResultForSession(session, activity);
+  const diagnosisInput = buildDiagnosisInput(session, activity);
+  let athleteContext = null;
+  try {
+    athleteContext = await getAthleteContextSnapshot(args.supabase, session.athlete_id ?? args.userId);
+  } catch {
+    athleteContext = null;
+  }
+  const { evidence } = buildExecutionEvidence({
+    athleteId: session.athlete_id ?? args.userId,
+    sessionId: session.id,
+    sessionTitle: session.session_name ?? session.type,
+    sessionRole: session.session_role,
+    diagnosisInput,
+    weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
+  });
+  const verdict = await generateCoachVerdict({
+    evidence,
+    athleteContext,
+    recentReviewedSessions: []
+  });
+  const executionResult = toPersistedExecutionReview({
+    linkedActivityId: activity.id,
+    evidence,
+    verdict
+  });
 
   const { error } = await args.supabase
     .from("sessions")
@@ -242,6 +305,12 @@ export async function syncSessionExecutionFromActivityLink(args: {
     .eq("user_id", args.userId);
 
   if (error) throw new Error(error.message);
+
+  try {
+    await refreshObservedPatterns(args.supabase, session.athlete_id ?? args.userId);
+  } catch {
+    // Pattern refresh is non-blocking.
+  }
 
   return executionResult;
 }
@@ -290,6 +359,7 @@ export async function backfillPendingSessionExecutions(args: {
   supabase: SupabaseClient;
   userId: string;
   limit?: number;
+  force?: boolean;
 }) {
   const { data: links, error: linkError } = await args.supabase
     .from("session_activity_links")
@@ -307,26 +377,32 @@ export async function backfillPendingSessionExecutions(args: {
     return { updated: 0, attempted: 0 };
   }
 
-  const sessionIds = [...new Set(confirmedLinks.map((link) => link.planned_session_id as string))];
-  const { data: sessions, error: sessionError } = await args.supabase
-    .from("sessions")
-    .select("id,execution_result")
-    .eq("user_id", args.userId)
-    .in("id", sessionIds);
+  let candidateLinks = confirmedLinks;
 
-  if (sessionError) throw new Error(sessionError.message);
+  if (!args.force) {
+    const sessionIds = [...new Set(confirmedLinks.map((link) => link.planned_session_id as string))];
+    const { data: sessions, error: sessionError } = await args.supabase
+      .from("sessions")
+      .select("id,execution_result")
+      .eq("user_id", args.userId)
+      .in("id", sessionIds);
 
-  const pendingSessionIds = new Set(
-    ((sessions ?? []) as Array<{ id: string; execution_result?: Record<string, unknown> | null }>)
-      .filter((session) => !session.execution_result)
-      .map((session) => session.id)
-  );
+    if (sessionError) throw new Error(sessionError.message);
 
-  const pendingLinks = confirmedLinks.filter((link) => pendingSessionIds.has(link.planned_session_id as string));
-  const dedupedPendingLinks = [...new Map(pendingLinks.map((link) => [link.planned_session_id as string, link])).values()].slice(0, args.limit ?? 20);
+    const pendingSessionIds = new Set(
+      ((sessions ?? []) as Array<{ id: string; execution_result?: Record<string, unknown> | null }>)
+        .filter((session) => !session.execution_result)
+        .map((session) => session.id)
+    );
+
+    candidateLinks = confirmedLinks.filter((link) => pendingSessionIds.has(link.planned_session_id as string));
+  }
+
+  const dedupedLinks = [...new Map(candidateLinks.map((link) => [link.planned_session_id as string, link])).values()];
+  const linksToProcess = typeof args.limit === "number" ? dedupedLinks.slice(0, args.limit) : dedupedLinks;
 
   let updated = 0;
-  for (const link of dedupedPendingLinks) {
+  for (const link of linksToProcess) {
     try {
       await syncSessionExecutionFromActivityLink({
         supabase: args.supabase,
@@ -342,6 +418,6 @@ export async function backfillPendingSessionExecutions(args: {
 
   return {
     updated,
-    attempted: dedupedPendingLinks.length
+    attempted: linksToProcess.length
   };
 }
