@@ -22,6 +22,12 @@ export default function SettingsPage() {
           <h2 className="mt-2 text-lg font-semibold">Garmin import</h2>
           <p className="mt-1 text-sm text-muted">Upload TCX files and review recent ingestion events.</p>
         </Link>
+
+        <Link href="/settings/athlete-context" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
+          <p className="text-sm uppercase tracking-[0.16em] text-accent">Coach</p>
+          <h2 className="mt-2 text-lg font-semibold">Athlete context</h2>
+          <p className="mt-1 text-sm text-muted">Set the durable context Coach should use across reviews, briefs, and chat.</p>
+        </Link>
       </div>
 
       <ThemePicker />

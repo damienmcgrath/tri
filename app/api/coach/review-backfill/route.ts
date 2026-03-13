@@ -14,6 +14,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
+  let runAll = false;
+  try {
+    const body = (await request.json()) as { all?: boolean };
+    runAll = body.all === true;
+  } catch {
+    runAll = false;
+  }
+
   const supabase = await createClient();
   const {
     data: { user }
@@ -27,7 +35,8 @@ export async function POST(request: Request) {
     const result = await backfillPendingSessionExecutions({
       supabase,
       userId: user.id,
-      limit: 20
+      limit: runAll ? undefined : 20,
+      force: runAll
     });
 
     return NextResponse.json(result);

@@ -1,6 +1,10 @@
+import Link from "next/link";
 import { CoachChat } from "./coach-chat";
+import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
+import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
+import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 
 type SessionRow = {
@@ -23,6 +27,29 @@ function toMatchStatus(value: unknown): CoachDiagnosisSession["status"] {
 function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
   if (!row.execution_result || typeof row.execution_result !== "object") {
     return null;
+  }
+
+  const v2 = parsePersistedExecutionReview(row.execution_result);
+  if (v2) {
+    return {
+      id: row.id,
+      sessionName: getSessionDisplayName({
+        sessionName: row.session_name ?? row.type,
+        subtype: row.type,
+        discipline: row.sport
+      }),
+      plannedIntent: v2.deterministic.planned.intentCategory ?? row.intent_category ?? row.type,
+      executionSummary: v2.verdict?.explanation.whatHappened ?? v2.executionSummary,
+      status: toMatchStatus(v2.status),
+      executionScore: v2.executionScore,
+      executionScoreBand: v2.executionScoreBand,
+      executionScoreProvisional: v2.executionScoreProvisional,
+      whyItMatters: v2.verdict?.explanation.whyItMatters ?? v2.whyItMatters,
+      nextAction: v2.verdict?.explanation.whatToDoNextTime ?? v2.recommendedNextAction,
+      confidenceNote: `Confidence: ${v2.diagnosisConfidence}${v2.executionCost ? ` · Cost: ${v2.executionCost}` : ""}`,
+      evidence: v2.evidence,
+      importance: v2.status === "missed_intent" ? 3 : v2.status === "partial_intent" ? 2 : 1
+    };
   }
 
   const result = row.execution_result;
@@ -94,21 +121,17 @@ function mapDiagnosedSession(row: SessionRow): CoachDiagnosisSession | null {
   };
 }
 
-async function getDiagnosisSessions() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+async function getDiagnosisSessions(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, weekStart: string, weekEnd: string) {
+  if (!userId) {
     return [] as CoachDiagnosisSession[];
   }
 
   const { data, error } = await supabase
     .from("sessions")
     .select("id,date,sport,type,session_name,intent_category,status,execution_result")
-    .eq("user_id", user.id)
-    .eq("status", "completed")
+    .eq("user_id", userId)
+    .gte("date", weekStart)
+    .lte("date", weekEnd)
     .not("execution_result", "is", null)
     .order("date", { ascending: false })
     .limit(12);
@@ -124,13 +147,8 @@ async function getDiagnosisSessions() {
     .slice(0, 6);
 }
 
-async function getBriefingContext(): Promise<CoachBriefingContext> {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, weekStart: string, weekEnd: string): Promise<CoachBriefingContext> {
+  if (!userId) {
     return {
       uploadedSessionCount: 0,
       linkedSessionCount: 0,
@@ -139,22 +157,36 @@ async function getBriefingContext(): Promise<CoachBriefingContext> {
     };
   }
 
-  const [{ data: activities }, { data: links }, { data: reviewedSessions }] = await Promise.all([
-    supabase.from("completed_activities").select("id").eq("user_id", user.id),
+  const [{ data: activities }, { data: weeklySessions }, { data: links }, { data: reviewedSessions }] = await Promise.all([
     supabase
-      .from("session_activity_links")
-      .select("planned_session_id,confirmation_status")
-      .eq("user_id", user.id),
+      .from("completed_activities")
+      .select("id")
+      .eq("user_id", userId)
+      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
+      .lte("start_time_utc", `${weekEnd}T23:59:59.999Z`),
     supabase
       .from("sessions")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
+      .gte("date", weekStart)
+      .lte("date", weekEnd),
+    supabase
+      .from("session_activity_links")
+      .select("planned_session_id,confirmation_status")
+      .eq("user_id", userId),
+    supabase
+      .from("sessions")
+      .select("id")
+      .eq("user_id", userId)
+      .gte("date", weekStart)
+      .lte("date", weekEnd)
       .not("execution_result", "is", null)
   ]);
 
+  const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
   const confirmedLinkedSessionIds = new Set(
     (links ?? [])
-      .filter((link) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .filter((link) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
       .map((link) => link.planned_session_id as string)
   );
 
@@ -169,17 +201,195 @@ async function getBriefingContext(): Promise<CoachBriefingContext> {
   };
 }
 
+function addDays(dateIso: string, days: number) {
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isContextIncomplete(snapshot: Awaited<ReturnType<typeof getAthleteContextSnapshot>>) {
+  return !snapshot.declared.experienceLevel.value ||
+    !snapshot.goals.priorityEventName ||
+    snapshot.declared.limiters.length === 0 ||
+    snapshot.declared.strongestDisciplines.length === 0 ||
+    snapshot.declared.weeklyConstraints.length === 0;
+}
+
+function getMissingContextLabels(snapshot: Awaited<ReturnType<typeof getAthleteContextSnapshot>>) {
+  return [
+    !snapshot.declared.experienceLevel.value ? "Experience level" : null,
+    !snapshot.goals.goalType ? "Goal type" : null,
+    snapshot.declared.limiters.length === 0 ? "Limiter" : null,
+    snapshot.declared.strongestDisciplines.length === 0 ? "Strongest discipline" : null,
+    snapshot.declared.weeklyConstraints.length === 0 ? "Weekly constraint" : null
+  ].filter((item): item is string => Boolean(item));
+}
+
 export default async function CoachPage({ searchParams }: { searchParams?: { prompt?: string } }) {
-  const [diagnosisSessions, briefingContext] = await Promise.all([getDiagnosisSessions(), getBriefingContext()]);
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const weekStart = getCurrentWeekStart();
+  const weekEnd = addDays(weekStart, 6);
+
+  const [diagnosisSessions, briefingContext, athleteContext] = await Promise.all([
+    user ? getDiagnosisSessions(supabase, user.id, weekStart, weekEnd) : [],
+    user ? getBriefingContext(supabase, user.id, weekStart, weekEnd) : getBriefingContext(supabase, "", weekStart, weekEnd),
+    user ? getAthleteContextSnapshot(supabase, user.id) : null
+  ]);
+
+  const weeklyBrief = user && athleteContext
+    ? await buildWeeklyExecutionBrief({
+      supabase,
+      athleteId: user.id,
+      weekStart,
+      weekEnd,
+      athleteContext
+    })
+    : null;
+  const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;
+  const missingContextLabels = athleteContext ? getMissingContextLabels(athleteContext) : [];
 
   return (
     <section className="space-y-4">
-      <article className="surface p-4">
-        <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach</p>
-        <h1 className="mt-1 text-lg font-semibold">Session execution coaching</h1>
-        <p className="mt-1 text-sm text-muted">See which completed sessions matched intent, what missed, and your next best adjustment.</p>
-      </article>
-      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} />
+      {weeklyBrief ? (
+        <article className="surface p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach Briefing</p>
+              <h2 className="mt-1 text-2xl font-semibold">{weeklyBrief.weekHeadline}</h2>
+              <p className="mt-2 max-w-3xl text-sm text-muted">{weeklyBrief.weekSummary}</p>
+            </div>
+            <Link href="/settings/athlete-context" className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground">
+              Edit athlete context
+            </Link>
+          </div>
+
+          {weeklyBrief.trend.reviewedCount === 0 ? (
+            <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What unlocks a stronger brief</p>
+                <p className="mt-2 text-sm">Once this week has reviewed sessions, Coach will summarize what landed, what drifted, and what to protect next.</p>
+                <p className="mt-2 text-xs text-tertiary">{briefingContext.uploadedSessionCount} uploaded · {briefingContext.linkedSessionCount} linked · {briefingContext.pendingReviewCount} pending review</p>
+              </div>
+              <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Best next move</p>
+                <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
+                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? <p className="mt-2 text-xs text-tertiary">{athleteContext.observed.recurringPatterns[0]?.detail}</p> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key positive</p>
+                  <p className="mt-2 text-sm">{weeklyBrief.keyPositive ?? "No strong positive yet. More reviewed sessions will sharpen the read."}</p>
+                </div>
+                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key risk</p>
+                  <p className="mt-2 text-sm">{weeklyBrief.keyRisk ?? "No single session is creating outsized risk right now."}</p>
+                </div>
+                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:col-span-2">
+                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Next-week decision</p>
+                  <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
+                  {weeklyBrief.confidenceNote ? <p className="mt-2 text-xs text-tertiary">{weeklyBrief.confidenceNote}</p> : null}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Trend line</p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-2xl font-semibold">{weeklyBrief.trend.reviewedCount}</p>
+                    <p className="text-xs text-muted">Reviewed</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-[hsl(var(--success))]">{weeklyBrief.trend.onTargetCount}</p>
+                    <p className="text-xs text-muted">On target</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-[hsl(var(--warning))]">{weeklyBrief.trend.partialCount}</p>
+                    <p className="text-xs text-muted">Partial</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-[hsl(var(--signal-risk))]">{weeklyBrief.trend.missedCount}</p>
+                    <p className="text-xs text-muted">Missed</p>
+                  </div>
+                </div>
+                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? (
+                  <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Athlete context cue</p>
+                    <p className="mt-2 text-sm">{athleteContext.observed.recurringPatterns[0]?.detail}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {weeklyBrief.sessionsNeedingAttention.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {weeklyBrief.sessionsNeedingAttention.map((session) => (
+                  <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[hsl(var(--border))] p-4 transition hover:border-[hsl(var(--accent)/0.4)]">
+                    <p className="text-sm font-semibold">{session.sessionName}</p>
+                    <p className="mt-2 text-xs text-tertiary">{session.scoreHeadline}</p>
+                    <p className="mt-2 text-sm text-muted">{session.reason}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </article>
+      ) : null}
+
+      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
+
+      <section className="space-y-2.5">
+        <div>
+          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Coach tools</p>
+        </div>
+        <div className="grid gap-2.5 xl:grid-cols-[1.15fr_0.85fr]">
+          {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : <div />}
+
+          {athleteContext ? (
+            <article className="surface p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-accent">Coaching profile</p>
+                  <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    {contextIncomplete
+                      ? "Finish a few durable context fields so Coach can personalize language and stay conservative for the right reasons."
+                      : "Coach already has your baseline context and can keep using it across briefing, reviews, and chat."}
+                  </p>
+                </div>
+                <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "btn-secondary px-3 py-1.5 text-xs"}>
+                  {contextIncomplete ? "Complete profile" : "Edit profile"}
+                </Link>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {contextIncomplete
+                  ? missingContextLabels.map((label) => (
+                    <span key={label} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{label}</span>
+                  ))
+                  : (
+                    <>
+                      {athleteContext.goals.priorityEventName ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.priorityEventName}</span> : null}
+                      {athleteContext.goals.goalType ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.goalType}</span> : null}
+                      {athleteContext.declared.experienceLevel.value ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.declared.experienceLevel.value}</span> : null}
+                      {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
+                        <span key={limiter.value} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{limiter.value}</span>
+                      ))}
+                    </>
+                  )}
+              </div>
+            </article>
+          ) : null}
+        </div>
+      </section>
     </section>
   );
 }

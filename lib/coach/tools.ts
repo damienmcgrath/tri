@@ -4,6 +4,7 @@ export const getAthleteSnapshotArgsSchema = z.object({}).strict();
 export const getRecentSessionsArgsSchema = z.object({ daysBack: z.number().int().min(1).max(60).default(14) }).strict();
 export const getUpcomingSessionsArgsSchema = z.object({ daysAhead: z.number().int().min(1).max(30).default(7) }).strict();
 export const getWeekProgressArgsSchema = z.object({}).strict();
+export const getWeeklyBriefArgsSchema = z.object({}).strict();
 export const getActivityDetailsArgsSchema = z.object({ activityId: z.string().uuid() }).strict();
 export const createPlanChangeProposalArgsSchema = z.object({
   title: z.string().trim().min(3).max(160),
@@ -19,6 +20,7 @@ export const coachToolSchemas = {
   get_recent_sessions: getRecentSessionsArgsSchema,
   get_upcoming_sessions: getUpcomingSessionsArgsSchema,
   get_week_progress: getWeekProgressArgsSchema,
+  get_weekly_brief: getWeeklyBriefArgsSchema,
   get_activity_details: getActivityDetailsArgsSchema,
   create_plan_change_proposal: createPlanChangeProposalArgsSchema
 } as const;
@@ -65,6 +67,17 @@ export const coachTools = [
     type: "function" as const,
     name: "get_week_progress",
     description: "Return this week's planned vs completed volume summary.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {}
+    }
+  },
+  {
+    type: "function" as const,
+    name: "get_weekly_brief",
+    description: "Return the persisted weekly execution briefing and athlete-context cue for the current week.",
     strict: false,
     parameters: {
       type: "object",
