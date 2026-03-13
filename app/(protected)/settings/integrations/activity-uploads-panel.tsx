@@ -127,14 +127,15 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
               const activity = upload.completed_activities[0];
               const hasConfirmedLink = upload.session_activity_links.some((link) => Boolean(link.planned_session_id) && link.confirmation_status === "confirmed");
               const hasSuggestion = upload.session_activity_links.some((link) => Boolean(link.planned_session_id) && link.confirmation_status === "suggested");
-              const linked = activity?.schedule_status === "scheduled" || upload.status === "matched" || hasConfirmedLink;
+              const hasRejectedLink = upload.session_activity_links.some((link) => link.confirmation_status === "rejected");
+              const linked = activity?.schedule_status === "scheduled" || hasConfirmedLink;
               return (
                 <tr key={upload.id} className="border-t border-white/10">
                   <td className="py-2">{formatUploadDate(upload.created_at)}</td>
                   <td>{activity?.sport_type ?? "—"}</td>
                   <td>{fmtDuration(activity?.duration_sec)}</td>
                   <td>{activity?.distance_m ? `${(Number(activity.distance_m) / 1000).toFixed(2)} km` : "—"}</td>
-                  <td>{upload.status === "error" ? "Error" : linked ? "Scheduled" : hasSuggestion ? "Suggested" : "Unscheduled"}</td>
+                  <td>{upload.status === "error" ? "Error" : linked ? "Scheduled" : hasRejectedLink || upload.status === "matched" ? "Extra" : hasSuggestion ? "Suggested" : "Unscheduled"}</td>
                   <td className="space-x-2 text-xs">
                     {activity?.id ? <Link className="text-cyan-300 underline" href={`/activities/${activity.id}`}>View activity</Link> : <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>}
                     {!linked && upload.status !== "error" ? (

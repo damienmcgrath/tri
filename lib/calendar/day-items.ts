@@ -24,17 +24,22 @@ export type CalendarSessionRecord = {
 export type CalendarActivityRecord = {
   id: string;
   upload_id: string | null;
+  upload_status?: "uploaded" | "parsed" | "matched" | "error" | null;
   sport_type: string;
   start_time_utc: string;
   duration_sec: number | null;
   distance_m: number | null;
   avg_hr: number | null;
   avg_power: number | null;
+  schedule_status?: "scheduled" | "unscheduled" | null;
+  is_unplanned?: boolean | null;
+  notes?: string | null;
 };
 
 export type CalendarLinkRecord = {
   planned_session_id: string | null;
   completed_activity_id: string;
+  confirmation_status?: "suggested" | "confirmed" | "rejected" | null;
 };
 
 export type LegacyCompletedRecord = {
@@ -63,6 +68,7 @@ export type CalendarDisplayItem = {
   linkedStats: { durationMin: number; distanceKm: number; avgHr: number | null; avgPower: number | null } | null;
   unassignedSameDayCount: number;
   is_key: boolean;
+  isUnplanned: boolean;
   displayType: "planned_session" | "completed_activity";
 };
 
@@ -75,6 +81,7 @@ type ActivityItem = {
   distance_km: number | null;
   avg_hr: number | null;
   avg_power: number | null;
+  is_unplanned: boolean;
   created_at: string;
 };
 
@@ -126,6 +133,16 @@ export function buildCalendarDisplayItems(input: {
   weekEndExclusive?: string;
 }) {
   const { sessions, activities, links, legacyCompleted, timeZone, weekStart, weekEndExclusive } = input;
+  const explicitlyExtraActivityIds = new Set(
+    links
+      .filter((link) => link.confirmation_status === "rejected")
+      .map((link) => link.completed_activity_id)
+  );
+  const confirmedLinkedActivityIds = new Set(
+    links
+      .filter((link) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null || typeof link.confirmation_status === "undefined"))
+      .map((link) => link.completed_activity_id)
+  );
 
   const activityById = new Map<string, ActivityItem>(
     activities
@@ -142,6 +159,10 @@ export function buildCalendarDisplayItems(input: {
         distance_km: activity.distance_m ? Number(activity.distance_m) / 1000 : null,
         avg_hr: activity.avg_hr,
         avg_power: activity.avg_power,
+        is_unplanned:
+          Boolean(activity.is_unplanned) ||
+          explicitlyExtraActivityIds.has(activity.id) ||
+          (activity.upload_status === "matched" && !confirmedLinkedActivityIds.has(activity.id)),
         created_at: activity.start_time_utc
       }
     ])
@@ -152,7 +173,8 @@ export function buildCalendarDisplayItems(input: {
 
   links.forEach((link) => {
     const activity = activityById.get(link.completed_activity_id);
-    if (!activity || !link.planned_session_id) return;
+    const isConfirmedLink = link.confirmation_status === "confirmed" || link.confirmation_status === null || typeof link.confirmation_status === "undefined";
+    if (!activity || !link.planned_session_id || !isConfirmedLink) return;
     linkedActivityIds.add(activity.id);
     const list = linkedBySession.get(link.planned_session_id) ?? [];
     list.push(activity);
@@ -217,6 +239,7 @@ export function buildCalendarDisplayItems(input: {
       linkedStats,
       unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0),
       is_key: Boolean(session.is_key),
+      isUnplanned: false,
       displayType: "planned_session"
     };
   });
@@ -249,6 +272,7 @@ export function buildCalendarDisplayItems(input: {
       },
       unassignedSameDayCount: 0,
       is_key: false,
+      isUnplanned: item.is_unplanned,
       displayType: "completed_activity"
     }));
 

@@ -125,4 +125,30 @@ describe("createReviewViewModel", () => {
     expect(vm.whyItMatters).toMatch(/Matching the planned session intent|planned quality stimulus/i);
     expect(vm.nextAction).toMatch(/Good control|Keep the same execution approach/i);
   });
+
+  test("uses extra-session framing instead of planned-intent framing for unplanned work", () => {
+    const vm = createReviewViewModel({
+      id: "extra-1",
+      date: "2026-03-13",
+      sport: "bike",
+      type: "Extra workout",
+      duration_minutes: 30,
+      status: "completed",
+      is_extra: true,
+      execution_result: {
+        status: "matched_intent",
+        executionScore: 88,
+        executionScoreBand: "On target",
+        executionScoreSummary: "Steady aerobic ride with controlled effort."
+      }
+    });
+
+    expect(vm.reviewModeLabel).toBe("Extra session review");
+    expect(vm.sessionStatusLabel).toBe("Extra workout");
+    expect(vm.plannedIntent).toBe("No planned intent. Review this as additional weekly load.");
+    expect(vm.mainGap).toMatch(/no planned target/i);
+    expect(vm.unlockTitle).toBe("Weekly context");
+    expect(vm.followUpIntro).toMatch(/extra session/i);
+    expect(vm.followUpPrompts[0]).toMatch(/help or hurt the week/i);
+  });
 });

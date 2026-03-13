@@ -4,6 +4,31 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncSessionExecutionAfterUnlink, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 
+async function updateUploadStatusForActivity(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+  status: "uploaded" | "parsed" | "matched" | "error";
+}) {
+  const { supabase, userId, activityId, status } = params;
+  const { data: activity, error: loadError } = await supabase
+    .from("completed_activities")
+    .select("upload_id")
+    .eq("id", activityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (loadError || !activity?.upload_id) {
+    return;
+  }
+
+  await supabase
+    .from("activity_uploads")
+    .update({ status, error_message: null })
+    .eq("id", activity.upload_id)
+    .eq("user_id", userId);
+}
+
 export async function linkActivityAction(activityId: string, plannedSessionId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -30,6 +55,7 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
   if (error) return { error: error.message };
 
   await supabase.from("completed_activities").update({ schedule_status: "scheduled", is_unplanned: false }).eq("id", activityId).eq("user_id", user.id);
+  await updateUploadStatusForActivity({ supabase, userId: user.id, activityId, status: "matched" });
   await syncSessionExecutionFromActivityLink({
     supabase,
     userId: user.id,
@@ -63,6 +89,7 @@ export async function unlinkActivityAction(activityId: string) {
   if (error) return { error: error.message };
 
   await supabase.from("completed_activities").update({ schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
+  await updateUploadStatusForActivity({ supabase, userId: user.id, activityId, status: "parsed" });
   for (const sessionId of affectedSessionIds) {
     await syncSessionExecutionAfterUnlink({
       supabase,
@@ -96,6 +123,7 @@ export async function markUnplannedAction(activityId: string) {
   await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
   const { error } = await supabase.from("completed_activities").update({ is_unplanned: true, schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
   if (error) return { error: error.message };
+  await updateUploadStatusForActivity({ supabase, userId: user.id, activityId, status: "matched" });
 
   for (const sessionId of affectedSessionIds) {
     await syncSessionExecutionAfterUnlink({

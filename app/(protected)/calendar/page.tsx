@@ -36,8 +36,100 @@ type LegacyPlannedSession = {
   created_at: string;
 };
 
+type CalendarActivityRow = {
+  id: string;
+  upload_id: string | null;
+  sport_type: string;
+  start_time_utc: string;
+  duration_sec: number | null;
+  distance_m: number | null;
+  avg_hr: number | null;
+  avg_power: number | null;
+  schedule_status: string;
+  is_unplanned: boolean;
+};
+
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+function isMissingActivityColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return error.code === "42703" || /(schedule_status|is_unplanned|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
+async function loadCalendarActivities(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+  weekEnd: string;
+}): Promise<CalendarActivityRow[]> {
+  const { supabase, userId, weekStart, weekEnd } = params;
+  const rangeStart = `${addDays(weekStart, -1)}T00:00:00.000Z`;
+  const rangeEnd = `${addDays(weekEnd, 1)}T00:00:00.000Z`;
+
+  const selectVariants = [
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,notes",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,notes",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,notes",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,notes",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power"
+  ] as const;
+
+  let lastError: { code?: string; message?: string } | null = null;
+
+  for (const selectClause of selectVariants) {
+    const query = await supabase
+      .from("completed_activities")
+      .select(selectClause)
+      .eq("user_id", userId)
+      .gte("start_time_utc", rangeStart)
+      .lt("start_time_utc", rangeEnd);
+
+    if (!query.error) {
+      return ((query.data ?? []) as unknown as Array<Record<string, unknown>>).map((activity) => ({
+        id: String(activity.id),
+        upload_id: typeof activity.upload_id === "string" ? activity.upload_id : null,
+        sport_type: String(activity.sport_type),
+        start_time_utc: String(activity.start_time_utc),
+        duration_sec: typeof activity.duration_sec === "number" ? activity.duration_sec : null,
+        distance_m: typeof activity.distance_m === "number" ? activity.distance_m : null,
+        avg_hr: typeof activity.avg_hr === "number" ? activity.avg_hr : null,
+        avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
+        schedule_status: typeof activity.schedule_status === "string" ? activity.schedule_status : "unscheduled",
+        is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false
+      }));
+    }
+
+    lastError = query.error;
+    if (!isMissingActivityColumnError(query.error)) {
+      break;
+    }
+  }
+
+  throw new Error(lastError?.message ?? "Failed to load uploaded activities for calendar.");
+}
+
+async function loadUploadStatuses(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  uploadIds: string[];
+}) {
+  const { supabase, userId, uploadIds } = params;
+  if (uploadIds.length === 0) return new Map<string, string>();
+
+  const { data, error } = await supabase
+    .from("activity_uploads")
+    .select("id,status")
+    .eq("user_id", userId)
+    .in("id", uploadIds);
+
+  if (error) {
+    throw new Error(error.message ?? "Failed to load upload statuses for calendar.");
+  }
+
+  return new Map((data ?? []).map((upload: { id: string; status: string }) => [upload.id, upload.status]));
+}
 
 function getMonday(date = new Date()) {
   const day = date.getUTCDay();
@@ -147,17 +239,25 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     throw new Error(sessionError.message ?? "Failed to load calendar sessions.");
   }
 
-  const [{ data: legacyCompleted }, { data: activities }, { data: links }] = await Promise.all([
+  const activitiesData = await loadCalendarActivities({
+    supabase,
+    userId: user.id,
+    weekStart,
+    weekEnd
+  });
+  const uploadStatusById = await loadUploadStatuses({
+    supabase,
+    userId: user.id,
+    uploadIds: activitiesData
+      .map((activity) => (typeof (activity as { upload_id?: unknown }).upload_id === "string" ? (activity as { upload_id: string }).upload_id : null))
+      .filter((uploadId): uploadId is string => Boolean(uploadId))
+  });
+
+  const [{ data: legacyCompleted }, { data: links }] = await Promise.all([
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
-      .from("completed_activities")
-      .select("id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power")
-      .eq("user_id", user.id)
-      .gte("start_time_utc", `${addDays(weekStart, -1)}T00:00:00.000Z`)
-      .lt("start_time_utc", `${addDays(weekEnd, 1)}T00:00:00.000Z`),
-    supabase
       .from("session_activity_links")
-      .select("planned_session_id,completed_activity_id")
+      .select("planned_session_id,completed_activity_id,confirmation_status")
       .eq("user_id", user.id)
   ]);
 
@@ -168,7 +268,13 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
 
   const sessions = buildCalendarDisplayItems({
     sessions: normalizedSessions,
-    activities: (activities ?? []) as any[],
+    activities: activitiesData.map((activity) => ({
+      ...activity,
+      upload_status:
+        typeof activity.upload_id === "string"
+          ? (uploadStatusById.get(activity.upload_id) ?? "parsed")
+          : "parsed"
+    })) as any[],
     links: (links ?? []) as any[],
     legacyCompleted: (legacyCompleted ?? []) as Array<{ date: string; sport: string }>,
     timeZone,
@@ -177,7 +283,8 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   });
 
   const plannedSessions = sessions.filter((item) => item.displayType === "planned_session");
-  const unmatchedUploadCount = sessions.filter((item) => item.displayType === "completed_activity").length;
+  const unmatchedUploadCount = sessions.filter((item) => item.displayType === "completed_activity" && !item.isUnplanned).length;
+  const extraActivityCount = sessions.filter((item) => item.displayType === "completed_activity" && item.isUnplanned).length;
   const plannedSessionCount = plannedSessions.length;
 
   const countMetrics = computeWeekSessionCounts(
@@ -218,7 +325,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
         completedCount={countMetrics.completedCount}
         plannedTotalCount={countMetrics.plannedTotalCount}
         skippedCount={countMetrics.skippedCount}
-        extraSessionCount={unmatchedUploadCount}
+        extraSessionCount={extraActivityCount}
         plannedRemainingCount={countMetrics.plannedRemainingCount}
         plannedMinutes={minuteMetrics.plannedMinutes}
         completedMinutes={minuteMetrics.completedMinutes}
