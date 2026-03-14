@@ -88,7 +88,10 @@ export default async function DebriefPage({
     };
   }
 
-  if (snapshot.artifact && snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION) {
+  if (
+    snapshot.artifact &&
+    (snapshot.stale || snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION)
+  ) {
     const refreshed = await refreshWeeklyDebrief({
       supabase,
       athleteId: user.id,

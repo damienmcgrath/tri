@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getNestedNumber } from "@/lib/workouts/metrics-v2";
 
 export type SessionActivityLinkRecord = {
   planned_session_id?: string | null;
@@ -17,7 +18,9 @@ export type CompletedActivityRecord = {
   avg_power: number | null;
   schedule_status: "scheduled" | "unscheduled";
   is_unplanned: boolean;
+  metrics_v2?: Record<string, unknown> | null;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type ExtraCompletedActivity = {
@@ -25,6 +28,12 @@ export type ExtraCompletedActivity = {
   sport: string;
   date: string;
   durationMinutes: number;
+  avgHr: number | null;
+  avgPower: number | null;
+  normalizedPower: number | null;
+  trainingStressScore: number | null;
+  intensityFactor: number | null;
+  totalWorkKj: number | null;
 };
 
 export function localIsoDate(utcIso: string, timeZone: string) {
@@ -53,7 +62,7 @@ export function hasConfirmedPlannedSessionLink(link: {
 }
 
 export function buildExtraCompletedActivities(params: {
-  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "start_time_utc" | "duration_sec">>;
+  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "start_time_utc" | "duration_sec" | "avg_hr" | "avg_power" | "metrics_v2">>;
   links: Array<Pick<SessionActivityLinkRecord, "completed_activity_id" | "planned_session_id" | "confirmation_status">>;
   timeZone: string;
   weekStart: string;
@@ -71,7 +80,13 @@ export function buildExtraCompletedActivities(params: {
       id: activity.id,
       sport: activity.sport_type,
       date: localIsoDate(activity.start_time_utc, timeZone),
-      durationMinutes: Math.round((activity.duration_sec ?? 0) / 60)
+      durationMinutes: Math.round((activity.duration_sec ?? 0) / 60),
+      avgHr: activity.avg_hr ?? null,
+      avgPower: activity.avg_power ?? null,
+      normalizedPower: getNestedNumber(activity.metrics_v2, [["power", "normalizedPower"], ["power", "normalized_power"]]),
+      trainingStressScore: getNestedNumber(activity.metrics_v2, [["load", "trainingStressScore"], ["load", "training_stress_score"]]),
+      intensityFactor: getNestedNumber(activity.metrics_v2, [["power", "intensityFactor"], ["power", "intensity_factor"]]),
+      totalWorkKj: getNestedNumber(activity.metrics_v2, [["power", "totalWorkKj"], ["power", "total_work_kj"]])
     }))
     .filter((activity) => activity.date >= weekStart && activity.date < weekEndExclusive)
     .filter((activity) => !confirmedLinkedActivityIds.has(activity.id));
@@ -85,7 +100,19 @@ export async function loadCompletedActivities(params: {
 }): Promise<CompletedActivityRecord[]> {
   const { supabase, userId, rangeStart, rangeEnd } = params;
   const selectVariants = [
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at,updated_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at",
     "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at",
     "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at",
     "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at",
     "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at"
@@ -113,7 +140,12 @@ export async function loadCompletedActivities(params: {
         avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
         schedule_status: activity.schedule_status === "scheduled" ? "scheduled" : "unscheduled",
         is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false,
-        created_at: typeof activity.created_at === "string" ? activity.created_at : undefined
+        metrics_v2:
+          activity.metrics_v2 && typeof activity.metrics_v2 === "object" && !Array.isArray(activity.metrics_v2)
+            ? activity.metrics_v2 as Record<string, unknown>
+            : null,
+        created_at: typeof activity.created_at === "string" ? activity.created_at : undefined,
+        updated_at: typeof activity.updated_at === "string" ? activity.updated_at : undefined
       }));
     }
 

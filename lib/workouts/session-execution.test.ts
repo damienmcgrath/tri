@@ -24,7 +24,18 @@ describe("buildExecutionResultForSession", () => {
         metrics_v2: {
           timeAboveTargetPct: 0.31,
           firstHalfAvgHr: 145,
-          lastHalfAvgHr: 156
+          lastHalfAvgHr: 156,
+          power: {
+            normalizedPower: 205,
+            intensityFactor: 0.78,
+            totalWorkKj: 910
+          },
+          load: {
+            trainingStressScore: 92.4
+          },
+          cadence: {
+            avgCadence: 86
+          }
         }
       }
     );
@@ -32,6 +43,9 @@ describe("buildExecutionResultForSession", () => {
     expect(result.status).toBe(result.intentMatchStatus);
     expect(result.summary).toBe(result.executionScoreSummary);
     expect(result.linkedActivityId).toBe("activity-1");
+    expect(result.normalizedPower).toBe(205);
+    expect(result.trainingStressScore).toBe(92.4);
+    expect(result.avgCadence).toBe(86);
     expect(result.suggestedWeekAdjustment).toMatch(/protect recovery|keep the week steady/i);
   });
 

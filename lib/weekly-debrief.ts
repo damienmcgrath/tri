@@ -5,6 +5,7 @@ import { getAthleteContextSnapshot, type AthleteContextSnapshot } from "@/lib/at
 import { parsePersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
 import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { getSessionDisplayName } from "@/lib/training/session";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 import { addDays, weekRangeLabel } from "@/app/(protected)/week-context";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 5;
@@ -130,6 +131,8 @@ export type WeeklyDebriefReadiness = z.infer<typeof weeklyDebriefReadinessSchema
 
 type WeeklyDebriefSession = {
   id: string;
+  athlete_id?: string | null;
+  user_id?: string | null;
   date: string;
   sport: string;
   type: string;
@@ -158,7 +161,9 @@ type WeeklyDebriefActivity = {
   avg_power: number | null;
   schedule_status: "scheduled" | "unscheduled";
   is_unplanned: boolean;
+  metrics_v2?: Record<string, unknown> | null;
   created_at?: string;
+  updated_at?: string;
 };
 
 type WeeklyDebriefLink = {
@@ -266,6 +271,22 @@ function formatMinutes(minutes: number) {
   if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
   if (hours > 0) return `${hours}h`;
   return `${mins}m`;
+}
+
+function describeExtraActivityLoad(activity: ReturnType<typeof buildExtraCompletedActivities>[number]) {
+  const parts: string[] = [];
+  if (activity.trainingStressScore !== null) parts.push(`${Math.round(activity.trainingStressScore)} TSS`);
+  if (activity.intensityFactor !== null) parts.push(`IF ${activity.intensityFactor.toFixed(2)}`);
+  if (activity.normalizedPower !== null) parts.push(`NP ${Math.round(activity.normalizedPower)} w`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function getHardestExtraActivity(extraActivities: ReturnType<typeof buildExtraCompletedActivities>) {
+  return [...extraActivities].sort((a, b) => {
+    const scoreA = a.trainingStressScore ?? a.durationMinutes;
+    const scoreB = b.trainingStressScore ?? b.durationMinutes;
+    return scoreB - scoreA;
+  })[0] ?? null;
 }
 
 function isSkippedByTag(notes: string | null | undefined) {
@@ -761,6 +782,7 @@ function buildPositiveHighlights(args: {
   lateWeekSkippedSessions: number;
   weekShape: "normal" | "partial_reflection" | "disrupted";
   strongestExecutionSession: WeeklyDebriefSessionSummary | null;
+  hardestExtraActivity: ReturnType<typeof buildExtraCompletedActivities>[number] | null;
 }) {
   const highlights = [
     args.strongestExecutionSession
@@ -776,6 +798,9 @@ function buildPositiveHighlights(args: {
         : null,
     args.addedSessions > 0 && args.skippedSessions === 0
       ? "Extra work stayed additive rather than replacing the main week."
+      : null,
+    args.hardestExtraActivity && (args.hardestExtraActivity.trainingStressScore ?? 0) >= 70 && args.skippedSessions === 0
+      ? `${capitalize(args.hardestExtraActivity.sport)} extra work added meaningful load without replacing the plan.`
       : null,
     args.weekShape === "disrupted"
       ? "Even with some messiness, the stronger sessions still showed what is worth protecting."
@@ -809,10 +834,11 @@ function buildFallbackEvidenceSummaries(sessionSummaries: WeeklyDebriefSessionSu
   }
 
   for (const activity of extraActivities.slice(0, 4)) {
+    const loadDetail = describeExtraActivityLoad(activity);
     evidence.push({
       id: activity.id,
       label: `${capitalize(activity.sport)} extra workout`,
-      detail: `${formatMinutes(activity.durationMinutes)} of unscheduled work was added to the week.`,
+      detail: `${formatMinutes(activity.durationMinutes)} of unscheduled work was added to the week.${loadDetail ? ` ${loadDetail}.` : ""}`,
       kind: "activity",
       href: `/sessions/activity/${activity.id}`,
       supportType: "fact"
@@ -934,6 +960,7 @@ function buildDeterministicSuggestions(args: {
   addedSessions: number;
   latestIssueSession: WeeklyDebriefSessionSummary | null;
   keySessionsTotal: number;
+  hardestExtraActivity: ReturnType<typeof buildExtraCompletedActivities>[number] | null;
 }) {
   const carry: string[] = [];
   if (args.latestIssueSession?.label) {
@@ -948,6 +975,8 @@ function buildDeterministicSuggestions(args: {
 
   if (args.lateSkippedSessions > 0) {
     carry.push("Protect the back half of the week from spillover.");
+  } else if (args.hardestExtraActivity && (args.hardestExtraActivity.trainingStressScore ?? 0) >= 70) {
+    carry.push("Treat the hardest extra session as real load before adding anything else around it.");
   } else if (args.addedSessions > 0) {
     carry.push("Only add extra work after the planned sessions are already done.");
   } else if (args.athleteContext?.weeklyState.note) {
@@ -969,6 +998,7 @@ function buildDeterministicObservations(args: {
   addedSessions: number;
   keySessionsMissed: number;
   reviewedSessionsCount: number;
+  hardestExtraActivity: ReturnType<typeof buildExtraCompletedActivities>[number] | null;
 }) {
   const observations: string[] = [];
   if (args.latestIssueSession?.label) {
@@ -983,6 +1013,9 @@ function buildDeterministicObservations(args: {
   }
   if (args.addedSessions > 0) {
     observations.push("Added work changed the shape of the week and is worth reading alongside the planned sessions, not separately from them.");
+  }
+  if (args.hardestExtraActivity && (args.hardestExtraActivity.trainingStressScore ?? 0) >= 70) {
+    observations.push(`${capitalize(args.hardestExtraActivity.sport)} extra work was a meaningful load addition, not just extra minutes.`);
   }
   if (args.reviewedSessionsCount === 0 && observations.length === 0) {
     observations.push("This week reads more through overall rhythm than through one standout session.");
@@ -999,6 +1032,16 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     return acc;
   }, {});
 
+  const confirmedLinks = input.links.filter(hasConfirmedPlannedSessionLink);
+  const linkedActivityBySessionId = new Map<string, WeeklyDebriefActivity>();
+  for (const link of confirmedLinks) {
+    if (!link.planned_session_id || linkedActivityBySessionId.has(link.planned_session_id)) continue;
+    const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
+    if (activity) {
+      linkedActivityBySessionId.set(link.planned_session_id, activity);
+    }
+  }
+
   const sessionSummaries: WeeklyDebriefSessionSummary[] = input.sessions
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at))
     .map((session) => {
@@ -1008,7 +1051,41 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
         subtype: session.subtype ?? session.workout_type ?? session.type,
         discipline: session.sport
       });
-      const review = parsePersistedExecutionReview(session.execution_result ?? null);
+      const linkedActivity = linkedActivityBySessionId.get(session.id);
+      const refreshedExecutionResult = linkedActivity && shouldRefreshExecutionResultFromActivity(session.execution_result ?? null, {
+        id: linkedActivity.id,
+        sport_type: linkedActivity.sport_type,
+        duration_sec: linkedActivity.duration_sec,
+        distance_m: linkedActivity.distance_m,
+        avg_hr: linkedActivity.avg_hr,
+        avg_power: linkedActivity.avg_power,
+        metrics_v2: linkedActivity.metrics_v2 ?? null
+      })
+        ? buildExecutionResultForSession(
+            {
+              id: session.id,
+              athlete_id: session.athlete_id ?? undefined,
+              user_id: session.user_id ?? session.athlete_id ?? "unknown-athlete",
+              sport: session.sport,
+              type: session.type,
+              duration_minutes: session.duration_minutes ?? null,
+              intent_category: session.intent_category ?? null,
+              session_name: session.session_name ?? session.type,
+              session_role: session.session_role ?? null,
+              status: session.status ?? "planned"
+            },
+            {
+              id: linkedActivity.id,
+              sport_type: linkedActivity.sport_type,
+              duration_sec: linkedActivity.duration_sec,
+              distance_m: linkedActivity.distance_m,
+              avg_hr: linkedActivity.avg_hr,
+              avg_power: linkedActivity.avg_power,
+              metrics_v2: linkedActivity.metrics_v2 ?? null
+            }
+          )
+        : session.execution_result ?? null;
+      const review = parsePersistedExecutionReview(refreshedExecutionResult);
       return {
         id: session.id,
         label,
@@ -1021,8 +1098,6 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
         completedMinutes: status === "completed" ? Math.max(0, session.duration_minutes ?? 0) : 0
       };
     });
-
-  const confirmedLinks = input.links.filter(hasConfirmedPlannedSessionLink);
   const linkedActivityIds = new Set(confirmedLinks.map((link) => link.completed_activity_id));
   const durationByActivityId = new Map(
     input.activities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)])
@@ -1090,6 +1165,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
   });
 
   const reviewedSessions = sessionSummaries.filter((session) => Boolean(session.review));
+  const hardestExtraActivity = getHardestExtraActivity(extraActivities);
   const strongestExecutionSession =
     reviewedSessions
       .filter((session) => session.review?.deterministic.rulesSummary.intentMatch === "on_target")
@@ -1161,7 +1237,11 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
       : addedSessions > 0
         ? `${addedSessions} extra ${addedSessions === 1 ? "session was" : "sessions were"} added.`
         : `${formatMinutes(completedMinutes)} of training was completed.`,
-    extraMinutes > 0 ? `${formatMinutes(extraMinutes)} was added outside the original plan.` : `${formatMinutes(completedMinutes)} was completed against ${formatMinutes(plannedMinutes)} planned.`
+    extraMinutes > 0
+      ? hardestExtraActivity && describeExtraActivityLoad(hardestExtraActivity)
+        ? `${formatMinutes(extraMinutes)} was added outside the original plan, led by ${describeExtraActivityLoad(hardestExtraActivity)} of extra ${hardestExtraActivity.sport} load.`
+        : `${formatMinutes(extraMinutes)} was added outside the original plan.`
+      : `${formatMinutes(completedMinutes)} was completed against ${formatMinutes(plannedMinutes)} planned.`
   ].filter((value, index, all) => value && all.indexOf(value) === index).slice(0, 4);
 
   const positiveHighlights = buildPositiveHighlights({
@@ -1171,7 +1251,8 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     addedSessions,
     lateWeekSkippedSessions,
     weekShape,
-    strongestExecutionSession
+    strongestExecutionSession,
+    hardestExtraActivity
   });
 
   const observations = buildDeterministicObservations({
@@ -1181,7 +1262,8 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     skippedSessions,
     addedSessions,
     keySessionsMissed,
-    reviewedSessionsCount: reviewedSessions.length
+    reviewedSessionsCount: reviewedSessions.length,
+    hardestExtraActivity
   });
   const carryForward = buildDeterministicSuggestions({
     weekShape,
@@ -1190,7 +1272,8 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     lateSkippedSessions: lateWeekSkippedSessions,
     addedSessions,
     latestIssueSession,
-    keySessionsTotal: keySessions.length
+    keySessionsTotal: keySessions.length,
+    hardestExtraActivity
   });
 
   const qualityOnTargetCount = reviewedSessions.filter((session) => session.review?.deterministic.rulesSummary.intentMatch === "on_target").length;
@@ -1209,7 +1292,10 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     {
       label: "Time",
       value: `${formatMinutes(completedMinutes)} / ${formatMinutes(plannedMinutes)}`,
-      detail: addedSessions > 0 ? `${formatMinutes(completedMinutes)} done • includes ${formatMinutes(extraMinutes)} added work` : `${formatMinutes(completedMinutes)} done`,
+      detail:
+        addedSessions > 0
+          ? `${formatMinutes(completedMinutes)} done • includes ${formatMinutes(extraMinutes)} added work${hardestExtraActivity && describeExtraActivityLoad(hardestExtraActivity) ? ` • ${describeExtraActivityLoad(hardestExtraActivity)}` : ""}`
+          : `${formatMinutes(completedMinutes)} done`,
       tone: completionPct >= 90 ? "positive" as const : completionPct >= 70 ? "neutral" as const : "caution" as const
     },
     ...(reviewedSessions.length > 0 ? [{
@@ -1323,7 +1409,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     evidenceGroups,
     sourceUpdatedAt: getSourceUpdatedAt([
       ...input.sessions.map((session) => session.updated_at ?? session.created_at),
-      ...input.activities.map((activity) => activity.created_at ?? activity.start_time_utc),
+      ...input.activities.map((activity) => activity.updated_at ?? activity.created_at ?? activity.start_time_utc),
       ...input.links.map((link) => link.created_at ?? null),
       input.athleteContext?.weeklyState.updatedAt
     ])
@@ -1344,7 +1430,7 @@ async function loadWeeklyDebriefInputs(args: {
   const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext] = await Promise.all([
     args.supabase
       .from("sessions")
-      .select("id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
+      .select("id,athlete_id,user_id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
       .or(`athlete_id.eq.${args.athleteId},user_id.eq.${args.athleteId}`)
       .gte("date", args.weekStart)
       .lte("date", args.weekEnd)
@@ -1510,7 +1596,7 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
     }),
     sourceUpdatedAt: getSourceUpdatedAt([
       ...input.sessions.map((session) => session.updated_at ?? session.created_at),
-      ...input.activities.map((activity) => activity.created_at ?? activity.start_time_utc),
+      ...input.activities.map((activity) => activity.updated_at ?? activity.created_at ?? activity.start_time_utc),
       ...input.links.map((link) => link.created_at ?? null),
       input.weeklyCheckinUpdatedAt
     ])

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis, type SessionDiagnosisInput, type SplitMetrics } from "@/lib/coach/session-diagnosis";
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
+import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
 
 type SessionExecutionSessionRow = {
   id: string;
@@ -59,6 +60,47 @@ function getNestedNumber(sources: Array<Record<string, unknown> | null | undefin
       if (typeof cursor === "number" && Number.isFinite(cursor)) return cursor;
     }
   }
+  return null;
+}
+
+function deriveCompletedIntervals(activity: SessionExecutionActivityRow) {
+  const lapMetrics = getMetricsV2Laps(activity.metrics_v2);
+  if (lapMetrics.length > 0) return lapMetrics.length;
+  return activity.laps_count ?? null;
+}
+
+function deriveTimeAboveTargetPct(args: {
+  targetBands: PlannedTargetBand | null;
+  activity: SessionExecutionActivityRow;
+}) {
+  const metrics = asRecord(args.activity.metrics_v2);
+  const lapMetrics = getMetricsV2Laps(args.activity.metrics_v2);
+  const explicit =
+    getNumber(metrics, ["timeAboveTargetPct", "time_above_target_pct"]) ??
+    getNestedNumber([metrics], [["intensity", "timeAboveTargetPct"], ["intensity", "time_above_target_pct"]]);
+  if (explicit !== null) return explicit;
+
+  const totalLapDurationSec = lapMetrics.reduce((sum, lap) => sum + Math.max(0, lap.durationSec ?? 0), 0);
+  if (totalLapDurationSec <= 0) return null;
+
+  const targetPowerMax = args.targetBands?.power?.max;
+  if (targetPowerMax) {
+    const abovePowerSec = lapMetrics.reduce((sum, lap) => {
+      if (!lap.durationSec || !lap.avgPower) return sum;
+      return lap.avgPower > targetPowerMax ? sum + lap.durationSec : sum;
+    }, 0);
+    if (abovePowerSec > 0) return Number((abovePowerSec / totalLapDurationSec).toFixed(2));
+  }
+
+  const targetHrMax = args.targetBands?.hr?.max;
+  if (targetHrMax) {
+    const aboveHrSec = lapMetrics.reduce((sum, lap) => {
+      if (!lap.durationSec || !lap.avgHr) return sum;
+      return lap.avgHr > targetHrMax ? sum + lap.durationSec : sum;
+    }, 0);
+    if (aboveHrSec > 0) return Number((aboveHrSec / totalLapDurationSec).toFixed(2));
+  }
+
   return null;
 }
 
@@ -140,30 +182,91 @@ function extractSplitMetrics(activity: SessionExecutionActivityRow): SplitMetric
   return Object.keys(splitMetrics).length > 0 ? splitMetrics : null;
 }
 
+function asExecutionResult(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+export function shouldRefreshExecutionResultFromActivity(
+  executionResult: Record<string, unknown> | null | undefined,
+  activity: SessionExecutionActivityRow
+) {
+  const current = asExecutionResult(executionResult);
+  if (!current) return true;
+
+  const metrics = asRecord(activity.metrics_v2);
+  const splitMetrics = extractSplitMetrics(activity);
+  const normalizedPower = getMetricsNestedNumber(metrics, [["power", "normalizedPower"], ["power", "normalized_power"]]);
+  const variabilityIndex =
+    getMetricsNestedNumber(metrics, [["power", "variabilityIndex"], ["power", "variability_index"]]) ??
+    getNumber(metrics, ["variabilityIndex", "variability_index"]);
+  const trainingStressScore = getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]]);
+  const avgCadence =
+    getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]) ??
+    getNumber(metrics, ["avgCadence", "avg_cadence"]);
+
+  if (normalizedPower !== null && getNumber(current, ["normalizedPower", "normalized_power"]) === null) return true;
+  if (variabilityIndex !== null && getNumber(current, ["variabilityIndex", "variability_index"]) === null) return true;
+  if (trainingStressScore !== null && getNumber(current, ["trainingStressScore", "training_stress_score"]) === null) return true;
+  if (avgCadence !== null && getNumber(current, ["avgCadence", "avg_cadence"]) === null) return true;
+
+  if (splitMetrics) {
+    const hasSplitMetricsInResult = [
+      getNumber(current, ["firstHalfAvgHr", "first_half_avg_hr"]),
+      getNumber(current, ["lastHalfAvgHr", "last_half_avg_hr"]),
+      getNumber(current, ["firstHalfAvgPower", "first_half_avg_power"]),
+      getNumber(current, ["lastHalfAvgPower", "last_half_avg_power"]),
+      getNumber(current, ["firstHalfPaceSPerKm", "first_half_pace_s_per_km"]),
+      getNumber(current, ["lastHalfPaceSPerKm", "last_half_pace_s_per_km"])
+    ].some((value) => value !== null);
+
+    if (!hasSplitMetricsInResult) return true;
+  }
+
+  return false;
+}
+
 function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: SessionExecutionActivityRow): SessionDiagnosisInput {
   const metrics = asRecord(activity.metrics_v2);
   const parseSummary = asRecord(activity.parse_summary);
   const plannedIntervals = parsePlannedIntervals(session.target ?? session.type);
+  const targetBands = parseTargetBands(session.target);
+  const completedIntervals = deriveCompletedIntervals(activity);
 
   const intervalCompletionPct =
     getNumber(metrics, ["intervalCompletionPct", "interval_completion_pct"]) ??
     getNumber(parseSummary, ["intervalCompletionPct", "interval_completion_pct"]) ??
-    (plannedIntervals && activity.laps_count ? Number((Math.min(1, activity.laps_count / plannedIntervals)).toFixed(2)) : null);
+    (plannedIntervals && completedIntervals ? Number((Math.min(1, completedIntervals / plannedIntervals)).toFixed(2)) : null);
 
-  const timeAboveTargetPct =
-    getNumber(metrics, ["timeAboveTargetPct", "time_above_target_pct"]) ??
-    getNestedNumber([metrics], [["intensity", "timeAboveTargetPct"], ["intensity", "time_above_target_pct"]]);
+  const timeAboveTargetPct = deriveTimeAboveTargetPct({ targetBands, activity });
 
   const variabilityIndex =
     getNumber(metrics, ["variabilityIndex", "variability_index"]) ??
     getNestedNumber([metrics], [["power", "variabilityIndex"], ["power", "variability_index"]]);
+
+  const normalizedPower =
+    getMetricsNestedNumber(metrics, [["power", "normalizedPower"], ["power", "normalized_power"]]);
+  const trainingStressScore =
+    getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]]);
+  const intensityFactor =
+    getMetricsNestedNumber(metrics, [["power", "intensityFactor"], ["power", "intensity_factor"]]);
+  const totalWorkKj =
+    getMetricsNestedNumber(metrics, [["power", "totalWorkKj"], ["power", "total_work_kj"]]);
+  const avgCadence =
+    getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]) ??
+    getNumber(metrics, ["avgCadence", "avg_cadence"]);
+  const maxHr =
+    getMetricsNestedNumber(metrics, [["heartRate", "maxHr"], ["heart_rate", "max_hr"]]) ??
+    getNumber(parseSummary, ["maxHr", "max_hr"]);
+  const maxPower =
+    getMetricsNestedNumber(metrics, [["power", "maxPower"], ["power", "max_power"]]) ??
+    getNumber(parseSummary, ["maxPower", "max_power"]);
 
   return {
     planned: {
       sport: (session.sport as SessionDiagnosisInput["planned"]["sport"]) ?? "other",
       plannedDurationSec: session.duration_minutes ? session.duration_minutes * 60 : null,
       intentCategory: session.intent_category ?? session.type,
-      targetBands: parseTargetBands(session.target),
+      targetBands,
       plannedIntervals
     },
     actual: {
@@ -174,11 +277,19 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
       variabilityIndex,
       timeAboveTargetPct,
       intervalCompletionPct,
-      completedIntervals: activity.laps_count ?? null,
+      completedIntervals,
       splitMetrics: extractSplitMetrics(activity),
       metrics: {
         avg_hr: activity.avg_hr ?? null,
-        avg_power: activity.avg_power ?? null
+        avg_power: activity.avg_power ?? null,
+        normalized_power: normalizedPower,
+        variability_index: variabilityIndex,
+        training_stress_score: trainingStressScore,
+        intensity_factor: intensityFactor,
+        total_work_kj: totalWorkKj,
+        avg_cadence: avgCadence,
+        max_hr: maxHr,
+        max_power: maxPower
       }
     }
   };

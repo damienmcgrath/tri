@@ -226,6 +226,14 @@ describe("weekly debrief helpers", () => {
           avg_power: null,
           schedule_status: "unscheduled",
           is_unplanned: true,
+          metrics_v2: {
+            power: {
+              intensityFactor: 0.81
+            },
+            load: {
+              trainingStressScore: 74
+            }
+          },
           created_at: "2026-03-12T18:30:00.000Z"
         }
       ],
@@ -287,7 +295,9 @@ describe("weekly debrief helpers", () => {
 
     expect(result.facts.weekShape).toBe("disrupted");
     expect(result.facts.title).toMatch(/Disrupted week/i);
+    expect(result.facts.factualBullets.some((bullet) => bullet.includes("74 TSS"))).toBe(true);
     expect(result.evidence.some((item) => item.href === "/sessions/session-1")).toBe(true);
+    expect(result.evidence.some((item) => item.detail.includes("74 TSS"))).toBe(true);
     expect(result.deterministicNarrative.observations.length).toBeGreaterThan(0);
   });
 });

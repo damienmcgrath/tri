@@ -7,6 +7,7 @@ import {
   type CoachToolName
 } from "@/lib/coach/tools";
 import { logCoachAudit } from "@/lib/coach/audit";
+import { getNestedNumber } from "@/lib/workouts/metrics-v2";
 
 type ToolDeps = {
   supabase: SupabaseClient;
@@ -94,6 +95,12 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
     const avgPacePer100mSec = activity.sport_type === "swim" && activity.avg_pace_per_100m_sec
       ? Number(activity.avg_pace_per_100m_sec)
       : null;
+    const normalizedPower = getNestedNumber(activity.metrics_v2, [["power", "normalizedPower"], ["power", "normalized_power"]]);
+    const variabilityIndex = getNestedNumber(activity.metrics_v2, [["power", "variabilityIndex"], ["power", "variability_index"]]);
+    const trainingStressScore = getNestedNumber(activity.metrics_v2, [["load", "trainingStressScore"], ["load", "training_stress_score"]]);
+    const intensityFactor = getNestedNumber(activity.metrics_v2, [["power", "intensityFactor"], ["power", "intensity_factor"]]);
+    const totalWorkKj = getNestedNumber(activity.metrics_v2, [["power", "totalWorkKj"], ["power", "total_work_kj"]]);
+    const avgCadence = getNestedNumber(activity.metrics_v2, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]);
 
     return {
       id: `activity:${activity.id}`,
@@ -109,6 +116,12 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
       avgPacePer100mSec,
       avgHr: activity.avg_hr ?? null,
       avgPower: activity.avg_power ?? null,
+      normalizedPower,
+      variabilityIndex,
+      trainingStressScore,
+      intensityFactor,
+      totalWorkKj,
+      avgCadence,
       calories: activity.calories ?? null,
       metricsV2: activity.metrics_v2 ?? null,
       avgPaceSecPerKm: null,

@@ -28,6 +28,13 @@ export type ExecutionEvidence = {
     timeAboveTargetPct: number | null;
     intervalCompletionPct: number | null;
     variabilityIndex: number | null;
+    normalizedPower?: number | null;
+    trainingStressScore?: number | null;
+    intensityFactor?: number | null;
+    totalWorkKj?: number | null;
+    avgCadence?: number | null;
+    maxHr?: number | null;
+    maxPower?: number | null;
     splitMetrics: {
       firstHalfAvgHr?: number;
       lastHalfAvgHr?: number;
@@ -131,6 +138,13 @@ export type PersistedExecutionReview = {
   timeAboveTargetPct: number | null;
   avgHr: number | null;
   avgPower: number | null;
+  normalizedPower: number | null;
+  trainingStressScore: number | null;
+  intensityFactor: number | null;
+  totalWorkKj: number | null;
+  avgCadence: number | null;
+  maxHr: number | null;
+  maxPower: number | null;
   firstHalfAvgHr: number | null;
   lastHalfAvgHr: number | null;
   firstHalfPaceSPerKm: number | null;
@@ -192,6 +206,11 @@ function getIssueSeverity(code: string) {
   return "low" as const;
 }
 
+function getActualMetric(input: SessionDiagnosisInput["actual"], key: string) {
+  const value = input.metrics?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function deriveExecutionCost(params: {
   timeAboveTargetPct: number | null;
   hrDrift: number | null;
@@ -226,6 +245,15 @@ function buildEvidenceSummary(evidence: ExecutionEvidence) {
   }
   if (evidence.actual.avgPower !== null) {
     points.push(`average power ${Math.round(evidence.actual.avgPower)} w`);
+  }
+  if (typeof evidence.actual.normalizedPower === "number") {
+    points.push(`normalized power ${Math.round(evidence.actual.normalizedPower)} w`);
+  }
+  if (typeof evidence.actual.variabilityIndex === "number") {
+    points.push(`VI ${evidence.actual.variabilityIndex.toFixed(2)}`);
+  }
+  if (typeof evidence.actual.trainingStressScore === "number") {
+    points.push(`TSS ${Math.round(evidence.actual.trainingStressScore)}`);
   }
   return points.slice(0, 4);
 }
@@ -358,6 +386,13 @@ export function buildExecutionEvidence(args: {
         timeAboveTargetPct: args.diagnosisInput.actual.timeAboveTargetPct ?? null,
         intervalCompletionPct: args.diagnosisInput.actual.intervalCompletionPct ?? null,
         variabilityIndex: args.diagnosisInput.actual.variabilityIndex ?? null,
+        normalizedPower: getActualMetric(args.diagnosisInput.actual, "normalized_power"),
+        trainingStressScore: getActualMetric(args.diagnosisInput.actual, "training_stress_score"),
+        intensityFactor: getActualMetric(args.diagnosisInput.actual, "intensity_factor"),
+        totalWorkKj: getActualMetric(args.diagnosisInput.actual, "total_work_kj"),
+        avgCadence: getActualMetric(args.diagnosisInput.actual, "avg_cadence"),
+        maxHr: getActualMetric(args.diagnosisInput.actual, "max_hr"),
+        maxPower: getActualMetric(args.diagnosisInput.actual, "max_power"),
         splitMetrics: args.diagnosisInput.actual.splitMetrics ?? null
       },
       detectedIssues: [],
@@ -405,6 +440,13 @@ export function buildExecutionEvidence(args: {
         timeAboveTargetPct: args.diagnosisInput.actual.timeAboveTargetPct ?? null,
         intervalCompletionPct: args.diagnosisInput.actual.intervalCompletionPct ?? null,
         variabilityIndex: args.diagnosisInput.actual.variabilityIndex ?? null,
+        normalizedPower: getActualMetric(args.diagnosisInput.actual, "normalized_power"),
+        trainingStressScore: getActualMetric(args.diagnosisInput.actual, "training_stress_score"),
+        intensityFactor: getActualMetric(args.diagnosisInput.actual, "intensity_factor"),
+        totalWorkKj: getActualMetric(args.diagnosisInput.actual, "total_work_kj"),
+        avgCadence: getActualMetric(args.diagnosisInput.actual, "avg_cadence"),
+        maxHr: getActualMetric(args.diagnosisInput.actual, "max_hr"),
+        maxPower: getActualMetric(args.diagnosisInput.actual, "max_power"),
         splitMetrics: args.diagnosisInput.actual.splitMetrics ?? null
       },
       detectedIssues: issues,
@@ -516,6 +558,13 @@ export function toPersistedExecutionReview(args: {
     timeAboveTargetPct: args.evidence.actual.timeAboveTargetPct,
     avgHr: args.evidence.actual.avgHr,
     avgPower: args.evidence.actual.avgPower,
+    normalizedPower: args.evidence.actual.normalizedPower ?? null,
+    trainingStressScore: args.evidence.actual.trainingStressScore ?? null,
+    intensityFactor: args.evidence.actual.intensityFactor ?? null,
+    totalWorkKj: args.evidence.actual.totalWorkKj ?? null,
+    avgCadence: args.evidence.actual.avgCadence ?? null,
+    maxHr: args.evidence.actual.maxHr ?? null,
+    maxPower: args.evidence.actual.maxPower ?? null,
     firstHalfAvgHr: args.evidence.actual.splitMetrics?.firstHalfAvgHr ?? null,
     lastHalfAvgHr: args.evidence.actual.splitMetrics?.lastHalfAvgHr ?? null,
     firstHalfPaceSPerKm: args.evidence.actual.splitMetrics?.firstHalfPaceSPerKm ?? null,

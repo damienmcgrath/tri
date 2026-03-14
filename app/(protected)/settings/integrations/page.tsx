@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ActivityUploadsPanel } from "./activity-uploads-panel";
+import { ActivityMetricsBackfillButton } from "./activity-metrics-backfill-button";
 import { ReviewBackfillButton } from "./review-backfill-button";
 
 type UploadRow = {
@@ -124,7 +125,10 @@ export default async function IntegrationsPage() {
         <p className="mt-1 text-sm text-muted">Upload .fit or .tcx activities, then review and attach them to planned sessions.</p>
       </header>
 
-      <ReviewBackfillButton />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ActivityMetricsBackfillButton />
+        <ReviewBackfillButton />
+      </div>
 
       <article className="surface p-5">
         <ActivityUploadsPanel initialUploads={uploads} plannedSessions={plannedSessions} />
