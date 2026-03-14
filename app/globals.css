@@ -8,6 +8,7 @@
   --surface: 200 20% 96%;
   --surface-elevated: 0 0% 100%;
   --surface-soft: 200 33% 98%;
+  --surface-subtle: var(--surface-soft);
   --surface-1: var(--surface-elevated);
   --surface-2: 197 56% 94%;
 
@@ -25,6 +26,9 @@
   --signal-risk: 2 63% 59%;
   --signal-recovery: 200 36% 47%;
   --signal-neutral: 215 19% 63%;
+  --success: var(--signal-ready);
+  --warning: var(--signal-load);
+  --danger: var(--signal-risk);
 
   --ai-accent-core: var(--accent-performance);
   --ai-accent-glow: 192 52% 78%;
@@ -57,6 +61,7 @@
   --surface: 210 14% 96%;
   --surface-elevated: 0 0% 100%;
   --surface-soft: 210 10% 95%;
+  --surface-subtle: var(--surface-soft);
   --surface-1: var(--surface-elevated);
   --surface-2: 210 10% 93%;
 
@@ -108,6 +113,7 @@
   --surface: 220 16% 13%;
   --surface-elevated: 220 14% 16%;
   --surface-soft: 220 13% 18%;
+  --surface-subtle: var(--surface-soft);
   --surface-1: var(--surface-elevated);
   --surface-2: 220 12% 21%;
 
@@ -160,6 +166,7 @@
     --surface: 224 24% 8%;
     --surface-elevated: 222 21% 12%;
     --surface-soft: 223 18% 15%;
+    --surface-subtle: var(--surface-soft);
     --surface-1: var(--surface-elevated);
     --surface-2: 223 16% 18%;
     --text-primary: 210 20% 96%;
@@ -177,6 +184,7 @@
     --surface: 218 24% 9%;
     --surface-elevated: 220 20% 12%;
     --surface-soft: 220 17% 16%;
+    --surface-subtle: var(--surface-soft);
     --surface-1: var(--surface-elevated);
     --surface-2: 220 16% 18%;
 
@@ -400,6 +408,458 @@
     background: hsl(var(--bg-card));
     border: 1px solid hsl(var(--border));
     @apply rounded-xl;
+  }
+
+  .surface-card {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--bg-elevated));
+    @apply rounded-2xl;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) {
+    color-scheme: dark;
+    --surface: 220 8% 6%;
+    --surface-elevated: 220 7% 8%;
+    --surface-soft: 220 6% 10%;
+    --surface-subtle: var(--surface-soft);
+    --surface-1: var(--surface-elevated);
+    --surface-2: 220 6% 12%;
+
+    --text-primary: 40 18% 97%;
+    --text-secondary: 32 10% 76%;
+    --text-tertiary: 28 6% 54%;
+
+    --accent-performance: 24 100% 57%;
+    --accent-recovery: 0 0% 90%;
+
+    --signal-ready: 148 8% 74%;
+    --signal-load: 27 78% 58%;
+    --signal-risk: 8 64% 59%;
+    --signal-recovery: 0 0% 97%;
+    --signal-neutral: 220 5% 61%;
+
+    --success: var(--signal-ready);
+    --warning: var(--signal-load);
+    --danger: var(--signal-risk);
+
+    --ai-accent-core: var(--accent-performance);
+    --ai-accent-glow: 24 42% 17%;
+
+    --bg: var(--surface);
+    --bg-elevated: var(--surface-elevated);
+    --bg-card: var(--surface-soft);
+    --fg: var(--text-primary);
+    --fg-muted: var(--text-secondary);
+    --border: 220 6% 18%;
+    --ring: 24 100% 57%;
+    --accent: var(--accent-performance);
+    --accent-soft: 24 36% 16%;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme)::before {
+    inset: -14%;
+    background:
+      radial-gradient(circle at 16% 0%, hsl(0 0% 100% / 0.045), transparent 28%),
+      radial-gradient(circle at 92% 100%, hsl(var(--accent-performance) / 0.08), transparent 20%),
+      linear-gradient(180deg, hsl(220 10% 4%), hsl(var(--bg)) 32%, hsl(var(--bg-elevated)) 100%);
+    animation: none;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme)::after {
+    opacity: 0.34;
+    mix-blend-mode: normal;
+    background-image:
+      linear-gradient(hsl(0 0% 100% / 0.024) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(0 0% 100% / 0.018) 1px, transparent 1px);
+    background-size: 100% 24px, 24px 100%;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.14));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .shell-header {
+    border-color: hsl(var(--border) / 0.96);
+    background: hsl(var(--bg) / 0.82);
+    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .shell-header::before {
+    inset: auto 0 0;
+    height: 1px;
+    opacity: 0.48;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent-performance) / 0.55), transparent);
+    animation: none;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .surface,
+  .app-shell.app-shell:has(.race-lab-theme) .surface-card {
+    border-color: hsl(var(--border) / 0.96);
+    border-radius: 1.125rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated)), hsl(220 7% 7%));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.035),
+      0 0 0 1px hsl(0 0% 0% / 0.16);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .surface:hover,
+  .app-shell.app-shell:has(.race-lab-theme) .surface-card:hover {
+    transform: none;
+    border-color: hsl(0 0% 100% / 0.12);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.04),
+      0 18px 44px -36px hsl(0 0% 0% / 0.92);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .surface-subtle {
+    border-color: hsl(var(--border) / 0.92);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--surface-soft) / 0.9), hsl(220 7% 8% / 0.94));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.03);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) aside > .surface {
+    background: linear-gradient(180deg, hsl(220 7% 8% / 0.94), hsl(220 7% 7% / 0.96));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .btn-primary {
+    border-color: hsl(var(--accent-performance) / 0.72);
+    border-radius: 0.9rem;
+    background: linear-gradient(180deg, hsl(26 100% 62%), hsl(var(--accent-performance)));
+    color: hsl(220 20% 8%);
+    letter-spacing: 0.02em;
+    box-shadow: none;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .btn-primary:hover {
+    filter: brightness(1.02);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .btn-secondary,
+  .app-shell.app-shell:has(.race-lab-theme) .btn-header-cta,
+  .app-shell.app-shell:has(.race-lab-theme) .status-badge-passive {
+    border-color: hsl(var(--border) / 0.96);
+    border-radius: 0.9rem;
+    background: hsl(var(--surface-soft));
+    color: hsl(var(--fg));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.02);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .btn-header-cta {
+    color: hsl(var(--accent-performance));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .btn-secondary:hover,
+  .app-shell.app-shell:has(.race-lab-theme) .btn-header-cta:hover {
+    background: hsl(var(--surface-2));
+    border-color: hsl(0 0% 100% / 0.12);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .status-badge-passive {
+    color: hsl(var(--fg-muted));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .nav-item-active {
+    background: linear-gradient(90deg, hsl(0 0% 100% / 0.05), hsl(0 0% 100% / 0.02));
+    color: hsl(var(--fg));
+    letter-spacing: 0.01em;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .nav-item-active::before {
+    left: 0.7rem;
+    width: 2px;
+    background: linear-gradient(180deg, hsl(var(--accent-performance)), hsl(var(--accent-performance) / 0.28));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .nav-item-active--mobile::before {
+    left: 0.55rem;
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .shell-header nav a:not(.nav-item-active),
+  .app-shell.app-shell:has(.race-lab-theme) nav a:not(.nav-item-active) {
+    color: hsl(var(--fg-muted) / 0.9);
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .signal-ready,
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip-tone-success {
+    border-color: hsl(var(--signal-ready) / 0.24);
+    background: hsl(var(--signal-ready) / 0.08);
+    color: hsl(var(--fg));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .signal-load,
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip-tone-warning,
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip-tone-info {
+    border-color: hsl(var(--signal-load) / 0.26);
+    background: hsl(var(--signal-load) / 0.08);
+    color: hsl(var(--signal-load));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .signal-risk,
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip-tone-attention {
+    border-color: hsl(var(--signal-risk) / 0.28);
+    background: hsl(var(--signal-risk) / 0.1);
+    color: hsl(var(--signal-risk));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .signal-neutral,
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip-tone-neutral {
+    border-color: hsl(var(--signal-neutral) / 0.22);
+    background: hsl(var(--signal-neutral) / 0.08);
+    color: hsl(var(--fg-muted));
+  }
+
+  .app-shell.app-shell:has(.race-lab-theme) .status-chip {
+    border-radius: 999px;
+  }
+
+  .race-lab-theme .race-lab-hero-card,
+  .race-lab-theme .race-lab-editorial-card,
+  .race-lab-theme .race-lab-context-card,
+  .race-lab-theme .race-lab-empty-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .race-lab-theme .race-lab-hero-card::before,
+  .race-lab-theme .race-lab-editorial-card::before,
+  .race-lab-theme .race-lab-context-card::before,
+  .race-lab-theme .race-lab-empty-card::before {
+    content: "";
+    position: absolute;
+    left: 1.5rem;
+    right: 1.5rem;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(var(--accent-performance) / 0.64), transparent 78%);
+    opacity: 0.66;
+    pointer-events: none;
+  }
+
+  .race-lab-theme .race-lab-kicker {
+    letter-spacing: 0.24em;
+  }
+
+  .race-lab-theme .race-lab-display {
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.06em;
+  }
+
+  .race-lab-theme .race-lab-day-strip {
+    gap: 0.6rem;
+  }
+
+  .race-lab-theme .race-lab-day-tile {
+    min-height: 4.75rem;
+    border-radius: 0.95rem;
+    border: 1px solid hsl(var(--border) / 0.9);
+    background: hsl(var(--surface-soft) / 0.84);
+  }
+
+  .race-lab-theme .race-lab-day-tile[data-tone="today-remaining"] {
+    border-color: hsl(var(--accent-performance) / 0.48);
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.045), transparent),
+      hsl(var(--surface-soft));
+    box-shadow: inset 2px 0 0 hsl(var(--accent-performance));
+  }
+
+  .race-lab-theme .race-lab-day-tile[data-tone="today-complete"] {
+    border-color: hsl(var(--signal-ready) / 0.22);
+    background: hsl(var(--surface-soft));
+  }
+
+  .race-lab-theme .race-lab-day-tile[data-tone="completed"] {
+    border-color: hsl(var(--border));
+    background: hsl(var(--surface-soft) / 0.74);
+  }
+
+  .race-lab-theme .race-lab-day-tile[data-tone="missed"] {
+    border-color: hsl(var(--signal-risk) / 0.32);
+    background: hsl(var(--signal-risk) / 0.08);
+  }
+
+  .race-lab-theme .race-lab-day-tile[data-tone="rest"] {
+    border-color: transparent;
+    background: transparent;
+    opacity: 0.72;
+  }
+
+  .race-lab-theme .race-lab-metric-grid {
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  .race-lab-theme .race-lab-metric {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .race-lab-theme .race-lab-session-row {
+    border-radius: 0.95rem;
+    border: 1px solid hsl(var(--border));
+    background: linear-gradient(180deg, hsl(var(--surface-soft)), hsl(var(--surface-elevated)));
+  }
+
+  .race-lab-theme .race-lab-session-row[data-state="completed"] {
+    border-color: hsl(var(--signal-ready) / 0.22);
+  }
+
+  .race-lab-theme .race-lab-calendar-toolbar {
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--surface-soft) / 0.92), hsl(var(--surface-elevated) / 0.9));
+  }
+
+  .race-lab-theme .race-lab-attention-panel {
+    border-radius: 1rem;
+    border: 1px solid hsl(var(--border) / 0.94);
+    background: linear-gradient(180deg, hsl(220 7% 9%), hsl(220 7% 8%));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.03);
+  }
+
+  .race-lab-theme .race-lab-attention-row {
+    border-radius: 0.95rem;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--surface-soft) / 0.94);
+  }
+
+  .race-lab-theme .race-lab-attention-row[data-issue="upload"] {
+    border-color: hsl(var(--accent-performance) / 0.3);
+    box-shadow: inset 2px 0 0 hsl(var(--accent-performance));
+  }
+
+  .race-lab-theme .race-lab-attention-row[data-issue="skip"] {
+    border-color: hsl(var(--signal-risk) / 0.3);
+  }
+
+  .race-lab-theme .race-lab-attention-row[data-issue="move"] {
+    border-color: hsl(var(--signal-load) / 0.28);
+  }
+
+  .race-lab-theme .race-lab-attention-row[data-issue="extra"] {
+    border-color: hsl(var(--border));
+    box-shadow: inset 2px 0 0 hsl(var(--accent-performance) / 0.7);
+  }
+
+  .race-lab-theme .race-lab-calendar-board {
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 1.25rem;
+    border: 1px solid hsl(var(--border) / 0.94);
+    background: linear-gradient(180deg, hsl(var(--surface-elevated) / 0.9), hsl(var(--surface) / 0.98));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.03),
+      0 18px 40px -34px hsl(0 0% 0% / 0.88);
+  }
+
+  .race-lab-theme .race-lab-day-column {
+    min-height: 100%;
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--surface-elevated)), hsl(var(--surface-soft)));
+  }
+
+  .race-lab-theme .race-lab-day-column[data-day-state="today"] {
+    box-shadow:
+      inset 2px 0 0 hsl(var(--accent-performance)),
+      inset 0 1px 0 hsl(0 0% 100% / 0.04);
+  }
+
+  .race-lab-theme .race-lab-day-column[data-day-state="needs-attention"] {
+    background:
+      linear-gradient(180deg, hsl(var(--signal-risk) / 0.06), transparent 38%),
+      linear-gradient(180deg, hsl(var(--surface-elevated)), hsl(var(--surface-soft)));
+  }
+
+  .race-lab-theme .race-lab-day-column[data-day-state="complete"] {
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.025), transparent 30%),
+      linear-gradient(180deg, hsl(var(--surface-elevated)), hsl(var(--surface-soft)));
+  }
+
+  .race-lab-theme .race-lab-day-header {
+    min-height: 5.4rem;
+  }
+
+  .race-lab-theme .race-lab-empty-slot {
+    border-radius: 0.95rem;
+    background: linear-gradient(180deg, hsl(var(--surface-soft) / 0.6), transparent);
+  }
+
+  .race-lab-theme .race-lab-session-card {
+    border-radius: 0.95rem;
+    border: 1px solid hsl(var(--border));
+    background: linear-gradient(180deg, hsl(var(--surface-soft)), hsl(var(--surface-elevated)));
+    box-shadow: none;
+  }
+
+  .race-lab-theme .race-lab-session-card[data-state="completed"],
+  .race-lab-theme .race-lab-session-card[data-state="assigned_from_upload"] {
+    border-color: hsl(var(--signal-ready) / 0.24);
+  }
+
+  .race-lab-theme .race-lab-session-card[data-state="skipped"] {
+    border-color: hsl(var(--signal-risk) / 0.3);
+    background: linear-gradient(180deg, hsl(var(--signal-risk) / 0.08), hsl(var(--surface-elevated)));
+  }
+
+  .race-lab-theme .race-lab-session-card[data-state="moved"] {
+    border-color: hsl(var(--signal-load) / 0.28);
+    background: linear-gradient(180deg, hsl(var(--signal-load) / 0.07), hsl(var(--surface-elevated)));
+  }
+
+  .race-lab-theme .race-lab-session-card[data-state="extra"] {
+    box-shadow: inset 2px 0 0 hsl(var(--accent-performance) / 0.68);
+  }
+
+  .race-lab-theme .race-lab-session-card[data-state="unmatched_upload"] {
+    border-color: hsl(var(--accent-performance) / 0.32);
+    background: linear-gradient(180deg, hsl(var(--accent-performance) / 0.09), hsl(var(--surface-elevated)));
+    box-shadow: inset 2px 0 0 hsl(var(--accent-performance));
+  }
+
+  .race-lab-theme .race-lab-discipline-chip {
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .race-lab-theme .race-lab-field {
+    border-radius: 0.9rem;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--surface-soft));
+    color: hsl(var(--fg));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.02);
+  }
+
+  .race-lab-theme .race-lab-sheet,
+  .race-lab-theme .race-lab-modal {
+    background: linear-gradient(180deg, hsl(var(--surface-elevated)), hsl(var(--surface)));
+    box-shadow: 0 28px 90px -42px hsl(0 0% 0% / 0.94);
+  }
+
+  .race-lab-theme .race-lab-sheet-header,
+  .race-lab-theme .race-lab-modal-header {
+    background: hsl(var(--surface-soft) / 0.46);
+  }
+
+  @media (min-width: 1024px) {
+    .race-lab-theme .race-lab-calendar-board {
+      gap: 0;
+      padding: 0;
+    }
+
+    .race-lab-theme .race-lab-day-column {
+      border: 0;
+      border-right: 1px solid hsl(var(--border));
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .race-lab-theme .race-lab-day-column:last-child {
+      border-right: 0;
+    }
+
+    .race-lab-theme .race-lab-day-column[data-day-state="today"] {
+      background:
+        linear-gradient(180deg, hsl(0 0% 100% / 0.025), transparent 34%);
+    }
   }
 
   .priority-layout {

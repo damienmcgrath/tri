@@ -269,7 +269,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
 
 
   return (
-    <section className="space-y-3">
+    <section className="race-lab-theme race-lab-calendar-page space-y-3">
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
