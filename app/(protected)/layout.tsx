@@ -53,9 +53,9 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         }}
       />
 
-      <div className="mx-auto grid w-full max-w-[1280px] gap-4 px-4 pb-24 pt-3 md:px-6 lg:grid-cols-[72px_1fr] xl:grid-cols-[208px_1fr] lg:pb-8">
+      <div className="mx-auto grid min-h-[calc(100vh-61px)] w-full max-w-[1280px] gap-4 px-4 pb-24 pt-6 md:px-6 lg:grid-cols-[72px_1fr] lg:gap-6 lg:pb-8 xl:grid-cols-[220px_1fr]">
         <aside className="hidden lg:block">
-          <div className="surface sticky top-3 space-y-3 p-2.5 xl:p-3">
+          <div className="sticky top-[84px] border-r border-[var(--border-subtle)] bg-transparent pr-4 xl:pr-6">
             <div className="xl:hidden">
               <ShellNavRail compact />
             </div>

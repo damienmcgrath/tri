@@ -84,7 +84,7 @@ export function SignInForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <label className="label-base" htmlFor="email">
           Email
         </label>
@@ -98,7 +98,7 @@ export function SignInForm() {
         />
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-2">
         <label className="label-base" htmlFor="password">
           Password
         </label>
@@ -113,13 +113,13 @@ export function SignInForm() {
       </div>
 
       <div className="flex justify-end">
-        <Link href="/auth/forgot-password" className="text-sm font-medium text-cyan-300 hover:text-cyan-200">
+        <Link href="/auth/forgot-password" className="text-sm font-medium text-accent hover:text-white">
           I forgot my password
         </Link>
       </div>
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Signing in..." : "Sign in"}
@@ -136,7 +136,7 @@ export function SignInForm() {
 
       <p className="text-center text-sm text-muted">
         Need an account?{" "}
-        <Link href="/auth/sign-up" className="font-medium text-cyan-300 hover:text-cyan-200">
+        <Link href="/auth/sign-up" className="font-medium text-accent hover:text-white">
           Sign up
         </Link>
       </p>

@@ -257,7 +257,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
         <article className="surface p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach Briefing</p>
+              <p className="label">Coach Briefing</p>
               <h2 className="mt-1 text-2xl font-semibold">{weeklyBrief.weekHeadline}</h2>
               <p className="mt-2 max-w-3xl text-sm text-muted">{weeklyBrief.weekSummary}</p>
             </div>
@@ -283,37 +283,37 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
             <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key positive</p>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Key positive</p>
                   <p className="mt-2 text-sm">{weeklyBrief.keyPositive ?? "No strong positive yet. More reviewed sessions will sharpen the read."}</p>
                 </div>
                 <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key risk</p>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Key risk</p>
                   <p className="mt-2 text-sm">{weeklyBrief.keyRisk ?? "No single session is creating outsized risk right now."}</p>
                 </div>
                 <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Next-week decision</p>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Next-week decision</p>
                   <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
                   {weeklyBrief.confidenceNote ? <p className="mt-2 text-xs text-tertiary">{weeklyBrief.confidenceNote}</p> : null}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Trend line</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Trend line</p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-2xl font-semibold">{weeklyBrief.trend.reviewedCount}</p>
+                    <p className="font-mono text-[22px] font-medium text-white">{weeklyBrief.trend.reviewedCount}</p>
                     <p className="text-xs text-muted">Reviewed</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--success))]">{weeklyBrief.trend.onTargetCount}</p>
+                    <p className="font-mono text-[22px] font-medium text-[#34D399]">{weeklyBrief.trend.onTargetCount}</p>
                     <p className="text-xs text-muted">On target</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--warning))]">{weeklyBrief.trend.partialCount}</p>
+                    <p className="font-mono text-[22px] font-medium text-[hsl(var(--warning))]">{weeklyBrief.trend.partialCount}</p>
                     <p className="text-xs text-muted">Partial</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--signal-risk))]">{weeklyBrief.trend.missedCount}</p>
+                    <p className={`font-mono text-[22px] font-medium ${weeklyBrief.trend.missedCount > 0 ? "text-[#FF5A28]" : "text-[rgba(255,255,255,0.35)]"}`}>{weeklyBrief.trend.missedCount}</p>
                     <p className="text-xs text-muted">Missed</p>
                   </div>
                 </div>
@@ -329,12 +329,12 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
 
           {weeklyBrief.sessionsNeedingAttention.length > 0 ? (
             <div className="mt-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Sessions needing attention</p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 {weeklyBrief.sessionsNeedingAttention.map((session) => (
-                  <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[hsl(var(--border))] p-4 transition hover:border-[hsl(var(--accent)/0.4)]">
+                  <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#18181C] p-4 transition hover:border-[rgba(255,255,255,0.12)]" style={{ borderLeftWidth: "2px", borderLeftColor: "#FFB43C" }}>
                     <p className="text-sm font-semibold">{session.sessionName}</p>
-                    <p className="mt-2 text-xs text-tertiary">{session.scoreHeadline}</p>
+                    <p className="mt-2 text-xs text-tertiary">Intent only partially landed</p>
                     <p className="mt-2 text-sm text-muted">{session.reason}</p>
                   </Link>
                 ))}
@@ -348,7 +348,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
 
       <section className="space-y-2.5">
         <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Coach tools</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.25)]">Coach tools</p>
         </div>
         <div className="grid gap-2.5 xl:grid-cols-[1.15fr_0.85fr]">
           {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : <div />}
@@ -357,7 +357,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
             <article className="surface p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-accent">Coaching profile</p>
+                  <p className="label">Coaching profile</p>
                   <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
                   <p className="mt-1 text-sm text-muted">
                     {contextIncomplete
@@ -365,7 +365,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
                       : "Coach already has your baseline context and can keep using it across briefing, reviews, and chat."}
                   </p>
                 </div>
-                <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "btn-secondary px-3 py-1.5 text-xs"}>
+                <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md"}>
                   {contextIncomplete ? "Complete profile" : "Edit profile"}
                 </Link>
               </div>
@@ -373,15 +373,15 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
               <div className="mt-3 flex flex-wrap gap-2">
                 {contextIncomplete
                   ? missingContextLabels.map((label) => (
-                    <span key={label} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{label}</span>
+                    <span key={label} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{label}</span>
                   ))
                   : (
                     <>
-                      {athleteContext.goals.priorityEventName ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.priorityEventName}</span> : null}
-                      {athleteContext.goals.goalType ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.goalType}</span> : null}
-                      {athleteContext.declared.experienceLevel.value ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.declared.experienceLevel.value}</span> : null}
+                      {athleteContext.goals.priorityEventName ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.priorityEventName}</span> : null}
+                      {athleteContext.goals.goalType ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.goalType}</span> : null}
+                      {athleteContext.declared.experienceLevel.value ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.declared.experienceLevel.value}</span> : null}
                       {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
-                        <span key={limiter.value} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{limiter.value}</span>
+                        <span key={limiter.value} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{limiter.value}</span>
                       ))}
                     </>
                   )}

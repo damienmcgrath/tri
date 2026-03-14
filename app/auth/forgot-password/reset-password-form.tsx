@@ -47,7 +47,7 @@ export function ForgotPasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <label className="label-base" htmlFor="email">
           Email
         </label>
@@ -61,8 +61,8 @@ export function ForgotPasswordForm() {
         />
       </div>
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Sending reset link..." : "Send reset email"}
@@ -70,7 +70,7 @@ export function ForgotPasswordForm() {
 
       <p className="text-center text-sm text-muted">
         Remembered it?{" "}
-        <Link href="/auth/sign-in" className="font-medium text-cyan-300 hover:text-cyan-200">
+        <Link href="/auth/sign-in" className="font-medium text-accent hover:text-white">
           Back to sign in
         </Link>
       </p>

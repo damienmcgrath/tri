@@ -1,36 +1,33 @@
 import Link from "next/link";
 
-import { ThemePicker } from "./theme-picker";
-
 export default function SettingsPage() {
   return (
     <section className="space-y-4">
       <header className="surface p-6">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-1 text-sm text-muted">Manage race targets, account preferences, and integrations.</p>
+        <p className="label">Settings</p>
+        <h1 className="mt-3 text-2xl">Settings</h1>
+        <p className="mt-2 text-sm text-muted">Manage race targets, athlete context, and integration workflows.</p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Link href="/settings/race" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
-          <p className="text-sm uppercase tracking-[0.16em] text-accent">Race</p>
-          <h2 className="mt-2 text-lg font-semibold">Race settings</h2>
+        <Link href="/settings/race" className="surface p-5 transition hover:border-[var(--border-default)]">
+          <p className="label">Race</p>
+          <h2 className="mt-3 text-lg">Race settings</h2>
           <p className="mt-1 text-sm text-muted">Set your race name and date for dashboard countdown context.</p>
         </Link>
 
-        <Link href="/settings/integrations" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
-          <p className="text-sm uppercase tracking-[0.16em] text-accent">Integrations</p>
-          <h2 className="mt-2 text-lg font-semibold">Garmin import</h2>
+        <Link href="/settings/integrations" className="surface p-5 transition hover:border-[var(--border-default)]">
+          <p className="label">Integrations</p>
+          <h2 className="mt-3 text-lg">Garmin import</h2>
           <p className="mt-1 text-sm text-muted">Upload TCX files and review recent ingestion events.</p>
         </Link>
 
-        <Link href="/settings/athlete-context" className="surface p-5 transition hover:border-[hsl(var(--accent-performance)/0.35)]">
-          <p className="text-sm uppercase tracking-[0.16em] text-accent">Coach</p>
-          <h2 className="mt-2 text-lg font-semibold">Athlete context</h2>
+        <Link href="/settings/athlete-context" className="surface p-5 transition hover:border-[var(--border-default)]">
+          <p className="label">Coach</p>
+          <h2 className="mt-3 text-lg">Athlete context</h2>
           <p className="mt-1 text-sm text-muted">Set the durable context Coach should use across reviews, briefs, and chat.</p>
         </Link>
       </div>
-
-      <ThemePicker />
     </section>
   );
 }

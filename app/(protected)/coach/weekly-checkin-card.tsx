@@ -225,7 +225,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
       <article className="surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-accent">Weekly check-in</p>
+            <p className="label">Weekly check-in</p>
             <h2 className="mt-1 text-lg font-semibold">How does the week feel?</h2>
             <p className="mt-1 text-sm text-muted">Keep Coach grounded in your current recovery state without turning this page into a full control panel.</p>
           </div>
@@ -234,7 +234,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
             <span
               className={`rounded-full border px-3 py-1 text-xs ${
                 completedCount === METRICS.length
-                  ? "border-[hsl(var(--accent)/0.35)] bg-[hsl(var(--accent)/0.14)] text-[hsl(var(--accent))]"
+                  ? "border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] text-[#34D399]"
                   : "border-[hsl(var(--border))] text-tertiary"
               }`}
             >
@@ -246,12 +246,12 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
         <div className="mt-3 rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3.5">
           <div className="flex flex-wrap gap-2">
             {summaryChips.map((chip) => (
-              <span key={chip.key} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">
-                <span className="text-[hsl(var(--text-primary))]">{chip.label}:</span> {chip.value}
+              <span key={chip.key} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)]">
+                <span className="text-[rgba(255,255,255,0.35)]">{chip.label}:</span> <span className="text-[rgba(255,255,255,0.8)]">{chip.value}</span>
               </span>
             ))}
             {note.trim() ? (
-              <span className="rounded-full border border-[hsl(var(--accent)/0.3)] px-3 py-1.5 text-xs text-[hsl(var(--accent))]">
+              <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">
                 Note added
               </span>
             ) : null}
@@ -263,7 +263,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center rounded-full bg-[linear-gradient(180deg,hsl(var(--accent)),hsl(var(--accent)/0.88))] px-4 py-2 text-sm font-medium text-[hsl(var(--accent-foreground))] shadow-[0_14px_32px_hsl(var(--accent)/0.2)]"
+                className="inline-flex items-center rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[#0A0A0B]"
               >
                 {completedCount > 0 ? "Update check-in" : "Start check-in"}
               </button>
