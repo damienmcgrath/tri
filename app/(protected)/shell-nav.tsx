@@ -23,11 +23,11 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             href={item.href}
             title={item.label}
             prefetch
-            className={`rounded-xl px-3 py-2 text-sm transition ${
+            className={`relative rounded-md border border-transparent px-3 py-2 text-[13px] transition ${
               active
                 ? "nav-item-active pl-5"
-                : `${item.deemphasized ? "text-[hsl(var(--fg-muted)/0.78)]" : "text-[hsl(var(--fg-muted))]"} hover:bg-[hsl(var(--surface-2))] hover:text-[hsl(var(--fg))]`
-            } ${compact ? "flex items-center justify-center" : "block"}`}
+                : `${item.deemphasized ? "text-[hsl(var(--fg-muted)/0.78)]" : "text-[hsl(var(--fg-muted))]"} hover:border-[var(--border-subtle)] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]`
+            } ${compact ? "flex items-center justify-center px-2.5" : "block"}`}
           >
             {compact ? (
               <span aria-hidden="true" className="text-base">{item.icon}</span>
@@ -45,7 +45,7 @@ export function MobileBottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.96] px-2 py-2 backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 py-2 backdrop-blur lg:hidden">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -55,7 +55,7 @@ export function MobileBottomTabs() {
               href={item.href}
               title={item.label}
               prefetch
-              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
+              className={`relative rounded-md border border-transparent px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
             >
               <span className="block">{item.label}</span>
             </Link>

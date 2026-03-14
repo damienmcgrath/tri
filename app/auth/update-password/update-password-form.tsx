@@ -58,7 +58,7 @@ export function UpdatePasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <label className="label-base" htmlFor="password">
           New password
         </label>
@@ -73,7 +73,7 @@ export function UpdatePasswordForm() {
         />
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-2">
         <label className="label-base" htmlFor="confirmPassword">
           Confirm new password
         </label>
@@ -88,8 +88,8 @@ export function UpdatePasswordForm() {
         />
       </div>
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Updating password..." : "Update password"}
@@ -97,7 +97,7 @@ export function UpdatePasswordForm() {
 
       <p className="text-center text-sm text-muted">
         Need to start over?{" "}
-        <Link href="/auth/forgot-password" className="font-medium text-cyan-300 hover:text-cyan-200">
+        <Link href="/auth/forgot-password" className="font-medium text-accent hover:text-white">
           Send another reset email
         </Link>
       </p>

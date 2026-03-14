@@ -84,6 +84,14 @@ type DiagnosisAwareSignal = {
 
 type ExecutionRisk = "easy_control" | "recovery_control" | "bike_consistency" | "strong_execution";
 
+function kickerClassName(kicker: string) {
+  const normalized = kicker.trim().toLowerCase();
+  if (normalized === "needs attention") return "text-[#FF5A28]";
+  if (normalized === "focus this week") return "text-[#FFB43C]";
+  if (normalized === "this week") return "text-accent";
+  return "text-tertiary";
+}
+
 function toHoursAndMinutes(minutes: number) {
   const safeMinutes = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safeMinutes / 60);
@@ -660,11 +668,14 @@ export default async function DashboardPage({
           </div>
           <p className="mt-2 text-sm text-muted">{statusInterpretation}</p>
           {diagnosisDataState.isSparse ? <p className="mt-1 text-xs text-tertiary">{diagnosisDataState.unlockText}</p> : null}
+          <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]" aria-hidden>
+            <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${totals.planned > 0 ? (totals.completed / totals.planned) * 100 : 0}%` }} />
+          </div>
 
           <div className="mt-5 grid grid-cols-7 gap-2">
             {dailyStates.map((day) => {
               const toneClass = day.tone === "today-remaining"
-                ? "border-[hsl(var(--accent-performance)/0.72)] bg-[hsl(var(--accent-performance)/0.18)]"
+                ? "border-[rgba(190,255,0,0.40)] bg-[rgba(190,255,0,0.10)]"
                 : day.tone === "today-complete"
                   ? "border-[hsl(var(--success)/0.52)] bg-[hsl(var(--success)/0.16)]"
                   : day.tone === "completed"
@@ -701,7 +712,7 @@ export default async function DashboardPage({
 
               <div className="mt-4 space-y-3">
                 <div>
-                  <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">Remaining today</p>
+                  <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-tertiary">Remaining today</p>
                   <div className="space-y-2">
                     {pendingTodaySessions.map((session) => (
                       <div key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">
@@ -714,7 +725,7 @@ export default async function DashboardPage({
 
                 {completedTodaySessions.length > 0 || extraTodayActivities.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">Completed today</p>
+                    <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-tertiary">Completed today</p>
                     <div className="space-y-2">
                       {completedTodaySessions.map((session) => (
                         <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
@@ -790,7 +801,7 @@ export default async function DashboardPage({
 
       {contextualItems.length === 1 ? (
         <article className="surface p-5 md:p-6">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-accent">{contextualItems[0].kicker}</p>
+          <p className={`text-[11px] uppercase tracking-[0.14em] ${kickerClassName(contextualItems[0].kicker)}`}>{contextualItems[0].kicker}</p>
           <h3 className="mt-2 text-lg font-semibold">{contextualItems[0].title}</h3>
           <p className="mt-2 text-sm text-muted">{contextualItems[0].detail}</p>
           <div className="mt-4">
@@ -803,7 +814,7 @@ export default async function DashboardPage({
         <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
           {contextualItems.map((item) => (
             <article key={item.kicker} className="surface p-5 md:p-6">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">{item.kicker}</p>
+              <p className={`text-[11px] uppercase tracking-[0.14em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
               <h3 className="mt-2 text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-muted">{item.detail}</p>
               <div className="mt-4">

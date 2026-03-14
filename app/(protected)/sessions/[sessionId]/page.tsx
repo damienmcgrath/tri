@@ -356,6 +356,17 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
   const plannedColumnLabel = session.is_extra ? "Weekly context" : "Planned";
+  const ghostPillClass =
+    "rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[11px] font-medium text-[rgba(255,255,255,0.6)]";
+  const quietLabelClass = "text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary";
+  const sessionStatusBadgeClass =
+    reviewVm.sessionStatusLabel.toLowerCase() === "completed"
+      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[#34D399]"
+      : "rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
+  const intentBadgeClass =
+    reviewVm.intent.label === "Matched intent"
+      ? "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-accent)]"
+      : `rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`;
 
   return (
     <section className="space-y-4">
@@ -364,7 +375,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       <article className="surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-accent">Session review</p>
+            <p className="label">Session review</p>
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
@@ -375,17 +386,17 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
         <div className="mt-4 border-t border-[hsl(var(--border))] pt-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary">
+            <span className={sessionStatusBadgeClass}>
               {reviewVm.sessionStatusLabel}
             </span>
-            <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+            <span className={intentBadgeClass}>
               {reviewVm.intent.label}
             </span>
           </div>
 
           <div className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
-              <h2 className={`text-3xl font-semibold leading-tight ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
+              <h2 className={`text-[22px] font-medium leading-tight ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
                 {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
               </h2>
               <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]">{reviewVm.actualExecutionSummary}</p>
@@ -393,29 +404,29 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             </div>
 
             <div className="border-l border-[hsl(var(--border))] pl-5">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What to do next</p>
+              <p className={quietLabelClass}>What to do next</p>
               <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
-              <p className="mt-4 text-xs uppercase tracking-[0.14em] text-tertiary">This week</p>
+              <p className={`mt-4 ${quietLabelClass}`}>This week</p>
               <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className={`rounded-full border px-3 py-1.5 text-xs ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+            <span className={ghostPillClass}>
               {reviewVm.intent.label}
             </span>
             {reviewVm.isReviewable && reviewVm.scoreConfidenceNote ? (
-              <span className="rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-3 py-1.5 text-xs text-[hsl(var(--warning))]">
+              <span className={ghostPillClass}>
                 Provisional
               </span>
             ) : null}
             {reviewVm.isReviewable ? (
-              <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">
+              <span className={ghostPillClass}>
                 Cost: {reviewVm.executionCostLabel ?? "Unknown"}
               </span>
             ) : null}
             {reviewVm.confidenceLabel ? (
-              <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">
+              <span className={ghostPillClass}>
                 Confidence: {reviewVm.confidenceLabel}
               </span>
             ) : null}
@@ -449,7 +460,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                   {reviewVm.usefulMetrics.map((metric) => (
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
-                      <p className="mt-1 text-base font-semibold">{metric.value}</p>
+                      <p
+                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-[#34D399]" : "text-base font-semibold"}`}
+                      >
+                        {metric.value}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -480,9 +495,9 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       </section>
 
       {reviewVm.uncertaintyDetail ? (
-        <section className="rounded-2xl border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-5 py-4">
+        <section className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[var(--color-surface)] px-5 py-4" style={{ borderLeftWidth: "2px", borderLeftColor: "#FFB43C" }}>
           <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--warning))]">{reviewVm.uncertaintyTitle ?? "Uncertainty"}</p>
+            <p className="label-base text-[10px] text-[hsl(var(--warning))]">Early read</p>
             <p className="mt-2 text-sm">{reviewVm.uncertaintyDetail}</p>
             {reviewVm.missingEvidence.length > 0 ? (
               <p className="mt-2 text-sm text-muted">Missing evidence: {reviewVm.missingEvidence.join(", ")}.</p>
@@ -499,7 +514,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           </div>
           <Link
             href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="btn-primary px-3 py-1.5 text-xs"
           >
             Ask coach
           </Link>
@@ -509,7 +524,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <Link
               key={prompt}
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground"
+              className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
             >
               {prompt}
             </Link>

@@ -846,7 +846,7 @@ export function CoachChat({
       <section id="coaching-chat" className="surface overflow-hidden">
         <div className="grid h-[68vh] min-h-[560px] max-h-[780px] lg:grid-cols-[248px_1fr]">
           <aside className="flex min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5">
-            <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-1.5 text-sm">
+            <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
               New conversation
             </button>
             <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
@@ -854,13 +854,13 @@ export function CoachChat({
                 const isActive = conversation.id === conversationId;
 
                 return (
-                  <div key={conversation.id} className={`rounded-xl border px-2 py-1.5 ${isActive ? "border-[hsl(var(--ai-accent-core)/0.5)] bg-[hsl(var(--ai-accent-core)/0.14)] shadow-[inset_2px_0_0_hsl(var(--ai-accent-core))]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+                  <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
                     <div className="flex items-start justify-between gap-1">
                       <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-                        <p className={`truncate pr-1 text-sm font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"}`}>
+                        <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[rgba(255,255,255,0.55)]"}`}>
                           {conversationTitle(conversation, index)}
                         </p>
-                        <p className="mt-1 text-[11px] text-tertiary">{formatRecencyLabel(conversation.updated_at)}</p>
+                        <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
                       </button>
                       <details className="relative">
                         <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
@@ -880,7 +880,7 @@ export function CoachChat({
             <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-3.5 py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Active conversation</p>
+                  <p className="label">Active conversation</p>
                   <h3 className="mt-0.5 text-base font-semibold">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
                   <p className="mt-0.5 text-sm text-muted">{dataRecency}</p>
                 </div>
@@ -910,10 +910,10 @@ export function CoachChat({
                   <div
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
                       message.role === "user"
-                        ? "bg-[hsl(var(--ai-accent-core))] text-white"
+                        ? "bg-[hsl(var(--ai-accent-core))] text-[#0A0A0B]"
                         : message.failed
                           ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
-                          : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))]"
+                          : "border border-[rgba(255,255,255,0.06)] bg-[#1F1F25] px-4 py-3.5 text-[rgba(255,255,255,0.8)]"
                     }`}
                   >
                     {message.pending && message.content.trim().length === 0 ? (
@@ -951,7 +951,7 @@ export function CoachChat({
                     key={prompt}
                     type="button"
                     onClick={() => setInput(prompt)}
-                    className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                    className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1 text-[12px] font-medium text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
                   >
                     {prompt}
                   </button>
@@ -963,7 +963,7 @@ export function CoachChat({
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder="Ask how to execute better and what to adjust next..."
-                  className="input-base"
+                  className="w-full rounded-md border border-[rgba(255,255,255,0.08)] bg-[#18181C] px-3 py-2 text-[rgba(255,255,255,0.8)] placeholder:text-[rgba(255,255,255,0.25)] focus:border-[rgba(190,255,0,0.30)]"
                   disabled={isLoading}
                 />
                 <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">

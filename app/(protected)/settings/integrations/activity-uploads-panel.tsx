@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 type UploadRow = {
@@ -30,6 +31,7 @@ function formatUploadDate(iso: string) {
 }
 
 export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[] }) {
+  const router = useRouter();
   const [uploads, setUploads] = useState(initialUploads);
   const [message, setMessage] = useState<string>("");
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -205,8 +207,29 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                           return;
                         }
 
+                        setUploads((current) =>
+                          current.map((item) =>
+                            item.id === attachFor.id
+                              ? {
+                                  ...item,
+                                  status: "matched",
+                                  completed_activities: item.completed_activities.map((activity) => ({
+                                    ...activity,
+                                    schedule_status: "scheduled"
+                                  })),
+                                  session_activity_links: [
+                                    {
+                                      planned_session_id: candidate.id,
+                                      confirmation_status: "confirmed"
+                                    }
+                                  ]
+                                }
+                              : item
+                          )
+                        );
+                        setMessage(`Attached to ${candidate.date} · ${candidate.type}.`);
                         setAttachFor(null);
-                        window.location.reload();
+                        router.refresh();
                       });
                     }}
                   >

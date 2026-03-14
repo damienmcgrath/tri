@@ -59,6 +59,17 @@ function calendarDisciplineChipTone(sport: string) {
   return tones[sport] ?? tones.other;
 }
 
+function calendarDisciplineBorderColor(sport: string) {
+  const tones: Record<string, string> = {
+    run: "#FF5A28",
+    swim: "#63B3ED",
+    bike: "#34D399",
+    strength: "#A78BFA"
+  };
+
+  return tones[sport] ?? "rgba(255,255,255,0.24)";
+}
+
 function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -388,9 +399,18 @@ export function WeekCalendar({
       <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
         <div className="flex items-center gap-2 text-xs">
           <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
-          <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
-          <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">This week</Link>
-          <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
+          <Link href={withWeek(addDays(activeWeekStart, -7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Prev</Link>
+          <Link
+            href={withWeek(currentWeekStart)}
+            className={`rounded-md border bg-[var(--color-surface-raised)] px-2 py-1 text-xs ${
+              activeWeekStart === currentWeekStart
+                ? "border-[rgba(190,255,0,0.40)] text-[var(--color-accent)]"
+                : "border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.6)]"
+            }`}
+          >
+            This week
+          </Link>
+          <Link href={withWeek(addDays(activeWeekStart, 7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Next</Link>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
@@ -409,7 +429,7 @@ export function WeekCalendar({
       {hasAdaptation ? (
         <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FF5A28]">Needs attention</p>
             <p className="text-[11px] text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
@@ -551,7 +571,15 @@ export function WeekCalendar({
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
           return (
-            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
+            <section
+              key={day.iso}
+              className="surface-card h-full rounded-md border border-[rgba(255,255,255,0.06)] p-2"
+              style={{
+                background: isToday ? "rgba(190,255,0,0.04)" : "#111114",
+                borderTopColor: isToday ? "#BEFF00" : "rgba(255,255,255,0.06)",
+                borderTopWidth: isToday ? "2px" : "1px"
+              }}
+            >
               <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
@@ -574,20 +602,9 @@ export function WeekCalendar({
                   const state = getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
-                  const toneClass =
-                    state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
-                      : state === "skipped"
-                        ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
-                        : state === "moved"
-                          ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                        : state === "extra"
-                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                          : state === "unmatched_upload"
-                            ? "border-[hsl(var(--accent-performance)/0.42)] bg-[linear-gradient(180deg,hsl(var(--accent-performance)/0.12),hsl(var(--accent-performance)/0.05))] shadow-[inset_0_1px_0_hsl(var(--accent-performance)/0.12)]"
-                          : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
-                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
+                  const isNeedsAttentionCard = state === "skipped" || state === "unmatched_upload";
+                  const cardBackground = isNeedsAttentionCard ? "rgba(255,90,40,0.04)" : "#18181C";
+                  const leftBorderColor = isNeedsAttentionCard ? "#FF5A28" : calendarDisciplineBorderColor(session.sport);
 
                   const stateBadge =
                     state === "extra" ? (
@@ -607,7 +624,13 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${reviewableCompleted ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
+                      style={{
+                        background: cardBackground,
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        borderLeftWidth: "2px",
+                        borderLeftColor: leftBorderColor
+                      }}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -649,9 +672,15 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
                       <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
+                      {isNeedsAttentionCard && !showCompletedFooter ? (
+                        <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[var(--color-warning)]">
+                          <span aria-hidden="true" className="h-[6px] w-[6px] rounded-full bg-[var(--color-warning)]" />
+                          <span>{state === "skipped" ? "Needs attention" : "Needs review"}</span>
+                        </div>
+                      ) : null}
                       {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
+                        <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-[#34D399]">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>
@@ -668,9 +697,9 @@ export function WeekCalendar({
                             </button>
                           ) : null}
                         </div>
-                      ) : (
+                      ) : !isNeedsAttentionCard ? (
                         <div className="mt-1 flex items-center justify-end">{stateBadge}</div>
-                      )}
+                      ) : null}
                     </article>
                   );
                 })}

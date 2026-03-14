@@ -122,14 +122,25 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
 function disciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(86,182,217,0.22)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.35)" },
-    bike: { bg: "rgba(107,170,117,0.2)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.34)" },
-    run: { bg: "rgba(196,135,114,0.2)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.34)" },
-    strength: { bg: "rgba(154,134,200,0.22)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.36)" },
-    other: { bg: "rgba(148,163,184,0.2)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.35)" }
+    swim: { bg: "rgba(99,179,237,0.10)", text: "#63B3ED", dot: "#63B3ED", border: "transparent" },
+    bike: { bg: "rgba(52,211,153,0.10)", text: "#34D399", dot: "#34D399", border: "transparent" },
+    run: { bg: "rgba(255,90,40,0.10)", text: "#FF5A28", dot: "#FF5A28", border: "transparent" },
+    strength: { bg: "rgba(167,139,250,0.10)", text: "#A78BFA", dot: "#A78BFA", border: "transparent" },
+    other: { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.65)", dot: "rgba(255,255,255,0.65)", border: "transparent" }
   };
 
   return tones[sport] ?? tones.other;
+}
+
+function disciplineBorderColor(sport: string) {
+  const tones: Record<string, string> = {
+    run: "#FF5A28",
+    swim: "#63B3ED",
+    bike: "#34D399",
+    strength: "#A78BFA"
+  };
+
+  return tones[sport] ?? "rgba(255,255,255,0.24)";
 }
 
 function plannerFocusFromNotes(notes: string) {
@@ -422,20 +433,34 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       <header className="surface-subtle px-4 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">Plan</p>
+            <p className="label-base text-[10px] text-accent">Plan</p>
             <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
             <p className="text-sm text-muted">{weekRangeLabel(selectedWeek.week_start_date)} · Planned {totalMinutes} min</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)} disabled={!previousWeek}>←</button>
+            <button
+              type="button"
+              className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+              onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
+              disabled={!previousWeek}
+            >
+              ←
+            </button>
             <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base w-auto py-1.5 text-xs" aria-label="Select plan week">
               {planWeeks.map((week) => (
                 <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>
               ))}
             </select>
-            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)} disabled={!nextWeek}>→</button>
+            <button
+              type="button"
+              className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+              onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
+              disabled={!nextWeek}
+            >
+              →
+            </button>
             {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 py-1.5 text-xs">Save</button> : null}
-            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="btn-secondary px-3 py-1.5 text-xs">Actions</button>
+            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md">Actions</button>
           </div>
         </div>
       </header>
@@ -443,23 +468,23 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       <section className="surface-subtle px-4 py-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Block</p>
-            <p className="mt-1 text-sm">{weekDraft.focus}</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Block</p>
+            <p className="mt-1 text-sm font-medium text-white">{weekDraft.focus}</p>
           </div>
           {displayWeekFocus ? (
             <div className="md:col-span-2">
-              <p className="text-xs uppercase tracking-wide text-muted">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
-              <p className="mt-1 text-sm">{displayWeekFocus}</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
+              <p className="mt-1 text-sm font-medium text-white">{displayWeekFocus}</p>
             </div>
           ) : null}
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Rest days</p>
-            <p className="mt-1 text-sm">{restDays}</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Rest days</p>
+            <p className="mt-1 text-sm font-medium text-white">{restDays}</p>
           </div>
           {keySessions > 0 ? (
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted">Key sessions</p>
-              <p className="mt-1 text-sm">{keySessions}</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Key sessions</p>
+              <p className="mt-1 text-sm font-medium text-white">{keySessions}</p>
             </div>
           ) : null}
         </div>
@@ -487,8 +512,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
       <article className="surface p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold">Week board (Mon–Sun)</h3>
-          <p className="text-xs text-muted">For scheduling changes, use Calendar.</p>
+          <h3 className="text-sm font-medium text-[rgba(255,255,255,0.5)]">Week board (Mon–Sun)</h3>
+          <p className="text-xs text-tertiary">For scheduling changes, use Calendar.</p>
         </div>
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
@@ -510,14 +535,23 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => setActiveSessionId(session.id)}
+                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.06)",
+                        borderLeftWidth: "2px",
+                        borderLeftColor: disciplineBorderColor(session.sport)
+                      }}
+                    >
                       <div className="flex items-center justify-between gap-1">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
-                            color: disciplineChipTone(session.sport).text,
-                            borderColor: disciplineChipTone(session.sport).border
+                            color: disciplineChipTone(session.sport).text
                           }}
                         >
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
@@ -535,7 +569,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 })}
                 {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery window</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
             </section>
           ))}
         </div>
@@ -553,14 +587,23 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => setActiveSessionId(session.id)}
+                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left text-xs"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.06)",
+                        borderLeftWidth: "2px",
+                        borderLeftColor: disciplineBorderColor(session.sport)
+                      }}
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
-                            color: disciplineChipTone(session.sport).text,
-                            borderColor: disciplineChipTone(session.sport).border
+                            color: disciplineChipTone(session.sport).text
                           }}
                         >
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
@@ -578,7 +621,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 })}
                 {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
             </section>
           ))}
         </div>

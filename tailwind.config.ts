@@ -10,10 +10,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        slateBlue: "#273469",
-        mint: "#1b998b",
-        ember: "#f46036",
-        cloud: "#f6f7eb"
+        base: "var(--color-base)",
+        surface: "var(--color-surface)",
+        raised: "var(--color-surface-raised)",
+        overlay: "var(--color-surface-overlay)",
+        accent: "var(--color-accent)",
+        success: "var(--color-success)",
+        warning: "var(--color-warning)",
+        danger: "var(--color-danger)",
+        info: "var(--color-info)",
+        run: "var(--color-run)",
+        swim: "var(--color-swim)",
+        bike: "var(--color-bike)",
+        strength: "var(--color-strength)"
+      },
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "monospace"]
+      },
+      spacing: {
+        18: "72px",
+        22: "88px"
+      },
+      borderRadius: {
+        sm: "6px",
+        md: "10px",
+        lg: "14px",
+        xl: "20px"
       }
     }
   },
