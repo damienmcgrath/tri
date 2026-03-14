@@ -159,17 +159,30 @@ describe("DashboardPage", () => {
 
     render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
 
-    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What matters right now" })).toBeInTheDocument();
     expect(screen.getByText("1 remaining · 1 completed")).toBeInTheDocument();
     expect(screen.getByText("Completed today")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Bike extra workout/i })).toHaveAttribute("href", "/sessions/activity/a-extra");
     expect(screen.getByText("30 min • Done")).toBeInTheDocument();
   });
 
-  it("shows extra workouts in the completed-only Today card when no planned work remains", async () => {
+  it("shifts the completed Today card toward the next important session", async () => {
     mockedCreateServerClient.mockReturnValue(
       createSupabaseMock({
-        sessions: [],
+        sessions: [
+          {
+            id: "s-long-run",
+            plan_id: "plan-1",
+            date: "2026-03-15",
+            sport: "run",
+            type: "Long Run",
+            duration_minutes: 90,
+            notes: null,
+            created_at: "2026-03-10T08:00:00.000Z",
+            status: "planned",
+            is_key: true
+          }
+        ],
         links: [
           {
             completed_activity_id: "a-extra",
@@ -182,9 +195,12 @@ describe("DashboardPage", () => {
 
     render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
 
+    expect(screen.getByRole("heading", { name: "Today is done" })).toBeInTheDocument();
     expect(screen.getByText("0 remaining · 1 completed")).toBeInTheDocument();
-    expect(screen.getByText("0h 30m done")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Review completed sessions/i })).toHaveAttribute("href", "/sessions/activity/a-extra");
-    expect(screen.getByRole("link", { name: /Bike extra workout/i })).toHaveAttribute("href", "/sessions/activity/a-extra");
+    expect(screen.getByText("Up next")).toBeInTheDocument();
+    expect(screen.getAllByText("Long Run").length).toBeGreaterThan(0);
+    expect(screen.getByText("Sunday • 90 min • Key session")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Prepare Long Run/i })).toHaveAttribute("href", "/calendar?focus=s-long-run");
+    expect(screen.getByRole("link", { name: /Review today/i })).toHaveAttribute("href", "/sessions/activity/a-extra");
   });
 });
