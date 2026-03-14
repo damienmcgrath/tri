@@ -10,7 +10,9 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
+import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
+import { WeeklyDebriefCard } from "./weekly-debrief-card";
 
 type Session = {
   id: string;
@@ -451,6 +453,7 @@ export default async function DashboardPage({
   const todayIso = localIsoDate(new Date().toISOString(), timeZone);
   const activityRangeStart = `${addDays(weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(weekEnd, 1)}T00:00:00.000Z`;
+  const showWeeklyDebriefCard = weekStart === currentWeekStart;
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -731,6 +734,15 @@ export default async function DashboardPage({
   const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
   const todayCue = diagnosisAwareSignal.todayCue;
   const nextImportantSession = getNextImportantSession(sessions, todayIso);
+  const weeklyDebriefSnapshot = showWeeklyDebriefCard
+    ? await getWeeklyDebriefSnapshot({
+        supabase,
+        athleteId: user.id,
+        weekStart,
+        timeZone,
+        todayIso
+      })
+    : null;
 
   const contextualItems = [attentionItem, resolvedFocusItem].filter((item): item is ContextualItem => Boolean(item));
 
@@ -889,6 +901,8 @@ export default async function DashboardPage({
           )}
         </article>
       </div>
+
+      {weeklyDebriefSnapshot ? <WeeklyDebriefCard snapshot={weeklyDebriefSnapshot} /> : null}
 
       {contextualItems.length === 1 ? (
         <article className={`surface p-4 md:p-5 ${contextualItems[0].kicker.toLowerCase() === "focus this week" ? "border-[rgba(190,255,0,0.14)] bg-[linear-gradient(180deg,rgba(190,255,0,0.05),rgba(255,255,255,0.01))]" : ""}`}>
