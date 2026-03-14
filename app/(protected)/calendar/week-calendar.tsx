@@ -152,6 +152,10 @@ function getIssueId(type: AdaptationIssueType, id: string) {
   return `${type}:${id}`;
 }
 
+function getDismissedIssuesStorageKey(weekStart: string) {
+  return `tri.calendar.dismissedIssues:${weekStart}`;
+}
+
 function SessionActionMenu({
   session,
   state,
@@ -248,6 +252,7 @@ export function WeekCalendar({
   const [assignSource, setAssignSource] = useState<CalendarSession | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
+  const [loadedDismissedIssuesWeek, setLoadedDismissedIssuesWeek] = useState<string | null>(null);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -293,6 +298,31 @@ export function WeekCalendar({
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const activeWeekStart = weekDays[0]?.iso ?? currentWeekStart;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storedValue = window.localStorage.getItem(getDismissedIssuesStorageKey(activeWeekStart));
+    if (!storedValue) {
+      setDismissedIssues([]);
+      setLoadedDismissedIssuesWeek(activeWeekStart);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(storedValue);
+      setDismissedIssues(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : []);
+    } catch {
+      setDismissedIssues([]);
+    }
+    setLoadedDismissedIssuesWeek(activeWeekStart);
+  }, [activeWeekStart]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (loadedDismissedIssuesWeek !== activeWeekStart) return;
+    window.localStorage.setItem(getDismissedIssuesStorageKey(activeWeekStart), JSON.stringify([...new Set(dismissedIssues)]));
+  }, [activeWeekStart, dismissedIssues, loadedDismissedIssuesWeek]);
 
   const withWeek = (targetWeekStart: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -371,6 +401,7 @@ export function WeekCalendar({
     )
     .slice(0, 2);
 
+  const hasLoadedDismissalsForActiveWeek = loadedDismissedIssuesWeek === activeWeekStart;
   const hasAdaptation = unmatchedUploads.length > 0 || skippedToResolve.length > 0 || movedItems.length > 0 || extraItems.length > 0;
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -426,7 +457,7 @@ export function WeekCalendar({
         </div>
       </header>
 
-      {hasAdaptation ? (
+      {hasLoadedDismissalsForActiveWeek && hasAdaptation ? (
         <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FF5A28]">Needs attention</p>
