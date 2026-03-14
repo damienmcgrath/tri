@@ -14,7 +14,7 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav className={compact ? "flex flex-col gap-2" : "space-y-1"}>
+    <nav className={compact ? "flex flex-col gap-2" : "space-y-1.5"}>
       {navItems.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
@@ -23,10 +23,10 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
             href={item.href}
             title={item.label}
             prefetch
-            className={`rounded-xl px-3 py-2 text-sm transition ${
+            className={`rounded-[0.95rem] px-3 py-2 text-sm transition ${
               active
                 ? "nav-item-active pl-5"
-                : `${item.deemphasized ? "text-[hsl(var(--fg-muted)/0.78)]" : "text-[hsl(var(--fg-muted))]"} hover:bg-[hsl(var(--surface-2))] hover:text-[hsl(var(--fg))]`
+                : `${item.deemphasized ? "text-[hsl(var(--fg-muted)/0.78)]" : "text-[hsl(var(--fg-muted))]"} hover:bg-[hsl(var(--surface-2)/0.82)] hover:text-[hsl(var(--fg))]`
             } ${compact ? "flex items-center justify-center" : "block"}`}
           >
             {compact ? (
@@ -45,7 +45,7 @@ export function MobileBottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))/0.96] px-2 py-2 backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--border)/0.9)] bg-[hsl(var(--bg-elevated))/0.98] px-2 py-2 backdrop-blur lg:hidden">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -55,7 +55,7 @@ export function MobileBottomTabs() {
               href={item.href}
               title={item.label}
               prefetch
-              className={`rounded-lg px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
+              className={`rounded-[0.85rem] px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
             >
               <span className="block">{item.label}</span>
             </Link>

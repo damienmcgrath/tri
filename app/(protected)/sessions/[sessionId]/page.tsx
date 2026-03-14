@@ -361,24 +361,24 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     <section className="space-y-4">
       <Link href="/calendar" className="text-sm text-cyan-300 underline-offset-2 hover:underline">← Back to Calendar</Link>
 
-      <article className="surface p-5">
+      <article className="review-hero p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-accent">Session review</p>
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
-          <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
+          <div className={`review-pill ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
             {reviewVm.reviewModeLabel}
           </div>
         </div>
 
         <div className="mt-4 border-t border-[hsl(var(--border))] pt-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary">
+            <span className="review-pill text-tertiary">
               {reviewVm.sessionStatusLabel}
             </span>
-            <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+            <span className={`review-pill ${toneToBadgeClass(reviewVm.intent.tone)}`}>
               {reviewVm.intent.label}
             </span>
           </div>
@@ -423,7 +423,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         </div>
       </article>
 
-      <section className="surface p-5">
+      <section className="review-panel p-5">
         {reviewVm.isReviewable ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-5">
@@ -447,14 +447,14 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               {reviewVm.usefulMetrics.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {reviewVm.usefulMetrics.map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                    <div key={metric.label} className="review-card-soft p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p className="mt-1 text-base font-semibold">{metric.value}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <div className="review-card-soft p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Available evidence</p>
                   <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
                 </div>
@@ -480,7 +480,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       </section>
 
       {reviewVm.uncertaintyDetail ? (
-        <section className="rounded-2xl border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-5 py-4">
+        <section className="review-card-soft px-5 py-4">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--warning))]">{reviewVm.uncertaintyTitle ?? "Uncertainty"}</p>
             <p className="mt-2 text-sm">{reviewVm.uncertaintyDetail}</p>
@@ -491,7 +491,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         </section>
       ) : null}
 
-      <section className="border-t border-[hsl(var(--border))] pt-4">
+      <section className="coach-section-block pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
@@ -509,7 +509,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <Link
               key={prompt}
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground"
+              className="review-followup-chip transition"
             >
               {prompt}
             </Link>

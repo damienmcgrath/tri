@@ -765,7 +765,7 @@ export function CoachChat({
   return (
     <div className="space-y-5">
       {showBriefingPanel ? (
-        <section className="surface p-5">
+        <section className="coach-brief-panel p-5">
           <div className="border-b border-[hsl(var(--border))] pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
             <h2 className="mt-2 text-2xl font-semibold text-[hsl(var(--text-primary))]">{topInsight.headline}</h2>
@@ -788,7 +788,7 @@ export function CoachChat({
                 </Link>
                 <a
                   href={topInsight.secondaryAction.href}
-                  className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                  className="coach-inline-action transition"
                 >
                   {topInsight.secondaryAction.label}
                 </a>
@@ -799,7 +799,7 @@ export function CoachChat({
                 {briefingContext.pendingReviewCount > 0 ? ` · ${briefingContext.pendingReviewCount} pending review` : ""}
               </p>
             </div>
-            <div id="sessions-needing-attention" className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
+            <div id="sessions-needing-attention" className="coach-brief-inset p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
                 <span className="text-xs text-tertiary">{flaggedSessions.length}</span>
@@ -809,7 +809,7 @@ export function CoachChat({
               ) : (
                 <ul className="mt-1.5 space-y-1">
                   {flaggedSessions.slice(0, 2).map((session) => (
-                    <li key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2 py-1.5 text-xs">
+                    <li key={session.id} className="coach-workspace-inset px-2 py-1.5 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <Link href={`/sessions/${session.id}`} className="truncate text-[hsl(var(--text-secondary))] underline-offset-2 hover:text-[hsl(var(--text-primary))] hover:underline">
                           {session.sessionName}
@@ -818,7 +818,7 @@ export function CoachChat({
                       </div>
                       {session.executionScoreBand ? (
                         <div className="mt-1">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${executionScoreBandTone(session.executionScoreBand)}`}>
+                          <span className={`rounded-[0.7rem] border px-2 py-0.5 text-[10px] font-medium ${executionScoreBandTone(session.executionScoreBand)}`}>
                             {scoreHeadline(session)}
                           </span>
                         </div>
@@ -843,9 +843,9 @@ export function CoachChat({
         </section>
       ) : null}
 
-      <section id="coaching-chat" className="surface overflow-hidden">
+      <section id="coaching-chat" className="coach-workspace overflow-hidden">
         <div className="grid h-[68vh] min-h-[560px] max-h-[780px] lg:grid-cols-[248px_1fr]">
-          <aside className="flex min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5">
+          <aside className="coach-sidebar-panel flex min-h-0 flex-col p-2.5">
             <button type="button" onClick={handleNewChat} className="btn-primary px-3 py-1.5 text-sm">
               New conversation
             </button>
@@ -854,7 +854,7 @@ export function CoachChat({
                 const isActive = conversation.id === conversationId;
 
                 return (
-                  <div key={conversation.id} className={`rounded-xl border px-2 py-1.5 ${isActive ? "border-[hsl(var(--ai-accent-core)/0.5)] bg-[hsl(var(--ai-accent-core)/0.14)] shadow-[inset_2px_0_0_hsl(var(--ai-accent-core))]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+                  <div key={conversation.id} className={`coach-thread-item px-2 py-1.5 ${isActive ? "coach-thread-item--active" : ""}`}>
                     <div className="flex items-start justify-between gap-1">
                       <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
                         <p className={`truncate pr-1 text-sm font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[hsl(var(--text-secondary))]"}`}>
@@ -864,7 +864,7 @@ export function CoachChat({
                       </button>
                       <details className="relative">
                         <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
-                        <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
+                        <div className="absolute right-0 z-10 mt-1 w-28 rounded-[0.8rem] border border-[hsl(var(--border)/0.9)] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
                           <button type="button" onClick={() => void handleRenameConversation(conversation, index)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
                           <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
                         </div>
@@ -877,7 +877,7 @@ export function CoachChat({
           </aside>
 
           <div className="flex min-h-0 flex-col">
-            <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-3.5 py-2.5">
+            <div className="coach-thread-header px-3.5 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Active conversation</p>
@@ -886,7 +886,7 @@ export function CoachChat({
                 </div>
               </div>
             </div>
-            <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3.5 py-2">
+            <div className="coach-meta-strip px-3.5 py-2.5">
               <p className="text-xs text-[hsl(var(--text-secondary))]">
                 {sessionDiagnoses.length > 0
                   ? `${sessionDiagnoses.length} reviewed this week${flaggedSessions.length > 0 ? ` · ${flaggedSessions.length} needing attention` : ""}. Focus: ${nextActions[0] ?? "Stabilise execution quality."}`
@@ -903,17 +903,17 @@ export function CoachChat({
                 const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
                 shouldAutoScrollRef.current = distanceToBottom < 40;
               }}
-              className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3.5 py-3"
+              className="coach-transcript min-h-0 flex-1 space-y-3 overflow-y-auto px-3.5 py-3.5"
             >
               {messages.map((message, index) => (
-                <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={message.id} className={`coach-transcript-group flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
+                    className={`max-w-[85%] whitespace-pre-wrap px-4 py-3 text-sm ${
                       message.role === "user"
-                        ? "bg-[hsl(var(--ai-accent-core))] text-white"
+                        ? "coach-message coach-message-user"
                         : message.failed
-                          ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
-                          : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))]"
+                          ? "coach-message coach-message-failed"
+                          : "coach-message coach-message-assistant"
                     }`}
                   >
                     {message.pending && message.content.trim().length === 0 ? (
@@ -941,17 +941,17 @@ export function CoachChat({
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2.5">
+            <form onSubmit={handleSubmit} className="coach-composer px-2.5 py-2.5">
               <label htmlFor="coach-input" className="sr-only">
                 Ask your triathlon coach
               </label>
-              <div className="mb-1.5 flex flex-wrap gap-1">
+              <div className="mb-2 flex flex-wrap gap-1.5">
                 {quickPrompts.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setInput(prompt)}
-                    className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-[hsl(var(--text-primary))]"
+                    className="coach-prompt-chip transition"
                   >
                     {prompt}
                   </button>
@@ -970,7 +970,7 @@ export function CoachChat({
                   Send
                 </button>
                 {isLoading ? (
-                  <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]">
+                  <button type="button" onClick={handleStopStreaming} className="coach-inline-action px-3">
                     Stop
                   </button>
                 ) : null}

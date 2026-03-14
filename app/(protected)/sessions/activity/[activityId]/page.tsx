@@ -141,25 +141,25 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
     <section className="space-y-4">
       <Link href="/calendar" className="text-sm text-cyan-300 underline-offset-2 hover:underline">← Back to Calendar</Link>
 
-      <article className="surface p-5">
+      <article className="review-hero p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-accent">Session review</p>
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
-          <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
+          <div className={`review-pill ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
             {reviewVm.reviewModeLabel}
           </div>
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface-subtle)),hsl(var(--surface)))] p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary">
+            <div className="review-card-soft p-4">
+              <div className="flex flex-wrap items-center gap-2">
+              <span className="review-pill text-tertiary">
                 {reviewVm.sessionStatusLabel}
               </span>
-              <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
+              <span className={`review-pill ${toneToBadgeClass(reviewVm.intent.tone)}`}>
                 {reviewVm.intent.label}
               </span>
             </div>
@@ -168,18 +168,18 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
           </div>
 
           <div className={`grid gap-3 ${reviewVm.isReviewable ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <div className="review-card-soft p-4">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Discipline</p>
               <p className="mt-2 text-base font-semibold">{disciplineLabel}</p>
               <p className="mt-1 text-sm text-muted">{sessionDateLabel}</p>
             </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <div className="review-card-soft p-4">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{outcomeLabel}</p>
               <p className={`mt-2 text-base font-semibold ${toneToTextClass(reviewVm.intent.tone)}`}>{reviewVm.intent.label}</p>
               <p className="mt-1 text-sm text-muted">{reviewVm.intent.detail}</p>
             </div>
             {reviewVm.isReviewable ? (
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <div className="review-card-soft p-4">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
                 <p className={`mt-2 text-base font-semibold ${toneToTextClass(reviewVm.scoreTone)}`}>{reviewVm.scoreHeadline}</p>
                 <p className="mt-1 text-sm text-muted">{reviewVm.scoreInterpretation}</p>
@@ -189,7 +189,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
         </div>
       </article>
 
-      <article className="surface p-5">
+      <article className="review-panel p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{comparisonHeading}</h2>
           {reviewVm.scoreConfidenceNote ? <p className="text-xs text-tertiary">{reviewVm.scoreConfidenceNote}</p> : null}
@@ -209,7 +209,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
             </div>
 
             <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <div className="review-card-soft p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Main gap</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
               </div>
@@ -217,14 +217,14 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
               {reviewVm.usefulMetrics.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {reviewVm.usefulMetrics.map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                    <div key={metric.label} className="review-card-soft p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p className="mt-1 text-base font-semibold">{metric.value}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <div className="review-card-soft p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Available evidence</p>
                   <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
                 </div>
@@ -237,7 +237,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
               <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{leftColumnLabel}</p>
               <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
             </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <div className="review-card-soft p-4">
               <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.unlockTitle}</p>
               <p className="mt-2 text-sm">{reviewVm.unlockDetail}</p>
             </div>
@@ -245,7 +245,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
         )}
       </article>
 
-      <article className="surface p-5">
+      <article className="review-panel p-5">
         <h2 className="text-lg font-semibold">Coaching takeaway</h2>
         {reviewVm.isReviewable ? (
           <dl className="mt-3 grid gap-3 md:grid-cols-3">
@@ -276,7 +276,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
         )}
       </article>
 
-      <article className="surface p-5">
+      <article className="review-panel p-5">
         <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
         <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -284,7 +284,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
             <Link
               key={prompt}
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground"
+              className="review-followup-chip transition"
             >
               {prompt}
             </Link>

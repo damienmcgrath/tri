@@ -122,11 +122,11 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
 function disciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(86,182,217,0.22)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.35)" },
-    bike: { bg: "rgba(107,170,117,0.2)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.34)" },
-    run: { bg: "rgba(196,135,114,0.2)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.34)" },
-    strength: { bg: "rgba(154,134,200,0.22)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.36)" },
-    other: { bg: "rgba(148,163,184,0.2)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.35)" }
+    swim: { bg: "rgba(173,207,214,0.24)", text: "#315863", dot: "#5C95A4", border: "rgba(108,146,154,0.3)" },
+    bike: { bg: "rgba(180,197,167,0.24)", text: "#42553A", dot: "#718867", border: "rgba(111,132,96,0.3)" },
+    run: { bg: "rgba(214,187,168,0.24)", text: "#6A473B", dot: "#B27A5F", border: "rgba(170,118,90,0.3)" },
+    strength: { bg: "rgba(196,181,164,0.24)", text: "#5A4E43", dot: "#9A816B", border: "rgba(139,117,95,0.3)" },
+    other: { bg: "rgba(205,197,184,0.24)", text: "#5D554A", dot: "#978D7D", border: "rgba(150,140,124,0.3)" }
   };
 
   return tones[sport] ?? tones.other;
@@ -187,10 +187,10 @@ function getSessionRoleCue(role: ReturnType<typeof getOptionalSessionRoleLabel>)
   if (!role) return null;
 
   const tones: Record<string, { marker: string; className: string }> = {
-    Key: { marker: "◆", className: "border-[hsl(var(--accent-performance)/0.42)] bg-[hsl(var(--accent-performance)/0.13)] text-accent" },
-    Supporting: { marker: "•", className: "border-[hsl(var(--border))] bg-[hsl(var(--bg))] text-muted" },
-    Recovery: { marker: "○", className: "border-emerald-400/45 bg-emerald-500/10 text-emerald-200" },
-    Optional: { marker: "+", className: "border-sky-400/45 bg-sky-500/10 text-sky-200" }
+    Key: { marker: "◆", className: "border-[hsl(var(--accent-performance)/0.44)] bg-[hsl(var(--accent-performance)/0.12)] text-accent" },
+    Supporting: { marker: "•", className: "border-[hsl(var(--border)/0.82)] bg-[hsl(var(--surface-1))] text-muted" },
+    Recovery: { marker: "○", className: "border-[hsl(var(--signal-ready)/0.42)] bg-[hsl(var(--signal-ready)/0.14)] text-[hsl(var(--signal-ready))]" },
+    Optional: { marker: "+", className: "border-[hsl(var(--signal-load)/0.42)] bg-[hsl(var(--signal-load)/0.12)] text-[hsl(var(--signal-load))]" }
   };
 
   return tones[role] ?? null;
@@ -485,7 +485,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         <input type="hidden" name="notes" value={weekDraft.notes} />
       </form>
 
-      <article className="surface p-4">
+      <article className="plan-workspace p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold">Week board (Mon–Sun)</h3>
           <p className="text-xs text-muted">For scheduling changes, use Calendar.</p>
@@ -493,7 +493,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
           {weekDays.map((day) => (
-            <section key={day.iso} className={`group/day flex min-h-[236px] min-w-0 flex-col p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
+            <section key={day.iso} className={`plan-board-day group/day flex min-h-[236px] min-w-0 flex-col p-2.5 ${day.isRest ? "plan-board-day--rest opacity-85" : ""}`}>
               <div className="mb-1.5 flex items-start justify-between border-b border-[hsl(var(--border))] pb-1.5">
                 <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
                 <div className="text-right">
@@ -510,10 +510,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="plan-session-card w-full px-2 py-2 text-left" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-1">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          className="plan-discipline-chip"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text,
@@ -524,7 +524,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span>{meta.label}</span>
                         </span>
                         {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          <span title={role ?? undefined} className={`plan-role-chip ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                         ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
@@ -533,7 +533,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery window</p> : null}
+                {day.sessions.length === 0 ? <p className="plan-empty-state py-4 text-center text-xs">Rest day · planned recovery window</p> : null}
               </div>
               <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
             </section>
@@ -542,7 +542,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
         <div className="space-y-3 lg:hidden">
           {weekDays.map((day) => (
-            <section key={day.iso} className={`group/day p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
+            <section key={day.iso} className={`plan-board-day group/day p-2.5 ${day.isRest ? "plan-board-day--rest opacity-85" : ""}`}>
               <div className="mb-1.5 flex items-center justify-between border-b border-[hsl(var(--border))] pb-1.5">
                 <p className="text-sm font-semibold">{day.label} · {day.date}</p>
                 <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.roleCounts.key > 0 ? " · Key day" : day.roleCounts.recovery > 0 ? " · Recovery-biased" : ""}</p>
@@ -553,10 +553,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   return (
-                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
+                    <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="plan-session-card w-full px-2 py-2 text-left text-xs" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                          className="plan-discipline-chip"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text,
@@ -567,7 +567,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
                         {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          <span title={role ?? undefined} className={`plan-role-chip ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                         ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
@@ -576,7 +576,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
+                {day.sessions.length === 0 ? <p className="plan-empty-state py-2 text-xs">Rest day · planned recovery window.</p> : null}
               </div>
               <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 text-[11px] text-muted transition group-hover/day:text-accent focus-visible:text-accent">＋ Add</button>
             </section>
@@ -606,7 +606,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       </details>
 
       {quickAddDay ? (
-        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
+        <div className="panel-sheet fixed bottom-0 right-0 top-14 z-20 w-full max-w-md p-5 shadow-2xl overflow-y-auto">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
           <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
           <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
@@ -624,7 +624,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       ) : null}
 
       {activeSession ? (
-        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
+        <div className="panel-sheet fixed bottom-0 right-0 top-14 z-20 w-full max-w-md p-5 shadow-2xl overflow-y-auto">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
           <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />

@@ -156,24 +156,24 @@
 
 :root[data-theme="coach-journal"] {
   color-scheme: light;
-  --surface: 36 31% 93%;
-  --surface-elevated: 42 27% 97%;
-  --surface-soft: 36 24% 95%;
-  --surface-1: 0 0% 100%;
-  --surface-2: 34 23% 91%;
+  --surface: 37 28% 92%;
+  --surface-elevated: 42 30% 97%;
+  --surface-soft: 36 20% 94%;
+  --surface-1: 40 29% 99%;
+  --surface-2: 34 18% 88%;
 
-  --text-primary: 28 18% 16%;
-  --text-secondary: 26 12% 34%;
-  --text-tertiary: 28 10% 47%;
+  --text-primary: 26 20% 14%;
+  --text-secondary: 26 13% 30%;
+  --text-tertiary: 28 10% 42%;
 
   --accent-performance: 24 78% 49%;
-  --accent-recovery: 34 30% 45%;
+  --accent-recovery: 32 33% 40%;
 
-  --signal-ready: 118 19% 47%;
-  --signal-load: 35 56% 47%;
-  --signal-risk: 15 44% 48%;
-  --signal-recovery: 34 31% 44%;
-  --signal-neutral: 28 12% 58%;
+  --signal-ready: 118 24% 38%;
+  --signal-load: 34 68% 42%;
+  --signal-risk: 15 53% 42%;
+  --signal-recovery: 34 33% 40%;
+  --signal-neutral: 28 12% 50%;
 
   --success: var(--signal-ready);
   --warning: var(--signal-load);
@@ -193,10 +193,10 @@
   --bg-card: var(--surface-soft);
   --fg: var(--text-primary);
   --fg-muted: var(--text-secondary);
-  --border: 31 19% 82%;
+  --border: 30 16% 76%;
   --ring: 24 78% 49%;
   --accent: var(--ai-accent-core);
-  --accent-soft: 35 54% 92%;
+  --accent-soft: 34 50% 89%;
 
   --background: var(--bg);
   --card: var(--bg-elevated);
@@ -397,9 +397,9 @@
 
   :root[data-theme="coach-journal"] .app-shell::before {
     background:
-      radial-gradient(circle at 12% 16%, hsl(var(--accent-performance) / 0.08), transparent 34%),
-      radial-gradient(circle at 82% 12%, hsl(var(--signal-load) / 0.08), transparent 26%),
-      linear-gradient(180deg, hsl(42 30% 96%), hsl(var(--bg)) 48%, hsl(38 24% 91%) 100%);
+      radial-gradient(circle at 12% 16%, hsl(var(--accent-performance) / 0.05), transparent 28%),
+      radial-gradient(circle at 82% 12%, hsl(var(--signal-load) / 0.04), transparent 20%),
+      linear-gradient(180deg, hsl(42 32% 96%), hsl(var(--bg)) 46%, hsl(38 18% 89%) 100%);
     animation: none;
   }
 
@@ -410,25 +410,27 @@
   }
 
   :root[data-theme="coach-journal"] .surface {
-    border-color: hsl(var(--border) / 0.38);
-    background: hsl(var(--bg-elevated) / 0.96);
-    border-radius: 1.5rem;
+    border-color: hsl(var(--border) / 0.72);
+    background: hsl(var(--bg-elevated) / 0.98);
+    border-radius: 1.2rem;
     box-shadow:
-      0 1px 0 hsl(30 20% 100% / 0.85),
-      0 10px 30px -24px hsl(28 24% 20% / 0.22);
+      0 1px 0 hsl(30 20% 100% / 0.9),
+      0 8px 22px -22px hsl(28 24% 16% / 0.16);
   }
 
   :root[data-theme="coach-journal"] .surface:hover {
-    border-color: hsl(var(--accent-performance) / 0.28);
+    border-color: hsl(var(--accent-performance) / 0.34);
     box-shadow:
-      0 1px 0 hsl(30 20% 100% / 0.85),
-      0 16px 34px -28px hsl(28 24% 20% / 0.24);
+      0 1px 0 hsl(30 20% 100% / 0.9),
+      0 10px 24px -22px hsl(28 24% 16% / 0.18);
   }
 
   :root[data-theme="coach-journal"] .surface-subtle {
-    border-color: transparent;
-    background: hsl(var(--surface-2) / 0.52);
-    box-shadow: inset 0 -1px 0 hsl(var(--border) / 0.62);
+    border-color: hsl(var(--border) / 0.56);
+    background: hsl(var(--surface-2) / 0.56);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.48),
+      inset 0 -1px 0 hsl(var(--border) / 0.52);
   }
 
 
@@ -568,15 +570,18 @@
   }
 
   :root[data-theme="coach-journal"] .nav-item-active {
-    background: hsl(var(--surface-2) / 0.9);
+    background: hsl(var(--surface-2) / 0.92);
     color: hsl(var(--fg));
-    box-shadow: inset 0 -1px 0 hsl(var(--border) / 0.5);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.48),
+      inset 0 -1px 0 hsl(var(--border) / 0.5);
   }
 
   :root[data-theme="coach-journal"] .nav-item-active::before {
     width: 2px;
-    left: 0.62rem;
-    background: hsl(var(--accent-performance) / 0.72);
+    left: 0.68rem;
+    background: hsl(var(--fg) / 0.84);
   }
   .nav-item-active::before {
     content: "";
@@ -646,11 +651,11 @@
   }
 
   :root[data-theme="coach-journal"] .btn-primary {
-    border-color: hsl(var(--accent-performance) / 0.52);
+    border-color: hsl(var(--accent-performance) / 0.72);
     background: hsl(var(--accent-performance));
     color: hsl(42 32% 96%);
-    border-radius: 999px;
-    box-shadow: 0 10px 16px -14px hsl(var(--accent-performance) / 0.68);
+    border-radius: 0.8rem;
+    box-shadow: 0 8px 16px -14px hsl(var(--accent-performance) / 0.46);
   }
 
   .btn-secondary {
@@ -670,10 +675,12 @@
   :root[data-theme="coach-journal"] .btn-secondary,
   :root[data-theme="coach-journal"] .btn-header-cta {
     background: hsl(var(--bg-elevated) / 0.88);
-    border-color: hsl(var(--border) / 0.76);
+    border-color: hsl(var(--border) / 0.86);
     color: hsl(var(--fg));
-    border-radius: 999px;
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.7);
+    border-radius: 0.8rem;
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.64),
+      0 1px 0 hsl(var(--border) / 0.2);
   }
 
   .btn-header-cta {
@@ -906,29 +913,29 @@
 
   :root[data-theme="coach-journal"] .signal-ready,
   :root[data-theme="coach-journal"] .status-chip-completed {
-    border-color: hsl(var(--signal-ready) / 0.26);
-    background: hsl(var(--signal-ready) / 0.14);
-    color: hsl(118 24% 34%);
+    border-color: hsl(var(--signal-ready) / 0.42);
+    background: hsl(var(--signal-ready) / 0.16);
+    color: hsl(118 29% 26%);
   }
 
   :root[data-theme="coach-journal"] .signal-load {
-    border-color: hsl(var(--signal-load) / 0.28);
-    background: hsl(var(--signal-load) / 0.12);
-    color: hsl(32 62% 34%);
+    border-color: hsl(var(--signal-load) / 0.4);
+    background: hsl(var(--signal-load) / 0.16);
+    color: hsl(32 70% 28%);
   }
 
   :root[data-theme="coach-journal"] .signal-risk,
   :root[data-theme="coach-journal"] .status-chip-skipped {
-    border-color: hsl(var(--signal-risk) / 0.26);
-    background: hsl(var(--signal-risk) / 0.12);
-    color: hsl(16 39% 36%);
+    border-color: hsl(var(--signal-risk) / 0.42);
+    background: hsl(var(--signal-risk) / 0.14);
+    color: hsl(14 53% 30%);
   }
 
   :root[data-theme="coach-journal"] .signal-neutral,
   :root[data-theme="coach-journal"] .status-chip-planned {
-    border-color: hsl(var(--signal-neutral) / 0.26);
-    background: hsl(var(--signal-neutral) / 0.1);
-    color: hsl(28 12% 42%);
+    border-color: hsl(var(--signal-neutral) / 0.34);
+    background: hsl(var(--signal-neutral) / 0.12);
+    color: hsl(28 12% 36%);
   }
 
   .status-card-transition {
@@ -989,13 +996,14 @@
   }
 
   .coach-journal-kicker {
-    @apply text-[11px] uppercase tracking-[0.16em];
-    color: hsl(var(--accent-performance) / 0.88);
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em];
+    color: hsl(var(--accent-performance) / 0.9);
   }
 
   .coach-journal-title {
     color: hsl(var(--fg));
     letter-spacing: -0.02em;
+    font-weight: 650;
   }
 
   .coach-journal-note {
@@ -1005,22 +1013,12 @@
   .coach-journal-brief {
     position: relative;
     overflow: hidden;
-    border-color: hsl(var(--border) / 0.32);
-    background:
-      linear-gradient(180deg, hsl(var(--bg-elevated) / 0.97), hsl(42 26% 95%) 100%);
+    border-color: hsl(var(--border) / 0.78);
+    background: hsl(var(--bg-elevated) / 0.98);
   }
 
   .coach-journal-brief::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 100%;
-    pointer-events: none;
-    background:
-      linear-gradient(90deg, hsl(var(--accent-performance) / 0.16), transparent 18%),
-      linear-gradient(180deg, transparent, hsl(30 16% 84% / 0.36));
-    opacity: 0.6;
-    mask-image: linear-gradient(180deg, black, transparent 65%);
+    content: none;
   }
 
   .coach-journal-metrics {
@@ -1028,39 +1026,40 @@
   }
 
   .coach-day-tile {
-    border: 1px solid transparent;
-    border-radius: 1.1rem;
-    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.78), hsl(var(--surface-2) / 0.78));
-    box-shadow: inset 0 -1px 0 hsl(var(--border) / 0.54);
+    border: 1px solid hsl(var(--border) / 0.52);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-1) / 0.94);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.58),
+      inset 0 -1px 0 hsl(var(--border) / 0.42);
   }
 
   .coach-day-tile--today {
-    border-color: hsl(var(--signal-load) / 0.3);
-    background: linear-gradient(180deg, hsl(38 62% 88%), hsl(38 42% 84%));
+    border-color: hsl(var(--signal-load) / 0.48);
+    background: hsl(39 56% 85%);
   }
 
   .coach-day-tile--complete {
-    border-color: hsl(var(--signal-ready) / 0.24);
-    background: linear-gradient(180deg, hsl(110 20% 92%), hsl(110 20% 88%));
+    border-color: hsl(var(--signal-ready) / 0.42);
+    background: hsl(108 23% 88%);
   }
 
   .coach-day-tile--attention {
-    border-color: hsl(var(--signal-risk) / 0.26);
-    background: linear-gradient(180deg, hsl(18 35% 92%), hsl(18 30% 88%));
+    border-color: hsl(var(--signal-risk) / 0.44);
+    background: hsl(17 39% 87%);
   }
 
   .coach-day-tile--planned {
-    border-color: hsl(var(--border) / 0.42);
+    border-color: hsl(var(--border) / 0.62);
   }
 
   .coach-note-card {
-    border: 1px solid hsl(var(--border) / 0.3);
-    border-radius: 1.25rem;
-    background:
-      linear-gradient(180deg, hsl(var(--bg-elevated) / 0.96), hsl(var(--surface-soft) / 0.96));
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.88));
     box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.7),
-      0 10px 24px -24px hsl(28 24% 20% / 0.34);
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 8px 20px -22px hsl(28 24% 16% / 0.16);
   }
 
   .coach-divider {
@@ -1068,82 +1067,342 @@
   }
 
   .coach-chip {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium;
-    border: 1px solid hsl(var(--border) / 0.52);
+    @apply inline-flex items-center rounded-[0.7rem] px-2.5 py-1 text-[10px] font-semibold;
+    border: 1px solid hsl(var(--border) / 0.74);
     background: hsl(var(--bg-elevated) / 0.82);
     color: hsl(var(--fg-muted));
   }
 
+  .coach-chip-strong {
+    @apply inline-flex items-center rounded-[0.68rem] px-2 py-0.5 text-[10px] font-semibold;
+    border: 1px solid hsl(var(--border) / 0.84);
+    background: hsl(var(--surface-1) / 0.96);
+    color: hsl(var(--fg));
+  }
+
+  .coach-kicker-muted {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em];
+    color: hsl(var(--text-tertiary));
+  }
+
+  .coach-section-block {
+    border-top: 1px solid hsl(var(--border) / 0.76);
+    padding-top: 0.9rem;
+  }
+
   .coach-calendar-toolbar {
-    border: 1px solid hsl(var(--border) / 0.28);
-    border-radius: 1.25rem;
-    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.9), hsl(var(--surface-soft) / 0.92));
-    box-shadow: inset 0 -1px 0 hsl(var(--border) / 0.55);
+    border: 1px solid hsl(var(--border) / 0.78);
+    border-radius: 1rem;
+    background: hsl(var(--bg-elevated) / 0.96);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.64),
+      inset 0 -1px 0 hsl(var(--border) / 0.46);
   }
 
   .coach-calendar-alert {
-    border: 1px solid hsl(var(--signal-risk) / 0.18);
-    border-radius: 1.35rem;
-    background: linear-gradient(180deg, hsl(28 28% 95%), hsl(28 28% 92%));
-    box-shadow: inset 0 -1px 0 hsl(var(--border) / 0.52);
+    border: 1px solid hsl(var(--signal-risk) / 0.38);
+    border-radius: 1rem;
+    background: hsl(24 36% 92%);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.48),
+      inset 0 -1px 0 hsl(var(--signal-risk) / 0.2);
   }
 
   .coach-calendar-column {
-    border: 1px solid hsl(var(--border) / 0.24);
-    border-radius: 1.35rem;
-    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.92), hsl(var(--surface-soft) / 0.96));
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.74));
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.72),
-      0 14px 28px -30px hsl(28 22% 18% / 0.24);
+      0 8px 18px -22px hsl(28 22% 14% / 0.12);
   }
 
   .coach-calendar-column-head {
-    border-bottom: 1px solid hsl(var(--border) / 0.62);
+    border-bottom: 1px solid hsl(var(--border) / 0.84);
   }
 
   .coach-calendar-empty {
-    border: 1px dashed hsl(var(--border) / 0.74);
-    border-radius: 1rem;
-    background: hsl(var(--surface-2) / 0.26);
+    border: 1px dashed hsl(var(--border) / 0.86);
+    border-radius: 0.85rem;
+    background: hsl(var(--surface-2) / 0.34);
   }
 
   .coach-session-card {
-    border: 1px solid hsl(var(--border) / 0.26);
-    border-radius: 1rem;
-    background: hsl(var(--bg-elevated) / 0.92);
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.7);
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 0.85rem;
+    background: hsl(var(--bg-elevated) / 0.98);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.64),
+      0 1px 0 hsl(var(--border) / 0.12);
   }
 
   .coach-session-card--planned {
-    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.92), hsl(var(--surface-soft) / 0.98));
+    border-color: hsl(var(--border) / 0.86);
+    background: hsl(var(--surface-1) / 0.95);
   }
 
   .coach-session-card--complete {
-    border-color: hsl(var(--signal-ready) / 0.24);
-    background: linear-gradient(180deg, hsl(110 22% 94%), hsl(110 16% 90%));
+    border-color: hsl(var(--signal-ready) / 0.5);
+    background: hsl(109 22% 86%);
   }
 
   .coach-session-card--today {
-    border-color: hsl(var(--signal-load) / 0.26);
-    background: linear-gradient(180deg, hsl(39 56% 90%), hsl(38 38% 87%));
+    border-color: hsl(var(--signal-load) / 0.52);
+    background: hsl(39 54% 83%);
   }
 
   .coach-session-card--attention {
-    border-color: hsl(var(--signal-risk) / 0.24);
-    background: linear-gradient(180deg, hsl(18 33% 93%), hsl(18 26% 89%));
+    border-color: hsl(var(--signal-risk) / 0.54);
+    background: hsl(16 38% 85%);
   }
 
   .coach-session-card--extra {
-    border-color: hsl(var(--signal-load) / 0.24);
-    background: linear-gradient(180deg, hsl(36 48% 92%), hsl(36 36% 88%));
+    border-color: hsl(var(--signal-load) / 0.5);
+    background: hsl(36 46% 84%);
+  }
+
+  .coach-workspace {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.8));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 10px 24px -24px hsl(28 22% 14% / 0.14);
+  }
+
+  .coach-workspace-inset {
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-1) / 0.96);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.68),
+      0 1px 0 hsl(var(--border) / 0.12);
+  }
+
+  .coach-sidebar-panel {
+    border-right: 1px solid hsl(var(--border) / 0.88);
+    background: linear-gradient(180deg, hsl(var(--surface-soft) / 0.96), hsl(var(--surface-2) / 0.52));
+  }
+
+  .coach-thread-item {
+    border: 1px solid hsl(var(--border) / 0.18);
+    border-radius: 0.82rem;
+    background: hsl(var(--surface-1) / 0.22);
+  }
+
+  .coach-thread-item:hover {
+    border-color: hsl(var(--border) / 0.78);
+    background: hsl(var(--surface-1) / 0.72);
+  }
+
+  .coach-thread-item--active {
+    border-color: hsl(var(--border) / 0.86);
+    background: hsl(var(--surface-1) / 0.96);
+    box-shadow:
+      inset 2px 0 0 hsl(var(--fg) / 0.78),
+      inset 0 1px 0 hsl(0 0% 100% / 0.56);
+  }
+
+  .coach-thread-header {
+    border-bottom: 1px solid hsl(var(--border) / 0.86);
+    background: linear-gradient(180deg, hsl(var(--surface-1) / 0.98), hsl(var(--surface-soft) / 0.86));
+  }
+
+  .coach-meta-strip {
+    border-bottom: 1px solid hsl(var(--border) / 0.78);
+    background: hsl(var(--surface-soft) / 0.9);
+  }
+
+  .coach-transcript {
+    background:
+      linear-gradient(180deg, hsl(var(--surface-1) / 0.48), transparent 6rem),
+      hsl(var(--bg-elevated) / 0.9);
+  }
+
+  .coach-transcript-group {
+    border-top: 1px solid hsl(var(--border) / 0.34);
+    padding-top: 0.75rem;
+  }
+
+  .coach-message {
+    border: 1px solid hsl(var(--border) / 0.8);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-1) / 0.96);
+    color: hsl(var(--text-secondary));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.56);
+  }
+
+  .coach-message-user {
+    border-color: hsl(var(--accent-performance) / 0.72);
+    background: hsl(var(--accent-performance));
+    color: hsl(42 32% 96%);
+  }
+
+  .coach-message-failed {
+    border-color: hsl(var(--signal-risk) / 0.44);
+    background: hsl(var(--signal-risk) / 0.12);
+    color: hsl(var(--text-secondary));
+  }
+
+  .coach-message-assistant {
+    background: linear-gradient(180deg, hsl(var(--surface-1) / 0.98), hsl(var(--surface-soft) / 0.82));
+  }
+
+  .coach-composer {
+    border-top: 1px solid hsl(var(--border) / 0.86);
+    background: linear-gradient(180deg, hsl(var(--surface-1) / 0.9), hsl(var(--surface-soft) / 0.84));
+  }
+
+  .coach-prompt-chip {
+    @apply rounded-[0.68rem] px-2 py-0.5 text-[11px] font-semibold;
+    border: 1px solid hsl(var(--border) / 0.82);
+    background: hsl(var(--surface-1) / 0.92);
+    color: hsl(var(--text-secondary));
+  }
+
+  .coach-prompt-chip:hover {
+    border-color: hsl(var(--accent-performance) / 0.34);
+    color: hsl(var(--fg));
+  }
+
+  .coach-inline-action {
+    @apply inline-flex items-center rounded-[0.75rem] px-4 py-2 text-sm font-medium;
+    border: 1px solid hsl(var(--border) / 0.82);
+    color: hsl(var(--text-secondary));
+    background: hsl(var(--surface-1) / 0.94);
+  }
+
+  .coach-inline-action:hover {
+    border-color: hsl(var(--accent-performance) / 0.28);
+    color: hsl(var(--fg));
+  }
+
+  .coach-brief-panel {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.9));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 8px 20px -24px hsl(28 22% 14% / 0.16);
+  }
+
+  .coach-brief-inset {
+    border: 1px solid hsl(var(--border) / 0.78);
+    border-radius: 0.9rem;
+    background: hsl(var(--surface-1) / 0.94);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.62);
+  }
+
+  .plan-workspace {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.84));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 10px 24px -24px hsl(28 22% 14% / 0.14);
+  }
+
+  .plan-board-day {
+    border: 1px solid hsl(var(--border) / 0.78);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-1) / 0.92);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.58),
+      inset 0 -1px 0 hsl(var(--border) / 0.34);
+  }
+
+  .plan-board-day--rest {
+    background: hsl(var(--surface-soft) / 0.88);
+  }
+
+  .plan-empty-state {
+    border-top: 1px solid hsl(var(--border) / 0.56);
+    color: hsl(var(--text-tertiary));
+  }
+
+  .plan-session-card {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 0.82rem;
+    background: hsl(var(--surface-1) / 0.97);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.62),
+      0 1px 0 hsl(var(--border) / 0.12);
+  }
+
+  .plan-session-card:hover {
+    border-color: hsl(var(--accent-performance) / 0.42);
+  }
+
+  .plan-discipline-chip {
+    @apply inline-flex items-center gap-1.5 rounded-[0.68rem] px-2 py-0.5 text-[11px] font-semibold;
+  }
+
+  .plan-role-chip {
+    @apply inline-flex items-center gap-1 rounded-[0.68rem] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide;
+  }
+
+  .panel-sheet {
+    border-left: 1px solid hsl(var(--border) / 0.88);
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.84));
+  }
+
+  .review-hero {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.88));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 10px 22px -24px hsl(28 22% 14% / 0.14);
+  }
+
+  .review-panel {
+    border: 1px solid hsl(var(--border) / 0.82);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, hsl(var(--bg-elevated) / 0.98), hsl(var(--surface-soft) / 0.8));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.72),
+      0 8px 18px -24px hsl(28 22% 14% / 0.12);
+  }
+
+  .review-card {
+    border: 1px solid hsl(var(--border) / 0.78);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-1) / 0.96);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.6);
+  }
+
+  .review-card-soft {
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: 0.95rem;
+    background: hsl(var(--surface-soft) / 0.92);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.54);
+  }
+
+  .review-pill {
+    @apply inline-flex items-center rounded-[0.72rem] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em];
+    border: 1px solid hsl(var(--border) / 0.82);
+  }
+
+  .review-followup-chip {
+    @apply inline-flex items-center rounded-[0.75rem] px-3 py-1.5 text-xs font-medium;
+    border: 1px solid hsl(var(--border) / 0.82);
+    color: hsl(var(--text-secondary));
+    background: hsl(var(--surface-1) / 0.94);
+  }
+
+  .review-followup-chip:hover {
+    border-color: hsl(var(--accent) / 0.5);
+    color: hsl(var(--fg));
   }
 
   .coach-select {
-    border: 1px solid hsl(var(--border) / 0.72);
-    border-radius: 999px;
+    border: 1px solid hsl(var(--border) / 0.9);
+    border-radius: 0.8rem;
     background: hsl(var(--bg-elevated) / 0.88);
     color: hsl(var(--fg));
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.66);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.58),
+      0 1px 0 hsl(var(--border) / 0.16);
   }
 
   .coach-overlay {

@@ -650,13 +650,13 @@ export default async function DashboardPage({
           <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="coach-journal-title text-5xl font-semibold leading-none md:text-6xl">{completionPct}%</p>
-              <p className="mt-2 text-lg font-medium text-[hsl(var(--fg))]">{toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
+              <p className="mt-2 text-lg font-semibold text-[hsl(var(--fg))]">{toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
               <p className="mt-1 text-sm coach-journal-note">
                 {completedSessionsCount} completed this week
                 {extraCompletedCount > 0 ? ` · ${plannedCompletedSessionsCount}/${sessions.length} planned landed · ${extraCompletedCount} extra` : ` · ${plannedCompletedSessionsCount}/${sessions.length} planned landed`}
               </p>
             </div>
-            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
+            <span className={`inline-flex rounded-[0.75rem] border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
           </div>
           <p className="mt-3 max-w-2xl text-sm leading-6 coach-journal-note">{statusInterpretation}</p>
           {diagnosisDataState.isSparse ? <p className="mt-1 text-xs text-tertiary">{diagnosisDataState.unlockText}</p> : null}
@@ -674,7 +674,7 @@ export default async function DashboardPage({
                       : "coach-day-tile opacity-75";
 
               return (
-                <div key={day.iso} className={`px-2 py-2 ${toneClass}`}>
+                <div key={day.iso} className={`px-2 py-2.5 ${toneClass}`}>
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--fg-muted))]">{day.label}</p>
                   <p className="mt-1 text-[11px] font-semibold leading-tight text-[hsl(var(--fg))]">{day.stateLabel}</p>
                   {day.microLabel ? <p className="mt-1 text-[10px] text-[hsl(var(--fg-muted))]">{day.microLabel}</p> : null}
@@ -684,9 +684,9 @@ export default async function DashboardPage({
           </div>
 
           <div className="coach-journal-metrics mt-5 grid grid-cols-3 gap-2 pt-4 text-sm">
-            <p className="px-1">Completed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(totals.completed)}</span></p>
-            <p className="px-1">Remaining <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(remainingMinutes)}</span></p>
-            <p className="px-1">Missed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(missedMinutes)}</span></p>
+            <p className="px-1 text-[hsl(var(--fg-muted))]">Completed <span className="mt-0.5 block text-sm font-semibold text-[hsl(var(--fg))]">{toHoursAndMinutes(totals.completed)}</span></p>
+            <p className="px-1 text-[hsl(var(--fg-muted))]">Remaining <span className="mt-0.5 block text-sm font-semibold text-[hsl(var(--fg))]">{toHoursAndMinutes(remainingMinutes)}</span></p>
+            <p className="px-1 text-[hsl(var(--fg-muted))]">Missed <span className="mt-0.5 block text-sm font-semibold text-[hsl(var(--fg))]">{toHoursAndMinutes(missedMinutes)}</span></p>
           </div>
         </article>
 
@@ -694,7 +694,7 @@ export default async function DashboardPage({
           {pendingTodaySessions.length > 0 ? (
             <>
               <p className="coach-journal-kicker">Today</p>
-              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Daily note</h2>
+              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Today&apos;s focus</h2>
               <p className="mt-1 text-sm coach-journal-note">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length + extraTodayActivities.length} completed`}</p>
               {todayCue ? <p className="mt-2 text-xs coach-journal-note">Cue: {todayCue}</p> : null}
 
@@ -703,8 +703,8 @@ export default async function DashboardPage({
                   <p className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--fg-muted))]">Remaining today</p>
                   <div className="space-y-2">
                     {pendingTodaySessions.map((session) => (
-                      <div key={session.id} className="coach-session-card coach-session-card--today px-3 py-2">
-                        <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
+                      <div key={session.id} className="coach-session-card coach-session-card--today px-3 py-2.5">
+                        <p className="text-sm font-semibold">{getSessionDisplayName(session)}</p>
                         <p className="text-xs text-muted">{session.duration_minutes} min{session.is_key ? " • Key" : ""} • Remaining</p>
                       </div>
                     ))}
@@ -716,14 +716,14 @@ export default async function DashboardPage({
                     <p className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--fg-muted))]">Completed today</p>
                     <div className="space-y-2">
                       {completedTodaySessions.map((session) => (
-                        <div key={session.id} className="coach-session-card coach-session-card--complete px-3 py-2">
-                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
+                        <div key={session.id} className="coach-session-card coach-session-card--complete px-3 py-2.5">
+                          <p className="text-sm font-semibold">{getSessionDisplayName(session)}</p>
                           <p className="text-xs text-muted">{getCompletedMinutes(session)} min • Done</p>
                         </div>
                       ))}
                       {extraTodayActivities.map((activity) => (
-                        <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="coach-session-card coach-session-card--complete block px-3 py-2 transition hover:border-[hsl(var(--success)/0.5)]">
-                          <p className="text-sm font-medium">{getDisciplineMeta(activity.sport).label} extra workout</p>
+                        <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="coach-session-card coach-session-card--complete block px-3 py-2.5 transition hover:border-[hsl(var(--success)/0.62)]">
+                          <p className="text-sm font-semibold">{getDisciplineMeta(activity.sport).label} extra workout</p>
                           <p className="text-xs text-muted">{activity.durationMinutes} min • Done</p>
                         </Link>
                       ))}
@@ -740,20 +740,20 @@ export default async function DashboardPage({
           ) : completedTodaySessions.length > 0 || extraTodayActivities.length > 0 ? (
             <>
               <p className="coach-journal-kicker">Today</p>
-              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Daily note</h2>
+              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Today&apos;s focus</h2>
               <p className="mt-1 text-sm coach-journal-note">0 remaining · {completedTodaySessions.length + extraTodayActivities.length} completed</p>
               <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
               <p className="mt-2 text-sm coach-journal-note">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still within reach"} this week.</p>
               <div className="mt-4 space-y-2">
                 {completedTodaySessions.map((session) => (
-                  <div key={session.id} className="coach-session-card coach-session-card--complete px-3 py-2">
-                    <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
+                  <div key={session.id} className="coach-session-card coach-session-card--complete px-3 py-2.5">
+                    <p className="text-sm font-semibold">{getSessionDisplayName(session)}</p>
                     <p className="text-xs text-muted">{getCompletedMinutes(session)} min • Done</p>
                   </div>
                 ))}
                 {extraTodayActivities.map((activity) => (
-                  <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="coach-session-card coach-session-card--complete block px-3 py-2 transition hover:border-[hsl(var(--success)/0.5)]">
-                    <p className="text-sm font-medium">{getDisciplineMeta(activity.sport).label} extra workout</p>
+                  <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="coach-session-card coach-session-card--complete block px-3 py-2.5 transition hover:border-[hsl(var(--success)/0.62)]">
+                    <p className="text-sm font-semibold">{getDisciplineMeta(activity.sport).label} extra workout</p>
                     <p className="text-xs text-muted">{activity.durationMinutes} min • Done</p>
                   </Link>
                 ))}
@@ -777,7 +777,7 @@ export default async function DashboardPage({
           ) : (
             <>
               <p className="coach-journal-kicker">Today</p>
-              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Daily note</h2>
+              <h2 className="coach-journal-title mt-2 text-2xl font-semibold">Today&apos;s focus</h2>
               <p className="mt-1 text-sm coach-journal-note">No sessions scheduled</p>
               <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
               <p className="mt-2 text-sm coach-journal-note">Use today for recovery and reset, then protect the next planned key session.</p>
