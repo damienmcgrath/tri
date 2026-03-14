@@ -25,8 +25,9 @@ describe("createReviewViewModel", () => {
     expect(vm.sessionStatusLabel).toBe("Completed");
     expect(vm.intent.label).toBe("Partial match");
     expect(vm.scoreHeadline).toBe("68 · Partial match");
-    expect(vm.mainGap).toMatch(/Threshold reps were under target|left incomplete/i);
-    expect(vm.actualExecutionSummary).toMatch(/Threshold work was only partially completed/i);
+    expect(vm.reviewOutcome).toBe("partial_match");
+    expect(vm.mainGap).toMatch(/Threshold work drifted late|planned stimulus only partially landed|full intended dose/i);
+    expect(vm.actualExecutionSummary).toMatch(/drifted late|partially landed|Threshold work/i);
   });
 
   test("avoids misleading completed semantics for planned sessions with no execution evidence", () => {
@@ -75,7 +76,7 @@ describe("createReviewViewModel", () => {
     expect(vm.scoreHeadline).toBe("Provisional · Partial match");
     expect(vm.scoreInterpretation).toMatch(/early read/i);
     expect(vm.scoreConfidenceNote).toMatch(/band looks useful/i);
-    expect(vm.mainGap).toMatch(/Easy session drifted too hard/i);
+    expect(vm.mainGap).toMatch(/Easy run drifted a bit too hard|session came up short|planned purpose/i);
   });
 
   test("does not ask for a re-upload when a workout is already linked", () => {
@@ -117,13 +118,13 @@ describe("createReviewViewModel", () => {
       }
     });
 
-    expect(vm.intent.label).toBe("Matched intent");
+    expect(vm.intent.label).toBe("On target");
     expect(vm.scoreHeadline).toBe("91 · On target");
-    expect(vm.actualExecutionSummary).toMatch(/delivered the intended training stimulus|planned quality stimulus/i);
-    expect(vm.mainGap).toBe("Session matched intent well. Keep the same execution approach next time.");
-    expect(vm.weekAction).toMatch(/Keep the next key session as planned/i);
+    expect(vm.actualExecutionSummary).toMatch(/aligned with the planned intent|intended training stimulus|planned quality stimulus/i);
+    expect(vm.mainGap).toMatch(/aligned with the planned session|matched intent well/i);
+    expect(vm.weekAction).toMatch(/Keep the rest of the week stable|Keep the next key session as planned/i);
     expect(vm.whyItMatters).toMatch(/Matching the planned session intent|planned quality stimulus/i);
-    expect(vm.nextAction).toMatch(/Good control|Keep the same execution approach/i);
+    expect(vm.nextAction).toMatch(/Proceed as planned|Good control|Keep the same execution approach/i);
   });
 
   test("uses extra-session framing instead of planned-intent framing for unplanned work", () => {
@@ -145,8 +146,8 @@ describe("createReviewViewModel", () => {
 
     expect(vm.reviewModeLabel).toBe("Extra session review");
     expect(vm.sessionStatusLabel).toBe("Extra workout");
-    expect(vm.plannedIntent).toBe("No planned intent. Review this as additional weekly load.");
-    expect(vm.mainGap).toMatch(/no planned target/i);
+    expect(vm.plannedIntent).toMatch(/Additional load outside the original plan|weekly load/i);
+    expect(vm.mainGap).toMatch(/Execution stayed aligned|planned stimulus|training purpose/i);
     expect(vm.unlockTitle).toBe("Weekly context");
     expect(vm.followUpIntro).toMatch(/extra session/i);
     expect(vm.followUpPrompts[0]).toMatch(/help or hurt the week/i);

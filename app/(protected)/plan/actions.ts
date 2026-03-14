@@ -20,6 +20,8 @@ const weekSchema = z.object({
 
 const upsertWeekSchema = weekSchema.extend({
   focus: z.enum(["Build", "Recovery", "Taper", "Race", "Custom"]),
+  objective: z.string().trim().max(240).optional(),
+  primaryEmphasis: z.string().trim().max(160).optional(),
   notes: z.string().trim().max(2000).optional(),
   targetMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(10080)]).optional()
 });
@@ -31,12 +33,15 @@ const createSessionSchema = z.object({
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
   sessionType: z.string().trim().max(100).optional(),
   target: z.string().trim().max(200).optional(),
+  intentSummary: z.string().trim().max(240).optional(),
   durationMinutes: z.coerce.number().int().min(1).max(1440),
   notes: z.string().trim().max(1000).optional(),
   distanceValue: z.union([z.literal(""), z.coerce.number().positive()]).optional(),
   distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional(),
   dayOrder: z.coerce.number().int().min(0).max(100).optional(),
   isKey: z.coerce.boolean().optional(),
+  isProtected: z.coerce.boolean().optional(),
+  isFlexible: z.coerce.boolean().optional(),
   sessionRole: z.union([z.literal(""), z.enum(["Key", "Supporting", "Recovery", "Optional"])]).optional()
 });
 
@@ -164,7 +169,10 @@ async function insertSessionWithCompat(
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
+  delete withoutOptionalColumns.intent_summary;
   delete withoutOptionalColumns.is_key;
+  delete withoutOptionalColumns.is_protected;
+  delete withoutOptionalColumns.is_flexible;
   delete withoutOptionalColumns.session_role;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
@@ -192,7 +200,10 @@ async function updateSessionWithCompat(
   const withoutOptionalColumns: Record<string, unknown> = { ...payload };
   delete withoutOptionalColumns.day_order;
   delete withoutOptionalColumns.target;
+  delete withoutOptionalColumns.intent_summary;
   delete withoutOptionalColumns.is_key;
+  delete withoutOptionalColumns.is_protected;
+  delete withoutOptionalColumns.is_flexible;
   delete withoutOptionalColumns.session_role;
 
   if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
@@ -220,7 +231,10 @@ async function insertSessionsBatchWithCompat(
     const next = { ...row };
     delete next.day_order;
     delete next.target;
+    delete next.intent_summary;
     delete next.is_key;
+    delete next.is_protected;
+    delete next.is_flexible;
     delete next.session_role;
     return next;
   });
@@ -240,7 +254,7 @@ async function assertWeekOwnership(
 ) {
   const query = supabase
     .from("training_weeks")
-    .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+    .select("id,plan_id,week_index,week_start_date,focus,objective,primary_emphasis,notes,target_minutes,target_tss")
     .eq("id", weekId);
 
   if (planId) {
@@ -359,6 +373,8 @@ export async function updateWeekAction(formData: FormData) {
     weekId: formData.get("weekId"),
     planId: formData.get("planId"),
     focus: formData.get("focus"),
+    objective: formData.get("objective"),
+    primaryEmphasis: formData.get("primaryEmphasis"),
     notes: formData.get("notes"),
     targetMinutes: formData.get("targetMinutes"),
   });
@@ -371,6 +387,8 @@ export async function updateWeekAction(formData: FormData) {
     .from("training_weeks")
     .update({
       focus: parsed.focus,
+      objective: parsed.objective ?? null,
+      primary_emphasis: parsed.primaryEmphasis ?? null,
       notes: parsed.notes ?? null,
       target_minutes: parsed.targetMinutes === "" ? null : parsed.targetMinutes
     })
@@ -421,6 +439,8 @@ export async function duplicateWeekForwardAction(formData: FormData) {
       .from("training_weeks")
       .update({
         focus: sourceWeek.focus,
+        objective: sourceWeek.objective ?? null,
+        primary_emphasis: sourceWeek.primary_emphasis ?? null,
         notes: sourceWeek.notes,
         target_minutes: sourceWeek.target_minutes,
         target_tss: sourceWeek.target_tss
@@ -434,7 +454,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
 
   const sourceSessionsQuery = await supabase
     .from("sessions")
-    .select("sport,type,target,duration_minutes,notes,distance_value,distance_unit,status,is_key,session_role,date,day_order")
+    .select("sport,type,target,intent_summary,duration_minutes,notes,distance_value,distance_unit,status,is_key,is_protected,is_flexible,session_role,date,day_order")
     .eq("week_id", sourceWeek.id)
     .order("date", { ascending: true });
 
@@ -460,11 +480,14 @@ export async function duplicateWeekForwardAction(formData: FormData) {
     sport: string;
     type: string;
     target?: string | null;
+    intent_summary?: string | null;
     duration_minutes: number;
     notes: string | null;
     distance_value: number | null;
     distance_unit: string | null;
     status: string;
+    is_protected?: boolean | null;
+    is_flexible?: boolean | null;
     session_role?: "Key" | "Supporting" | "Recovery" | "Optional" | null;
     date: string;
     day_order?: number | null;
@@ -499,12 +522,15 @@ export async function duplicateWeekForwardAction(formData: FormData) {
         sport: session.sport,
         type: session.type,
         target: session.target,
+        intent_summary: session.intent_summary ?? null,
         duration_minutes: session.duration_minutes,
         day_order: session.day_order,
         notes: session.notes,
         distance_value: session.distance_value,
         distance_unit: session.distance_unit,
         status: "planned",
+        is_protected: Boolean(session.is_protected),
+        is_flexible: Boolean(session.is_flexible),
         session_role: session.session_role ?? null
       };
     });
@@ -626,12 +652,15 @@ export async function createSessionAction(formData: FormData) {
     sport: formData.get("sport"),
     sessionType: getOptionalFormValue(formData, "sessionType"),
     target: getOptionalFormValue(formData, "target"),
+    intentSummary: getOptionalFormValue(formData, "intentSummary"),
     durationMinutes: formData.get("durationMinutes"),
     notes: getOptionalFormValue(formData, "notes"),
     distanceValue: getOptionalFormValue(formData, "distanceValue"),
     distanceUnit: getOptionalFormValue(formData, "distanceUnit"),
     dayOrder: getOptionalFormValue(formData, "dayOrder"),
     isKey: getOptionalFormValue(formData, "isKey"),
+    isProtected: getOptionalFormValue(formData, "isProtected"),
+    isFlexible: getOptionalFormValue(formData, "isFlexible"),
     sessionRole: getOptionalFormValue(formData, "sessionRole")
   });
 
@@ -658,6 +687,7 @@ export async function createSessionAction(formData: FormData) {
     sport: parsed.sport,
     type: fallbackSessionType(parsed.sport, parsed.sessionType),
     target: parsed.target || null,
+    intent_summary: parsed.intentSummary || null,
     day_order: parsed.dayOrder ?? (daySessions?.length ?? 0),
     duration_minutes: parsed.durationMinutes,
     notes: parsed.notes ?? null,
@@ -665,6 +695,8 @@ export async function createSessionAction(formData: FormData) {
     distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
     status: "planned",
     is_key: Boolean(parsed.isKey) || parsed.sessionRole === "Key",
+    is_protected: Boolean(parsed.isProtected) || parsed.sessionRole === "Key",
+    is_flexible: Boolean(parsed.isFlexible),
     session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 
@@ -682,12 +714,15 @@ export async function updateSessionAction(formData: FormData) {
     sport: formData.get("sport"),
     sessionType: getOptionalFormValue(formData, "sessionType"),
     target: getOptionalFormValue(formData, "target"),
+    intentSummary: getOptionalFormValue(formData, "intentSummary"),
     durationMinutes: formData.get("durationMinutes"),
     notes: getOptionalFormValue(formData, "notes"),
     distanceValue: getOptionalFormValue(formData, "distanceValue"),
     distanceUnit: getOptionalFormValue(formData, "distanceUnit"),
     status: formData.get("status"),
     isKey: getOptionalFormValue(formData, "isKey"),
+    isProtected: getOptionalFormValue(formData, "isProtected"),
+    isFlexible: getOptionalFormValue(formData, "isFlexible"),
     sessionRole: getOptionalFormValue(formData, "sessionRole")
   });
 
@@ -703,6 +738,7 @@ export async function updateSessionAction(formData: FormData) {
     sport: parsed.sport,
     type: fallbackSessionType(parsed.sport, parsed.sessionType),
     target: parsed.target || null,
+    intent_summary: parsed.intentSummary || null,
     notes: parsed.notes ?? null,
     distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
     distance_unit: parsed.distanceUnit === "" ? null : parsed.distanceUnit,
@@ -710,6 +746,8 @@ export async function updateSessionAction(formData: FormData) {
     status: parsed.status,
     user_id: user.id,
     is_key: Boolean(parsed.isKey) || parsed.sessionRole === "Key",
+    is_protected: Boolean(parsed.isProtected) || parsed.sessionRole === "Key",
+    is_flexible: Boolean(parsed.isFlexible),
     session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 

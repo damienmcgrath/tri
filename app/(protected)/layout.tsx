@@ -53,7 +53,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         }}
       />
 
-      <div className="mx-auto grid w-full max-w-[1280px] gap-4 px-4 pb-24 pt-3 md:px-6 lg:grid-cols-[72px_1fr] xl:grid-cols-[208px_1fr] lg:pb-8">
+      <div className="mx-auto grid w-full max-w-[1280px] gap-4 px-4 pb-24 pt-3 md:px-6 lg:grid-cols-[72px_1fr] xl:grid-cols-[192px_1fr] lg:pb-8">
         <aside className="hidden lg:block">
           <div className="surface sticky top-3 space-y-3 p-2.5 xl:p-3">
             <div className="xl:hidden">

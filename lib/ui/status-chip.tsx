@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import {
-  getSessionLifecycleLabel,
+  SESSION_LIFECYCLE_META,
   type SessionLifecycleState,
   SESSION_LIFECYCLE_TONES
 } from "@/lib/training/semantics";
@@ -9,17 +9,12 @@ import {
 export type SessionStatus = SessionLifecycleState;
 
 const statusMeta: Record<SessionStatus, { label: string; icon: ReactNode; className: string }> = {
-  planned: { label: getSessionLifecycleLabel("planned"), icon: "◌", className: "status-chip-planned" },
-  completed: { label: getSessionLifecycleLabel("completed"), icon: "✓", className: "status-chip-completed" },
-  skipped: { label: getSessionLifecycleLabel("skipped"), icon: "—", className: "status-chip-skipped" },
-  moved: { label: getSessionLifecycleLabel("moved"), icon: "↔", className: "status-chip-moved" },
-  extra: { label: getSessionLifecycleLabel("extra"), icon: "+", className: "status-chip-extra" },
-  assigned_from_upload: {
-    label: getSessionLifecycleLabel("assigned_from_upload"),
-    icon: "↳",
-    className: "status-chip-assigned"
-  },
-  unmatched_upload: { label: getSessionLifecycleLabel("unmatched_upload"), icon: "?", className: "status-chip-unmatched" }
+  planned: { label: SESSION_LIFECYCLE_META.planned.label, icon: SESSION_LIFECYCLE_META.planned.icon, className: "status-chip-planned" },
+  today: { label: SESSION_LIFECYCLE_META.today.label, icon: SESSION_LIFECYCLE_META.today.icon, className: "status-chip-today" },
+  completed: { label: SESSION_LIFECYCLE_META.completed.label, icon: SESSION_LIFECYCLE_META.completed.icon, className: "status-chip-completed" },
+  skipped: { label: SESSION_LIFECYCLE_META.skipped.label, icon: SESSION_LIFECYCLE_META.skipped.icon, className: "status-chip-skipped" },
+  missed: { label: SESSION_LIFECYCLE_META.missed.label, icon: SESSION_LIFECYCLE_META.missed.icon, className: "status-chip-missed" },
+  extra: { label: SESSION_LIFECYCLE_META.extra.label, icon: SESSION_LIFECYCLE_META.extra.icon, className: "status-chip-extra" }
 };
 
 export function getSessionStatusMeta(status: SessionStatus) {

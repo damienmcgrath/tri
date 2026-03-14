@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PlanRationalePanel } from "@/components/training/plan-rationale-panel";
+import { StatusPill } from "@/components/training/status-pill";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
 import { getSessionIntentLabel } from "@/lib/training/semantics";
@@ -21,6 +23,8 @@ type TrainingWeek = {
   week_index: number;
   week_start_date: string;
   focus: "Build" | "Recovery" | "Taper" | "Race" | "Custom";
+  objective?: string | null;
+  primary_emphasis?: string | null;
   notes: string | null;
   target_minutes: number | null;
   target_tss: number | null;
@@ -38,6 +42,7 @@ type Session = {
   subtype?: string | null;
   workout_type?: string | null;
   target: string | null;
+  intent_summary?: string | null;
   intent_category?: string | null;
   source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
   execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
@@ -48,6 +53,8 @@ type Session = {
   distance_unit: string | null;
   status: "planned" | "completed" | "skipped";
   is_key?: boolean | null;
+  is_protected?: boolean | null;
+  is_flexible?: boolean | null;
   session_role?: SessionRole | null;
 };
 
@@ -196,6 +203,29 @@ function getSessionRoleCue(role: ReturnType<typeof getOptionalSessionRoleLabel>)
   return tones[role] ?? null;
 }
 
+function getSessionPlanningBadges(session: Session) {
+  const badges: Array<{ label: string; tone: "attention" | "info" | "neutral" }> = [];
+  const role = getOptionalSessionRoleLabel(session);
+
+  if (Boolean(session.is_protected) || role === "Key") {
+    badges.push({ label: "Protected", tone: "attention" });
+  }
+
+  if (Boolean(session.is_flexible)) {
+    badges.push({ label: "Flexible", tone: "info" });
+  }
+
+  if (role === "Optional") {
+    badges.push({ label: "Optional", tone: "neutral" });
+  }
+
+  if (role === "Key" && !badges.some((badge) => badge.label === "Key")) {
+    badges.push({ label: "Key", tone: "attention" });
+  }
+
+  return badges;
+}
+
 function sessionRoleSortWeight(role: ReturnType<typeof getOptionalSessionRoleLabel>) {
   if (role === "Key") return 4;
   if (role === "Recovery") return 3;
@@ -282,6 +312,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
   const [weekDraft, setWeekDraft] = useState({
     focus: selectedWeek?.focus ?? "Build",
+    objective: selectedWeek?.objective ?? "",
+    primaryEmphasis: selectedWeek?.primary_emphasis ?? "",
     targetMinutes: selectedWeek?.target_minutes ? String(selectedWeek.target_minutes) : "",
     notes: selectedWeek?.notes ?? ""
   });
@@ -297,6 +329,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
     if (!selectedWeek) return;
     setWeekDraft({
       focus: selectedWeek.focus,
+      objective: selectedWeek.objective ?? "",
+      primaryEmphasis: selectedWeek.primary_emphasis ?? "",
       targetMinutes: selectedWeek.target_minutes ? String(selectedWeek.target_minutes) : "",
       notes: selectedWeek.notes ?? ""
     });
@@ -311,6 +345,9 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
+  const protectedSessions = weekSessions.filter((session) => Boolean(session.is_protected) || session.is_key);
+  const flexibleSessions = weekSessions.filter((session) => Boolean(session.is_flexible));
+  const optionalSessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Optional");
 
   const disciplineTotals = ["swim", "bike", "run", "strength", "other"]
     .map((sport) => ({
@@ -357,6 +394,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const isWeekDirty = Boolean(
     selectedWeek && (
       weekDraft.focus !== selectedWeek.focus
+      || weekDraft.objective !== (selectedWeek.objective ?? "")
+      || weekDraft.primaryEmphasis !== (selectedWeek.primary_emphasis ?? "")
       || weekDraft.targetMinutes !== (selectedWeek.target_minutes ? String(selectedWeek.target_minutes) : "")
       || weekDraft.notes !== (selectedWeek.notes ?? "")
     )
@@ -365,6 +404,19 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const duplicateTargets = planWeeks.filter((week) => week.id !== selectedWeek?.id);
   const activeSession = weekSessions.find((session) => session.id === activeSessionId);
   const notePreview = weekDraft.notes.trim();
+  const previousWeekSessions = previousWeek ? sessions.filter((session) => session.week_id === previousWeek.id) : [];
+  const previousWeekMinutes = previousWeekSessions.reduce((sum, session) => sum + session.duration_minutes, 0);
+  const dominantDiscipline = [...disciplineTotals].sort((a, b) => b.minutes - a.minutes)[0];
+  const bikeDelta = weekSessions.filter((session) => session.sport === "bike").reduce((sum, session) => sum + session.duration_minutes, 0)
+    - previousWeekSessions.filter((session) => session.sport === "bike").reduce((sum, session) => sum + session.duration_minutes, 0);
+  const runDelta = weekSessions.filter((session) => session.sport === "run").reduce((sum, session) => sum + session.duration_minutes, 0)
+    - previousWeekSessions.filter((session) => session.sport === "run").reduce((sum, session) => sum + session.duration_minutes, 0);
+  const objective = weekDraft.objective.trim() || displayWeekFocus || "Build durable load while keeping the week balanced.";
+  const primaryEmphasis = weekDraft.primaryEmphasis.trim()
+    || (dominantDiscipline ? `${getDisciplineMeta(dominantDiscipline.sport).label} focus` : "Balanced load");
+  const progressionNote = previousWeek
+    ? `${bikeDelta >= 0 ? "+" : ""}${bikeDelta} min bike, ${runDelta >= 0 ? "+" : ""}${runDelta} min run, ${totalMinutes - previousWeekMinutes >= 0 ? "+" : ""}${totalMinutes - previousWeekMinutes} min overall.`
+    : "First programmed week in this block.";
 
   async function handleQuickAddSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -423,7 +475,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.14em] text-muted">Plan</p>
-            <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
+            <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {selectedPlan.name}</h2>
             <p className="text-sm text-muted">{weekRangeLabel(selectedWeek.week_start_date)} · Planned {totalMinutes} min</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -440,31 +492,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         </div>
       </header>
 
-      <section className="surface-subtle px-4 py-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Block</p>
-            <p className="mt-1 text-sm">{weekDraft.focus}</p>
-          </div>
-          {displayWeekFocus ? (
-            <div className="md:col-span-2">
-              <p className="text-xs uppercase tracking-wide text-muted">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
-              <p className="mt-1 text-sm">{displayWeekFocus}</p>
-            </div>
-          ) : null}
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Rest days</p>
-            <p className="mt-1 text-sm">{restDays}</p>
-          </div>
-          {keySessions > 0 ? (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted">Key sessions</p>
-              <p className="mt-1 text-sm">{keySessions}</p>
-            </div>
-          ) : null}
-        </div>
-        {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
-      </section>
+      <PlanRationalePanel
+        block={weekDraft.focus}
+        objective={objective}
+        primaryEmphasis={primaryEmphasis}
+        progressionNote={progressionNote}
+        coachNotes={notePreview || "Use Calendar for schedule reshuffling. Keep this page focused on why the week is built this way."}
+        protectedSessions={protectedSessions.map((session) => ({ id: session.id, title: getSessionDisplayName(session) }))}
+        flexibleSessions={flexibleSessions.map((session) => ({ id: session.id, title: getSessionDisplayName(session) }))}
+        optionalSessions={optionalSessions.map((session) => ({ id: session.id, title: getSessionDisplayName(session) }))}
+      />
 
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
@@ -481,14 +518,18 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         <input type="hidden" name="planId" value={selectedPlan.id} />
         <input type="hidden" name="weekId" value={selectedWeek.id} />
         <input type="hidden" name="focus" value={weekDraft.focus} />
+        <input type="hidden" name="objective" value={weekDraft.objective} />
+        <input type="hidden" name="primaryEmphasis" value={weekDraft.primaryEmphasis} />
         <input type="hidden" name="targetMinutes" value={weekDraft.targetMinutes} />
         <input type="hidden" name="notes" value={weekDraft.notes} />
       </form>
 
       <article className="surface p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold">Week board (Mon–Sun)</h3>
-          <p className="text-xs text-muted">For scheduling changes, use Calendar.</p>
+          <div>
+            <h3 className="text-base font-semibold">Week structure</h3>
+            <p className="mt-1 text-xs text-muted">Use Calendar for scheduling changes. This view stays focused on the planned intent.</p>
+          </div>
         </div>
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
@@ -507,8 +548,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 {day.sessions.map((session) => {
                   const meta = getDisciplineMeta(session.sport);
                   const role = getOptionalSessionRoleLabel(session);
-                  const roleCue = getSessionRoleCue(role);
-                  const intentCue = getSessionIntentCue(session.intent_category);
+                  const planningBadges = getSessionPlanningBadges(session);
+                  const intentCue = session.intent_summary?.trim() || getSessionIntentCue(session.intent_category);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left hover:border-[hsl(var(--accent-performance)/0.5)]" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-1">
@@ -523,13 +564,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{meta.label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
-                      {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
-                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
+                      {intentCue ? <p className="text-[11px] text-muted">{intentCue}</p> : null}
+                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
+                      {planningBadges.length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {planningBadges.map((badge) => (
+                            <StatusPill key={badge.label} label={badge.label} tone={badge.tone} compact />
+                          ))}
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -550,8 +595,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               <div className="space-y-1.5">
                 {day.sessions.map((session) => {
                   const role = getOptionalSessionRoleLabel(session);
-                  const roleCue = getSessionRoleCue(role);
-                  const intentCue = getSessionIntentCue(session.intent_category);
+                  const planningBadges = getSessionPlanningBadges(session);
+                  const intentCue = session.intent_summary?.trim() || getSessionIntentCue(session.intent_category);
                   return (
                     <button key={session.id} type="button" onClick={() => setActiveSessionId(session.id)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2 py-2 text-left text-xs" style={{ borderLeftWidth: sessionRoleSortWeight(role) >= 3 ? "2px" : undefined }}>
                       <div className="flex items-center justify-between gap-2">
@@ -566,13 +611,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
-                      {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
-                      <p className="text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
+                      {intentCue ? <p className="text-[11px] text-muted">{intentCue}</p> : null}
+                      <p className="text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}</p>
+                      {planningBadges.length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {planningBadges.map((badge) => (
+                            <StatusPill key={badge.label} label={badge.label} tone={badge.tone} compact />
+                          ))}
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -585,29 +634,37 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       </article>
 
       <details className="surface-subtle p-3">
-        <summary className="cursor-pointer text-sm font-medium">Week notes & settings</summary>
+        <summary className="cursor-pointer text-sm font-medium">Programming details</summary>
         <div className="mt-2">
-          <p className="text-xs text-muted">Discipline totals: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
+          <p className="text-xs text-muted">Planned mix: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div>
-            <label className="label-base">Focus</label>
+            <label className="label-base">Block</label>
             <select className="input-base" value={weekDraft.focus} onChange={(event) => setWeekDraft((prev) => ({ ...prev, focus: event.target.value as TrainingWeek["focus"] }))}><option>Build</option><option>Recovery</option><option>Taper</option><option>Race</option><option>Custom</option></select>
           </div>
           <div>
-            <label className="label-base">Target minutes</label>
-            <input className="input-base" type="number" min={0} value={weekDraft.targetMinutes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, targetMinutes: event.target.value }))} />
+            <label className="label-base">Week objective</label>
+            <input className="input-base" value={weekDraft.objective} onChange={(event) => setWeekDraft((prev) => ({ ...prev, objective: event.target.value }))} placeholder="Build bike durability while keeping run frequency steady" />
           </div>
           <div>
-            <label className="label-base">Week note</label>
-            <textarea className="input-base min-h-20" value={weekDraft.notes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, notes: event.target.value }))} />
+            <label className="label-base">Primary emphasis</label>
+            <input className="input-base" value={weekDraft.primaryEmphasis} onChange={(event) => setWeekDraft((prev) => ({ ...prev, primaryEmphasis: event.target.value }))} placeholder="Bike durability" />
           </div>
+          <div>
+            <label className="label-base">Planned minutes</label>
+            <input className="input-base" type="number" min={0} value={weekDraft.targetMinutes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, targetMinutes: event.target.value }))} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className="label-base">Coach/program notes</label>
+          <textarea className="input-base min-h-24" value={weekDraft.notes} onChange={(event) => setWeekDraft((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Explain why the week is structured this way. Scheduling changes belong in Calendar." />
         </div>
       </details>
 
       {quickAddDay ? (
         <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
+          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add planned session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
           <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
           <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
             <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
@@ -615,8 +672,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <label className="label-base">Session name</label><input name="sessionType" className="input-base" placeholder="Easy Run, Power Bike, Aerobic Swim" />
             <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} required className="input-base" />
             <label className="label-base">Target</label><input name="target" className="input-base" placeholder="Z2, 4x8 threshold, etc" />
+            <label className="label-base">Session intent</label><input name="intentSummary" className="input-base" placeholder="Sustained tempo control under fatigue" />
             <label className="label-base">Role (optional)</label>
             <select name="sessionRole" className="input-base" defaultValue=""><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isKey" /> Key session</label>
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isProtected" /> Protected</label>
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isFlexible" /> Flexible</label>
+            </div>
             <label className="label-base">Notes</label><textarea name="notes" className="input-base min-h-20" />
             <button disabled={isSavingQuickAdd} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-70">{isSavingQuickAdd ? "Saving..." : "Add session"}</button>
           </form>
@@ -625,15 +688,21 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
       {activeSession ? (
         <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
+          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit planned session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
           <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
             <label className="label-base">Discipline</label><select name="sport" defaultValue={activeSession.sport} className="input-base" required>{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
             <label className="label-base">Session name</label><input name="sessionType" defaultValue={activeSession.type ?? ""} className="input-base" />
             <label className="label-base">Duration (minutes)</label><input name="durationMinutes" type="number" min={1} defaultValue={activeSession.duration_minutes} className="input-base" required />
             <label className="label-base">Target</label><input name="target" defaultValue={activeSession.target ?? ""} className="input-base" />
+            <label className="label-base">Session intent</label><input name="intentSummary" defaultValue={activeSession.intent_summary ?? ""} className="input-base" />
             <label className="label-base">Role (optional)</label>
             <select name="sessionRole" className="input-base" defaultValue={activeSession.session_role ?? (activeSession.is_key ? "Key" : "")}><option value="">No role</option>{sessionRoles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isKey" defaultChecked={Boolean(activeSession.is_key)} /> Key session</label>
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isProtected" defaultChecked={Boolean(activeSession.is_protected || activeSession.is_key)} /> Protected</label>
+              <label className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-xs text-muted"><input type="checkbox" name="isFlexible" defaultChecked={Boolean(activeSession.is_flexible)} /> Flexible</label>
+            </div>
             <label className="label-base">Status</label><select name="status" defaultValue={activeSession.status} className="input-base"><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option></select>
             <label className="label-base">Notes</label><textarea name="notes" defaultValue={activeSession.notes ?? ""} className="input-base min-h-20" />
             <div className="flex gap-2"><button disabled={isSavingSession || isDeletingSession} className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-70">{isSavingSession ? "Saving..." : "Save changes"}</button><button type="button" disabled={isSavingSession || isDeletingSession} onClick={() => void handleSessionDelete(activeSession.id)} className="btn-secondary px-3 disabled:cursor-not-allowed disabled:opacity-70">{isDeletingSession ? "Deleting..." : "Delete"}</button></div>

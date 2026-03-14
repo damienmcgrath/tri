@@ -82,7 +82,7 @@ describe("buildCalendarDisplayItems", () => {
     });
     expect(items.find((item) => item.id === "activity:a-suggested")).toMatchObject({
       id: "activity:a-suggested",
-      status: "unmatched_upload",
+      status: "completed",
       displayType: "completed_activity"
     });
   });
@@ -113,7 +113,7 @@ describe("buildCalendarDisplayItems", () => {
     expect(items[0]).toMatchObject({
       id: "activity:a2",
       date: "2026-03-03",
-      status: "unmatched_upload",
+      status: "completed",
       isUnplanned: false,
       displayType: "completed_activity"
     });

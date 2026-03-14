@@ -2,16 +2,17 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { AdaptationDecisionPanel, AdaptationStrip } from "@/components/training/calendar-adaptation";
+import { StatusPill } from "@/components/training/status-pill";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { getSessionDisplayName } from "@/lib/training/session";
-import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
-import { clearSkippedAction, confirmSkippedAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
-import { hasConfirmedSkipTag } from "@/lib/plans/skip-notes";
+import { buildWeekStateSummary } from "@/lib/training/week-state";
+import { SESSION_LIFECYCLE_META, type SessionLifecycleState } from "@/lib/training/semantics";
+import { clearSkippedAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 
 type SessionStatus = SessionLifecycleState;
-type FilterStatus = "all" | SessionStatus | "extra" | "moved";
+type FilterStatus = "all" | SessionStatus | "extra";
 type SportFilter = "all" | "swim" | "bike" | "run" | "strength";
 
 type CalendarSession = {
@@ -42,6 +43,7 @@ type CalendarSession = {
 type WeekDay = { iso: string; weekday: string; label: string };
 type RecentMove = { sessionId: string; fromDate: string; toDate: string };
 type AdaptationIssueType = "unmatched_upload" | "skipped_reassign" | "moved_session" | "extra_workout";
+type AdaptationDecisionState = "pending_decision" | "resolved";
 const MOVE_TAG_PATTERN = /\[moved\sfrom\s(\d{4}-\d{2}-\d{2})\]/i;
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -126,19 +128,17 @@ function getSessionState(session: CalendarSession, recentMoves: RecentMove[], ex
     if (session.isUnplanned || extraActivityIds.includes(session.id)) {
       return "extra" as const;
     }
-    return "unmatched_upload" as const;
-  }
-  if (recentMoves.some((move) => move.sessionId === session.id)) {
-    return "moved" as const;
-  }
-  if (session.linkedActivityCount && session.linkedActivityCount > 0 && session.status === "completed") {
-    return "assigned_from_upload" as const;
+    return "completed" as const;
   }
   return session.status;
 }
 
 function getIssueId(type: AdaptationIssueType, id: string) {
   return `${type}:${id}`;
+}
+
+function getAdaptationDecisionKey(weekStart: string) {
+  return `calendar-adaptation:${weekStart}`;
 }
 
 function SessionActionMenu({
@@ -150,7 +150,7 @@ function SessionActionMenu({
   onAssign
 }: {
   session: CalendarSession;
-  state: "planned" | "completed" | "skipped" | "extra" | "moved" | "assigned_from_upload" | "unmatched_upload";
+  state: "planned" | "today" | "completed" | "skipped" | "missed" | "extra";
   onMove: () => void;
   onOpen: () => void;
   onToggleSkip: () => void;
@@ -239,6 +239,8 @@ export function WeekCalendar({
   const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
+  const [isAdaptationOpen, setIsAdaptationOpen] = useState(false);
+  const [adaptationDecision, setAdaptationDecision] = useState<AdaptationDecisionState | null>(null);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
   const isOverlayOpen = Boolean(quickAddDate || moveSource || detailSession || assignSource);
@@ -282,6 +284,17 @@ export function WeekCalendar({
 
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const activeWeekStart = weekDays[0]?.iso ?? currentWeekStart;
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const persisted = window.sessionStorage.getItem(getAdaptationDecisionKey(activeWeekStart));
+    if (persisted === "pending_decision" || persisted === "resolved") {
+      setAdaptationDecision(persisted);
+      return;
+    }
+    setAdaptationDecision(null);
+  }, [activeWeekStart]);
 
   const withWeek = (targetWeekStart: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -291,14 +304,65 @@ export function WeekCalendar({
     return `${pathname}${query ? `?${query}` : ""}`;
   };
 
+  const weekState = useMemo(
+    () =>
+      buildWeekStateSummary({
+        sessions: localSessions
+          .map((session) => {
+            const state = getSessionState(session, trackedMoves, extraActivityIds);
+            if (session.displayType === "completed_activity" && state !== "extra") {
+              return null;
+            }
+            const storedStatus: "planned" | "completed" | "skipped" =
+              state === "completed" || state === "skipped"
+                ? state
+                : "planned";
+
+            return {
+              id: session.id,
+              date: session.date,
+              title: getSessionTitle(session),
+              sport: session.sport,
+              durationMinutes: session.duration,
+              storedStatus,
+              isKey: Boolean(session.is_key),
+              isProtected: Boolean(session.is_key),
+              isFlexible: session.role === "recovery" || session.role === "optional",
+              isOptional: session.role === "optional",
+              intentCategory: session.intentCategory ?? null,
+              target: null,
+              executionResult: session.executionResult ?? null,
+              isExtra: state === "extra"
+            };
+          })
+          .filter((session): session is NonNullable<typeof session> => Boolean(session)),
+        todayIso
+      }),
+    [extraActivityIds, localSessions, todayIso, trackedMoves]
+  );
+
+  const derivedLifecycleById = useMemo(
+    () => new Map(weekState.sessions.map((session) => [session.id, session.lifecycle])),
+    [weekState.sessions]
+  );
+
+  const effectiveAdaptationState =
+    weekState.adaptation === null
+      ? "none"
+      : adaptationDecision === "resolved"
+        ? "resolved"
+        : adaptationDecision === "pending_decision"
+          ? "pending_decision"
+          : weekState.adaptation.state;
+
   const filteredSessions = useMemo(() => {
     return localSessions.filter((session) => {
       const sportMatch = sportFilter === "all" || session.sport === sportFilter;
-      const state = getSessionState(session, trackedMoves, extraActivityIds);
+      const state = derivedLifecycleById.get(session.id) ?? getSessionState(session, trackedMoves, extraActivityIds);
       const statusMatch = statusFilter === "all" || state === statusFilter;
       return sportMatch && statusMatch;
     });
-  }, [extraActivityIds, localSessions, sportFilter, statusFilter, trackedMoves]);
+  }, [derivedLifecycleById, extraActivityIds, localSessions, sportFilter, statusFilter, trackedMoves]);
 
   const visibleIds = useMemo(() => new Set(filteredSessions.map((session) => session.id)), [filteredSessions]);
 
@@ -339,32 +403,6 @@ export function WeekCalendar({
         !dismissedIssues.includes(getIssueId("unmatched_upload", session.id))
     )
     .slice(0, 2);
-  const skippedToResolve = localSessions
-    .filter(
-      (session) =>
-        session.displayType !== "completed_activity" &&
-        session.status === "skipped" &&
-        !hasConfirmedSkipTag(session.notes) &&
-        !dismissedIssues.includes(getIssueId("skipped_reassign", session.id))
-    )
-    .slice(0, 2);
-  const movedItems = trackedMoves
-    .filter((move) => !dismissedIssues.includes(getIssueId("moved_session", move.sessionId)))
-    .slice(0, 2);
-  const extraItems = localSessions
-    .filter(
-      (session) =>
-        session.displayType === "completed_activity" &&
-        (session.isUnplanned || extraActivityIds.includes(session.id)) &&
-        !dismissedIssues.includes(getIssueId("extra_workout", session.id))
-    )
-    .slice(0, 2);
-
-  const hasAdaptation = unmatchedUploads.length > 0 || skippedToResolve.length > 0 || movedItems.length > 0 || extraItems.length > 0;
-
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const absorbDay = dayMetrics.find((day) => day.openCapacity || day.availableDay)?.day ?? weekDays[0]?.iso;
-  const absorbDayLabel = weekDays.find((day) => day.iso === absorbDay)?.weekday ?? absorbDay;
 
   function moveSession(session: CalendarSession, newDate: string) {
     if (session.date === newDate) return;
@@ -383,6 +421,82 @@ export function WeekCalendar({
     });
   }
 
+  function persistAdaptationDecision(nextDecision: AdaptationDecisionState) {
+    setAdaptationDecision(nextDecision);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(getAdaptationDecisionKey(activeWeekStart), nextDecision);
+    }
+  }
+
+  function resolveAdaptation() {
+    persistAdaptationDecision("resolved");
+    setIsAdaptationOpen(false);
+  }
+
+  function deferAdaptation() {
+    persistAdaptationDecision("pending_decision");
+    setIsAdaptationOpen(false);
+  }
+
+  function applyAdaptation() {
+    const recommendation = weekState.adaptation;
+    if (!recommendation) return;
+
+    if (recommendation.operation === "move_session") {
+      const targetSession = localSessions.find(
+        (session) => recommendation.affectedSessionIds.includes(session.id) && session.displayType !== "completed_activity"
+      );
+      if (targetSession) {
+        setMoveSource(targetSession);
+        setIsAdaptationOpen(false);
+        return;
+      }
+    }
+
+    if (recommendation.operation === "drop_session") {
+      const targetSession = localSessions.find(
+        (session) =>
+          recommendation.affectedSessionIds.includes(session.id) &&
+          session.displayType !== "completed_activity" &&
+          session.status !== "completed" &&
+          session.status !== "skipped"
+      );
+
+      if (!targetSession) {
+        resolveAdaptation();
+        return;
+      }
+
+      startTransition(() => {
+        void (async () => {
+          try {
+            await markSkippedAction({ sessionId: targetSession.id });
+            setLocalSessions((prev) =>
+              prev.map((session) =>
+                session.id === targetSession.id
+                  ? {
+                      ...session,
+                      status: "skipped",
+                      notes: session.notes ? `${session.notes}\n[Skipped ${todayIso}]` : `[Skipped ${todayIso}]`
+                    }
+                  : session
+              )
+            );
+            resolveAdaptation();
+            setToast("Week adjustment applied");
+            router.refresh();
+          } catch {
+            setToast("Could not apply recommendation");
+          }
+        })();
+      });
+      return;
+    }
+
+    resolveAdaptation();
+    setToast("Week adjustment saved");
+  }
+
   return (
     <section className="space-y-3">
       <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
@@ -399,31 +513,93 @@ export function WeekCalendar({
           </select>
           <label className="sr-only" htmlFor="status-filter">Status filter</label>
           <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
-            <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
+            <option value="all">All statuses</option><option value="today">Today</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="missed">Missed</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} completed · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">
+            {weekState.counts.completed} completed · {weekState.counts.remaining} remaining · {weekState.counts.missed} missed · {weekState.counts.extra} extra
+          </span>
         </div>
       </header>
 
-      {hasAdaptation ? (
-        <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
-            <p className="text-[11px] text-muted">
-              {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
-            </p>
-          </div>
-          <div className="flex flex-col gap-1.5 text-xs">
-            {unmatchedUploads.map((upload) => (
-              <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
-                  <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
+      {weekState.adaptation ? (
+        <>
+          <AdaptationStrip
+            state={effectiveAdaptationState}
+            whatChanged={weekState.adaptation.whatChanged}
+            whyItMatters={weekState.adaptation.whyItMatters}
+            recommendation={weekState.adaptation.recommendation}
+            onReview={() => setIsAdaptationOpen((current) => !current)}
+            secondaryAction={
+              effectiveAdaptationState === "pending_decision" ? (
+                <p className="text-xs text-muted">Decision saved for later. Come back after you review the rest of the week.</p>
+              ) : effectiveAdaptationState === "resolved" ? (
+                <p className="text-xs text-muted">Decision logged. The rest of the week can stay focused on execution.</p>
+              ) : null
+            }
+          />
+          {isAdaptationOpen ? (
+            <section className="surface p-5">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div>
+                  <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Current week state</p>
+                    <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">
+                      {weekState.counts.completed} completed · {weekState.counts.remaining} remaining · {weekState.counts.missed} missed · {weekState.counts.extra} extra
+                    </p>
+                    <p className="mt-2 text-sm text-muted">{weekState.focusStatement}</p>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-[hsl(var(--border))] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Affected sessions</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {weekState.sessions
+                        .filter((session) => weekState.adaptation?.affectedSessionIds.includes(session.id))
+                        .map((session) => {
+                          const meta = SESSION_LIFECYCLE_META[session.lifecycle];
+                          return (
+                            <div key={session.id} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
+                              <p className="text-sm font-medium text-[hsl(var(--text-primary))]">{session.title}</p>
+                              <div className="mt-2">
+                                <StatusPill label={meta.label} tone={meta.tone} icon={meta.icon} compact />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] md:justify-end">
+                <AdaptationDecisionPanel
+                  title={weekState.adaptation.whatChanged}
+                  summary={weekState.adaptation.recommendation}
+                  rationale={weekState.adaptation.rationale}
+                  onApply={applyAdaptation}
+                  onKeep={resolveAdaptation}
+                  onLater={deferAdaptation}
+                  applyLabel={weekState.adaptation.primaryLabel}
+                />
+              </div>
+            </section>
+          ) : null}
+        </>
+      ) : null}
+
+      {unmatchedUploads.length > 0 ? (
+        <section className="surface-subtle p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Uploads needing assignment</p>
+              <p className="mt-1 text-sm text-muted">These workouts are secondary to week repair. Assign them once the week decision is clear.</p>
+            </div>
+            <p className="text-xs text-muted">{unmatchedUploads.length} open</p>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {unmatchedUploads.map((upload) => (
+              <div key={upload.id} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-3">
+                <p className="text-sm font-semibold text-[hsl(var(--text-primary))]">Uploaded workout</p>
+                <p className="mt-1 text-xs text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {upload.source?.uploadId ? (
-                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to session</button>
+                    <button onClick={() => setAssignSource(upload)} className="btn-secondary px-3 py-1.5 text-xs">Assign to session</button>
                   ) : null}
                   <button
                     onClick={() => {
@@ -450,75 +626,11 @@ export function WeekCalendar({
                         })();
                       });
                     }}
-                    className="text-muted hover:text-foreground"
+                    className="btn-secondary px-3 py-1.5 text-xs"
                   >
                     Mark extra
                   </button>
-                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="text-muted hover:text-foreground">Dismiss</button>
                 </div>
-              </div>
-            ))}
-            {skippedToResolve.map((session) => (
-              <div key={session.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                <p className="font-semibold">Skipped session</p>
-                <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
-                <p className="text-muted">Suggested move: {absorbDayLabel}</p>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 md:justify-end">
-                  <button onClick={() => setMoveSource(session)} className="text-accent hover:underline">Move to another day</button>
-                  <button
-                    onClick={() => {
-                      startTransition(() => {
-                        void (async () => {
-                          try {
-                            await confirmSkippedAction({ sessionId: session.id });
-                            setLocalSessions((prev) =>
-                              prev.map((item) =>
-                                item.id === session.id
-                                  ? { ...item, notes: item.notes ? `${item.notes}\n[Skip confirmed ${new Date().toISOString().slice(0, 10)}]` : `[Skip confirmed ${new Date().toISOString().slice(0, 10)}]` }
-                                  : item
-                              )
-                            );
-                            setDismissedIssues((prev) => [...prev, getIssueId("skipped_reassign", session.id)]);
-                            setToast("Skip confirmed");
-                            router.refresh();
-                          } catch {
-                            setToast("Could not confirm skip");
-                          }
-                        })();
-                      });
-                    }}
-                    className="text-muted hover:text-foreground"
-                  >
-                    Confirm skip
-                  </button>
-                </div>
-              </div>
-            ))}
-            {movedItems.map((move) => {
-              const session = localSessions.find((item) => item.id === move.sessionId);
-              if (!session) return null;
-              return (
-                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
-                  <p className="font-semibold">Moved session</p>
-                  <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 md:justify-end">
-                    <button onClick={() => setDetailSession(session)} className="text-accent hover:underline">Review</button>
-                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="text-muted hover:text-foreground">Dismiss</button>
-                  </div>
-                </div>
-              );
-            })}
-            {extraItems.map((item) => (
-              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold">Extra workout logged</p>
-                  <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
-                </div>
-                <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("extra_workout", item.id)])} className="text-muted hover:text-foreground">Dismiss</button>
               </div>
             ))}
           </div>
@@ -530,25 +642,29 @@ export function WeekCalendar({
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
           const isToday = day.iso === todayIso;
-          const isFuture = day.iso > todayIso;
-          const isPast = day.iso < todayIso;
-          const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
-          const dayLabel = isToday
-            ? getDayStateLabel("today")
-            : needsAttention
-              ? getDayStateLabel("needs_attention")
-              : metrics?.fullyDone
-                ? getDayStateLabel("complete")
-                : metrics?.isRest
-                  ? getDayStateLabel("rest_day")
-                  : metrics?.availableDay
-                    ? getDayStateLabel("available")
-                    : metrics?.openCapacity
-                      ? getDayStateLabel("open_capacity")
-                      : isFuture && metrics?.hasPlanned
-                        ? getDayStateLabel("planned")
-                        : getDayStateLabel("planned");
-          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
+          const plannedDaySessions = weekState.sessions.filter((session) => session.date === day.iso && !session.isExtra);
+          const dayHasMissed = plannedDaySessions.some((session) => session.lifecycle === "missed");
+          const dayHasToday = plannedDaySessions.some((session) => session.lifecycle === "today");
+          const dayAllCompleted = plannedDaySessions.length > 0 && plannedDaySessions.every((session) => session.lifecycle === "completed");
+          const dayAllSkipped = plannedDaySessions.length > 0 && plannedDaySessions.every((session) => session.lifecycle === "skipped");
+          const dayLabel = dayHasToday
+            ? "Today"
+            : dayHasMissed
+              ? "Missed"
+              : dayAllCompleted
+                ? "Completed"
+                : dayAllSkipped
+                  ? "Skipped"
+                  : metrics?.availableDay || plannedDaySessions.length === 0
+                    ? "Recovery"
+                    : "Planned";
+          const dayTone = dayHasMissed
+            ? "text-[hsl(var(--signal-risk))]"
+            : dayHasToday
+              ? "text-accent"
+              : dayAllCompleted
+                ? "text-[hsl(var(--success))]"
+                : "text-muted";
 
           return (
             <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
@@ -571,38 +687,28 @@ export function WeekCalendar({
                 ) : null}
                 {daySessions.map((session) => {
                   const movedMeta = trackedMoves.find((move) => move.sessionId === session.id) ?? (getMovedFromDate(session.notes) ? { fromDate: getMovedFromDate(session.notes) } : null);
-                  const state = getSessionState(session, trackedMoves, extraActivityIds);
+                  const state = derivedLifecycleById.get(session.id) ?? getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
                     state === "completed"
                       ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
                       : state === "skipped"
-                        ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
-                        : state === "moved"
-                          ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
+                        ? "border-[hsl(var(--warning)/0.4)] bg-[hsl(var(--warning)/0.08)]"
+                        : state === "missed"
+                          ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
+                          : state === "today"
+                            ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
                         : state === "extra"
                           ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                          : state === "unmatched_upload"
+                          : session.displayType === "completed_activity"
                             ? "border-[hsl(var(--accent-performance)/0.42)] bg-[linear-gradient(180deg,hsl(var(--accent-performance)/0.12),hsl(var(--accent-performance)/0.05))] shadow-[inset_0_1px_0_hsl(var(--accent-performance)/0.12)]"
-                          : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
-                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
-
-                  const stateBadge =
-                    state === "extra" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
-                    ) : state === "unmatched_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
-                    ) : state === "moved" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
-                    ) : (
-                      <SessionStatusChip status={session.status} compact />
-                    );
+                            : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
-                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload";
-                  const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
+                  const stateMeta = SESSION_LIFECYCLE_META[state];
+                  const needsAssignment = session.displayType === "completed_activity" && !session.isUnplanned && !extraActivityIds.includes(session.id);
+                  const cardTitle = needsAssignment ? "Uploaded workout" : getSessionTitle(session);
 
                   return (
                     <article
@@ -636,8 +742,13 @@ export function WeekCalendar({
                             startTransition(() => {
                               void (async () => {
                                 try {
-                                  if (session.status === "skipped") await clearSkippedAction({ sessionId: session.id });
-                                  else await markSkippedAction({ sessionId: session.id });
+                                  if (session.status === "skipped") {
+                                    await clearSkippedAction({ sessionId: session.id });
+                                    setLocalSessions((prev) => prev.map((item) => item.id === session.id ? { ...item, status: "planned" } : item));
+                                  } else {
+                                    await markSkippedAction({ sessionId: session.id });
+                                    setLocalSessions((prev) => prev.map((item) => item.id === session.id ? { ...item, status: "skipped" } : item));
+                                  }
                                   router.refresh();
                                 } catch {
                                   setToast("Could not update skipped state");
@@ -648,29 +759,19 @@ export function WeekCalendar({
                         />
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
-                      <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
-                      {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
-                            <span aria-hidden="true">✓</span>
-                            Completed
-                          </span>
-                        </div>
-                      ) : state === "unmatched_upload" ? (
-                        <div className="mt-2 border-t border-[hsl(var(--accent-performance)/0.18)] pt-1.5">
-                          {session.source?.uploadId ? (
-                            <button
-                              type="button"
-                              onClick={() => setAssignSource(session)}
-                              className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
-                            >
-                              Review upload
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="mt-1 flex items-center justify-end">{stateBadge}</div>
-                      )}
+                      <p className="mt-0 text-[11px] text-muted">{session.duration} min{needsAssignment ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5 border-t border-[hsl(var(--border)/0.7)] pt-1.5">
+                        <StatusPill label={stateMeta.label} tone={stateMeta.tone} icon={stateMeta.icon} compact />
+                        {needsAssignment ? <StatusPill label="Needs review" tone="info" compact /> : null}
+                        {movedMeta ? (
+                          <StatusPill
+                            label={`Moved${movedMeta.fromDate ? ` from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}`}
+                            tone="info"
+                            compact
+                          />
+                        ) : null}
+                        {session.is_key ? <StatusPill label="Key session" tone="attention" compact /> : null}
+                      </div>
                     </article>
                   );
                 })}

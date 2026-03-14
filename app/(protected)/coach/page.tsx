@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { CoachIssueWorkspace } from "@/components/training/coach-issue-workspace";
+import { StatusPill } from "@/components/training/status-pill";
 import { CoachChat } from "./coach-chat";
 import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { createClient } from "@/lib/supabase/server";
@@ -6,6 +8,7 @@ import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getSessionDisplayName } from "@/lib/training/session";
+import { buildWeekStateSummary } from "@/lib/training/week-state";
 
 type SessionRow = {
   id: string;
@@ -14,7 +17,14 @@ type SessionRow = {
   type: string;
   session_name?: string | null;
   intent_category?: string | null;
+  intent_summary?: string | null;
+  target?: string | null;
+  duration_minutes?: number | null;
   status?: "planned" | "completed" | "skipped" | null;
+  is_key?: boolean | null;
+  is_protected?: boolean | null;
+  is_flexible?: boolean | null;
+  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
   execution_result?: Record<string, unknown> | null;
 };
 
@@ -147,6 +157,31 @@ async function getDiagnosisSessions(supabase: Awaited<ReturnType<typeof createCl
     .slice(0, 6);
 }
 
+async function getWeekSessions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  weekStart: string,
+  weekEnd: string
+) {
+  if (!userId) {
+    return [] as SessionRow[];
+  }
+
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("id,date,sport,type,session_name,intent_category,intent_summary,target,duration_minutes,status,is_key,is_protected,is_flexible,session_role,execution_result")
+    .eq("user_id", userId)
+    .gte("date", weekStart)
+    .lte("date", weekEnd)
+    .order("date", { ascending: true });
+
+  if (error) {
+    return [] as SessionRow[];
+  }
+
+  return (data ?? []) as SessionRow[];
+}
+
 async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, weekStart: string, weekEnd: string): Promise<CoachBriefingContext> {
   if (!userId) {
     return {
@@ -233,10 +268,11 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
   const weekStart = getCurrentWeekStart();
   const weekEnd = addDays(weekStart, 6);
 
-  const [diagnosisSessions, briefingContext, athleteContext] = await Promise.all([
+  const [diagnosisSessions, briefingContext, athleteContext, weekSessions] = await Promise.all([
     user ? getDiagnosisSessions(supabase, user.id, weekStart, weekEnd) : [],
     user ? getBriefingContext(supabase, user.id, weekStart, weekEnd) : getBriefingContext(supabase, "", weekStart, weekEnd),
-    user ? getAthleteContextSnapshot(supabase, user.id) : null
+    user ? getAthleteContextSnapshot(supabase, user.id) : null,
+    user ? getWeekSessions(supabase, user.id, weekStart, weekEnd) : []
   ]);
 
   const weeklyBrief = user && athleteContext
@@ -250,146 +286,150 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
     : null;
   const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;
   const missingContextLabels = athleteContext ? getMissingContextLabels(athleteContext) : [];
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const weekState = buildWeekStateSummary({
+    sessions: weekSessions.map((session) => ({
+      id: session.id,
+      date: session.date,
+      title: getSessionDisplayName({
+        sessionName: session.session_name ?? session.type,
+        subtype: session.type,
+        discipline: session.sport
+      }),
+      sport: session.sport,
+      durationMinutes: session.duration_minutes ?? 0,
+      storedStatus: session.status ?? "planned",
+      isKey: Boolean(session.is_key),
+      isProtected: Boolean(session.is_protected || session.is_key),
+      isFlexible: Boolean(session.is_flexible),
+      isOptional: String(session.session_role ?? "").toLowerCase() === "optional",
+      intentSummary: session.intent_summary ?? null,
+      intentCategory: session.intent_category ?? null,
+      target: session.target ?? null,
+      executionResult: session.execution_result ?? null
+    })),
+    todayIso
+  });
+  const issueItems = weekState.issues.map((issue) => ({ ...issue }));
+  const reviewedCount = weeklyBrief?.trend.reviewedCount ?? diagnosisSessions.length;
+  const onTargetCount = weeklyBrief?.trend.onTargetCount ?? diagnosisSessions.filter((session) => session.status === "matched").length;
+  const partialCount = weeklyBrief?.trend.partialCount ?? diagnosisSessions.filter((session) => session.status === "partial").length;
+  const missedCount = weeklyBrief?.trend.missedCount ?? diagnosisSessions.filter((session) => session.status === "missed").length;
+  const topRisk = weeklyBrief?.keyRisk ?? weekState.topIntervention.why;
+  const topAction = weekState.topIntervention.recommendedAction;
 
   return (
     <section className="space-y-4">
-      {weeklyBrief ? (
-        <article className="surface p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-accent">Coach Briefing</p>
-              <h2 className="mt-1 text-2xl font-semibold">{weeklyBrief.weekHeadline}</h2>
-              <p className="mt-2 max-w-3xl text-sm text-muted">{weeklyBrief.weekSummary}</p>
+      <article className="surface p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.14em] text-accent">Weekly coaching briefing</p>
+            <h1 className="mt-1 text-2xl font-semibold">{weeklyBrief?.weekHeadline ?? "Current coaching read"}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-muted">{weeklyBrief?.weekSummary ?? weekState.focusStatement}</p>
+          </div>
+          <Link href="/settings/athlete-context" className="btn-secondary px-3 py-1.5 text-xs">
+            Your coaching profile
+          </Link>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Overall coaching read</p>
+              <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{weeklyBrief?.nextWeekDecision ?? weekState.focusStatement}</p>
             </div>
-            <Link href="/settings/athlete-context" className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground">
-              Edit athlete context
-            </Link>
+            <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Top risk</p>
+              <p className="mt-2 text-sm text-muted">{topRisk}</p>
+            </div>
+            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:col-span-2">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Top recommended action</p>
+              <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{topAction}</p>
+              {weeklyBrief?.confidenceNote ? <p className="mt-2 text-xs text-tertiary">{weeklyBrief.confidenceNote}</p> : null}
+            </div>
           </div>
 
-          {weeklyBrief.trend.reviewedCount === 0 ? (
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What unlocks a stronger brief</p>
-                <p className="mt-2 text-sm">Once this week has reviewed sessions, Coach will summarize what landed, what drifted, and what to protect next.</p>
-                <p className="mt-2 text-xs text-tertiary">{briefingContext.uploadedSessionCount} uploaded · {briefingContext.linkedSessionCount} linked · {briefingContext.pendingReviewCount} pending review</p>
+          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Reviewed this week</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-2xl font-semibold">{reviewedCount}</p>
+                <p className="text-xs text-muted">Reviewed</p>
               </div>
-              <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Best next move</p>
-                <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
-                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? <p className="mt-2 text-xs text-tertiary">{athleteContext.observed.recurringPatterns[0]?.detail}</p> : null}
+              <div>
+                <p className="text-2xl font-semibold text-[hsl(var(--success))]">{onTargetCount}</p>
+                <p className="text-xs text-muted">On target</p>
               </div>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key positive</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.keyPositive ?? "No strong positive yet. More reviewed sessions will sharpen the read."}</p>
-                </div>
-                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Key risk</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.keyRisk ?? "No single session is creating outsized risk right now."}</p>
-                </div>
-                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Next-week decision</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
-                  {weeklyBrief.confidenceNote ? <p className="mt-2 text-xs text-tertiary">{weeklyBrief.confidenceNote}</p> : null}
-                </div>
+              <div>
+                <p className="text-2xl font-semibold text-[hsl(var(--warning))]">{partialCount}</p>
+                <p className="text-xs text-muted">Partial</p>
               </div>
-
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Trend line</p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-2xl font-semibold">{weeklyBrief.trend.reviewedCount}</p>
-                    <p className="text-xs text-muted">Reviewed</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--success))]">{weeklyBrief.trend.onTargetCount}</p>
-                    <p className="text-xs text-muted">On target</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--warning))]">{weeklyBrief.trend.partialCount}</p>
-                    <p className="text-xs text-muted">Partial</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold text-[hsl(var(--signal-risk))]">{weeklyBrief.trend.missedCount}</p>
-                    <p className="text-xs text-muted">Missed</p>
-                  </div>
-                </div>
-                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? (
-                  <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Athlete context cue</p>
-                    <p className="mt-2 text-sm">{athleteContext.observed.recurringPatterns[0]?.detail}</p>
-                  </div>
-                ) : null}
+              <div>
+                <p className="text-2xl font-semibold text-[hsl(var(--signal-risk))]">{missedCount}</p>
+                <p className="text-xs text-muted">Missed intent</p>
               </div>
             </div>
-          )}
-
-          {weeklyBrief.sessionsNeedingAttention.length > 0 ? (
-            <div className="mt-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                {weeklyBrief.sessionsNeedingAttention.map((session) => (
-                  <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[hsl(var(--border))] p-4 transition hover:border-[hsl(var(--accent)/0.4)]">
-                    <p className="text-sm font-semibold">{session.sessionName}</p>
-                    <p className="mt-2 text-xs text-tertiary">{session.scoreHeadline}</p>
-                    <p className="mt-2 text-sm text-muted">{session.reason}</p>
-                  </Link>
-                ))}
-              </div>
+            <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Current context</p>
+              <p className="mt-2 text-sm text-muted">
+                {athleteContext?.observed.recurringPatterns[0]?.detail ?? `Uploads ${briefingContext.uploadedSessionCount} · linked ${briefingContext.linkedSessionCount} · pending review ${briefingContext.pendingReviewCount}`}
+              </p>
             </div>
-          ) : null}
-        </article>
-      ) : null}
-
-      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
-
-      <section className="space-y-2.5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Coach tools</p>
+          </div>
         </div>
-        <div className="grid gap-2.5 xl:grid-cols-[1.15fr_0.85fr]">
-          {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : <div />}
+      </article>
 
-          {athleteContext ? (
-            <article className="surface p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-accent">Coaching profile</p>
-                  <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
-                  <p className="mt-1 text-sm text-muted">
-                    {contextIncomplete
-                      ? "Finish a few durable context fields so Coach can personalize language and stay conservative for the right reasons."
-                      : "Coach already has your baseline context and can keep using it across briefing, reviews, and chat."}
-                  </p>
-                </div>
-                <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "btn-secondary px-3 py-1.5 text-xs"}>
-                  {contextIncomplete ? "Complete profile" : "Edit profile"}
-                </Link>
-              </div>
+      <CoachIssueWorkspace
+        issues={issueItems}
+        defaultPromptPrefix={`Week of ${weekStart}: `}
+      />
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {contextIncomplete
-                  ? missingContextLabels.map((label) => (
-                    <span key={label} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{label}</span>
-                  ))
-                  : (
-                    <>
-                      {athleteContext.goals.priorityEventName ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.priorityEventName}</span> : null}
-                      {athleteContext.goals.goalType ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.goals.goalType}</span> : null}
-                      {athleteContext.declared.experienceLevel.value ? <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{athleteContext.declared.experienceLevel.value}</span> : null}
-                      {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
-                        <span key={limiter.value} className="rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-muted">{limiter.value}</span>
-                      ))}
-                    </>
-                  )}
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : <div />}
+
+        {athleteContext ? (
+          <article className="surface p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-accent">Your coaching profile</p>
+                <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "A few context details are still missing" : "Context is ready for this week"}</h2>
+                <p className="mt-1 text-sm text-muted">
+                  {contextIncomplete
+                    ? "Finish the missing fields so weekly decisions and session reviews can stay specific."
+                    : "Coach can use this context across briefing, flagged issues, and follow-up."}
+                </p>
               </div>
-            </article>
-          ) : null}
-        </div>
+              <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "btn-secondary px-3 py-1.5 text-xs"}>
+                {contextIncomplete ? "Complete profile" : "Edit profile"}
+              </Link>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {contextIncomplete
+                ? missingContextLabels.map((label) => (
+                  <StatusPill key={label} label={label} tone="warning" compact />
+                ))
+                : (
+                  <>
+                    {athleteContext.goals.priorityEventName ? <StatusPill label={athleteContext.goals.priorityEventName} tone="neutral" compact /> : null}
+                    {athleteContext.goals.goalType ? <StatusPill label={athleteContext.goals.goalType} tone="neutral" compact /> : null}
+                    {athleteContext.declared.experienceLevel.value ? <StatusPill label={athleteContext.declared.experienceLevel.value} tone="neutral" compact /> : null}
+                    {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
+                      <StatusPill key={limiter.value} label={limiter.value} tone="neutral" compact />
+                    ))}
+                  </>
+                )}
+            </div>
+          </article>
+        ) : null}
       </section>
+
+      <details className="surface-subtle p-4">
+        <summary className="cursor-pointer text-sm font-medium">Conversation history</summary>
+        <div className="mt-4">
+          <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
+        </div>
+      </details>
     </section>
   );
 }

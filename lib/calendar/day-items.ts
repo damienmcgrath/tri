@@ -262,7 +262,7 @@ export function buildCalendarDisplayItems(input: {
       duration: item.duration_min,
       notes: null,
       created_at: item.created_at,
-      status: "unmatched_upload",
+      status: item.is_unplanned ? "extra" : "completed",
       linkedActivityCount: 1,
       linkedStats: {
         durationMin: item.duration_min,

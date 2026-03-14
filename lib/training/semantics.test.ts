@@ -1,20 +1,41 @@
 import {
+  ADAPTATION_META,
   DAY_STATE_LABELS,
+  EVIDENCE_QUALITY_META,
   EXECUTION_RESULT_LABELS,
+  REVIEW_OUTCOME_META,
+  SESSION_INTENT_CATEGORIES,
+  SESSION_LIFECYCLE_META,
+  SESSION_LIFECYCLE_TONES,
+  SESSION_SECONDARY_META,
+  deriveSessionLifecycleState,
   getExecutionResultLabel,
   getSessionIntentLabel,
   getSessionLifecycleLabel,
   getSessionRoleLabel,
-  SESSION_INTENT_CATEGORIES,
-  SESSION_LIFECYCLE_LABELS,
-  SESSION_LIFECYCLE_TONES
+  normalizeReviewOutcomeState
 } from "./semantics";
 
 describe("training semantics", () => {
-  it("exposes labels for all session lifecycle states", () => {
-    expect(SESSION_LIFECYCLE_LABELS.assigned_from_upload).toBe("Assigned from upload");
-    expect(SESSION_LIFECYCLE_LABELS.unmatched_upload).toBe("Unmatched upload");
-    expect(getSessionLifecycleLabel("moved")).toBe("Moved");
+  it("exposes labels for canonical lifecycle and secondary states", () => {
+    expect(getSessionLifecycleLabel("today")).toBe("Today");
+    expect(SESSION_LIFECYCLE_META.missed.label).toBe("Missed");
+    expect(SESSION_SECONDARY_META.unmatched_upload.label).toBe("Needs review");
+  });
+
+  it("derives lifecycle state from stored status, date, and extra-work flags", () => {
+    expect(deriveSessionLifecycleState({ storedStatus: "completed", date: "2026-03-10", todayIso: "2026-03-11" })).toBe("completed");
+    expect(deriveSessionLifecycleState({ storedStatus: "planned", date: "2026-03-11", todayIso: "2026-03-11" })).toBe("today");
+    expect(deriveSessionLifecycleState({ storedStatus: "planned", date: "2026-03-10", todayIso: "2026-03-11" })).toBe("missed");
+    expect(deriveSessionLifecycleState({ storedStatus: "planned", date: "2026-03-12", todayIso: "2026-03-11", isExtra: true })).toBe("extra");
+  });
+
+  it("normalizes review outcomes and exposes athlete-facing labels", () => {
+    expect(normalizeReviewOutcomeState("matched_intent")).toBe("on_target");
+    expect(normalizeReviewOutcomeState("partial")).toBe("partial_match");
+    expect(REVIEW_OUTCOME_META.missed_intent.label).toBe("Missed intent");
+    expect(EVIDENCE_QUALITY_META.low.label).toBe("Low");
+    expect(ADAPTATION_META.pending_decision.label).toBe("Decision pending");
   });
 
   it("exposes day, role, and intent labels", () => {
@@ -24,9 +45,9 @@ describe("training semantics", () => {
     expect(SESSION_INTENT_CATEGORIES).toContain("technique_swim");
   });
 
-  it("exposes execution labels and shared tone mapping", () => {
+  it("keeps execution labels and lifecycle tones available", () => {
     expect(getExecutionResultLabel("partial_intent")).toBe("Partial intent");
     expect(EXECUTION_RESULT_LABELS.missed_intent).toBe("Missed intent");
-    expect(SESSION_LIFECYCLE_TONES.unmatched_upload).toBe("attention");
+    expect(SESSION_LIFECYCLE_TONES.extra).toBe("info");
   });
 });

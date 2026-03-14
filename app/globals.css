@@ -760,6 +760,12 @@
     color: hsl(var(--signal-neutral));
   }
 
+  .status-chip-today {
+    border-color: hsl(var(--accent-performance) / 0.42);
+    background: hsl(var(--accent-performance) / 0.14);
+    color: hsl(var(--accent-performance));
+  }
+
   .status-chip-completed {
     border-color: hsl(var(--signal-ready) / 0.35);
     background: hsl(var(--signal-ready) / 0.14);
@@ -772,14 +778,29 @@
     color: hsl(var(--signal-risk));
   }
 
+  .status-chip-missed {
+    border-color: hsl(var(--signal-risk) / 0.45);
+    background: hsl(var(--signal-risk) / 0.18);
+    color: hsl(var(--signal-risk));
+  }
+
+  .status-chip-extra {
+    border-color: hsl(var(--signal-load) / 0.38);
+    background: hsl(var(--signal-load) / 0.14);
+    color: hsl(var(--signal-load));
+  }
+
   :root[data-theme="carbon-coach"] .signal-ready,
   :root[data-theme="carbon-coach"] .signal-load,
   :root[data-theme="carbon-coach"] .signal-risk,
   :root[data-theme="carbon-coach"] .signal-recovery,
   :root[data-theme="carbon-coach"] .signal-neutral,
   :root[data-theme="carbon-coach"] .status-chip-planned,
+  :root[data-theme="carbon-coach"] .status-chip-today,
   :root[data-theme="carbon-coach"] .status-chip-completed,
-  :root[data-theme="carbon-coach"] .status-chip-skipped {
+  :root[data-theme="carbon-coach"] .status-chip-skipped,
+  :root[data-theme="carbon-coach"] .status-chip-missed,
+  :root[data-theme="carbon-coach"] .status-chip-extra {
     border-color: hsl(var(--border) / 0.88);
     background: hsl(var(--surface-soft));
   }

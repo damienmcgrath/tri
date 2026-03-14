@@ -1,5 +1,11 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
+import {
+  normalizeReviewSummary,
+  type IntentVsActualMetric,
+  type StimulusLandingState
+} from "@/lib/training/review-summary";
+import type { EvidenceQualityState, ReviewOutcomeState } from "@/lib/training/semantics";
 
 export type SessionReviewRow = {
   id: string;
@@ -32,6 +38,7 @@ export type ReviewViewModel = {
   sessionStatusLabel: string;
   sessionStatusDetail: string;
   isReviewable: boolean;
+  reviewOutcome: ReviewOutcomeState;
   intent: { label: string; tone: Tone; detail: string };
   score: number | null;
   scoreBand: ScoreBand | null;
@@ -42,12 +49,23 @@ export type ReviewViewModel = {
   executionCostLabel: string | null;
   confidenceLabel: string | null;
   plannedIntent: string;
+  intendedStimulus: string;
   actualExecutionSummary: string;
   mainGap: string;
   usefulMetrics: Array<{ label: string; value: string }>;
+  intentVsActualMetrics: IntentVsActualMetric[];
+  verdictSummary: string;
+  didStimulusLand: StimulusLandingState;
+  recommendation: string;
+  stimulusImpactLabel: string;
+  effectOnWeekLabel: string;
   whyItMatters: string;
   nextAction: string;
   weekAction: string;
+  evidenceQualityState: EvidenceQualityState;
+  evidenceQualityLabel: string;
+  confidenceExplanation: string;
+  missingEvidenceLabels: string[];
   uncertaintyTitle: string | null;
   uncertaintyDetail: string | null;
   missingEvidence: string[];
@@ -220,9 +238,9 @@ function toIntent(status: unknown, isReviewable: boolean, hasLinkedActivity: boo
     };
   }
 
-  if (status === "matched_intent" || status === "matched") {
+  if (status === "matched_intent" || status === "matched" || status === "on_target") {
     return {
-      label: "Matched intent",
+      label: "On target",
       tone: "success" as const,
       detail: "Execution stayed aligned with the planned training stimulus."
     };
@@ -268,7 +286,7 @@ function summarizeActualExecution(params: {
 }) {
   const { bucket, intentLabel, executionSummary, timeAbove, intervalCompletion, durationCompletion, hrDrift, paceFade } = params;
 
-  if (intentLabel === "Matched intent") return summarizeMatchedSession(bucket);
+  if (intentLabel === "On target") return summarizeMatchedSession(bucket);
   if (bucket === "recovery" && (timeAbove ?? 0) >= 0.15) return "Recovery intent drifted too hard, so the session likely stopped acting like true recovery.";
   if (bucket === "easy" && ((timeAbove ?? 0) >= 0.2 || (hrDrift ?? 1) > 1.06)) return "The easy session drifted harder than planned, especially once fatigue started to rise.";
   if (bucket === "threshold" && (intervalCompletion ?? 1) < 0.9) return "Threshold work was only partially completed, so the quality block landed short of the planned stimulus.";
@@ -294,7 +312,7 @@ function deriveMainGap(params: {
   const { isReviewable, bucket, intentLabel, timeAbove, intervalCompletion, durationCompletion, hrDrift, paceFade } = params;
 
   if (!isReviewable) return "No execution gap yet, because this workout has not been completed and synced for review.";
-  if (intentLabel === "Matched intent") return "Session matched intent well. Keep the same execution approach next time.";
+  if (intentLabel === "On target") return "Session matched intent well. Keep the same execution approach next time.";
   if (bucket === "recovery" && (timeAbove ?? 0) >= 0.15) return "Recovery session stayed too hard to deliver the easy-day reset it was meant to provide.";
   if (bucket === "easy" && ((timeAbove ?? 0) >= 0.2 || (hrDrift ?? 1) > 1.06)) return "Easy session drifted too hard, so the aerobic intent lost some of its control.";
   if (bucket === "threshold" && (intervalCompletion ?? 1) < 0.85) return "Threshold reps were under target or left incomplete, reducing the specific quality dose.";
@@ -310,7 +328,7 @@ function deriveMainGap(params: {
 function deriveWeekAction(params: { intentLabel: string; bucket: IntentBucket; isReviewable: boolean }) {
   const { intentLabel, bucket, isReviewable } = params;
   if (!isReviewable) return "Complete or sync this workout before making bigger training changes.";
-  if (intentLabel === "Matched intent") return "Keep the next key session as planned, and carry the same execution discipline into it.";
+  if (intentLabel === "On target") return "Keep the next key session as planned, and carry the same execution discipline into it.";
   if (bucket === "recovery" || bucket === "easy") return "Protect the next 48 hours from extra intensity so the week does not drift harder than planned.";
   if (bucket === "threshold") return "Keep the next key session on the calendar, but only progress the load if you can hit the full set cleanly.";
   if (bucket === "long") return "Hold the planned week structure, but be more deliberate with pacing and fueling before the next long session.";
@@ -337,14 +355,27 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const hasLinkedActivity = session.has_linked_activity === true;
   const hasDiagnosticSignals = Boolean(diagnosis) && Object.keys(diagnosis ?? {}).length > 0;
   const isExtra = session.is_extra === true;
+  const normalizedSummary = normalizeReviewSummary({
+    sport: session.sport,
+    type: session.type,
+    sessionName: session.session_name ?? session.type,
+    intentCategory: session.intent_category ?? null,
+    intentSummary: null,
+    target: session.target ?? null,
+    durationMinutes: session.duration_minutes ?? null,
+    storedStatus: session.status ?? "planned",
+    executionResult: diagnosis,
+    hasLinkedActivity,
+    isExtra
+  });
   const reviewState = isExtra ? toExtraReviewState(hasDiagnosticSignals) : toReviewState(session.status, diagnosis, hasLinkedActivity);
-  const intent = toIntent(diagnosis?.status, reviewState.isReviewable, hasLinkedActivity);
+  const intent = toIntent(normalizedSummary.outcome, reviewState.isReviewable, hasLinkedActivity);
   const bucket = toIntentBucket(session.intent_category, session.sport);
 
   const defaultWhyItMatters = isExtra
     ? "Unplanned sessions still change the training week, so the key question is whether this added useful stimulus or unnecessary load."
     : reviewState.isReviewable
-    ? intent.label === "Matched intent"
+    ? intent.label === "On target"
       ? "Matching the planned session intent preserves the adaptation you wanted from the day and supports the rest of the week."
       : "Execution consistency protects the intended training effect and helps the rest of the week land as planned."
     : "A useful review starts with a completed session, because that is what makes coaching advice trustworthy.";
@@ -352,7 +383,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const defaultNextAction = isExtra
     ? "Decide whether this should count as added load, a replacement for missed work, or a reason to trim the next session."
     : reviewState.isReviewable
-    ? intent.label === "Matched intent"
+    ? intent.label === "On target"
       ? "Good control. Keep the same execution approach next time."
       : "Start the next similar session with one clear execution cue and protect it early."
     : hasLinkedActivity
@@ -398,35 +429,9 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const hrDrift = firstHalfHr && lastHalfHr ? lastHalfHr / firstHalfHr : null;
   const paceFade = firstHalfPace && lastHalfPace ? lastHalfPace / firstHalfPace : null;
 
-  const actualExecutionSummary = isExtra
-    ? executionSummary || "This extra session added training load outside the original plan."
-    : summarizeActualExecution({
-    bucket,
-    intentLabel: intent.label,
-    executionSummary,
-    timeAbove,
-    intervalCompletion,
-    durationCompletion,
-    avgHr,
-    avgPower,
-    hrDrift,
-    paceFade
-  });
+  const actualExecutionSummary = normalizedSummary.actualExecution;
 
-  const mainGap = isExtra
-    ? reviewState.isReviewable
-      ? "There is no planned target to compare against, so the main question is whether this extra load helped the week or created recovery cost."
-      : "Without richer data, treat this extra session as additive load and judge it by how it affects the next 48 hours."
-    : deriveMainGap({
-    isReviewable: reviewState.isReviewable,
-    bucket,
-    intentLabel: intent.label,
-    timeAbove,
-    intervalCompletion,
-    durationCompletion,
-    hrDrift,
-    paceFade
-  });
+  const mainGap = normalizedSummary.primaryGap;
 
   const scoreHeadline =
     score !== null
@@ -482,8 +487,8 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
       : null
   ].filter((metric): metric is { label: string; value: string } => metric !== null);
 
-  const plannedIntent = isExtra ? "No planned intent. Review this as additional weekly load." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
-  const weekAction = getString(
+  const plannedIntent = normalizedSummary.intendedStimulus;
+  const weekAction = normalizedSummary.weekRecommendation || getString(
     v2Review?.verdict?.explanation
       ? { suggestedWeekAdjustment: v2Review.verdict.explanation.whatToDoThisWeek }
       : diagnosis,
@@ -499,16 +504,16 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
       : null;
   const confidenceLabel = v2Review?.verdict?.sessionVerdict.confidence ?? (getString(diagnosis, ["diagnosisConfidence", "diagnosis_confidence"]) || null);
   const uncertaintyTitle =
-    v2Review?.verdict?.uncertainty.label === "confident_read"
+    normalizedSummary.evidenceQuality === "high" || v2Review?.verdict?.uncertainty.label === "confident_read"
       ? null
       : v2Review?.verdict?.uncertainty.label === "insufficient_data"
         ? "Insufficient data"
         : v2Review?.verdict?.uncertainty.label === "early_read"
           ? "Early read"
-          : null;
-  const uncertaintyDetail = v2Review?.verdict?.uncertainty.label && v2Review.verdict.uncertainty.label !== "confident_read"
-    ? v2Review.verdict.uncertainty.detail
-    : null;
+          : "Early read";
+  const uncertaintyDetail = normalizedSummary.evidenceQuality === "high"
+    ? null
+    : normalizedSummary.confidenceExplanation;
   const missingEvidence = v2Review?.verdict?.uncertainty.missingEvidence ?? (Array.isArray(diagnosis?.missingEvidence) ? diagnosis.missingEvidence.filter((item): item is string => typeof item === "string") : []);
 
   const unlockTitle = isExtra ? "Weekly context" : reviewState.isReviewable ? "Review evidence" : "What unlocks review";
@@ -551,6 +556,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     sessionStatusLabel: reviewState.sessionStatusLabel,
     sessionStatusDetail: reviewState.sessionStatusDetail,
     isReviewable: reviewState.isReviewable,
+    reviewOutcome: normalizedSummary.outcome,
     intent,
     score,
     scoreBand,
@@ -561,12 +567,23 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     executionCostLabel,
     confidenceLabel,
     plannedIntent,
+    intendedStimulus: normalizedSummary.intendedStimulus,
     actualExecutionSummary,
     mainGap,
     usefulMetrics,
+    intentVsActualMetrics: normalizedSummary.metrics,
+    verdictSummary: normalizedSummary.summary,
+    didStimulusLand: normalizedSummary.didStimulusLand,
+    recommendation: normalizedSummary.recommendation,
+    stimulusImpactLabel: normalizedSummary.stimulusImpact,
+    effectOnWeekLabel: normalizedSummary.effectOnWeek,
     whyItMatters,
-    nextAction,
+    nextAction: reviewState.isReviewable ? (normalizedSummary.recommendation || nextAction) : nextAction,
     weekAction,
+    evidenceQualityState: normalizedSummary.evidenceQuality,
+    evidenceQualityLabel: normalizedSummary.evidenceQualityLabel,
+    confidenceExplanation: normalizedSummary.confidenceExplanation,
+    missingEvidenceLabels: normalizedSummary.missingEvidenceLabels,
     uncertaintyTitle,
     uncertaintyDetail,
     missingEvidence,

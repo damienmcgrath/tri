@@ -1,78 +1,79 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { WeekRiskCard, WeeklyInterventionCard } from "@/components/training/dashboard-cards";
+import { StatusPill } from "@/components/training/status-pill";
+import { buildWeekStateSummary, type WeekSessionInput } from "@/lib/training/week-state";
+import { SESSION_LIFECYCLE_META } from "@/lib/training/semantics";
 import { getSessionDisplayName } from "@/lib/training/session";
-import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
-import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
+import { createClient } from "@/lib/supabase/server";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 
-type Session = {
+type SessionRow = {
   id: string;
   plan_id: string;
   date: string;
   sport: string;
   type: string;
   session_name?: string | null;
+  discipline?: string | null;
   subtype?: string | null;
   workout_type?: string | null;
   intent_category?: string | null;
-  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
-  source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
-  execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
+  intent_summary?: string | null;
+  target?: string | null;
   duration_minutes: number | null;
   notes: string | null;
   created_at: string;
-  status: "planned" | "completed" | "skipped";
+  status?: "planned" | "completed" | "skipped" | null;
+  execution_result?: Record<string, unknown> | null;
   is_key?: boolean | null;
+  is_protected?: boolean | null;
+  is_flexible?: boolean | null;
+  session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
 };
 
-type CompletedSession = {
+type LegacySessionRow = {
+  id: string;
+  plan_id: string;
+  date: string;
+  sport: string;
+  type: string;
+  duration_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+  status?: "planned" | "completed" | "skipped" | null;
+};
+
+type CompletedSessionRow = {
   date: string;
   sport: string;
 };
 
-type CompletedActivity = {
+type CompletedActivityRow = {
   id: string;
   sport_type: string;
   start_time_utc: string;
-  duration_sec: number;
-  schedule_status: "scheduled" | "unscheduled";
-  is_unplanned: boolean | null;
+  duration_sec: number | null;
+  schedule_status?: "scheduled" | "unscheduled" | null;
+  is_unplanned?: boolean | null;
 };
 
 type Profile = {
   active_plan_id: string | null;
-  race_date: string | null;
-  race_name: string | null;
 };
 
 type Plan = {
   id: string;
 };
 
-type ContextualItem = {
-  kicker: string;
-  title: string;
-  detail: string;
-  cta: string;
-  href: string;
-  ctaStyle: "primary" | "secondary";
-};
+function isMissingSessionColumnError(message?: string) {
+  return /(target|intent_summary|is_key|is_protected|is_flexible|session_name|discipline|subtype|workout_type|intent_category|execution_result|schema cache|column .* does not exist|42703)/i.test(
+    message ?? ""
+  );
+}
 
-type StatusChip = {
-  label: string;
-  className: string;
-};
-
-type DiagnosisAwareSignal = {
-  statusChipOverride?: StatusChip;
-  interpretationRisk?: ExecutionRisk;
-  statusInterpretation?: string;
-  focusOverride?: ContextualItem;
-  todayCue?: string;
-};
-
-type ExecutionRisk = "easy_control" | "recovery_control" | "bike_consistency" | "strong_execution";
+function isMissingActivityColumnError(message?: string) {
+  return /(schedule_status|is_unplanned|schema cache|column .* does not exist|42703)/i.test(message ?? "");
+}
 
 function toHoursAndMinutes(minutes: number) {
   const safeMinutes = Math.max(0, Math.round(minutes));
@@ -81,19 +82,26 @@ function toHoursAndMinutes(minutes: number) {
   return `${hours}h ${mins}m`;
 }
 
-function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
-  if (session.status === "completed" || session.status === "skipped") {
-    return session.status;
-  }
+function getLocalTodayIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  const isSkipped = /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(session.notes ?? "");
-  if (isSkipped) {
-    return "skipped" as const;
-  }
+function getFallbackStoredStatus(
+  session: Pick<SessionRow, "date" | "sport" | "notes" | "status">,
+  completionLedger: Record<string, number>,
+  linkedSessionIds: Set<string>,
+  sessionId: string
+) {
+  if (linkedSessionIds.has(sessionId)) return "completed" as const;
+  if (session.status === "completed" || session.status === "skipped") return session.status;
+  if (/\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(session.notes ?? "")) return "skipped" as const;
 
   const key = `${session.date}:${session.sport}`;
   const completedCount = completionLedger[key] ?? 0;
-
   if (completedCount > 0) {
     completionLedger[key] = completedCount - 1;
     return "completed" as const;
@@ -102,207 +110,63 @@ function getSessionStatus(session: Session, completionLedger: Record<string, num
   return "planned" as const;
 }
 
-function getStatusChip(completionPct: number, expectedByTodayPct: number) {
-  if (expectedByTodayPct <= 0) {
-    return { label: "On track", className: "signal-ready" };
-  }
-
-  const delta = completionPct - expectedByTodayPct;
-
-  if (delta >= -12) {
-    return { label: "On track", className: "signal-ready" };
-  }
-
-  if (delta >= -22) {
-    return { label: "Slightly behind", className: "signal-load" };
-  }
-
-  return { label: "At risk", className: "signal-risk" };
-}
-
-function getDefaultStatusInterpretation(statusLabel: string) {
-  if (statusLabel === "On track") {
-    return "On track — keep session order and keep easy work controlled.";
-  }
-
-  if (statusLabel === "Slightly behind") {
-    return "Slightly behind — protect key sessions and avoid stacking missed work.";
-  }
-
-  return "At risk — complete the next key session and keep weekend load unchanged.";
-}
-
-function getDiagnosisStatusInterpretation(statusLabel: string, risk: ExecutionRisk) {
-  if (risk === "easy_control") {
-    if (statusLabel === "On track") {
-      return "On track — easy days are drifting too hard.";
-    }
-    if (statusLabel === "Slightly behind") {
-      return "Slightly behind — keep easy work truly easy.";
-    }
-    return "At risk — rein in easy-day intensity now.";
-  }
-
-  if (risk === "recovery_control") {
-    if (statusLabel === "On track") {
-      return "On track — recovery sessions are running too hard.";
-    }
-    if (statusLabel === "Slightly behind") {
-      return "Slightly behind — hold recovery intent this week.";
-    }
-    return "At risk — protect recovery quality before adding load.";
-  }
-
-  if (risk === "bike_consistency") {
-    if (statusLabel === "On track") {
-      return "On track — bike execution needs tighter control.";
-    }
-    if (statusLabel === "Slightly behind") {
-      return "Slightly behind — bike sessions need better execution.";
-    }
-    return "At risk — stabilize bike execution before adding work.";
-  }
-
-  if (statusLabel === "On track") {
-    return "On track — execution is strong, hold the current load.";
-  }
-  if (statusLabel === "Slightly behind") {
-    return "Slightly behind, but execution quality is strong.";
-  }
-  return "At risk on progress — keep quality high while stabilizing load.";
-}
-
-function weekdayName(isoDate: string) {
-  return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00.000Z`));
-}
-
-function isMissingSessionColumnError(message: string | undefined) {
-  return /42703|schema cache|sessions\.(session_name|subtype|workout_type|intent_category|session_role|source_metadata|execution_result|is_key)/i.test(
-    message ?? ""
-  );
-}
-
-function getDayMeaningLabel(daySessions: Session[]) {
-  const plannedSessions = daySessions.filter((session) => session.status === "planned");
-  if (plannedSessions.length === 0) return null;
-
-  if (plannedSessions.length === 1) {
-    return getSessionDisplayName(plannedSessions[0]);
-  }
-
-  const uniqueSports = [...new Set(plannedSessions.map((session) => getDisciplineMeta(session.sport).label))];
-  if (uniqueSports.length === 1) {
-    return `${uniqueSports[0]} x${plannedSessions.length}`;
-  }
-
-  if (uniqueSports.length >= 2) {
-    return `${uniqueSports[0]} + ${uniqueSports[1]}`;
-  }
-
-  return `${plannedSessions.length} sessions`;
-}
-
-function getDiagnosisAwareSignal({
-  sessions,
-  todayIso,
-  nextPendingTodaySession,
-  fallbackFocusItem
-}: {
-  sessions: Session[];
+function getDaySummary(params: {
+  iso: string;
   todayIso: string;
-  nextPendingTodaySession: Session | null;
-  fallbackFocusItem: ContextualItem | null;
-}): DiagnosisAwareSignal {
-  const completedWithDiagnosis = sessions.filter(
-    (session) => session.status === "completed" && session.execution_result?.status
-  );
+  sessions: ReturnType<typeof buildWeekStateSummary>["sessions"];
+}) {
+  const daySessions = params.sessions.filter((session) => session.date === params.iso && !session.isExtra);
+  const completed = daySessions.filter((session) => session.lifecycle === "completed");
+  const skipped = daySessions.filter((session) => session.lifecycle === "skipped");
+  const missed = daySessions.filter((session) => session.lifecycle === "missed");
+  const remaining = daySessions.filter((session) => session.lifecycle === "today" || session.lifecycle === "planned");
+  const totalMinutes = daySessions.reduce((sum, session) => sum + session.durationMinutes, 0);
 
-  if (completedWithDiagnosis.length < 2) {
-    return { focusOverride: fallbackFocusItem ?? undefined };
-  }
-
-  const easySessions = completedWithDiagnosis.filter((session) => /easy|aerobic|base|endurance|recovery/i.test(session.intent_category ?? ""));
-  const easyOffIntent = easySessions.filter((session) => session.execution_result?.status !== "matched_intent");
-
-  const bikeSessions = completedWithDiagnosis.filter((session) => session.sport === "bike");
-  const bikeOffIntent = bikeSessions.filter((session) => session.execution_result?.status !== "matched_intent");
-
-  const recoverySessions = completedWithDiagnosis.filter((session) => /recovery/i.test(session.intent_category ?? ""));
-  const recoveryOffIntent = recoverySessions.filter((session) => session.execution_result?.status !== "matched_intent");
-
-  const keySessions = completedWithDiagnosis.filter((session) => session.is_key);
-  const keyMatched = keySessions.filter((session) => session.execution_result?.status === "matched_intent");
-
-  const easyOffRatio = easySessions.length > 0 ? easyOffIntent.length / easySessions.length : 0;
-  const bikeOffRatio = bikeSessions.length > 0 ? bikeOffIntent.length / bikeSessions.length : 0;
-  const recoveryOffRatio = recoverySessions.length > 0 ? recoveryOffIntent.length / recoverySessions.length : 0;
-
-  const nextEasyToday = nextPendingTodaySession && /easy|aerobic|base|endurance|recovery/i.test(nextPendingTodaySession.intent_category ?? "");
-  const nextRecoveryToday = nextPendingTodaySession && /recovery/i.test(nextPendingTodaySession.intent_category ?? "");
-  const upcomingBike = sessions
-    .filter((session) => session.status === "planned" && session.date >= todayIso && session.sport === "bike")
-    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
-
-  if (easySessions.length >= 2 && easyOffRatio >= 0.66) {
+  if (remaining.length > 0 && params.iso === params.todayIso) {
     return {
-      interpretationRisk: "easy_control",
-      focusOverride: {
-        kicker: "Focus this week",
-        title: "Easy sessions are drifting too hard",
-        detail: "Hold easy sessions below target strain so key work stays high quality.",
-        cta: nextEasyToday ? "Open today\'s easy session" : "Review upcoming easy sessions",
-        href: nextEasyToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
-        ctaStyle: "secondary"
-      },
-      todayCue: nextEasyToday ? "Keep this easy session truly easy." : undefined
+      label: "Today",
+      detail: `${remaining.reduce((sum, session) => sum + session.durationMinutes, 0)}m left`,
+      tone: "info" as const
     };
   }
 
-  if (recoverySessions.length >= 2 && recoveryOffRatio >= 0.66) {
+  if (missed.length > 0) {
     return {
-      interpretationRisk: "recovery_control",
-      focusOverride: {
-        kicker: "Focus this week",
-        title: "Recovery quality is slipping",
-        detail: "Keep recovery sessions genuinely light to protect your next key day.",
-        cta: nextRecoveryToday ? "Open today\'s recovery session" : "Review recovery sessions",
-        href: nextRecoveryToday && nextPendingTodaySession ? `/calendar?focus=${nextPendingTodaySession.id}` : "/calendar",
-        ctaStyle: "secondary"
-      },
-      todayCue: nextRecoveryToday ? "Maintain recovery intent." : undefined
+      label: "Missed",
+      detail: `${missed.reduce((sum, session) => sum + session.durationMinutes, 0)}m behind`,
+      tone: "attention" as const
     };
   }
 
-  if (bikeSessions.length >= 2 && bikeOffRatio >= 0.66) {
+  if (completed.length > 0 && completed.length === daySessions.length) {
     return {
-      interpretationRisk: "bike_consistency",
-      focusOverride: {
-        kicker: "Focus this week",
-        title: "Protect bike consistency",
-        detail: `${bikeOffIntent.length} of last ${bikeSessions.length} bike sessions missed intent. Lock in execution before adding load.`,
-        cta: upcomingBike ? `Open ${weekdayName(upcomingBike.date)} bike` : "Open next bike session",
-        href: upcomingBike ? `/calendar?focus=${upcomingBike.id}` : "/calendar",
-        ctaStyle: "secondary"
-      },
-      todayCue: nextPendingTodaySession?.sport === "bike" ? "Cap effort early." : undefined
+      label: "Completed",
+      detail: `${completed.reduce((sum, session) => sum + session.durationMinutes, 0)}m done`,
+      tone: "success" as const
     };
   }
 
-  if (keySessions.length >= 2 && keyMatched.length / keySessions.length >= 0.75) {
+  if (skipped.length > 0 && skipped.length === daySessions.length) {
     return {
-      interpretationRisk: "strong_execution",
-      focusOverride: {
-        kicker: "Focus this week",
-        title: "Key session execution is strong — maintain load",
-        detail: "Key sessions are landing. Keep easy and recovery days controlled to sustain momentum.",
-        cta: "Open weekly plan",
-        href: "/calendar",
-        ctaStyle: "secondary"
-      }
+      label: "Skipped",
+      detail: `${skipped.reduce((sum, session) => sum + session.durationMinutes, 0)}m dropped`,
+      tone: "warning" as const
     };
   }
 
-  return { focusOverride: fallbackFocusItem ?? undefined };
+  if (remaining.length > 0) {
+    return {
+      label: "Planned",
+      detail: `${remaining.reduce((sum, session) => sum + session.durationMinutes, 0)}m planned`,
+      tone: "neutral" as const
+    };
+  }
+
+  return {
+    label: "Recovery",
+    detail: totalMinutes > 0 ? `${totalMinutes}m mixed` : "No sessions",
+    tone: "neutral" as const
+  };
 }
 
 export default async function DashboardPage({
@@ -323,10 +187,10 @@ export default async function DashboardPage({
   const currentWeekStart = getMonday().toISOString().slice(0, 10);
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
   const weekEnd = addDays(weekStart, 7);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = getLocalTodayIso();
 
-  const [{ data: profileData }, { data: plansData }, { data: completedData }, { data: completedActivities }, { data: linksData }] = await Promise.all([
-    supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
+  const [{ data: profileData }, { data: plansData }, { data: completedData }, activitiesQuery, { data: linksData }] = await Promise.all([
+    supabase.from("profiles").select("active_plan_id").eq("id", user.id).maybeSingle(),
     supabase.from("training_plans").select("id").order("start_date", { ascending: false }),
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
@@ -335,7 +199,10 @@ export default async function DashboardPage({
       .eq("user_id", user.id)
       .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
       .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`),
-    supabase.from("session_activity_links").select("completed_activity_id,planned_session_id,confirmation_status").eq("user_id", user.id)
+    supabase
+      .from("session_activity_links")
+      .select("completed_activity_id,planned_session_id,confirmation_status")
+      .eq("user_id", user.id)
   ]);
 
   const profile = (profileData ?? null) as Profile | null;
@@ -343,12 +210,30 @@ export default async function DashboardPage({
   const hasAnyPlan = plans.length > 0;
   const activePlanId = profile?.active_plan_id ?? plans[0]?.id ?? null;
 
-  let sessionsData: unknown[] | null = [];
+  if (!activePlanId && !hasAnyPlan) {
+    return (
+      <section className="space-y-4">
+        <article className="surface p-6">
+          <p className="text-xs uppercase tracking-[0.16em] text-accent">Get started</p>
+          <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
+          <p className="mt-2 text-sm text-muted">
+            Create a plan to unlock week status, today priorities, and coach-grade review.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/plan" className="btn-primary">Create a plan</Link>
+            <Link href="/settings/integrations" className="btn-secondary">Connect Garmin</Link>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
+  let sessionData: unknown[] | null = [];
 
   if (activePlanId) {
     const primary = await supabase
       .from("sessions")
-      .select("id,plan_id,date,sport,type,session_name,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
+      .select("id,plan_id,date,sport,type,session_name,discipline,subtype,workout_type,intent_category,intent_summary,target,duration_minutes,notes,created_at,status,execution_result,is_key,is_protected,is_flexible,session_role")
       .eq("user_id", user.id)
       .eq("plan_id", activePlanId)
       .gte("date", weekStart)
@@ -366,380 +251,287 @@ export default async function DashboardPage({
         .lt("date", weekEnd)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
-      if (fallback.error) throw new Error(fallback.error.message);
-      sessionsData = fallback.data as unknown[] | null;
+
+      if (fallback.error) {
+        throw new Error(fallback.error.message);
+      }
+
+      sessionData = fallback.data as unknown[] | null;
     } else if (primary.error) {
       throw new Error(primary.error.message);
     } else {
-      sessionsData = primary.data as unknown[] | null;
+      sessionData = primary.data as unknown[] | null;
     }
   }
 
-  const completionLedger = ((completedData ?? []) as CompletedSession[]).reduce<Record<string, number>>((acc, session) => {
+  let normalizedActivities = (activitiesQuery.data ?? []) as CompletedActivityRow[];
+
+  if (activitiesQuery.error && isMissingActivityColumnError(activitiesQuery.error.message)) {
+    const fallbackActivities = await supabase
+      .from("completed_activities")
+      .select("id,sport_type,start_time_utc,duration_sec")
+      .eq("user_id", user.id)
+      .gte("start_time_utc", `${weekStart}T00:00:00.000Z`)
+      .lt("start_time_utc", `${weekEnd}T00:00:00.000Z`);
+
+    if (fallbackActivities.error) {
+      throw new Error(fallbackActivities.error.message);
+    }
+
+    normalizedActivities = ((fallbackActivities.data ?? []) as Array<Record<string, unknown>>).map((activity) => ({
+      id: String(activity.id),
+      sport_type: String(activity.sport_type),
+      start_time_utc: String(activity.start_time_utc),
+      duration_sec: typeof activity.duration_sec === "number" ? activity.duration_sec : null,
+      schedule_status: null,
+      is_unplanned: false
+    }));
+  } else if (activitiesQuery.error) {
+    throw new Error(activitiesQuery.error.message);
+  }
+
+  const links = (linksData ?? []) as Array<{
+    completed_activity_id: string;
+    planned_session_id?: string | null;
+    confirmation_status?: "suggested" | "confirmed" | "rejected" | null;
+  }>;
+  const confirmedLinks = links.filter((item) => item.confirmation_status === "confirmed" || item.confirmation_status === null || typeof item.confirmation_status === "undefined");
+  const linkedSessionIds = new Set(confirmedLinks.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
+  const linkedActivityIds = new Set(confirmedLinks.map((item) => item.completed_activity_id));
+  const rejectedActivityIds = new Set(
+    links
+      .filter((item) => item.confirmation_status === "rejected")
+      .map((item) => item.completed_activity_id)
+  );
+
+  const completionLedger = ((completedData ?? []) as CompletedSessionRow[]).reduce<Record<string, number>>((acc, session) => {
     const key = `${session.date}:${session.sport}`;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
 
-  const uploadedActivities = (completedActivities ?? []) as CompletedActivity[];
-  const links = (linksData ?? []) as Array<{ completed_activity_id: string; planned_session_id?: string | null; confirmation_status?: "suggested" | "confirmed" | "rejected" | null }>;
-  const confirmedLinks = links.filter((item) => item.confirmation_status === "confirmed" || !item.confirmation_status);
-  const linkedSessionIds = new Set(confirmedLinks.map((item) => item.planned_session_id).filter((value): value is string => Boolean(value)));
+  const sessions = ((sessionData ?? []) as Array<SessionRow | LegacySessionRow>).map((row) => {
+    const session = row as SessionRow;
 
-  const durationByActivityId = new Map(uploadedActivities.map((activity) => [activity.id, Math.round((activity.duration_sec ?? 0) / 60)]));
-  const linkedMinutesBySession = confirmedLinks.reduce<Map<string, number>>((acc, link) => {
-    if (!link.planned_session_id) return acc;
-    const minutes = durationByActivityId.get(link.completed_activity_id) ?? 0;
-    acc.set(link.planned_session_id, (acc.get(link.planned_session_id) ?? 0) + minutes);
-    return acc;
-  }, new Map());
-
-  const getCompletedMinutes = (session: Pick<Session, "id" | "duration_minutes" | "status">) => {
-    const linkedMinutes = linkedMinutesBySession.get(session.id);
-    if (typeof linkedMinutes === "number" && linkedMinutes > 0) {
-      return linkedMinutes;
-    }
-
-    return session.status === "completed" ? session.duration_minutes ?? 0 : 0;
-  };
-
-  const sessions = ((sessionsData ?? []) as Session[]).map((session) => ({
-    ...session,
-    duration_minutes: session.duration_minutes ?? 0,
-    status: linkedSessionIds.has(session.id) ? ("completed" as const) : getSessionStatus(session, completionLedger),
-    is_key: Boolean((session as { is_key?: boolean }).is_key)
-  }));
-
-  const hasActivePlan = Boolean(activePlanId);
-  const todaySessions = sessions.filter((session) => session.date === todayIso);
-  const pendingTodaySessions = todaySessions.filter((session) => session.status === "planned");
-  const completedTodaySessions = todaySessions.filter((session) => session.status === "completed");
-  const nextPendingTodaySession = pendingTodaySessions[0] ?? null;
-  const todayCompletedMinutes = completedTodaySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-
-  const weekMetricSessions = sessions.map((session) => ({
-    id: session.id,
-    date: session.date,
-    sport: session.sport,
-    durationMinutes: session.duration_minutes ?? 0,
-    status: session.status,
-    isKey: session.is_key
-  }));
-
-  const minuteMetrics = computeWeekMinuteTotals(weekMetricSessions);
-  const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
-  const completedSessionsCount = sessions.filter((session) => session.status === "completed").length;
-  const missedSessions = sessions.filter((session) => session.status === "planned" && session.date < todayIso);
-  const missedSessionsCount = missedSessions.length;
-  const missedMinutes = missedSessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-
-  const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
-  const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
-  const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
-  const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
-  const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
-  const statusChip = getStatusChip(completionPct, expectedByTodayPct);
-
-  const dailyStates = Array.from({ length: 7 }).map((_, index) => {
-    const iso = addDays(weekStart, index);
-    const daySessions = sessions.filter((session) => session.date === iso);
-    const plannedCount = daySessions.filter((session) => session.status === "planned").length;
-    const plannedMinutes = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-    const remainingMinutesOnDay = daySessions.filter((session) => session.status === "planned").reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-    const completedMinutesOnDay = daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0);
-    const trainingMeaning = getDayMeaningLabel(daySessions);
-
-    const label = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
-
-    let tone: "rest" | "upcoming" | "today-remaining" | "today-complete" | "completed" | "missed" = "rest";
-    let stateLabel = "Rest";
-    let microLabel = "Rest";
-
-    if (iso === todayIso) {
-      if (plannedCount > 0) {
-        tone = "today-remaining";
-        stateLabel = "Today";
-        microLabel = `${remainingMinutesOnDay}m left`;
-      } else if (daySessions.length > 0) {
-        tone = "today-complete";
-        stateLabel = "Completed";
-        microLabel = `${completedMinutesOnDay}m done`;
-      }
-    } else if (iso < todayIso) {
-      if (plannedCount > 0) {
-        tone = "missed";
-        stateLabel = "Missed";
-        microLabel = `${remainingMinutesOnDay || plannedMinutes}m missed`;
-      } else if (daySessions.length > 0) {
-        tone = "completed";
-        stateLabel = "Completed";
-        microLabel = `${completedMinutesOnDay || plannedMinutes}m done`;
-      }
-    } else if (plannedCount > 0) {
-      tone = "upcoming";
-      stateLabel = trainingMeaning ? `${trainingMeaning} · ${plannedMinutes}m` : `${plannedMinutes}m planned`;
-      microLabel = trainingMeaning ? "" : `${plannedMinutes}m planned`;
-    }
-
-    return { iso, label, tone, stateLabel, microLabel };
+    return {
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      title: getSessionDisplayName({
+        sessionName: session.session_name ?? session.type,
+        discipline: session.discipline ?? session.sport,
+        subtype: session.subtype,
+        workoutType: session.workout_type,
+        intentCategory: session.intent_category
+      }),
+      durationMinutes: session.duration_minutes ?? 0,
+      storedStatus: getFallbackStoredStatus(session, completionLedger, linkedSessionIds, session.id),
+      isKey: Boolean(session.is_key),
+      isProtected: Boolean(session.is_protected || session.is_key),
+      isFlexible: Boolean(session.is_flexible),
+      isOptional: String(session.session_role ?? "").toLowerCase() === "optional",
+      intentSummary: session.intent_summary ?? null,
+      intentCategory: session.intent_category ?? null,
+      target: session.target ?? null,
+      executionResult: session.execution_result ?? null
+    } satisfies WeekSessionInput;
   });
 
-  const overdueKeySession = sessions
-    .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
-    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  const extraSessions = normalizedActivities
+    .filter((activity) => !linkedActivityIds.has(activity.id))
+    .filter((activity) => Boolean(activity.is_unplanned) || activity.schedule_status === "unscheduled" || rejectedActivityIds.has(activity.id))
+    .map((activity) => ({
+      id: `activity:${activity.id}`,
+      date: activity.start_time_utc.slice(0, 10),
+      sport: activity.sport_type,
+      title: "Extra workout",
+      durationMinutes: Math.round((activity.duration_sec ?? 0) / 60),
+      storedStatus: "completed" as const,
+      isExtra: true
+    } satisfies WeekSessionInput));
 
-  const behindByMinutes = Math.max(Math.round((expectedByTodayPct / 100) * totals.planned) - totals.completed, 0);
+  const weekSummary = buildWeekStateSummary({
+    sessions: [...sessions, ...extraSessions],
+    todayIso
+  });
 
-  const sports = ["swim", "bike", "run", "strength"] as const;
-  const biggestGap = sports
-    .map((sport) => {
-      const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
-      const completed = sessions
-        .filter((session) => session.sport === sport)
-        .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
-      return { sport, label: getDisciplineMeta(sport).label, gap: Math.max(planned - completed, 0), planned, completed };
-    })
-    .sort((a, b) => b.gap - a.gap)[0];
+  const completionPct = weekSummary.plannedMinutes > 0
+    ? Math.round((weekSummary.completedMinutes / weekSummary.plannedMinutes) * 100)
+    : 0;
 
-  const nextGapSession = biggestGap
-    ? sessions
-      .filter((session) => session.sport === biggestGap.sport && session.status === "planned" && session.date >= todayIso)
-      .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
-    : null;
+  const todaySessions = weekSummary.sessions
+    .filter((session) => session.date === todayIso)
+    .sort((left, right) => {
+      const leftPriority = left.isProtected ? 0 : left.isKey ? 1 : 2;
+      const rightPriority = right.isProtected ? 0 : right.isKey ? 1 : 2;
+      return leftPriority - rightPriority;
+    });
+  const todayRemaining = todaySessions.filter((session) => session.lifecycle === "today");
+  const todayCompleted = todaySessions.filter((session) => session.lifecycle === "completed");
+  const todayExtra = todaySessions.filter((session) => session.lifecycle === "extra");
+  const currentPrioritySession = todayRemaining[0] ?? null;
 
-  const attentionItem: ContextualItem | null = overdueKeySession
-    ? {
-        kicker: "Needs attention",
-        title: `Missed key session: ${getSessionDisplayName(overdueKeySession)}`,
-        detail: "Missing this key session shifts too much load into the back half of the week.",
-        cta: "Reschedule key session",
-        href: `/calendar?focus=${overdueKeySession.id}`,
-        ctaStyle: "primary"
-      }
-    : behindByMinutes >= 30
-      ? {
-          kicker: "Needs attention",
-          title: "You are behind this week",
-          detail: `${toHoursAndMinutes(behindByMinutes)} behind expected progress today.`,
-          cta: "Open weekly plan",
-          href: "/calendar",
-          ctaStyle: "primary"
-        }
-      : missedSessionsCount > 0
-        ? {
-            kicker: "Needs attention",
-            title: `${missedSessionsCount} missed session${missedSessionsCount > 1 ? "s" : ""}`,
-            detail: `${toHoursAndMinutes(missedMinutes)} still open from earlier this week.`,
-            cta: "Review missed work",
-            href: "/calendar",
-            ctaStyle: "primary"
-          }
-        : null;
-
-  const focusItem: ContextualItem | null = biggestGap && biggestGap.gap >= 20
-    ? {
-        kicker: "Focus this week",
-        title: `Protect ${biggestGap.label.toLowerCase()} consistency`,
-        detail: nextGapSession
-          ? `${biggestGap.gap} min behind on ${biggestGap.label.toLowerCase()} load. Complete ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()} and keep weekend unchanged.`
-          : `${biggestGap.gap} min behind on ${biggestGap.label.toLowerCase()} load. Complete the next planned ${biggestGap.label.toLowerCase()} workout and keep weekend unchanged.`,
-        cta: nextGapSession
-          ? `Open ${weekdayName(nextGapSession.date)} ${getDisciplineMeta(nextGapSession.sport).label.toLowerCase()}`
-          : `Open next ${biggestGap.label.toLowerCase()} workout`,
-        href: nextGapSession ? `/calendar?focus=${nextGapSession.id}` : "/calendar",
-        ctaStyle: "secondary"
-      }
-    : null;
-
-  const diagnosedSessionCount = sessions.filter((session) => session.status === "completed" && session.execution_result?.status).length;
-  const diagnosisDataState = getDiagnosisDataState(diagnosedSessionCount);
-
-  const diagnosisAwareSignal = diagnosisDataState.isSparse
-    ? { focusOverride: focusItem ?? undefined }
-    : getDiagnosisAwareSignal({
-        sessions,
+  const weekDays = Array.from({ length: 7 }).map((_, index) => {
+    const iso = addDays(weekStart, index);
+    const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
+    return {
+      iso,
+      weekday,
+      summary: getDaySummary({
+        iso,
         todayIso,
-        nextPendingTodaySession,
-        fallbackFocusItem: focusItem
-      });
-
-  const resolvedStatusChip = diagnosisAwareSignal.statusChipOverride ?? statusChip;
-  const statusInterpretation = diagnosisDataState.isSparse
-    ? `${getDefaultStatusInterpretation(resolvedStatusChip.label)} ${diagnosisDataState.guidanceText}`
-    : diagnosisAwareSignal.statusInterpretation
-      ?? (diagnosisAwareSignal.interpretationRisk
-        ? getDiagnosisStatusInterpretation(resolvedStatusChip.label, diagnosisAwareSignal.interpretationRisk)
-        : getDefaultStatusInterpretation(resolvedStatusChip.label));
-  const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
-  const todayCue = diagnosisAwareSignal.todayCue;
-
-  const contextualItems = [attentionItem, resolvedFocusItem].filter((item): item is ContextualItem => Boolean(item));
-
-  if (!hasActivePlan && !hasAnyPlan) {
-    return (
-      <section className="space-y-4">
-        <article className="surface p-6">
-          <p className="text-xs uppercase tracking-[0.16em] text-accent">Get started</p>
-          <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
-          <p className="mt-2 text-sm text-muted">
-            Create a plan to unlock this week progress, today execution, and focused coaching decisions.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/plan" className="btn-primary">Create a plan</Link>
-            <Link href="/settings/integrations" className="btn-secondary">Connect Garmin</Link>
-          </div>
-        </article>
-      </section>
-    );
-  }
+        sessions: weekSummary.sessions
+      })
+    };
+  });
 
   return (
     <section className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <article className="surface p-5 md:p-6">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
-          <p className="mt-1 text-sm text-muted">Week of {weekRangeLabel(weekStart)}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
+              <p className="mt-1 text-sm text-muted">Week of {weekRangeLabel(weekStart)}</p>
+            </div>
+            <StatusPill
+              label={weekSummary.weekRiskLabel}
+              tone={weekSummary.weekRisk === "on_track" ? "success" : weekSummary.weekRisk === "watch" ? "warning" : "attention"}
+            />
+          </div>
 
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-5xl font-semibold leading-none">{completionPct}%</p>
-              <p className="mt-2 text-base font-medium">{toHoursAndMinutes(totals.completed)} / {toHoursAndMinutes(totals.planned)}</p>
-              <p className="mt-1 text-sm text-muted">{completedSessionsCount} / {sessions.length} sessions completed</p>
+              <p className="mt-2 text-base font-medium">
+                {toHoursAndMinutes(weekSummary.completedMinutes)} / {toHoursAndMinutes(weekSummary.plannedMinutes)}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {weekSummary.counts.completed} completed · {weekSummary.counts.remaining} remaining · {weekSummary.counts.missed} missed · {weekSummary.counts.extra} extra
+              </p>
             </div>
-            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
+            <div className="grid gap-2 text-right text-sm">
+              <p>
+                Remaining
+                <span className="mt-0.5 block text-lg font-semibold text-[hsl(var(--text-primary))]">
+                  {toHoursAndMinutes(weekSummary.remainingMinutes)}
+                </span>
+              </p>
+              <p className="text-muted">
+                Protected sessions left: {weekSummary.protected.remaining}
+              </p>
+            </div>
           </div>
-          <p className="mt-2 text-sm text-muted">{statusInterpretation}</p>
-          {diagnosisDataState.isSparse ? <p className="mt-1 text-xs text-tertiary">{diagnosisDataState.unlockText}</p> : null}
 
           <div className="mt-5 grid grid-cols-7 gap-2">
-            {dailyStates.map((day) => {
-              const toneClass = day.tone === "today-remaining"
-                ? "border-[hsl(var(--accent-performance)/0.72)] bg-[hsl(var(--accent-performance)/0.18)]"
-                : day.tone === "today-complete"
-                  ? "border-[hsl(var(--success)/0.52)] bg-[hsl(var(--success)/0.16)]"
-                  : day.tone === "completed"
-                    ? "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.07)]"
-                    : day.tone === "missed"
-                      ? "border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.1)]"
-                      : day.tone === "upcoming"
-                        ? "border-[hsl(var(--border))] bg-[hsl(var(--surface-2)/0.68)]"
-                        : "border-transparent bg-transparent opacity-70";
+            {weekDays.map((day) => (
+              <div key={day.iso} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.7)] px-2 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-[0.04em] text-[hsl(var(--fg-muted))]">{day.weekday}</p>
+                <p className="mt-1 text-[11px] font-semibold leading-tight">{day.summary.label}</p>
+                <div className="mt-1">
+                  <StatusPill label={day.summary.label} tone={day.summary.tone} compact />
+                </div>
+                <p className="mt-1 text-[10px] text-[hsl(var(--fg-muted))]">{day.summary.detail}</p>
+              </div>
+            ))}
+          </div>
 
+          <WeekRiskCard
+            risk={weekSummary.weekRisk}
+            summary={weekSummary.focusStatement}
+            detail={`Protected completed: ${weekSummary.protected.completed}. Protected still open: ${weekSummary.protected.remaining}.`}
+          />
+        </article>
+
+        <article className="surface p-5 md:p-6">
+          <h2 className="text-xl font-semibold">Today</h2>
+          {currentPrioritySession ? (
+            <>
+              <p className="mt-1 text-sm text-muted">Current priority</p>
+              <h3 className="mt-3 text-lg font-semibold">{currentPrioritySession.title}</h3>
+              <p className="mt-2 text-sm text-muted">
+                {currentPrioritySession.durationMinutes} min
+                {currentPrioritySession.target ? ` · ${currentPrioritySession.target}` : ""}
+                {currentPrioritySession.isProtected ? " · Protected" : currentPrioritySession.isFlexible ? " · Flexible" : ""}
+              </p>
+              {currentPrioritySession.intentSummary ? (
+                <p className="mt-2 text-sm text-muted">{currentPrioritySession.intentSummary}</p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-muted">Current priority</p>
+              <h3 className="mt-3 text-lg font-semibold">
+                {todayCompleted.length > 0 ? "Today is done" : "No session scheduled today"}
+              </h3>
+              <p className="mt-2 text-sm text-muted">
+                {todayCompleted.length > 0
+                  ? "Use the rest of the day to protect recovery and keep the week steady."
+                  : "Use Calendar if you need to move anything. Otherwise keep the next protected session fixed."}
+              </p>
+            </>
+          )}
+
+          <div className="mt-4 space-y-2">
+            {todayRemaining.map((session) => {
+              const meta = SESSION_LIFECYCLE_META[session.lifecycle];
               return (
-                <div key={day.iso} className={`rounded-lg border px-2 py-1.5 ${toneClass}`}>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.04em] text-[hsl(var(--fg-muted))]">{day.label}</p>
-                  <p className="mt-0.5 text-[11px] font-semibold leading-tight">{day.stateLabel}</p>
-                  {day.microLabel ? <p className="mt-0.5 text-[10px] text-[hsl(var(--fg-muted))]">{day.microLabel}</p> : null}
+                <div key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{session.title}</p>
+                    <StatusPill label={meta.label} tone={meta.tone} icon={meta.icon} compact />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{session.durationMinutes} min{session.target ? ` · ${session.target}` : ""}</p>
+                </div>
+              );
+            })}
+
+            {todayCompleted.map((session) => {
+              const meta = SESSION_LIFECYCLE_META[session.lifecycle];
+              return (
+                <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{session.title}</p>
+                    <StatusPill label={meta.label} tone={meta.tone} icon={meta.icon} compact />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{session.durationMinutes} min</p>
+                </div>
+              );
+            })}
+
+            {todayExtra.map((session) => {
+              const meta = SESSION_LIFECYCLE_META[session.lifecycle];
+              return (
+                <div key={session.id} className="rounded-lg border border-[hsl(var(--accent-performance)/0.35)] bg-[hsl(var(--accent-performance)/0.08)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{session.title}</p>
+                    <StatusPill label={meta.label} tone={meta.tone} icon={meta.icon} compact />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{session.durationMinutes} min</p>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[hsl(var(--border)/0.7)] pt-3 text-sm">
-            <p className="px-1">Completed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(totals.completed)}</span></p>
-            <p className="px-1">Remaining <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(remainingMinutes)}</span></p>
-            <p className="px-1">Missed <span className="mt-0.5 block text-sm font-semibold">{toHoursAndMinutes(missedMinutes)}</span></p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={currentPrioritySession ? `/calendar?focus=${currentPrioritySession.id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">
+              Open Calendar
+            </Link>
+            <Link href="/plan" className="btn-secondary px-3 py-1.5 text-xs">
+              Open Plan
+            </Link>
           </div>
-        </article>
-
-        <article className="surface p-5 md:p-6">
-          {pendingTodaySessions.length > 0 ? (
-            <>
-              <h2 className="text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-muted">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length} completed`}</p>
-              {todayCue ? <p className="mt-2 text-xs text-muted">Cue: {todayCue}</p> : null}
-
-              <div className="mt-4 space-y-3">
-                <div>
-                  <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">Remaining today</p>
-                  <div className="space-y-2">
-                    {pendingTodaySessions.map((session) => (
-                      <div key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-2">
-                        <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                        <p className="text-xs text-muted">{session.duration_minutes} min{session.is_key ? " • Key" : ""} • Remaining</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {completedTodaySessions.length > 0 ? (
-                  <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">Completed today</p>
-                    <div className="space-y-2">
-                      {completedTodaySessions.map((session) => (
-                        <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                          <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {nextPendingTodaySession ? <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Open session</Link> : null}
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
-              </div>
-            </>
-          ) : completedTodaySessions.length > 0 ? (
-            <>
-              <h2 className="text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-muted">0 remaining · {completedTodaySessions.length} completed</p>
-              <h3 className="mt-2 text-lg font-semibold">{toHoursAndMinutes(todayCompletedMinutes)} done</h3>
-              <p className="mt-2 text-sm text-muted">All scheduled sessions for today are complete. You are {resolvedStatusChip.label === "On track" ? "on track" : "still within reach"} this week.</p>
-              <div className="mt-4 space-y-2">
-                {completedTodaySessions.map((session) => (
-                  <div key={session.id} className="rounded-lg border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                    <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                    <p className="text-xs text-muted">{session.duration_minutes} min • Done</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link href={completedTodaySessions[0] ? `/sessions/${completedTodaySessions[0].id}` : "/calendar"} className="btn-primary px-3 py-1.5 text-xs">Review completed sessions</Link>
-                <Link href="/plan" className="btn-secondary px-3 py-1.5 text-xs">Open plan</Link>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-muted">No sessions scheduled</p>
-              <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
-              <p className="mt-2 text-sm text-muted">Use today for recovery and reset, then protect the next planned key session.</p>
-              <div className="mt-4">
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
-              </div>
-            </>
-          )}
         </article>
       </div>
 
-      {contextualItems.length === 1 ? (
-        <article className="surface p-5 md:p-6">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-accent">{contextualItems[0].kicker}</p>
-          <h3 className="mt-2 text-lg font-semibold">{contextualItems[0].title}</h3>
-          <p className="mt-2 text-sm text-muted">{contextualItems[0].detail}</p>
-          <div className="mt-4">
-            <Link href={contextualItems[0].href} className={`${contextualItems[0].ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 py-1.5 text-xs`}>{contextualItems[0].cta}</Link>
-          </div>
-        </article>
-      ) : null}
-
-      {contextualItems.length === 2 ? (
-        <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-          {contextualItems.map((item) => (
-            <article key={item.kicker} className="surface p-5 md:p-6">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">{item.kicker}</p>
-              <h3 className="mt-2 text-lg font-semibold">{item.title}</h3>
-              <p className="mt-2 text-sm text-muted">{item.detail}</p>
-              <div className="mt-4">
-                <Link href={item.href} className={`${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 py-1.5 text-xs`}>{item.cta}</Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : null}
+      <WeeklyInterventionCard
+        title={weekSummary.topIntervention.title}
+        statusLine={weekSummary.topIntervention.statusLine}
+        why={weekSummary.topIntervention.why}
+        recommendedAction={weekSummary.topIntervention.recommendedAction}
+        impactIfIgnored={weekSummary.topIntervention.impactIfIgnored}
+        href={weekSummary.topIntervention.href}
+      />
     </section>
   );
 }

@@ -13,7 +13,9 @@ describe("week metrics", () => {
       completedCount: 1,
       skippedCount: 1,
       plannedRemainingCount: 2,
-      plannedTotalCount: 4
+      plannedTotalCount: 4,
+      missedCount: 0,
+      extraCount: 0
     });
   });
 
@@ -21,7 +23,9 @@ describe("week metrics", () => {
     expect(computeWeekMinuteTotals(sessions)).toEqual({
       plannedMinutes: 225,
       completedMinutes: 45,
-      remainingMinutes: 180
+      remainingMinutes: 180,
+      missedMinutes: 0,
+      extraMinutes: 0
     });
   });
 

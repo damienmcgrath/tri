@@ -3,6 +3,12 @@ import { z } from "zod";
 import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import { diagnoseCompletedSession, type SessionDiagnosisInput, type Sport } from "@/lib/coach/session-diagnosis";
+import {
+  MISSING_EVIDENCE_REASONS,
+  type EvidenceQualityState,
+  type MissingEvidenceReason,
+  type ReviewOutcomeState
+} from "@/lib/training/semantics";
 
 export type ExecutionEvidence = {
   sessionId: string;
@@ -42,7 +48,7 @@ export type ExecutionEvidence = {
     severity: "low" | "moderate" | "high";
     supportingMetrics: string[];
   }>;
-  missingEvidence: string[];
+  missingEvidence: MissingEvidenceReason[];
   rulesSummary: {
     intentMatch: "on_target" | "partial" | "missed";
     executionScore: number | null;
@@ -72,8 +78,8 @@ export type CoachVerdict = {
   uncertainty: {
     label: "confident_read" | "early_read" | "insufficient_data";
     detail: string;
-    missingEvidence: string[];
-  };
+  missingEvidence: MissingEvidenceReason[];
+};
   citedEvidence: Array<{
     claim: string;
     support: string[];
@@ -100,6 +106,33 @@ export type WeeklyExecutionBrief = {
     reason: string;
   }>;
   confidenceNote: string | null;
+};
+
+export type PersistedReviewMetric = {
+  label: string;
+  planned: string;
+  actual: string;
+  note?: string;
+  tone: "neutral" | "success" | "warning" | "attention";
+};
+
+export type PersistedReviewSummary = {
+  headline: string;
+  summary: string;
+  outcome: ReviewOutcomeState;
+  confidence: EvidenceQualityState;
+  evidenceQuality: EvidenceQualityState;
+  primaryGap: string;
+  keyIssues: string[];
+  intendedStimulus: string;
+  actualExecution: string;
+  didStimulusLand: "yes" | "partially" | "no";
+  recommendation: string;
+  weekRecommendation: string;
+  effectOnWeek: "small" | "moderate" | "significant";
+  stimulusImpact: "low" | "medium" | "high";
+  missingEvidenceReasons: MissingEvidenceReason[];
+  metrics: PersistedReviewMetric[];
 };
 
 export type PersistedExecutionReview = {
@@ -136,7 +169,8 @@ export type PersistedExecutionReview = {
   firstHalfPaceSPerKm: number | null;
   lastHalfPaceSPerKm: number | null;
   executionCost: "low" | "moderate" | "high" | "unknown";
-  missingEvidence: string[];
+  missingEvidence: MissingEvidenceReason[];
+  review_summary?: PersistedReviewSummary;
 };
 
 const coachVerdictSchema = z.object({
@@ -157,7 +191,7 @@ const coachVerdictSchema = z.object({
   uncertainty: z.object({
     label: z.enum(["confident_read", "early_read", "insufficient_data"]),
     detail: z.string().min(1).max(500),
-    missingEvidence: z.array(z.string().min(1)).max(8)
+    missingEvidence: z.array(z.enum(MISSING_EVIDENCE_REASONS)).max(8)
   }),
   citedEvidence: z.array(z.object({
     claim: z.string().min(1).max(200),
@@ -178,11 +212,19 @@ function toLegacyStatus(status: "on_target" | "partial" | "missed") {
 }
 
 function deriveMissingEvidence(input: SessionDiagnosisInput) {
-  const missing: string[] = [];
-  if (!input.actual.durationSec) missing.push("completed duration");
-  if (input.planned.plannedIntervals && input.actual.intervalCompletionPct === null && input.actual.completedIntervals === null) missing.push("interval completion");
-  if (!input.actual.avgHr && !input.actual.avgPower && !input.actual.avgPaceSPerKm) missing.push("intensity data");
-  if (!input.actual.splitMetrics || Object.keys(input.actual.splitMetrics).length === 0) missing.push("split comparison");
+  const missing: MissingEvidenceReason[] = [];
+  if (input.planned.plannedIntervals && input.actual.intervalCompletionPct === null && input.actual.completedIntervals === null) {
+    missing.push("no_interval_structure_match");
+  }
+  if (!input.actual.avgHr && !input.actual.avgPower && !input.actual.avgPaceSPerKm) {
+    missing.push("summary_only_upload");
+  }
+  if (!input.actual.splitMetrics || Object.keys(input.actual.splitMetrics).length === 0) {
+    missing.push("no_split_data");
+  }
+  if (!input.planned.targetBands || Object.keys(input.planned.targetBands).length === 0) {
+    missing.push("missing_target_zones");
+  }
   return missing;
 }
 
@@ -228,6 +270,173 @@ function buildEvidenceSummary(evidence: ExecutionEvidence) {
     points.push(`average power ${Math.round(evidence.actual.avgPower)} w`);
   }
   return points.slice(0, 4);
+}
+
+function toReviewOutcomeState(intentMatch: "on_target" | "partial" | "missed"): ReviewOutcomeState {
+  if (intentMatch === "on_target") return "on_target";
+  if (intentMatch === "missed") return "missed_intent";
+  return "partial_match";
+}
+
+function deriveReviewConfidence(evidence: ExecutionEvidence): EvidenceQualityState {
+  const supportingSignals = [
+    evidence.actual.durationSec !== null,
+    evidence.actual.intervalCompletionPct !== null || evidence.planned.plannedIntervals === null,
+    evidence.actual.timeAboveTargetPct !== null || evidence.actual.avgHr !== null || evidence.actual.avgPower !== null,
+    Boolean(evidence.actual.splitMetrics && Object.keys(evidence.actual.splitMetrics).length > 0)
+  ].filter(Boolean).length;
+
+  if (supportingSignals >= 3) return "high";
+  if (supportingSignals >= 2) return "medium";
+  return "low";
+}
+
+function formatDurationSeconds(seconds: number | null) {
+  if (!seconds || seconds <= 0) return "—";
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) return "—";
+  return `${Math.round(value * 100)}%`;
+}
+
+function buildReviewMetrics(evidence: ExecutionEvidence): PersistedReviewMetric[] {
+  const metrics: PersistedReviewMetric[] = [];
+  const durationCompletion =
+    evidence.actual.durationSec !== null && evidence.planned.durationSec
+      ? Number((evidence.actual.durationSec / evidence.planned.durationSec).toFixed(2))
+      : null;
+
+  if (evidence.planned.durationSec || evidence.actual.durationSec) {
+    metrics.push({
+      label: "Duration",
+      planned: formatDurationSeconds(evidence.planned.durationSec),
+      actual: formatDurationSeconds(evidence.actual.durationSec),
+      note: durationCompletion !== null ? `${formatPercent(durationCompletion)} of planned duration` : undefined,
+      tone:
+        durationCompletion === null
+          ? "neutral"
+          : durationCompletion >= 0.9
+            ? "success"
+            : durationCompletion >= 0.85
+              ? "warning"
+              : "attention"
+    });
+  }
+
+  if (evidence.planned.plannedIntervals !== null || evidence.actual.intervalCompletionPct !== null) {
+    metrics.push({
+      label: "Structure",
+      planned: evidence.planned.plannedIntervals !== null ? `${evidence.planned.plannedIntervals} planned blocks` : "Planned blocks",
+      actual:
+        evidence.planned.plannedIntervals !== null && evidence.actual.intervalCompletionPct !== null
+          ? `${Math.round(evidence.actual.intervalCompletionPct * evidence.planned.plannedIntervals)} of ${evidence.planned.plannedIntervals} blocks`
+          : formatPercent(evidence.actual.intervalCompletionPct),
+      note: evidence.actual.intervalCompletionPct !== null ? `${formatPercent(evidence.actual.intervalCompletionPct)} of the planned structure` : undefined,
+      tone:
+        evidence.actual.intervalCompletionPct === null
+          ? "neutral"
+          : evidence.actual.intervalCompletionPct >= 0.9
+            ? "success"
+            : evidence.actual.intervalCompletionPct >= 0.85
+              ? "warning"
+              : "attention"
+    });
+  }
+
+  if (evidence.actual.timeAboveTargetPct !== null) {
+    metrics.push({
+      label: "Target control",
+      planned: "Stay near target",
+      actual: `${formatPercent(1 - evidence.actual.timeAboveTargetPct)} within target`,
+      note: `${formatPercent(evidence.actual.timeAboveTargetPct)} above target`,
+      tone:
+        evidence.actual.timeAboveTargetPct <= 0.1
+          ? "success"
+          : evidence.actual.timeAboveTargetPct <= 0.2
+            ? "warning"
+            : "attention"
+    });
+  }
+
+  if (evidence.actual.splitMetrics?.firstHalfAvgHr && evidence.actual.splitMetrics?.lastHalfAvgHr) {
+    const drift = evidence.actual.splitMetrics.lastHalfAvgHr / evidence.actual.splitMetrics.firstHalfAvgHr;
+    metrics.push({
+      label: "Late HR drift",
+      planned: "Controlled through the finish",
+      actual: `${Math.round(evidence.actual.splitMetrics.lastHalfAvgHr - evidence.actual.splitMetrics.firstHalfAvgHr)} bpm rise`,
+      note: `${formatPercent(drift - 1)} drift`,
+      tone: drift <= 1.04 ? "success" : drift <= 1.08 ? "warning" : "attention"
+    });
+  } else if (evidence.actual.splitMetrics?.firstHalfPaceSPerKm && evidence.actual.splitMetrics?.lastHalfPaceSPerKm) {
+    const fade = evidence.actual.splitMetrics.lastHalfPaceSPerKm / evidence.actual.splitMetrics.firstHalfPaceSPerKm;
+    metrics.push({
+      label: "Late-session fade",
+      planned: "Hold pace late",
+      actual: `${formatPercent(fade - 1)} slower late`,
+      tone: fade <= 1.04 ? "success" : fade <= 1.1 ? "warning" : "attention"
+    });
+  }
+
+  return metrics;
+}
+
+function buildPersistedReviewSummary(args: {
+  evidence: ExecutionEvidence;
+  verdict: CoachVerdict | null;
+  suggestedWeekAction: string;
+}): PersistedReviewSummary {
+  const outcome = toReviewOutcomeState(args.evidence.rulesSummary.intentMatch);
+  const confidence = deriveReviewConfidence(args.evidence);
+  const metrics = buildReviewMetrics(args.evidence);
+  const keyIssues = args.evidence.detectedIssues.map((issue) => issue.code.replaceAll("_", " "));
+  const summary =
+    args.verdict?.sessionVerdict.summary ??
+    (outcome === "on_target"
+      ? "The intended session stimulus landed cleanly."
+      : outcome === "partial_match"
+        ? "The session was completed, but the intended stimulus only partially landed."
+        : "The intended session stimulus did not land cleanly enough to count as planned.");
+
+  return {
+    headline:
+      outcome === "on_target"
+        ? "On target"
+        : outcome === "partial_match"
+          ? "Partial match"
+          : "Missed intent",
+    summary,
+    outcome,
+    confidence,
+    evidenceQuality: confidence,
+    primaryGap:
+      args.verdict?.explanation.whatHappened ??
+      (keyIssues.length > 0 ? `Primary gap: ${keyIssues[0]}.` : "Execution drifted away from the planned session."),
+    keyIssues,
+    intendedStimulus: args.evidence.planned.intentCategory ?? args.evidence.planned.title,
+    actualExecution: args.verdict?.explanation.whatHappened ?? "Execution evidence is available for review.",
+    didStimulusLand: outcome === "on_target" ? "yes" : outcome === "partial_match" ? "partially" : "no",
+    recommendation: args.verdict?.explanation.whatToDoNextTime ?? "Use one clear execution cue on the next similar session.",
+    weekRecommendation: args.suggestedWeekAction,
+    effectOnWeek:
+      outcome === "on_target"
+        ? "small"
+        : outcome === "missed_intent" || args.evidence.rulesSummary.executionCost === "high"
+          ? "significant"
+          : "moderate",
+    stimulusImpact:
+      outcome === "on_target"
+        ? "low"
+        : outcome === "missed_intent"
+          ? "high"
+          : "medium",
+    missingEvidenceReasons: args.evidence.missingEvidence,
+    metrics
+  };
 }
 
 function nextCallFromEvidence(intentMatch: "on_target" | "partial" | "missed", executionCost: "low" | "moderate" | "high" | "unknown") {
@@ -483,6 +692,11 @@ export function toPersistedExecutionReview(args: {
   const legacyStatus = toLegacyStatus(args.evidence.rulesSummary.intentMatch);
   const nextCall = args.verdict?.sessionVerdict.nextCall ?? nextCallFromEvidence(args.evidence.rulesSummary.intentMatch, args.evidence.rulesSummary.executionCost);
   const suggestedWeekAction = args.verdict?.explanation.whatToDoThisWeek ?? "Keep the rest of the week stable and use this review as guidance for the next similar session.";
+  const reviewSummary = buildPersistedReviewSummary({
+    evidence: args.evidence,
+    verdict: args.verdict,
+    suggestedWeekAction
+  });
 
   return {
     version: 2,
@@ -521,7 +735,8 @@ export function toPersistedExecutionReview(args: {
     firstHalfPaceSPerKm: args.evidence.actual.splitMetrics?.firstHalfPaceSPerKm ?? null,
     lastHalfPaceSPerKm: args.evidence.actual.splitMetrics?.lastHalfPaceSPerKm ?? null,
     executionCost: args.evidence.rulesSummary.executionCost,
-    missingEvidence: args.evidence.missingEvidence
+    missingEvidence: args.evidence.missingEvidence,
+    review_summary: reviewSummary
   };
 }
 
@@ -627,8 +842,8 @@ export async function buildWeeklyExecutionBrief(args: {
     .map((item) => ({
       sessionId: item.id,
       sessionName: item.name,
-      scoreHeadline: item.review.verdict?.sessionVerdict.headline ?? item.review.executionScoreSummary,
-      reason: item.review.verdict?.explanation.whyItMatters ?? item.review.whyItMatters
+      scoreHeadline: item.review.review_summary?.headline ?? item.review.verdict?.sessionVerdict.headline ?? item.review.executionScoreSummary,
+      reason: item.review.review_summary?.summary ?? item.review.verdict?.explanation.whyItMatters ?? item.review.whyItMatters
     }));
 
   const keyPositive = onTargetCount > 0 ? `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are landing on target.` : null;
@@ -654,7 +869,7 @@ export async function buildWeeklyExecutionBrief(args: {
     weekSummary:
       reviewedCount === 0
         ? "Early uploads are in. Hold the current structure for now, then let the next reviewed sessions sharpen the call."
-        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
+        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${contextCue ? ` Current context: ${contextCue}.` : ""}`,
     keyPositive,
     keyRisk,
     nextWeekDecision,
@@ -668,7 +883,7 @@ export async function buildWeeklyExecutionBrief(args: {
     sessionsNeedingAttention,
     confidenceNote:
       provisionalCount > 0
-        ? `${provisionalCount} review${provisionalCount === 1 ? "" : "s"} are still provisional because evidence is incomplete.`
+        ? `${provisionalCount} review${provisionalCount === 1 ? "" : "s"} are still early reads because some evidence is missing.`
         : null
   } satisfies WeeklyExecutionBrief;
 }

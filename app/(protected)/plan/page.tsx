@@ -14,6 +14,8 @@ type TrainingWeek = {
   week_index: number;
   week_start_date: string;
   focus: "Build" | "Recovery" | "Taper" | "Race" | "Custom";
+  objective?: string | null;
+  primary_emphasis?: string | null;
   notes: string | null;
   target_minutes: number | null;
   target_tss: number | null;
@@ -31,8 +33,11 @@ type Session = {
   subtype?: string | null;
   workout_type?: string | null;
   target: string | null;
+  intent_summary?: string | null;
   intent_category?: string | null;
   session_role?: "key" | "supporting" | "recovery" | "optional" | "Key" | "Supporting" | "Recovery" | "Optional" | null;
+  is_protected?: boolean | null;
+  is_flexible?: boolean | null;
   source_metadata?: { uploadId?: string | null; assignmentId?: string | null; assignedBy?: "planner" | "upload" | "coach" | null } | null;
   execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null } | null;
   duration_minutes: number;
@@ -88,8 +93,8 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
 
   const { data: initialWeeksData, error: weeksError } = selectedPlan
     ? await supabase
-        .from("training_weeks")
-        .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+      .from("training_weeks")
+        .select("id,plan_id,week_index,week_start_date,focus,objective,primary_emphasis,notes,target_minutes,target_tss")
         .eq("plan_id", selectedPlan.id)
         .order("week_index", { ascending: true })
     : { data: [] as TrainingWeek[], error: null };
@@ -111,7 +116,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
 
     const { data: seededWeeksData, error: seededWeeksFetchError } = await supabase
       .from("training_weeks")
-      .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+      .select("id,plan_id,week_index,week_start_date,focus,objective,primary_emphasis,notes,target_minutes,target_tss")
       .eq("plan_id", selectedPlan.id)
       .order("week_index", { ascending: true });
 
@@ -124,7 +129,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   if (selectedPlan) {
     const primaryQuery = await supabase
       .from("sessions")
-      .select("id,plan_id,week_id,date,sport,type,session_name,discipline,subtype,workout_type,target,duration_minutes,intent_category,session_role,source_metadata,execution_result,day_order,notes,distance_value,distance_unit,status,is_key")
+      .select("id,plan_id,week_id,date,sport,type,session_name,discipline,subtype,workout_type,target,intent_summary,duration_minutes,intent_category,session_role,is_protected,is_flexible,source_metadata,execution_result,day_order,notes,distance_value,distance_unit,status,is_key")
       .eq("plan_id", selectedPlan.id)
       .order("date", { ascending: true })
       .order("day_order", { ascending: true, nullsFirst: false });
@@ -167,8 +172,11 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
         subtype: null,
         workout_type: null,
         target: null,
+        intent_summary: null,
         intent_category: null,
         session_role: null,
+        is_protected: false,
+        is_flexible: false,
         source_metadata: null,
         execution_result: null,
         day_order: null,
