@@ -1,4 +1,4 @@
-import { parsePersistedExecutionReview } from "@/lib/execution-review";
+import { parsePersistedExecutionReview } from "@/lib/execution-review-shared";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import {
   getEvidenceQualityLabel,

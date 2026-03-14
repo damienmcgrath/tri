@@ -6,7 +6,8 @@ import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
-import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
+import { buildWeeklyExecutionBrief } from "@/lib/execution-review";
+import { parsePersistedExecutionReview } from "@/lib/execution-review-shared";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildWeekStateSummary } from "@/lib/training/week-state";
 

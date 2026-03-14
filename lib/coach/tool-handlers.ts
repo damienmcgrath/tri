@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CoachAuthContext } from "@/lib/coach/types";
-import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
+import { buildWeeklyExecutionBrief } from "@/lib/execution-review";
+import { parsePersistedExecutionReview } from "@/lib/execution-review-shared";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import {
   coachToolSchemas,

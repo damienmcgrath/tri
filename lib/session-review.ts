@@ -1,5 +1,5 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { parsePersistedExecutionReview } from "@/lib/execution-review";
+import { parsePersistedExecutionReview } from "@/lib/execution-review-shared";
 import {
   normalizeReviewSummary,
   type IntentVsActualMetric,
