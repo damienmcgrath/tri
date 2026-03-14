@@ -47,16 +47,32 @@ const MOVE_TAG_PATTERN = /\[moved\sfrom\s(\d{4}-\d{2}-\d{2})\]/i;
 const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const uploadDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
-function calendarDisciplineChipTone(sport: string) {
-  const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(86,182,217,0.16)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.28)" },
-    bike: { bg: "rgba(107,170,117,0.15)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.28)" },
-    run: { bg: "rgba(196,135,114,0.15)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.28)" },
-    strength: { bg: "rgba(154,134,200,0.16)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.3)" },
-    other: { bg: "rgba(148,163,184,0.15)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.28)" }
+function getCalendarDisciplineChipClass(sport: string) {
+  const tones: Record<string, string> = {
+    swim: "calendar-discipline-chip--swim",
+    bike: "calendar-discipline-chip--bike",
+    run: "calendar-discipline-chip--run",
+    strength: "calendar-discipline-chip--strength",
+    other: "calendar-discipline-chip--other"
   };
 
   return tones[sport] ?? tones.other;
+}
+
+function getCalendarSessionToneClass(state: ReturnType<typeof getSessionState>) {
+  if (state === "completed") return "calendar-session-card--completed";
+  if (state === "skipped") return "calendar-session-card--skipped";
+  if (state === "moved") return "calendar-session-card--moved";
+  if (state === "extra") return "calendar-session-card--extra";
+  if (state === "unmatched_upload") return "calendar-session-card--unmatched";
+  if (state === "assigned_from_upload") return "calendar-session-card--assigned";
+  return "";
+}
+
+function getAttentionItemClass(type: AdaptationIssueType) {
+  if (type === "unmatched_upload") return "calendar-attention-item calendar-attention-item--upload";
+  if (type === "skipped_reassign") return "calendar-attention-item calendar-attention-item--risk";
+  return "calendar-attention-item calendar-attention-item--load";
 }
 
 function addDays(isoDate: string, days: number) {
@@ -163,39 +179,39 @@ function SessionActionMenu({
     <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
+        className="calendar-menu-button px-1.5 py-0.5 text-[11px] hover:text-[hsl(var(--fg))]"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
         •••
       </button>
       {open ? (
-        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
+        <div className="calendar-menu-panel absolute right-0 top-7 z-20 w-36 p-1 text-[11px]">
           {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+            <Link className="calendar-menu-item block px-2 py-1" href={`/sessions/activity/${activityId}`}>
               Open details
             </Link>
           ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
+            <Link className="calendar-menu-item block px-2 py-1" href={`/sessions/${session.id}`}>
               Open details
             </Link>
           ) : (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
+            <button className="calendar-menu-item block w-full px-2 py-1 text-left" onClick={() => { onOpen(); setOpen(false); }}>
               Open details
             </button>
           )}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onMove(); setOpen(false); }}>
+            <button className="calendar-menu-item block w-full px-2 py-1 text-left" onClick={() => { onMove(); setOpen(false); }}>
               Move
             </button>
           ) : null}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onToggleSkip(); setOpen(false); }}>
+            <button className="calendar-menu-item block w-full px-2 py-1 text-left" onClick={() => { onToggleSkip(); setOpen(false); }}>
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
           {session.displayType === "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
+            <button className="calendar-menu-item block w-full px-2 py-1 text-left" onClick={() => { onAssign(); setOpen(false); }}>
               Assign to session
             </button>
           ) : null}
@@ -384,30 +400,30 @@ export function WeekCalendar({
   }
 
   return (
-    <section className="space-y-3">
-      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
+    <section className="calendar-titanium titanium-theme space-y-3">
+      <header className="calendar-control-bar surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <div className="calendar-control-group text-xs">
           <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
           <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
           <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">This week</Link>
           <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="calendar-control-group text-xs">
           <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="calendar-field px-2 py-1">
             <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
           </select>
           <label className="sr-only" htmlFor="status-filter">Status filter</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="calendar-field px-2 py-1">
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="calendar-overview-pill px-2 py-0.5">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
         </div>
       </header>
 
       {hasAdaptation ? (
-        <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
+        <section className="calendar-attention-panel px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
             <p className="text-[11px] text-muted">
@@ -416,14 +432,14 @@ export function WeekCalendar({
           </div>
           <div className="flex flex-col gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
-              <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={upload.id} className={`${getAttentionItemClass("unmatched_upload")} flex flex-col gap-1.5 px-2.5 py-2 md:flex-row md:items-center md:justify-between`}>
                 <div className="min-w-0">
                   <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] md:justify-end">
                   {upload.source?.uploadId ? (
-                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to session</button>
+                    <button onClick={() => setAssignSource(upload)} className="calendar-link-action">Assign to session</button>
                   ) : null}
                   <button
                     onClick={() => {
@@ -450,23 +466,23 @@ export function WeekCalendar({
                         })();
                       });
                     }}
-                    className="text-muted hover:text-foreground"
+                    className="calendar-link-muted"
                   >
                     Mark extra
                   </button>
-                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="text-muted hover:text-foreground">Dismiss</button>
+                  <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)])} className="calendar-link-muted">Dismiss</button>
                 </div>
               </div>
             ))}
             {skippedToResolve.map((session) => (
-              <div key={session.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={session.id} className={`${getAttentionItemClass("skipped_reassign")} flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between`}>
                 <div className="min-w-0">
                 <p className="font-semibold">Skipped session</p>
                 <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
                 <p className="text-muted">Suggested move: {absorbDayLabel}</p>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 md:justify-end">
-                  <button onClick={() => setMoveSource(session)} className="text-accent hover:underline">Move to another day</button>
+                  <button onClick={() => setMoveSource(session)} className="calendar-link-action">Move to another day</button>
                   <button
                     onClick={() => {
                       startTransition(() => {
@@ -489,7 +505,7 @@ export function WeekCalendar({
                         })();
                       });
                     }}
-                    className="text-muted hover:text-foreground"
+                    className="calendar-link-muted"
                   >
                     Confirm skip
                   </button>
@@ -500,32 +516,32 @@ export function WeekCalendar({
               const session = localSessions.find((item) => item.id === move.sessionId);
               if (!session) return null;
               return (
-                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+                <div key={`move-${move.sessionId}`} className={`${getAttentionItemClass("moved_session")} flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between`}>
                   <div className="min-w-0">
                   <p className="font-semibold">Moved session</p>
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 md:justify-end">
-                    <button onClick={() => setDetailSession(session)} className="text-accent hover:underline">Review</button>
-                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="text-muted hover:text-foreground">Dismiss</button>
+                    <button onClick={() => setDetailSession(session)} className="calendar-link-action">Review</button>
+                    <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("moved_session", move.sessionId)])} className="calendar-link-muted">Dismiss</button>
                   </div>
                 </div>
               );
             })}
             {extraItems.map((item) => (
-              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={`extra-${item.id}`} className={`${getAttentionItemClass("extra_workout")} flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between`}>
                 <div className="min-w-0">
                   <p className="font-semibold">Extra workout logged</p>
                   <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
                 </div>
-                <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("extra_workout", item.id)])} className="text-muted hover:text-foreground">Dismiss</button>
+                <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("extra_workout", item.id)])} className="calendar-link-muted">Dismiss</button>
               </div>
             ))}
           </div>
         </section>
       ) : null}
 
-      <article className="grid gap-2 lg:grid-cols-7">
+      <article className="calendar-board grid gap-2 lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -551,12 +567,12 @@ export function WeekCalendar({
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
           return (
-            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
+            <section key={day.iso} className={`calendar-day-column h-full p-2 ${isToday ? "calendar-day-column--today" : ""} ${needsAttention ? "calendar-day-column--attention" : ""}`.trim()}>
+              <div className="calendar-day-column-header mb-2 min-h-[86px] border-b pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                  {isToday ? <span className="calendar-day-chip-today px-2 py-0.5">Today</span> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
@@ -564,7 +580,7 @@ export function WeekCalendar({
 
               <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="calendar-empty-slot w-full min-h-[92px] px-2 py-2.5 text-xs text-muted hover:text-accent">
                     + Add session
                     <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
@@ -573,31 +589,16 @@ export function WeekCalendar({
                   const movedMeta = trackedMoves.find((move) => move.sessionId === session.id) ?? (getMovedFromDate(session.notes) ? { fromDate: getMovedFromDate(session.notes) } : null);
                   const state = getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
-                  const disciplineTone = calendarDisciplineChipTone(session.sport);
-                  const toneClass =
-                    state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
-                      : state === "skipped"
-                        ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
-                        : state === "moved"
-                          ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                        : state === "extra"
-                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                          : state === "unmatched_upload"
-                            ? "border-[hsl(var(--accent-performance)/0.42)] bg-[linear-gradient(180deg,hsl(var(--accent-performance)/0.12),hsl(var(--accent-performance)/0.05))] shadow-[inset_0_1px_0_hsl(var(--accent-performance)/0.12)]"
-                          : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
-                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
 
                   const stateBadge =
                     state === "extra" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
+                      <span className="signal-chip calendar-inline-badge signal-load">Extra</span>
                     ) : state === "unmatched_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
+                      <span className="signal-chip calendar-inline-badge calendar-inline-badge--review">Needs review</span>
                     ) : state === "moved" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
+                      <span className="signal-chip calendar-inline-badge signal-load">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
                     ) : (
-                      <SessionStatusChip status={session.status} compact />
+                      <SessionStatusChip status={session.status} compact className="calendar-inline-badge" />
                     );
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
@@ -607,7 +608,7 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      className={`calendar-session-card px-2 py-1.5 text-xs transition ${getCalendarSessionToneClass(state)} ${reviewableCompleted ? "calendar-session-card--interactive cursor-pointer focus-visible:outline-none" : ""}`}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -622,8 +623,8 @@ export function WeekCalendar({
                       tabIndex={reviewableCompleted ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
+                        <span className={`calendar-discipline-chip ${getCalendarDisciplineChipClass(session.sport)} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px]`}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
                           {discipline.label}
                         </span>
                         <SessionActionMenu
@@ -650,19 +651,19 @@ export function WeekCalendar({
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
                       <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
                       {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
+                        <div className="calendar-session-card-footer mt-1 flex items-center border-t pt-1 text-[10px]">
+                          <span className="signal-chip calendar-inline-badge signal-ready inline-flex items-center gap-1 px-1.5 py-0.5">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>
                         </div>
                       ) : state === "unmatched_upload" ? (
-                        <div className="mt-2 border-t border-[hsl(var(--accent-performance)/0.18)] pt-1.5">
+                        <div className="calendar-session-card-footer mt-2 border-t pt-1.5">
                           {session.source?.uploadId ? (
                             <button
                               type="button"
                               onClick={() => setAssignSource(session)}
-                              className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
+                              className="calendar-field w-full px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
                             >
                               Review upload
                             </button>
@@ -747,15 +748,15 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
           });
         }}
       >
-        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="calendar-input w-full px-3 py-2 text-sm">
           {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
         </select>
-        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="calendar-input w-full px-3 py-2 text-sm">
           <option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
         </select>
-        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
-        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
-        <div className="flex justify-end gap-2 border-t border-[hsl(var(--border))] pt-3">
+        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="calendar-input w-full px-3 py-2 text-sm" />
+        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="calendar-input w-full px-3 py-2 text-sm" />
+        <div className="calendar-session-card-footer flex justify-end gap-2 border-t pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button disabled={isPending} className="btn-primary px-2 py-1 text-xs">Save</button>
         </div>
@@ -770,7 +771,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
   return (
     <TaskSheet onClose={onClose} title={`Move ${getSessionTitle(session)}`} description="Move this planned session to a different day this week.">
       <div className="space-y-3">
-        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={date} onChange={(e) => setDate(e.target.value)} className="calendar-input w-full px-3 py-2 text-sm">
           {weekDays.map((day) => (
             <option key={day.iso} value={day.iso}>
               {day.weekday} · {day.label}
@@ -778,7 +779,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
             </option>
           ))}
         </select>
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
+        <div className="calendar-session-card-footer sticky bottom-0 flex justify-end gap-2 border-t bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move here</button>
         </div>
@@ -816,7 +817,7 @@ function AssignUploadModal({
       description="Choose where this workout belongs in your calendar."
     >
       <div className="space-y-3">
-        <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.3)] bg-[hsl(var(--accent-performance)/0.08)] p-3">
+        <div className="calendar-attention-item calendar-attention-item--upload p-3">
           <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Uploaded workout</p>
           <p className="mt-1 text-sm font-semibold text-[hsl(var(--text-primary))]">
             {getDisciplineMeta(upload.sport).label} · {upload.duration} min
@@ -826,7 +827,7 @@ function AssignUploadModal({
         {candidateSessions.length === 0 ? (
           <p className="text-xs text-muted">No planned sessions in this week. Add or move a planned session first.</p>
         ) : (
-          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="calendar-input w-full px-3 py-2 text-sm">
             {candidateSessions.map((session) => (
               <option key={session.id} value={session.id}>
                 {(weekDays.find((day) => day.iso === session.date)?.weekday ?? session.date)} · {getSessionTitle(session)} · {session.duration} min
@@ -834,7 +835,7 @@ function AssignUploadModal({
             ))}
           </select>
         )}
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
+        <div className="calendar-session-card-footer sticky bottom-0 flex justify-end gap-2 border-t bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
             type="button"
@@ -886,7 +887,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
       <div className="space-y-3 text-sm">
         <p className="text-muted">Status: {state}</p>
         {executionScore !== null && executionScoreBand ? (
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <div className="surface-subtle p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
               <span
@@ -903,18 +904,18 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
             </div>
             <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
             {(executionSummary || nextAction) ? (
-              <div className="mt-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2">
+              <div className="surface mt-2 px-2.5 py-2">
                 {executionSummary ? <p className="text-xs text-muted">{executionSummary}</p> : null}
                 {nextAction ? <p className="mt-1 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <div className="surface-subtle p-3">
             <p className="text-xs text-muted">Detailed execution scoring is still provisional. Use schedule status and session notes for now.</p>
           </div>
         )}
-        {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
+        {session.notes ? <p className="surface-subtle p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
         </div>
@@ -925,7 +926,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-[hsl(var(--titanium-shadow-color)/0.7)] backdrop-blur-[3px]">
       <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>
@@ -935,8 +936,8 @@ function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose
 function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <aside className="relative ml-auto flex min-h-screen w-full max-w-xl flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl">
-        <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-5 py-4">
+      <aside className="calendar-task-sheet relative ml-auto flex min-h-screen w-full max-w-xl flex-col">
+        <header className="calendar-task-sheet-header px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Calendar task</p>
@@ -947,7 +948,7 @@ function TaskSheet({ children, title, description, onClose }: { children: React.
                 </p>
               ) : null}
             </div>
-            <button type="button" onClick={onClose} className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs text-muted hover:text-foreground">Close</button>
+            <button type="button" onClick={onClose} className="calendar-menu-button px-2 py-1 text-xs hover:text-[hsl(var(--fg))]">Close</button>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
@@ -960,8 +961,8 @@ function TaskModal({ children, title, description, onClose }: { children: React.
   return (
     <TaskOverlay onClose={onClose}>
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <section className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl">
-          <header className="mb-4 border-b border-[hsl(var(--border))] pb-3">
+        <section className="calendar-task-modal w-full max-w-md p-5">
+          <header className="calendar-session-card-footer mb-4 border-b pb-3">
             <p className="text-base font-semibold">{title}</p>
             {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
           </header>
