@@ -73,6 +73,7 @@ const skippedSession = {
 describe("WeekCalendar", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -128,6 +129,47 @@ describe("WeekCalendar", () => {
     expect(markActivityExtraAction).toHaveBeenCalledWith({ activityId: "a1" });
     expect(await screen.findByText("Extra workout logged")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText(/Upload needs review/)).not.toBeInTheDocument());
+  });
+
+  it("persists dismissed needs-attention items across refreshes", async () => {
+    const { unmount } = render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await waitFor(() => expect(screen.queryByText("Upload needs review")).not.toBeInTheDocument());
+
+    unmount();
+
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    await waitFor(() => expect(screen.queryByText("Upload needs review")).not.toBeInTheDocument());
   });
 
   it("opens the upload review drawer from the unresolved day card", () => {
