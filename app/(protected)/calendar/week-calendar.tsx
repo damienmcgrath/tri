@@ -49,11 +49,11 @@ const uploadDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", d
 
 function calendarDisciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(86,182,217,0.16)", text: "#BFE9F8", dot: "#78CCE8", border: "rgba(86,182,217,0.28)" },
-    bike: { bg: "rgba(107,170,117,0.15)", text: "#C9E8CF", dot: "#8AC896", border: "rgba(107,170,117,0.28)" },
-    run: { bg: "rgba(196,135,114,0.15)", text: "#F0D3C8", dot: "#D9A995", border: "rgba(196,135,114,0.28)" },
-    strength: { bg: "rgba(154,134,200,0.16)", text: "#E2D7F8", dot: "#BDA8E8", border: "rgba(154,134,200,0.3)" },
-    other: { bg: "rgba(148,163,184,0.15)", text: "#E2E8F0", dot: "#CBD5E1", border: "rgba(148,163,184,0.28)" }
+    swim: { bg: "rgba(173,207,214,0.28)", text: "#315863", dot: "#5C95A4", border: "rgba(108,146,154,0.28)" },
+    bike: { bg: "rgba(180,197,167,0.28)", text: "#42553A", dot: "#718867", border: "rgba(111,132,96,0.28)" },
+    run: { bg: "rgba(214,187,168,0.3)", text: "#6A473B", dot: "#B27A5F", border: "rgba(170,118,90,0.28)" },
+    strength: { bg: "rgba(196,181,164,0.3)", text: "#5A4E43", dot: "#9A816B", border: "rgba(139,117,95,0.28)" },
+    other: { bg: "rgba(205,197,184,0.28)", text: "#5D554A", dot: "#978D7D", border: "rgba(150,140,124,0.28)" }
   };
 
   return tones[sport] ?? tones.other;
@@ -385,38 +385,38 @@ export function WeekCalendar({
 
   return (
     <section className="space-y-3">
-      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <header className="coach-calendar-toolbar flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
         <div className="flex items-center gap-2 text-xs">
-          <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <p className="text-sm font-semibold text-[hsl(var(--fg))]">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
           <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
           <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">This week</Link>
           <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="coach-select px-3 py-1.5">
             <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
           </select>
           <label className="sr-only" htmlFor="status-filter">Status filter</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="coach-select px-3 py-1.5">
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="coach-chip">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
         </div>
       </header>
 
       {hasAdaptation ? (
-        <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
+        <section className="coach-calendar-alert px-4 py-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--signal-risk))]">Needs attention</p>
             <p className="text-[11px] text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
           </div>
           <div className="flex flex-col gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
-              <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={upload.id} className="flex flex-col gap-1.5 rounded-2xl border border-[hsl(var(--signal-load)/0.22)] bg-[hsl(var(--surface-elevated)/0.78)] px-3 py-2.5 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
@@ -459,7 +459,7 @@ export function WeekCalendar({
               </div>
             ))}
             {skippedToResolve.map((session) => (
-              <div key={session.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={session.id} className="flex flex-col gap-2 rounded-2xl border border-[hsl(var(--signal-risk)/0.2)] bg-[hsl(var(--surface-elevated)/0.78)] px-3 py-2.5 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                 <p className="font-semibold">Skipped session</p>
                 <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
@@ -500,7 +500,7 @@ export function WeekCalendar({
               const session = localSessions.find((item) => item.id === move.sessionId);
               if (!session) return null;
               return (
-                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-2xl border border-[hsl(var(--signal-load)/0.2)] bg-[hsl(var(--surface-elevated)/0.78)] px-3 py-2.5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                   <p className="font-semibold">Moved session</p>
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
@@ -513,7 +513,7 @@ export function WeekCalendar({
               );
             })}
             {extraItems.map((item) => (
-              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-2xl border border-[hsl(var(--signal-load)/0.2)] bg-[hsl(var(--surface-elevated)/0.78)] px-3 py-2.5 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold">Extra workout logged</p>
                   <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
@@ -548,15 +548,15 @@ export function WeekCalendar({
                       : isFuture && metrics?.hasPlanned
                         ? getDayStateLabel("planned")
                         : getDayStateLabel("planned");
-          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
+          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-[hsl(var(--signal-load))]" : "text-muted";
 
           return (
-            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
+            <section key={day.iso} className="coach-calendar-column h-full p-2.5">
+              <div className="coach-calendar-column-head mb-2 min-h-[86px] pb-2">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                  {isToday ? <span className="coach-chip border-[hsl(var(--signal-load)/0.28)] bg-[hsl(var(--signal-load)/0.12)] px-2 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Today</span> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
@@ -564,7 +564,7 @@ export function WeekCalendar({
 
               <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="coach-calendar-empty w-full min-h-[92px] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
                     + Add session
                     <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
@@ -575,19 +575,15 @@ export function WeekCalendar({
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
                   const toneClass =
-                    state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
-                      : state === "skipped"
-                        ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
-                        : state === "moved"
-                          ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                        : state === "extra"
-                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                          : state === "unmatched_upload"
-                            ? "border-[hsl(var(--accent-performance)/0.42)] bg-[linear-gradient(180deg,hsl(var(--accent-performance)/0.12),hsl(var(--accent-performance)/0.05))] shadow-[inset_0_1px_0_hsl(var(--accent-performance)/0.12)]"
-                          : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
-                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
+                    state === "completed" || state === "assigned_from_upload"
+                      ? "coach-session-card coach-session-card--complete"
+                      : state === "skipped" || state === "moved"
+                        ? "coach-session-card coach-session-card--attention"
+                        : state === "extra" || state === "unmatched_upload"
+                          ? "coach-session-card coach-session-card--extra"
+                          : isToday
+                            ? "coach-session-card coach-session-card--today"
+                            : "coach-session-card coach-session-card--planned";
 
                   const stateBadge =
                     state === "extra" ? (
@@ -607,7 +603,7 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      className={`px-2.5 py-2 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.35)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.35)] focus-visible:outline-none" : ""}`}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -925,7 +921,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
+    <div className="coach-overlay fixed inset-0 z-40 overflow-y-auto">
       <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>

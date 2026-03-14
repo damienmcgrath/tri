@@ -10,6 +10,11 @@ type ThemeOption = {
 
 const THEME_OPTIONS: ThemeOption[] = [
   {
+    label: "Coach Journal",
+    value: "coach-journal",
+    description: "Warm editorial surfaces with ink typography and restrained coaching accents."
+  },
+  {
     label: "Default",
     value: "default",
     description: "Current cool-performance palette."
@@ -27,7 +32,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 ];
 
 const STORAGE_KEY = "tri-theme";
-const DEFAULT_THEME = "carbon-coach";
+const DEFAULT_THEME = "coach-journal";
 
 export function ThemePicker() {
   const [theme, setTheme] = useState(DEFAULT_THEME);
