@@ -163,39 +163,39 @@ function SessionActionMenu({
     <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
+        className="rounded-md border border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] px-1.5 py-0.5 text-[11px] text-muted hover:border-[hsl(var(--lab-line-strong))] hover:text-[hsl(var(--lab-text))]"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
         •••
       </button>
       {open ? (
-        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
+        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] p-1 text-[11px] shadow-lg">
           {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--lab-panel-muted))]" href={`/sessions/activity/${activityId}`}>
               Open details
             </Link>
           ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--lab-panel-muted))]" href={`/sessions/${session.id}`}>
               Open details
             </Link>
           ) : (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--lab-panel-muted))]" onClick={() => { onOpen(); setOpen(false); }}>
               Open details
             </button>
           )}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onMove(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--lab-panel-muted))]" onClick={() => { onMove(); setOpen(false); }}>
               Move
             </button>
           ) : null}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onToggleSkip(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--lab-panel-muted))]" onClick={() => { onToggleSkip(); setOpen(false); }}>
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
           {session.displayType === "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--lab-panel-muted))]" onClick={() => { onAssign(); setOpen(false); }}>
               Assign to session
             </button>
           ) : null}
@@ -385,38 +385,40 @@ export function WeekCalendar({
 
   return (
     <section className="space-y-3">
-      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <header className="performance-lab-toolbar flex flex-wrap items-center justify-between gap-2 px-3 py-2">
         <div className="flex items-center gap-2 text-xs">
-          <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <p className="performance-lab-reading text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
           <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
           <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">This week</Link>
           <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="performance-lab-field rounded-md px-2 py-1">
             <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
           </select>
           <label className="sr-only" htmlFor="status-filter">Status filter</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="performance-lab-field rounded-md px-2 py-1">
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="performance-lab-chip performance-lab-chip-neutral">
+            {completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra
+          </span>
         </div>
       </header>
 
       {hasAdaptation ? (
-        <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
+        <section className="performance-lab-panel rounded-xl px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
-            <p className="text-[11px] text-muted">
+            <p className="performance-lab-kicker text-[hsl(var(--lab-alert))]">Needs attention</p>
+            <p className="performance-lab-reading-label text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
           </div>
           <div className="flex flex-col gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
-              <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={upload.id} className="performance-lab-card flex flex-col gap-1.5 px-2.5 py-2 md:flex-row md:items-center md:justify-between" data-state="unmatched_upload">
                 <div className="min-w-0">
                   <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
@@ -459,7 +461,7 @@ export function WeekCalendar({
               </div>
             ))}
             {skippedToResolve.map((session) => (
-              <div key={session.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={session.id} className="performance-lab-card flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between" data-state="skipped">
                 <div className="min-w-0">
                 <p className="font-semibold">Skipped session</p>
                 <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
@@ -500,7 +502,7 @@ export function WeekCalendar({
               const session = localSessions.find((item) => item.id === move.sessionId);
               if (!session) return null;
               return (
-                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+                <div key={`move-${move.sessionId}`} className="performance-lab-card flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between" data-state="moved">
                   <div className="min-w-0">
                   <p className="font-semibold">Moved session</p>
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
@@ -513,7 +515,7 @@ export function WeekCalendar({
               );
             })}
             {extraItems.map((item) => (
-              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={`extra-${item.id}`} className="performance-lab-card flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between" data-state="extra">
                 <div className="min-w-0">
                   <p className="font-semibold">Extra workout logged</p>
                   <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
@@ -525,7 +527,7 @@ export function WeekCalendar({
         </section>
       ) : null}
 
-      <article className="grid gap-2 lg:grid-cols-7">
+      <article className="performance-lab-board grid lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -548,15 +550,16 @@ export function WeekCalendar({
                       : isFuture && metrics?.hasPlanned
                         ? getDayStateLabel("planned")
                         : getDayStateLabel("planned");
-          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
+          const dayTone = needsAttention ? "text-[hsl(var(--lab-alert))]" : isToday ? "text-accent" : "text-muted";
+          const daySurfaceState = isToday ? "today" : needsAttention ? "attention" : "default";
 
           return (
-            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
-              <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
+            <section key={day.iso} className="performance-lab-column h-full p-2" data-state={daySurfaceState}>
+              <div className="performance-lab-column-header mb-2 min-h-[86px] pb-2">
+                <p className="performance-lab-reading-label text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                  <p className="performance-lab-reading font-semibold">{day.label}</p>
+                  {isToday ? <span className="performance-lab-chip performance-lab-chip-live">Today</span> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
@@ -564,7 +567,7 @@ export function WeekCalendar({
 
               <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="performance-lab-empty w-full min-h-[92px] px-2 py-2.5 text-xs hover:border-[hsl(var(--lab-live)/0.4)] hover:text-accent">
                     + Add session
                     <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
@@ -574,28 +577,13 @@ export function WeekCalendar({
                   const state = getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
-                  const toneClass =
-                    state === "completed"
-                      ? "border-[hsl(var(--signal-ready)/0.38)] bg-[hsl(var(--signal-ready)/0.08)]"
-                      : state === "skipped"
-                        ? "border-[hsl(var(--signal-risk)/0.45)] bg-[hsl(var(--signal-risk)/0.08)]"
-                        : state === "moved"
-                          ? "border-[hsl(var(--signal-load)/0.45)] bg-[hsl(var(--signal-load)/0.08)]"
-                        : state === "extra"
-                          ? "border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.10)]"
-                          : state === "unmatched_upload"
-                            ? "border-[hsl(var(--accent-performance)/0.42)] bg-[linear-gradient(180deg,hsl(var(--accent-performance)/0.12),hsl(var(--accent-performance)/0.05))] shadow-[inset_0_1px_0_hsl(var(--accent-performance)/0.12)]"
-                          : state === "assigned_from_upload"
-                              ? "border-[hsl(var(--signal-ready)/0.34)] bg-[hsl(var(--signal-ready)/0.07)]"
-                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]";
-
                   const stateBadge =
                     state === "extra" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
+                      <span className="performance-lab-chip performance-lab-chip-extra">Extra</span>
                     ) : state === "unmatched_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
+                      <span className="performance-lab-chip performance-lab-chip-live">Needs review</span>
                     ) : state === "moved" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
+                      <span className="performance-lab-chip performance-lab-chip-warning">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
@@ -607,7 +595,8 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      className={`performance-lab-card px-2 py-1.5 text-xs transition ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--lab-positive)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--lab-positive)/0.4)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--lab-positive)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--lab-positive)/0.4)] focus-visible:outline-none" : ""}`}
+                      data-state={state}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -648,21 +637,21 @@ export function WeekCalendar({
                         />
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
-                      <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
+                      <p className="performance-lab-reading mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
                       {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--signal-ready)/0.3)] bg-[hsl(var(--signal-ready)/0.12)] px-1.5 py-0.5 text-[hsl(var(--signal-ready)/0.9)]">
+                        <div className="mt-1 flex items-center border-t border-[hsl(var(--lab-positive)/0.2)] pt-1 text-[10px]">
+                          <span className="performance-lab-chip performance-lab-chip-positive">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>
                         </div>
                       ) : state === "unmatched_upload" ? (
-                        <div className="mt-2 border-t border-[hsl(var(--accent-performance)/0.18)] pt-1.5">
+                        <div className="mt-2 border-t border-[hsl(var(--lab-live)/0.18)] pt-1.5">
                           {session.source?.uploadId ? (
                             <button
                               type="button"
                               onClick={() => setAssignSource(session)}
-                              className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
+                              className="w-full rounded-md border border-[hsl(var(--lab-live)/0.26)] bg-[hsl(var(--lab-live)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--lab-live)/0.1)]"
                             >
                               Review upload
                             </button>
@@ -747,15 +736,15 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
           });
         }}
       >
-        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="performance-lab-field px-3 py-2 text-sm">
           {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
         </select>
-        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="performance-lab-field px-3 py-2 text-sm">
           <option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
         </select>
-        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
-        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
-        <div className="flex justify-end gap-2 border-t border-[hsl(var(--border))] pt-3">
+        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="performance-lab-field px-3 py-2 text-sm" />
+        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="performance-lab-field px-3 py-2 text-sm" />
+        <div className="flex justify-end gap-2 border-t border-[hsl(var(--lab-line))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button disabled={isPending} className="btn-primary px-2 py-1 text-xs">Save</button>
         </div>
@@ -770,7 +759,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
   return (
     <TaskSheet onClose={onClose} title={`Move ${getSessionTitle(session)}`} description="Move this planned session to a different day this week.">
       <div className="space-y-3">
-        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={date} onChange={(e) => setDate(e.target.value)} className="performance-lab-field px-3 py-2 text-sm">
           {weekDays.map((day) => (
             <option key={day.iso} value={day.iso}>
               {day.weekday} · {day.label}
@@ -778,7 +767,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
             </option>
           ))}
         </select>
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move here</button>
         </div>
@@ -816,8 +805,8 @@ function AssignUploadModal({
       description="Choose where this workout belongs in your calendar."
     >
       <div className="space-y-3">
-        <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.3)] bg-[hsl(var(--accent-performance)/0.08)] p-3">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Uploaded workout</p>
+        <div className="performance-lab-card p-3" data-state="unmatched_upload">
+          <p className="performance-lab-kicker text-accent">Uploaded workout</p>
           <p className="mt-1 text-sm font-semibold text-[hsl(var(--text-primary))]">
             {getDisciplineMeta(upload.sport).label} · {upload.duration} min
           </p>
@@ -826,7 +815,7 @@ function AssignUploadModal({
         {candidateSessions.length === 0 ? (
           <p className="text-xs text-muted">No planned sessions in this week. Add or move a planned session first.</p>
         ) : (
-          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="performance-lab-field px-3 py-2 text-sm">
             {candidateSessions.map((session) => (
               <option key={session.id} value={session.id}>
                 {(weekDays.find((day) => day.iso === session.date)?.weekday ?? session.date)} · {getSessionTitle(session)} · {session.duration} min
@@ -834,7 +823,7 @@ function AssignUploadModal({
             ))}
           </select>
         )}
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
             type="button"
@@ -886,9 +875,9 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
       <div className="space-y-3 text-sm">
         <p className="text-muted">Status: {state}</p>
         {executionScore !== null && executionScoreBand ? (
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <div className="performance-lab-panel-subtle p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+              <p className="performance-lab-reading-label text-tertiary">Execution Score</p>
               <span
                 className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
                   executionScoreBand === "On target"
@@ -903,18 +892,18 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
             </div>
             <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
             {(executionSummary || nextAction) ? (
-              <div className="mt-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2">
+              <div className="mt-2 rounded-lg border border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] px-2.5 py-2">
                 {executionSummary ? <p className="text-xs text-muted">{executionSummary}</p> : null}
                 {nextAction ? <p className="mt-1 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <div className="performance-lab-panel-subtle p-3">
             <p className="text-xs text-muted">Detailed execution scoring is still provisional. Use schedule status and session notes for now.</p>
           </div>
         )}
-        {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
+        {session.notes ? <p className="performance-lab-panel-subtle p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
         </div>
@@ -925,7 +914,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
+    <div className="performance-lab-overlay fixed inset-0 z-40 overflow-y-auto">
       <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>
@@ -935,19 +924,19 @@ function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose
 function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <aside className="relative ml-auto flex min-h-screen w-full max-w-xl flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl">
-        <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-5 py-4">
+      <aside className="performance-lab-sheet relative ml-auto flex min-h-screen w-full max-w-xl flex-col">
+        <header className="border-b border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel-muted)/0.4)] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Calendar task</p>
+              <p className="performance-lab-kicker text-accent">Calendar task</p>
               <p className="mt-1 text-base font-semibold">{title}</p>
               {description ? (
-                <p className="mt-2 max-w-md rounded-lg border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--bg-elevated)/0.82)] px-3 py-2 text-xs text-muted">
+                <p className="mt-2 max-w-md rounded-lg border border-[hsl(var(--lab-line))] bg-[hsl(var(--lab-panel))] px-3 py-2 text-xs text-muted">
                   {description}
                 </p>
               ) : null}
             </div>
-            <button type="button" onClick={onClose} className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs text-muted hover:text-foreground">Close</button>
+            <button type="button" onClick={onClose} className="rounded-md border border-[hsl(var(--lab-line))] px-2 py-1 text-xs text-muted hover:border-[hsl(var(--lab-line-strong))] hover:text-[hsl(var(--lab-text))]">Close</button>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
@@ -960,8 +949,8 @@ function TaskModal({ children, title, description, onClose }: { children: React.
   return (
     <TaskOverlay onClose={onClose}>
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <section className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl">
-          <header className="mb-4 border-b border-[hsl(var(--border))] pb-3">
+        <section className="performance-lab-modal w-full max-w-md rounded-2xl p-5">
+          <header className="mb-4 border-b border-[hsl(var(--lab-line))] pb-3">
             <p className="text-base font-semibold">{title}</p>
             {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
           </header>
