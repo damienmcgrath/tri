@@ -163,39 +163,39 @@ function SessionActionMenu({
     <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
+        className="rounded-md border border-[hsl(var(--border)/0.8)] bg-[hsl(220_14%_11%_/_0.72)] px-1.5 py-0.5 text-[11px] text-muted hover:text-white"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
         •••
       </button>
       {open ? (
-        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
+        <div className="endurance-action-menu absolute right-0 top-7 z-20 w-36 border p-1 text-[11px] shadow-lg">
           {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--brand-line)/0.12)]" href={`/sessions/activity/${activityId}`}>
               Open details
             </Link>
           ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/${session.id}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--brand-line)/0.12)]" href={`/sessions/${session.id}`}>
               Open details
             </Link>
           ) : (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onOpen(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--brand-line)/0.12)]" onClick={() => { onOpen(); setOpen(false); }}>
               Open details
             </button>
           )}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onMove(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--brand-line)/0.12)]" onClick={() => { onMove(); setOpen(false); }}>
               Move
             </button>
           ) : null}
           {session.displayType !== "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onToggleSkip(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--brand-line)/0.12)]" onClick={() => { onToggleSkip(); setOpen(false); }}>
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
           {session.displayType === "completed_activity" ? (
-            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
+            <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--brand-line)/0.12)]" onClick={() => { onAssign(); setOpen(false); }}>
               Assign to session
             </button>
           ) : null}
@@ -385,38 +385,38 @@ export function WeekCalendar({
 
   return (
     <section className="space-y-3">
-      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <header className="endurance-toolbar surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
         <div className="flex items-center gap-2 text-xs">
-          <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <p className="text-sm font-semibold tracking-[-0.03em] text-[hsl(var(--brand-copy))]">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
           <Link href={withWeek(addDays(activeWeekStart, -7))} className="btn-secondary px-2 py-1 text-xs">Prev</Link>
           <Link href={withWeek(currentWeekStart)} className="btn-secondary px-2 py-1 text-xs">This week</Link>
           <Link href={withWeek(addDays(activeWeekStart, 7))} className="btn-secondary px-2 py-1 text-xs">Next</Link>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="endurance-filter px-2 py-1">
             <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
           </select>
           <label className="sr-only" htmlFor="status-filter">Status filter</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
+          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="endurance-filter px-2 py-1">
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(220_15%_13%_/_0.74)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
         </div>
       </header>
 
       {hasAdaptation ? (
-        <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
+        <section className="endurance-alert px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Needs attention</p>
+            <p className="endurance-kicker">Needs attention</p>
             <p className="text-[11px] text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
           </div>
           <div className="flex flex-col gap-1.5 text-xs">
             {unmatchedUploads.map((upload) => (
-              <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={upload.id} className="endurance-alert-item flex flex-col gap-1.5 px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
@@ -459,7 +459,7 @@ export function WeekCalendar({
               </div>
             ))}
             {skippedToResolve.map((session) => (
-              <div key={session.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={session.id} className="endurance-alert-item flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                 <p className="font-semibold">Skipped session</p>
                 <p className="text-muted">{weekDays.find((day) => day.iso === session.date)?.weekday} {getSessionTitle(session)} · {session.duration} min</p>
@@ -500,7 +500,7 @@ export function WeekCalendar({
               const session = localSessions.find((item) => item.id === move.sessionId);
               if (!session) return null;
               return (
-                <div key={`move-${move.sessionId}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+                <div key={`move-${move.sessionId}`} className="endurance-alert-item flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                   <p className="font-semibold">Moved session</p>
                   <p className="text-muted">{getSessionTitle(session)} moved from {weekDays.find((day) => day.iso === move.fromDate)?.weekday ?? move.fromDate}</p>
@@ -513,7 +513,7 @@ export function WeekCalendar({
               );
             })}
             {extraItems.map((item) => (
-              <div key={`extra-${item.id}`} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--signal-load)/0.35)] bg-[hsl(var(--signal-load)/0.08)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
+              <div key={`extra-${item.id}`} className="endurance-alert-item flex flex-col gap-2 px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold">Extra workout logged</p>
                   <p className="text-muted">{getDisciplineMeta(item.sport).label} · {item.duration} min</p>
@@ -525,7 +525,7 @@ export function WeekCalendar({
         </section>
       ) : null}
 
-      <article className="grid gap-2 lg:grid-cols-7">
+      <article className="endurance-board grid lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -551,12 +551,12 @@ export function WeekCalendar({
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
           return (
-            <section key={day.iso} className="surface-card h-full rounded-2xl border border-[hsl(var(--border))] p-2">
+            <section key={day.iso} className={`endurance-day-column h-full p-2 ${isToday ? "endurance-day-column--today" : ""}`}>
               <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                  <p className="font-semibold tracking-[-0.03em] text-[hsl(var(--brand-copy))]">{day.label}</p>
+                  {isToday ? <span className="rounded-full border border-[hsl(var(--brand-line)/0.5)] bg-[hsl(var(--brand-line)/0.14)] px-2 py-0.5 text-[10px] text-[hsl(var(--brand-line-soft))]">Today</span> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
@@ -564,7 +564,7 @@ export function WeekCalendar({
 
               <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="endurance-add-tile w-full min-h-[92px] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--brand-line)/0.42)] hover:text-[hsl(var(--brand-line-soft))]">
                     + Add session
                     <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
@@ -607,7 +607,7 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-xl border px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
+                      className={`endurance-session-card px-2 py-1.5 text-xs transition ${toneClass} ${reviewableCompleted ? "cursor-pointer hover:-translate-y-[1px] hover:border-[hsl(var(--signal-ready)/0.54)] hover:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:-translate-y-[1px] focus-visible:border-[hsl(var(--signal-ready)/0.54)] focus-visible:shadow-[0_8px_22px_-16px_hsl(var(--signal-ready)/0.65)] focus-visible:outline-none" : ""}`}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
                       }}
@@ -622,7 +622,7 @@ export function WeekCalendar({
                       tabIndex={reviewableCompleted ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                        <span className="endurance-discipline-chip" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
                           {discipline.label}
                         </span>
@@ -647,7 +647,7 @@ export function WeekCalendar({
                           }}
                         />
                       </div>
-                      <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
+                      <p className="mt-1 min-h-[1.5rem] font-medium leading-snug text-[hsl(var(--brand-copy))]">{cardTitle}</p>
                       <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[hsl(var(--signal-ready)/0.24)] pt-1 text-[10px]">
