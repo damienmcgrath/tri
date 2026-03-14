@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadActivityDetails } from "@/lib/workouts/activity-details";
+import { getMetricsV2HrZones, getMetricsV2Laps, getMetricsV2PowerZones, getNestedNumber, getNestedString } from "@/lib/workouts/metrics-v2";
 import { ActivityLinkingCard } from "./activity-linking-card";
 
 function sportIcon(sport: string) {
@@ -23,6 +24,27 @@ function formatDuration(sec: number) {
 function formatDistance(distanceM?: number | null) {
   if (!distanceM) return "—";
   return `${(distanceM / 1000).toFixed(2)} km`;
+}
+
+function formatSeconds(seconds?: number | null) {
+  if (!seconds || seconds <= 0) return "—";
+  const rounded = Math.round(seconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+function formatOptionalNumber(value?: number | null, suffix = "") {
+  if (value === null || typeof value === "undefined") return "—";
+  return `${value}${suffix}`;
+}
+
+function formatZoneRange(min: number | null | undefined, max: number | null | undefined, unit: string) {
+  if (min === null && max === null) return `Open ${unit}`.trim();
+  if (min === null || typeof min === "undefined") return `< ${max} ${unit}`.trim();
+  if (max === null || typeof max === "undefined") return `>= ${min} ${unit}`.trim();
+  return `${min}-${max} ${unit}`;
 }
 
 function derivePaceOrSpeed(sport: string, durationSec: number, distanceM: number | null) {
@@ -54,7 +76,33 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
     minute: "2-digit"
   });
 
-  const laps = Array.isArray(activity.parse_summary?.laps) ? activity.parse_summary?.laps : [];
+  const laps = getMetricsV2Laps(activity.metrics_v2);
+  const powerZones = getMetricsV2PowerZones(activity.metrics_v2);
+  const hrZones = getMetricsV2HrZones(activity.metrics_v2);
+  const normalizedPower = getNestedNumber(activity.metrics_v2, [["power", "normalizedPower"], ["power", "normalized_power"]]);
+  const variabilityIndex = getNestedNumber(activity.metrics_v2, [["power", "variabilityIndex"], ["power", "variability_index"]]);
+  const intensityFactor = getNestedNumber(activity.metrics_v2, [["power", "intensityFactor"], ["power", "intensity_factor"]]);
+  const trainingStressScore = getNestedNumber(activity.metrics_v2, [["load", "trainingStressScore"], ["load", "training_stress_score"]]);
+  const totalWorkKj = getNestedNumber(activity.metrics_v2, [["power", "totalWorkKj"], ["power", "total_work_kj"]]);
+  const avgCadence = getNestedNumber(activity.metrics_v2, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]) ?? activity.avg_cadence;
+  const maxCadence = getNestedNumber(activity.metrics_v2, [["cadence", "maxCadence"], ["cadence", "max_cadence"]]);
+  const pauseCount = getNestedNumber(activity.metrics_v2, [["pauses", "count"]]);
+  const pausedDurationSec = getNestedNumber(activity.metrics_v2, [["pauses", "totalPausedSec"], ["pauses", "total_paused_sec"]]);
+  const avgRespirationRate = getNestedNumber(activity.metrics_v2, [["environment", "avgRespirationRate"], ["environment", "avg_respiration_rate"]]);
+  const avgTemperature = getNestedNumber(activity.metrics_v2, [["environment", "avgTemperature"], ["environment", "avg_temperature"]]);
+  const sportProfileName = getNestedString(activity.metrics_v2, [["activity", "sportProfileName"], ["activity", "sport_profile_name"]]);
+  const loadCards = [
+    ["Moving", formatDuration(activity.duration_sec)],
+    ["Elapsed", activity.elapsed_duration_sec ? formatDuration(activity.elapsed_duration_sec) : "—"],
+    ["Distance", formatDistance(activity.distance_m)],
+    [activity.sport_type === "bike" ? "Speed" : "Pace", derivePaceOrSpeed(activity.sport_type, activity.duration_sec, activity.distance_m)],
+    ["Avg HR", activity.avg_hr ? `${activity.avg_hr} bpm` : "—"],
+    ["Avg Power", activity.avg_power ? `${activity.avg_power} w` : "—"],
+    ["NP", normalizedPower ? `${Math.round(normalizedPower)} w` : "—"],
+    ["VI", variabilityIndex ? variabilityIndex.toFixed(2) : "—"],
+    ["IF", intensityFactor ? intensityFactor.toFixed(2) : "—"],
+    ["TSS", trainingStressScore ? `${Math.round(trainingStressScore)}` : "—"]
+  ];
 
   return (
     <section className="space-y-4">
@@ -78,13 +126,7 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           </article>
 
           <article className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              ["Duration", formatDuration(activity.duration_sec)],
-              ["Distance", formatDistance(activity.distance_m)],
-              [activity.sport_type === "bike" ? "Speed" : "Pace", derivePaceOrSpeed(activity.sport_type, activity.duration_sec, activity.distance_m)],
-              ["Avg HR", activity.avg_hr ? `${activity.avg_hr} bpm` : "—"],
-              ["Avg Power", activity.avg_power ? `${activity.avg_power} w` : "—"]
-            ].map(([label, value]) => (
+            {loadCards.map(([label, value]) => (
               <div key={label} className="surface p-4">
                 <p className="text-xs text-muted">{label}</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
@@ -94,12 +136,58 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
 
           <article className="surface p-5">
             <h2 className="text-sm font-semibold">Key details</h2>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm lg:grid-cols-3">
               <dt className="text-muted">Start time</dt><dd>{new Date(activity.start_time_utc).toLocaleString()}</dd>
               <dt className="text-muted">End time</dt><dd>{activity.end_time_utc ? new Date(activity.end_time_utc).toLocaleString() : "—"}</dd>
               <dt className="text-muted">Calories</dt><dd>{activity.calories ?? "—"}</dd>
+              <dt className="text-muted">Avg cadence</dt><dd>{formatOptionalNumber(avgCadence, " rpm")}</dd>
+              <dt className="text-muted">Max cadence</dt><dd>{formatOptionalNumber(maxCadence, " rpm")}</dd>
+              <dt className="text-muted">Max HR</dt><dd>{formatOptionalNumber(activity.max_hr, " bpm")}</dd>
+              <dt className="text-muted">Max power</dt><dd>{formatOptionalNumber(activity.max_power, " w")}</dd>
+              <dt className="text-muted">Total work</dt><dd>{totalWorkKj ? `${totalWorkKj.toFixed(1)} kJ` : "—"}</dd>
+              <dt className="text-muted">Pause summary</dt><dd>{pauseCount ? `${pauseCount} stop${pauseCount === 1 ? "" : "s"} · ${formatSeconds(pausedDurationSec)}` : "Continuous"}</dd>
+              <dt className="text-muted">Respiration</dt><dd>{avgRespirationRate ? `${avgRespirationRate.toFixed(1)} brpm` : "—"}</dd>
+              <dt className="text-muted">Temperature</dt><dd>{avgTemperature ? `${avgTemperature.toFixed(1)}°C` : "—"}</dd>
+              <dt className="text-muted">Garmin profile</dt><dd>{sportProfileName ?? "—"}</dd>
             </dl>
           </article>
+
+          {(powerZones.length > 0 || hrZones.length > 0) ? (
+            <article className="surface p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Zone distribution</h2>
+                <p className="text-xs text-muted">Source-backed time in zone from Garmin FIT</p>
+              </div>
+              <div className={`mt-4 grid gap-4 ${powerZones.length > 0 && hrZones.length > 0 ? "lg:grid-cols-2" : ""}`}>
+                {powerZones.length > 0 ? (
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-muted">Power</p>
+                    <div className="mt-3 space-y-2">
+                      {powerZones.map((zone) => (
+                        <div key={`power-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
+                          <span>Z{zone.zone} · {formatZoneRange(zone.powerMin, zone.powerMax, "w")}</span>
+                          <span className="tabular-nums text-muted">{formatSeconds(zone.durationSec)}{zone.pctOfSession !== null ? ` · ${Math.round(zone.pctOfSession * 100)}%` : ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {hrZones.length > 0 ? (
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-muted">Heart rate</p>
+                    <div className="mt-3 space-y-2">
+                      {hrZones.map((zone) => (
+                        <div key={`hr-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
+                          <span>Z{zone.zone} · {formatZoneRange(zone.heartRateMin, zone.heartRateMax, "bpm")}</span>
+                          <span className="tabular-nums text-muted">{formatSeconds(zone.durationSec)}{zone.pctOfSession !== null ? ` · ${Math.round(zone.pctOfSession * 100)}%` : ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          ) : null}
 
           <article className="surface p-5">
             <h2 className="text-sm font-semibold">Splits / intervals</h2>
@@ -108,9 +196,27 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
             ) : (
               <div className="mt-3 overflow-auto">
                 <table className="min-w-full text-sm">
-                  <thead><tr className="text-left text-xs uppercase text-muted"><th>Lap</th><th>Split time</th><th>Distance</th><th>Avg HR</th><th>Avg Power</th></tr></thead>
-                  <tbody>{laps.map((lap: any, index: number) => (
-                    <tr key={index} className="border-t border-white/10"><td className="py-2">{index + 1}</td><td>{String(lap.duration_sec ?? "—")}</td><td>{lap.distance_m ? `${(Number(lap.distance_m) / 1000).toFixed(2)} km` : "—"}</td><td>{lap.avg_hr ?? "—"}</td><td>{lap.avg_power ?? "—"}</td></tr>
+                  <thead>
+                    <tr className="text-left text-xs uppercase text-muted">
+                      <th>Lap</th>
+                      <th>Time</th>
+                      <th>Distance</th>
+                      <th>Avg HR</th>
+                      <th>Avg Power</th>
+                      <th>NP</th>
+                      <th>Cadence</th>
+                    </tr>
+                  </thead>
+                  <tbody>{laps.map((lap) => (
+                    <tr key={lap.index} className="border-t border-white/10">
+                      <td className="py-2">{lap.index}</td>
+                      <td>{lap.durationSec ? formatDuration(Math.round(lap.durationSec)) : "—"}</td>
+                      <td>{lap.distanceM ? `${(lap.distanceM / 1000).toFixed(2)} km` : "—"}</td>
+                      <td>{lap.avgHr ?? "—"}</td>
+                      <td>{lap.avgPower ?? "—"}</td>
+                      <td>{lap.normalizedPower ?? "—"}</td>
+                      <td>{lap.avgCadence ?? "—"}</td>
+                    </tr>
                   ))}</tbody>
                 </table>
               </div>

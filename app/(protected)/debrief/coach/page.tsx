@@ -53,6 +53,24 @@ export default async function CoachDebriefPage({
     };
   }
 
+  if (snapshot.artifact && snapshot.stale) {
+    const refreshed = await refreshWeeklyDebrief({
+      supabase,
+      athleteId: user.id,
+      weekStart,
+      timeZone,
+      todayIso
+    });
+    snapshot = {
+      readiness: refreshed.readiness,
+      artifact: refreshed.artifact,
+      stale: false,
+      sourceUpdatedAt: refreshed.artifact?.sourceUpdatedAt ?? snapshot.sourceUpdatedAt,
+      weekStart,
+      weekEnd: addDays(weekStart, 6)
+    };
+  }
+
   if (!snapshot.readiness.isReady || !snapshot.artifact) {
     return (
       <section className="space-y-4">

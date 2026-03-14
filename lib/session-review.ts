@@ -422,6 +422,10 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const timeAbove = getNumber(diagnosis, ["timeAboveTargetPct", "time_above_target_pct"]);
   const avgHr = getNumber(diagnosis, ["avgHr", "avg_hr"]);
   const avgPower = getNumber(diagnosis, ["avgPower", "avg_power"]);
+  const normalizedPower = getNumber(diagnosis, ["normalizedPower", "normalized_power"]);
+  const variabilityIndex = getNumber(diagnosis, ["variabilityIndex", "variability_index"]);
+  const trainingStressScore = getNumber(diagnosis, ["trainingStressScore", "training_stress_score"]);
+  const avgCadence = getNumber(diagnosis, ["avgCadence", "avg_cadence"]);
   const firstHalfHr = getNumber(diagnosis, ["firstHalfAvgHr", "first_half_avg_hr"]);
   const lastHalfHr = getNumber(diagnosis, ["lastHalfAvgHr", "last_half_avg_hr"]);
   const firstHalfPace = getNumber(diagnosis, ["firstHalfPaceSPerKm", "first_half_pace_s_per_km"]);
@@ -506,6 +510,10 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
     hrDrift !== null && bucket !== "threshold" ? { label: "Late HR drift", value: pct(hrDrift - 1) } : null,
     paceFade !== null && bucket === "long" ? { label: "Late pace fade", value: pct(paceFade - 1) } : null,
+    normalizedPower !== null ? { label: "Normalized power", value: `${Math.round(normalizedPower)} w` } : null,
+    variabilityIndex !== null ? { label: "Variability Index", value: variabilityIndex.toFixed(2) } : null,
+    trainingStressScore !== null ? { label: "Training Stress", value: `${Math.round(trainingStressScore)} TSS` } : null,
+    avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} rpm` } : null,
     avgHr || avgPower
       ? {
           label: "Average load",

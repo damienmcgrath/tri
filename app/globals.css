@@ -143,6 +143,10 @@
     font-family: var(--font-geist-mono), monospace;
   }
 
+  .text-base {
+    color: inherit;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

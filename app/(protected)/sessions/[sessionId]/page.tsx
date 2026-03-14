@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { buildExecutionResultForSession } from "@/lib/workouts/session-execution";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 
 type SessionRow = SessionReviewRow;
 
@@ -32,6 +32,7 @@ type ActivityReviewRow = {
   laps_count?: number | null;
   parse_summary?: Record<string, unknown> | null;
   metrics_v2?: Record<string, unknown> | null;
+  updated_at?: string | null;
 };
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
@@ -86,7 +87,7 @@ async function loadActivityReviewRow(params: {
     () =>
       supabase
         .from("completed_activities")
-        .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,updated_at")
         .eq("id", activityId)
         .eq("user_id", userId)
         .maybeSingle(),
@@ -100,7 +101,7 @@ async function loadActivityReviewRow(params: {
     () =>
       supabase
         .from("completed_activities")
-        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,updated_at")
         .eq("id", activityId)
         .maybeSingle(),
     () =>
@@ -295,11 +296,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     }
   }
 
-  if (hasLinkedActivity && linkedActivityId && !session.execution_result) {
+  if (hasLinkedActivity && linkedActivityId) {
     try {
       const { data: activity } = await supabase
         .from("completed_activities")
-        .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,updated_at")
         .eq("id", linkedActivityId)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -316,24 +317,27 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           laps_count?: number | null;
           parse_summary?: Record<string, unknown> | null;
           metrics_v2?: Record<string, unknown> | null;
+          updated_at?: string | null;
         };
-        session.execution_result = buildExecutionResultForSession(
-          {
-            id: session.id,
-            athlete_id: (session as SessionRow & { athlete_id?: string }).athlete_id ?? user.id,
-            user_id: session.user_id ?? user.id,
-            sport: session.sport,
-            type: session.type,
-            duration_minutes: session.duration_minutes ?? null,
-            target: session.target ?? null,
-            intent_category: session.intent_category ?? null,
-            session_name: session.session_name ?? session.type,
-            session_role: (session as SessionRow & { session_role?: string | null }).session_role ?? null,
-            status: session.status ?? "planned"
-          },
-          linkedActivityDetails
-        );
-        session.status = "completed";
+        if (!session.execution_result || shouldRefreshExecutionResultFromActivity(session.execution_result, linkedActivityDetails)) {
+          session.execution_result = buildExecutionResultForSession(
+            {
+              id: session.id,
+              athlete_id: (session as SessionRow & { athlete_id?: string }).athlete_id ?? user.id,
+              user_id: session.user_id ?? user.id,
+              sport: session.sport,
+              type: session.type,
+              duration_minutes: session.duration_minutes ?? null,
+              target: session.target ?? null,
+              intent_category: session.intent_category ?? null,
+              session_name: session.session_name ?? session.type,
+              session_role: (session as SessionRow & { session_role?: string | null }).session_role ?? null,
+              status: session.status ?? "planned"
+            },
+            linkedActivityDetails
+          );
+          session.status = "completed";
+        }
       }
     } catch {
       // Leave the session in the honest "analysis pending" state if local backfill fails.
@@ -399,7 +403,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               <h2 className={`text-[22px] font-medium leading-tight ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
                 {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
               </h2>
-              <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]">{reviewVm.actualExecutionSummary}</p>
+              <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.actualExecutionSummary}</p>
               <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
             </div>
 
@@ -461,7 +465,8 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p
-                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-[#34D399]" : "text-base font-semibold"}`}
+                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-[#34D399]" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
+                        style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-primary))" }}
                       >
                         {metric.value}
                       </p>
