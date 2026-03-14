@@ -487,6 +487,108 @@
     transform: translateY(1px);
   }
 
+  .debrief-hero {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(190, 255, 0, 0.12), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 42%),
+      var(--color-surface);
+    border: 1px solid rgba(190, 255, 0, 0.1);
+  }
+
+  .debrief-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.02), transparent);
+    opacity: 0.6;
+  }
+
+  .debrief-metric-card {
+    display: flex;
+    min-height: 110px;
+    flex-direction: column;
+    justify-content: flex-start;
+    border: 1px solid var(--border-subtle);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 16px;
+  }
+
+  .debrief-metric-card--emphasis {
+    border-color: rgba(190, 255, 0, 0.18);
+    background:
+      linear-gradient(180deg, rgba(190, 255, 0, 0.08), rgba(190, 255, 0, 0.03)),
+      rgba(255, 255, 255, 0.02);
+  }
+
+  .debrief-section-card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.008)),
+      var(--color-surface);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+  }
+
+  .debrief-list-card {
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.018);
+    padding: 16px 18px;
+  }
+
+  .debrief-list-card--positive {
+    border-left: 2px solid rgba(52, 211, 153, 0.65);
+  }
+
+  .debrief-list-card--notice {
+    border-left: 2px solid rgba(255, 180, 60, 0.72);
+  }
+
+  .debrief-carry-card {
+    border: 1px solid rgba(190, 255, 0, 0.24);
+    border-radius: 20px;
+    background:
+      linear-gradient(180deg, rgba(190, 255, 0, 0.08), rgba(190, 255, 0, 0.04)),
+      rgba(255, 255, 255, 0.02);
+    padding: 18px 20px;
+  }
+
+  .debrief-kicker {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+  }
+
+  .debrief-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-default);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+  }
+
+  .debrief-pill--accent {
+    border-color: rgba(190, 255, 0, 0.24);
+    background: rgba(190, 255, 0, 0.08);
+    color: var(--color-accent);
+  }
+
+  .debrief-summary {
+    font-size: 17px;
+    line-height: 1.75;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
   .chip::before {
     content: "";
     width: 6px;

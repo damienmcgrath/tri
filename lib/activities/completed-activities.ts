@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SessionActivityLinkRecord = {
   planned_session_id?: string | null;
@@ -17,6 +17,7 @@ export type CompletedActivityRecord = {
   avg_power: number | null;
   schedule_status: "scheduled" | "unscheduled";
   is_unplanned: boolean;
+  created_at?: string;
 };
 
 export type ExtraCompletedActivity = {
@@ -77,17 +78,17 @@ export function buildExtraCompletedActivities(params: {
 }
 
 export async function loadCompletedActivities(params: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: SupabaseClient;
   userId: string;
   rangeStart: string;
   rangeEnd: string;
 }): Promise<CompletedActivityRecord[]> {
   const { supabase, userId, rangeStart, rangeEnd } = params;
   const selectVariants = [
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power"
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at",
+    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at"
   ] as const;
 
   let lastError: { code?: string; message?: string } | null = null;
@@ -111,7 +112,8 @@ export async function loadCompletedActivities(params: {
         avg_hr: typeof activity.avg_hr === "number" ? activity.avg_hr : null,
         avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
         schedule_status: activity.schedule_status === "scheduled" ? "scheduled" : "unscheduled",
-        is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false
+        is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false,
+        created_at: typeof activity.created_at === "string" ? activity.created_at : undefined
       }));
     }
 

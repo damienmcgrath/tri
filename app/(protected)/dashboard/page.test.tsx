@@ -22,9 +22,13 @@ type QueryResponse = { data: unknown; error: { code?: string; message?: string }
 
 type QueryBuilder = {
   eq: (column: string, value: unknown) => QueryBuilder;
+  in: (column: string, value: unknown[]) => QueryBuilder;
+  or: (filters: string) => QueryBuilder;
   gte: (column: string, value: unknown) => QueryBuilder;
+  lte: (column: string, value: unknown) => QueryBuilder;
   lt: (column: string, value: unknown) => QueryBuilder;
   order: (column: string, options?: { ascending?: boolean }) => QueryBuilder;
+  limit: (count: number) => QueryBuilder;
   maybeSingle: () => Promise<QueryResponse>;
   then: Promise<QueryResponse>["then"];
   catch: Promise<QueryResponse>["catch"];
@@ -38,9 +42,13 @@ function createQueryBuilder(result: QueryResult) {
 
   builder = {
     eq: jest.fn(() => builder),
+    in: jest.fn(() => builder),
+    or: jest.fn(() => builder),
     gte: jest.fn(() => builder),
+    lte: jest.fn(() => builder),
     lt: jest.fn(() => builder),
     order: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
     maybeSingle: jest.fn(async () => ({
       data: Array.isArray(result.data) ? result.data[0] ?? null : result.data,
       error: result.error ?? null
@@ -76,6 +84,15 @@ function createSupabaseMock(params: { sessions: unknown[]; links?: unknown[] }) 
               race_date: null,
               race_name: null
             }
+          },
+          athlete_context: {
+            data: null
+          },
+          athlete_checkins: {
+            data: null
+          },
+          athlete_observed_patterns: {
+            data: []
           },
           training_plans: {
             data: [{ id: "plan-1" }]
