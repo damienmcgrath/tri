@@ -143,9 +143,11 @@ describe("createReviewViewModel", () => {
       }
     });
 
-    expect(vm.reviewModeLabel).toBe("Extra session review");
-    expect(vm.sessionStatusLabel).toBe("Extra workout");
-    expect(vm.plannedIntent).toBe("No planned intent. Review this as additional weekly load.");
+    expect(vm.reviewModeLabel).toBe("Post-execution review");
+    expect(vm.sessionStatusLabel).toBe("Completed");
+    expect(vm.intent.label).toBe("Supportive load");
+    expect(vm.intent.detail).toMatch(/useful training load|without obvious disruption/i);
+    expect(vm.plannedIntent).toBe("No planned target. Treat this as completed load added on top of the week.");
     expect(vm.mainGap).toMatch(/no planned target/i);
     expect(vm.unlockTitle).toBe("Weekly context");
     expect(vm.followUpIntro).toMatch(/extra session/i);

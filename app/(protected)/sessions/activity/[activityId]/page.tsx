@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { isMissingCompletedActivityColumnError } from "@/lib/activities/completed-activities";
 import { createClient } from "@/lib/supabase/server";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
@@ -20,12 +21,6 @@ type ActivityReviewRow = {
   parse_summary?: Record<string, unknown> | null;
   metrics_v2?: Record<string, unknown> | null;
 };
-
-function isMissingActivityColumnError(error: { code?: string; message?: string } | null) {
-  if (!error) return false;
-  if (error.code === "42703") return true;
-  return /(schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
-}
 
 async function loadActivityReviewRow(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -68,7 +63,7 @@ async function loadActivityReviewRow(params: {
     if (data && !error) {
       return data as ActivityReviewRow;
     }
-    if (error && !isMissingActivityColumnError(error)) {
+    if (error && !isMissingCompletedActivityColumnError(error)) {
       break;
     }
   }
@@ -140,6 +135,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const comparisonHeading = reviewVm.isReviewable ? "Session impact" : "Review unlock";
   const leftColumnLabel = "Weekly context";
+  const outcomeLabel = session.is_extra ? "Week effect" : reviewVm.isReviewable ? "Intent result" : "Session status";
 
   return (
     <section className="space-y-4">
@@ -178,7 +174,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
               <p className="mt-1 text-sm text-muted">{sessionDateLabel}</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{reviewVm.isReviewable ? "Intent result" : "Session status"}</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">{outcomeLabel}</p>
               <p className={`mt-2 text-base font-semibold ${toneToTextClass(reviewVm.intent.tone)}`}>{reviewVm.intent.label}</p>
               <p className="mt-1 text-sm text-muted">{reviewVm.intent.detail}</p>
             </div>
