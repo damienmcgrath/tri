@@ -11,11 +11,18 @@ export type WeekMetricSession = {
   isKey?: boolean;
 };
 
-export function computeWeekSessionCounts(sessions: WeekMetricSession[]) {
-  const completedCount = sessions.filter((s) => s.status === "completed").length;
+export type WeekExtraCompletion = {
+  id: string;
+  date: string;
+  sport: string;
+  durationMinutes: number;
+};
+
+export function computeWeekSessionCounts(sessions: WeekMetricSession[], extraCompletions: WeekExtraCompletion[] = []) {
+  const completedCount = sessions.filter((s) => s.status === "completed").length + extraCompletions.length;
   const skippedCount = sessions.filter((s) => s.status === "skipped").length;
   const plannedRemainingCount = sessions.filter((s) => s.status === "planned").length;
-  const plannedTotalCount = completedCount + skippedCount + plannedRemainingCount;
+  const plannedTotalCount = sessions.length;
 
   return {
     completedCount,
@@ -25,17 +32,19 @@ export function computeWeekSessionCounts(sessions: WeekMetricSession[]) {
   };
 }
 
-export function computeWeekMinuteTotals(sessions: WeekMetricSession[]) {
+export function computeWeekMinuteTotals(sessions: WeekMetricSession[], extraCompletions: WeekExtraCompletion[] = []) {
   const plannedMinutes = sessions.reduce((sum, session) => sum + Math.max(session.durationMinutes, 0), 0);
   const completedMinutes = sessions
     .filter((session) => session.status === "completed")
     .reduce((sum, session) => sum + Math.max(session.durationMinutes, 0), 0);
+  const extraCompletedMinutes = extraCompletions.reduce((sum, activity) => sum + Math.max(activity.durationMinutes, 0), 0);
 
-  const remainingMinutes = Math.max(plannedMinutes - completedMinutes, 0);
+  const totalCompletedMinutes = completedMinutes + extraCompletedMinutes;
+  const remainingMinutes = Math.max(plannedMinutes - totalCompletedMinutes, 0);
 
   return {
     plannedMinutes,
-    completedMinutes,
+    completedMinutes: totalCompletedMinutes,
     remainingMinutes
   };
 }

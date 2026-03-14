@@ -1,5 +1,6 @@
 import type { ExecutionResultState, SessionLifecycleState, SessionRoleState } from "@/lib/training/semantics";
 import { normalizeSessionModel } from "@/lib/training/session";
+import { hasConfirmedPlannedSessionLink, localIsoDate } from "@/lib/activities/completed-activities";
 
 export type CalendarSessionRecord = {
   id: string;
@@ -89,18 +90,6 @@ function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
 
-function localIsoDate(utcIso: string, timeZone: string) {
-  const date = new Date(utcIso);
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  });
-  return formatter.format(date);
-}
-
-
 function dateInRange(date: string, start?: string, endExclusive?: string) {
   if (start && date < start) return false;
   if (endExclusive && date >= endExclusive) return false;
@@ -140,7 +129,7 @@ export function buildCalendarDisplayItems(input: {
   );
   const confirmedLinkedActivityIds = new Set(
     links
-      .filter((link) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null || typeof link.confirmation_status === "undefined"))
+      .filter(hasConfirmedPlannedSessionLink)
       .map((link) => link.completed_activity_id)
   );
 
@@ -173,12 +162,12 @@ export function buildCalendarDisplayItems(input: {
 
   links.forEach((link) => {
     const activity = activityById.get(link.completed_activity_id);
-    const isConfirmedLink = link.confirmation_status === "confirmed" || link.confirmation_status === null || typeof link.confirmation_status === "undefined";
-    if (!activity || !link.planned_session_id || !isConfirmedLink) return;
+    const plannedSessionId = link.planned_session_id;
+    if (!activity || !plannedSessionId || !hasConfirmedPlannedSessionLink(link)) return;
     linkedActivityIds.add(activity.id);
-    const list = linkedBySession.get(link.planned_session_id) ?? [];
+    const list = linkedBySession.get(plannedSessionId) ?? [];
     list.push(activity);
-    linkedBySession.set(link.planned_session_id, list);
+    linkedBySession.set(plannedSessionId, list);
   });
 
   const unassignedByDate = new Map<string, number>();

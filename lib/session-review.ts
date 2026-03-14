@@ -176,19 +176,19 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
 function toExtraReviewState(hasDiagnosticSignals: boolean) {
   if (hasDiagnosticSignals) {
     return {
-      reviewModeLabel: "Extra session review",
-      reviewModeDetail: "This unplanned workout is reviewed against weekly context rather than a planned session target.",
-      sessionStatusLabel: "Extra workout",
-      sessionStatusDetail: "Completed unplanned session with enough execution evidence to review its impact.",
+      reviewModeLabel: "Post-execution review",
+      reviewModeDetail: "This completed workout was not planned, so the review focuses on its execution and weekly impact rather than planned vs actual.",
+      sessionStatusLabel: "Completed",
+      sessionStatusDetail: "Completed workout without a planned target, but with enough evidence to review what it added to the week.",
       isReviewable: true
     };
   }
 
   return {
-    reviewModeLabel: "Extra session review",
-    reviewModeDetail: "This unplanned workout has limited evidence, so the review stays directional.",
-    sessionStatusLabel: "Extra workout",
-    sessionStatusDetail: "Completed unplanned session without enough detail for a stronger execution review.",
+    reviewModeLabel: "Post-execution review",
+    reviewModeDetail: "This completed workout was not planned, so the review stays directional until richer evidence syncs.",
+    sessionStatusLabel: "Completed",
+    sessionStatusDetail: "Completed workout without enough detail for a stronger execution read.",
     isReviewable: false
   };
 }
@@ -238,6 +238,38 @@ function toIntent(status: unknown, isReviewable: boolean, hasLinkedActivity: boo
     label: "Partial match",
     tone: "warning" as const,
     detail: "Some of the intended stimulus landed, but key parts of the execution were off."
+  };
+}
+
+function toExtraIntent(status: unknown, isReviewable: boolean) {
+  if (!isReviewable) {
+    return {
+      label: "Directional read",
+      tone: "muted" as const,
+      detail: "This extra workout still counts, but richer interval and intensity detail would sharpen how it should change the week."
+    };
+  }
+
+  if (status === "matched_intent" || status === "matched") {
+    return {
+      label: "Supportive load",
+      tone: "success" as const,
+      detail: "The extra work looks controlled enough to add useful training load without obvious disruption."
+    };
+  }
+
+  if (status === "missed_intent" || status === "missed") {
+    return {
+      label: "Risky load",
+      tone: "risk" as const,
+      detail: "The extra work looks costly enough that the rest of the week may need more protection."
+    };
+  }
+
+  return {
+    label: "Manage load",
+    tone: "warning" as const,
+    detail: "The extra work added stimulus, but treat the next sessions conservatively until recovery is clearer."
   };
 }
 
@@ -338,7 +370,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const hasDiagnosticSignals = Boolean(diagnosis) && Object.keys(diagnosis ?? {}).length > 0;
   const isExtra = session.is_extra === true;
   const reviewState = isExtra ? toExtraReviewState(hasDiagnosticSignals) : toReviewState(session.status, diagnosis, hasLinkedActivity);
-  const intent = toIntent(diagnosis?.status, reviewState.isReviewable, hasLinkedActivity);
+  const intent = isExtra ? toExtraIntent(diagnosis?.status, reviewState.isReviewable) : toIntent(diagnosis?.status, reviewState.isReviewable, hasLinkedActivity);
   const bucket = toIntentBucket(session.intent_category, session.sport);
 
   const defaultWhyItMatters = isExtra
@@ -482,7 +514,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
       : null
   ].filter((metric): metric is { label: string; value: string } => metric !== null);
 
-  const plannedIntent = isExtra ? "No planned intent. Review this as additional weekly load." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
+  const plannedIntent = isExtra ? "No planned target. Treat this as completed load added on top of the week." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
   const weekAction = getString(
     v2Review?.verdict?.explanation
       ? { suggestedWeekAdjustment: v2Review.verdict.explanation.whatToDoThisWeek }

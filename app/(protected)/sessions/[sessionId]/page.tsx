@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { isMissingCompletedActivityColumnError } from "@/lib/activities/completed-activities";
 import { createClient } from "@/lib/supabase/server";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
@@ -74,12 +75,6 @@ function toSessionRow(row: SessionRow | SessionsMinimalRow): SessionRow {
 
 const reviewDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
-function isMissingActivityColumnError(error: { code?: string; message?: string } | null) {
-  if (!error) return false;
-  if (error.code === "42703") return true;
-  return /(schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
-}
-
 async function loadActivityReviewRow(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -121,7 +116,7 @@ async function loadActivityReviewRow(params: {
     if (data && !error) {
       return data as ActivityReviewRow;
     }
-    if (error && !isMissingActivityColumnError(error)) {
+    if (error && !isMissingCompletedActivityColumnError(error)) {
       break;
     }
   }
@@ -156,6 +151,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       target: null,
       duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
       status: "completed",
+      is_extra: true,
       execution_result: buildExecutionResultForSession(
         {
           id: params.sessionId,
@@ -359,6 +355,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   const disciplineLabel = getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
+  const plannedColumnLabel = session.is_extra ? "Weekly context" : "Planned";
 
   return (
     <section className="space-y-4">
@@ -432,7 +429,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <div className="space-y-5">
               {hasSpecificPlannedIntent ? (
                 <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{plannedColumnLabel}</p>
                   <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
                 </div>
               ) : null}

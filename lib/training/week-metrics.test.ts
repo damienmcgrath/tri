@@ -25,6 +25,26 @@ describe("week metrics", () => {
     });
   });
 
+  it("adds extra completed work into weekly totals", () => {
+    const extras = [
+      { id: "extra-1", date: "2026-02-24", sport: "run", durationMinutes: 30 },
+      { id: "extra-2", date: "2026-02-25", sport: "bike", durationMinutes: 20 }
+    ];
+
+    expect(computeWeekSessionCounts(sessions, extras)).toEqual({
+      completedCount: 3,
+      skippedCount: 1,
+      plannedRemainingCount: 2,
+      plannedTotalCount: 4
+    });
+
+    expect(computeWeekMinuteTotals(sessions, extras)).toEqual({
+      plannedMinutes: 225,
+      completedMinutes: 95,
+      remainingMinutes: 130
+    });
+  });
+
   it("returns key sessions remaining in chronological order", () => {
     expect(getKeySessionsRemaining(sessions, "2026-02-24").map((s) => s.id)).toEqual(["2", "4"]);
   });
