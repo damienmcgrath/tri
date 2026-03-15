@@ -22,6 +22,7 @@ function hasRichMetrics(metrics: Record<string, unknown> | null | undefined) {
   const summary = asMetricsRecord(getNestedValue(record, ["summary"]));
   const laps = getNestedValue(record, ["laps"]);
   const activityType = getNestedString(record, [["activity", "normalizedType"]]);
+  const splits = asMetricsRecord(getNestedValue(record, ["splits"])) ?? asMetricsRecord(getNestedValue(record, ["halves"]));
 
   if (!summary || !Array.isArray(laps)) return false;
 
@@ -29,6 +30,20 @@ function hasRichMetrics(metrics: Record<string, unknown> | null | undefined) {
     const power = asMetricsRecord(getNestedValue(record, ["power"]));
     const zones = asMetricsRecord(getNestedValue(record, ["zones"]));
     return Boolean(power?.normalizedPower) && Array.isArray(zones?.power);
+  }
+
+  if (activityType === "run") {
+    const pace = asMetricsRecord(getNestedValue(record, ["pace"]));
+    const cadence = asMetricsRecord(getNestedValue(record, ["cadence"]));
+    const hrZones = getNestedValue(record, ["zones", "hr"]) ?? getNestedValue(record, ["zones", "heartRate"]);
+    return Boolean(pace?.avgPaceSecPerKm) && Boolean(cadence?.avgCadence) && Boolean(splits) && Array.isArray(hrZones);
+  }
+
+  if (activityType === "swim") {
+    const pace = asMetricsRecord(getNestedValue(record, ["pace"]));
+    const stroke = asMetricsRecord(getNestedValue(record, ["stroke"]));
+    const pool = asMetricsRecord(getNestedValue(record, ["pool"]));
+    return Boolean(pace?.avgPacePer100mSec) && Boolean(splits) && (Boolean(stroke?.avgStrokeRateSpm) || Boolean(pool?.poolLengthM));
   }
 
   return true;

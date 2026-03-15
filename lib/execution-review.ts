@@ -33,8 +33,24 @@ export type ExecutionEvidence = {
     intensityFactor?: number | null;
     totalWorkKj?: number | null;
     avgCadence?: number | null;
+    avgPacePer100mSec?: number | null;
+    bestPacePer100mSec?: number | null;
+    avgStrokeRateSpm?: number | null;
+    maxStrokeRateSpm?: number | null;
+    avgSwolf?: number | null;
+    elevationGainM?: number | null;
+    elevationLossM?: number | null;
+    poolLengthM?: number | null;
+    lengthCount?: number | null;
+    hrZoneTimeSec?: number | null;
+    paceZoneTimeSec?: number | null;
     maxHr?: number | null;
     maxPower?: number | null;
+    maxCadence?: number | null;
+    bestPaceSPerKm?: number | null;
+    normalizedGradedPaceSPerKm?: number | null;
+    aerobicTrainingEffect?: number | null;
+    anaerobicTrainingEffect?: number | null;
     splitMetrics: {
       firstHalfAvgHr?: number;
       lastHalfAvgHr?: number;
@@ -42,6 +58,72 @@ export type ExecutionEvidence = {
       lastHalfAvgPower?: number;
       firstHalfPaceSPerKm?: number;
       lastHalfPaceSPerKm?: number;
+      firstHalfAvgCadence?: number;
+      lastHalfAvgCadence?: number;
+      firstHalfPacePer100mSec?: number;
+      lastHalfPacePer100mSec?: number;
+      firstHalfStrokeRate?: number;
+      lastHalfStrokeRate?: number;
+    } | null;
+    sportSpecific?: {
+      run?: {
+        avgPaceSPerKm: number | null;
+        bestPaceSPerKm: number | null;
+        normalizedGradedPaceSPerKm: number | null;
+        avgHr: number | null;
+        maxHr: number | null;
+        hrZoneTimeSec: number | null;
+        paceZoneTimeSec: number | null;
+        avgCadence: number | null;
+        maxCadence: number | null;
+        elevationGainM: number | null;
+        elevationLossM: number | null;
+        trainingStressScore: number | null;
+        aerobicTrainingEffect: number | null;
+        anaerobicTrainingEffect: number | null;
+        splitMetrics: ExecutionEvidence["actual"]["splitMetrics"];
+      } | null;
+      swim?: {
+        avgPacePer100mSec: number | null;
+        bestPacePer100mSec: number | null;
+        avgStrokeRateSpm: number | null;
+        maxStrokeRateSpm: number | null;
+        avgSwolf: number | null;
+        poolLengthM: number | null;
+        lengthCount: number | null;
+        paceZoneTimeSec: number | null;
+        trainingStressScore: number | null;
+        aerobicTrainingEffect: number | null;
+        anaerobicTrainingEffect: number | null;
+        splitMetrics: ExecutionEvidence["actual"]["splitMetrics"];
+      } | null;
+      bike?: {
+        avgPower: number | null;
+        normalizedPower: number | null;
+        maxPower: number | null;
+        intensityFactor: number | null;
+        variabilityIndex: number | null;
+        totalWorkKj: number | null;
+        avgCadence: number | null;
+        maxCadence: number | null;
+        avgHr: number | null;
+        maxHr: number | null;
+        hrZoneTimeSec: number | null;
+        trainingStressScore: number | null;
+        aerobicTrainingEffect: number | null;
+        anaerobicTrainingEffect: number | null;
+        splitMetrics: ExecutionEvidence["actual"]["splitMetrics"];
+      } | null;
+      strength?: {
+        durationSec: number | null;
+        intervalCompletionPct: number | null;
+        avgHr: number | null;
+        maxHr: number | null;
+        timeAboveTargetPct: number | null;
+        trainingStressScore: number | null;
+        aerobicTrainingEffect: number | null;
+        anaerobicTrainingEffect: number | null;
+      } | null;
     } | null;
   };
   detectedIssues: Array<{
@@ -114,6 +196,7 @@ export type PersistedExecutionReview = {
   linkedActivityId: string | null;
   deterministic: ExecutionEvidence;
   verdict: CoachVerdict | null;
+  narrativeSource: "ai" | "fallback" | "legacy_unknown";
   weeklyImpact: {
     suggestedWeekAction: string;
     suggestedNextCall: "move_on" | "proceed_with_caution" | "repeat_session" | "protect_recovery" | "adjust_next_key_session";
@@ -143,12 +226,29 @@ export type PersistedExecutionReview = {
   intensityFactor: number | null;
   totalWorkKj: number | null;
   avgCadence: number | null;
+  avgPacePer100mSec?: number | null;
+  bestPacePer100mSec?: number | null;
+  avgStrokeRateSpm?: number | null;
+  maxStrokeRateSpm?: number | null;
+  avgSwolf?: number | null;
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
+  poolLengthM?: number | null;
+  lengthCount?: number | null;
+  hrZoneTimeSec?: number | null;
+  paceZoneTimeSec?: number | null;
   maxHr: number | null;
   maxPower: number | null;
   firstHalfAvgHr: number | null;
   lastHalfAvgHr: number | null;
   firstHalfPaceSPerKm: number | null;
   lastHalfPaceSPerKm: number | null;
+  firstHalfAvgCadence?: number | null;
+  lastHalfAvgCadence?: number | null;
+  firstHalfPacePer100mSec?: number | null;
+  lastHalfPacePer100mSec?: number | null;
+  firstHalfStrokeRate?: number | null;
+  lastHalfStrokeRate?: number | null;
   executionCost: "low" | "moderate" | "high" | "unknown";
   missingEvidence: string[];
 };
@@ -178,6 +278,36 @@ const coachVerdictSchema = z.object({
     support: z.array(z.string().min(1).max(180)).max(4)
   })).max(4)
 });
+
+const COACH_VERDICT_EXAMPLE: CoachVerdict = {
+  sessionVerdict: {
+    headline: "Intent partially landed",
+    summary: "The session hit some of the intended stimulus, but late fade and incomplete work kept it from fully landing.",
+    intentMatch: "partial",
+    executionCost: "moderate",
+    confidence: "medium",
+    nextCall: "proceed_with_caution"
+  },
+  explanation: {
+    whatHappened: "Early control was acceptable, but the final segment faded and the last planned work was not completed cleanly.",
+    whyItMatters: "That means the session delivered some useful stimulus, but not the precise version the week was counting on.",
+    whatToDoNextTime: "Start the first work block a touch easier so you can hold form and finish the full set.",
+    whatToDoThisWeek: "Keep the next key session on the calendar, but avoid forcing progression if fatigue is still lingering."
+  },
+  uncertainty: {
+    label: "early_read",
+    detail: "This read is useful, but it is still limited by missing split or interval detail.",
+    missingEvidence: ["split comparison"]
+  },
+  citedEvidence: [
+    {
+      claim: "Late fade showed up in the second half.",
+      support: ["Second-half pace slowed versus the first half", "Interval completion was below plan"]
+    }
+  ]
+};
+
+const COACH_VERDICT_JSON_EXAMPLE = JSON.stringify(COACH_VERDICT_EXAMPLE, null, 2);
 
 function toIntentMatch(status: "matched_intent" | "partial_intent" | "missed_intent") {
   if (status === "matched_intent") return "on_target" as const;
@@ -209,6 +339,341 @@ function getIssueSeverity(code: string) {
 function getActualMetric(input: SessionDiagnosisInput["actual"], key: string) {
   const value = input.metrics?.[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function buildSportSpecificEvidence(input: SessionDiagnosisInput): ExecutionEvidence["actual"]["sportSpecific"] {
+  const splitMetrics = input.actual.splitMetrics ?? null;
+  const avgHr = input.actual.avgHr ?? null;
+  const maxHr = getActualMetric(input.actual, "max_hr");
+  const trainingStressScore = getActualMetric(input.actual, "training_stress_score");
+  const aerobicTrainingEffect = getActualMetric(input.actual, "aerobic_training_effect");
+  const anaerobicTrainingEffect = getActualMetric(input.actual, "anaerobic_training_effect");
+
+  switch (input.planned.sport ?? "other") {
+    case "run":
+      return {
+        run: {
+          avgPaceSPerKm: input.actual.avgPaceSPerKm ?? null,
+          bestPaceSPerKm: getActualMetric(input.actual, "best_pace_s_per_km"),
+          normalizedGradedPaceSPerKm: getActualMetric(input.actual, "normalized_graded_pace_s_per_km"),
+          avgHr,
+          maxHr,
+          hrZoneTimeSec: getActualMetric(input.actual, "hr_zone_time_sec"),
+          paceZoneTimeSec: getActualMetric(input.actual, "pace_zone_time_sec"),
+          avgCadence: getActualMetric(input.actual, "avg_cadence"),
+          maxCadence: getActualMetric(input.actual, "max_cadence"),
+          elevationGainM: getActualMetric(input.actual, "elevation_gain_m"),
+          elevationLossM: getActualMetric(input.actual, "elevation_loss_m"),
+          trainingStressScore,
+          aerobicTrainingEffect,
+          anaerobicTrainingEffect,
+          splitMetrics
+        }
+      };
+    case "swim":
+      return {
+        swim: {
+          avgPacePer100mSec: getActualMetric(input.actual, "avg_pace_per_100m_sec"),
+          bestPacePer100mSec: getActualMetric(input.actual, "best_pace_per_100m_sec"),
+          avgStrokeRateSpm: getActualMetric(input.actual, "avg_stroke_rate_spm"),
+          maxStrokeRateSpm: getActualMetric(input.actual, "max_stroke_rate_spm"),
+          avgSwolf: getActualMetric(input.actual, "avg_swolf"),
+          poolLengthM: getActualMetric(input.actual, "pool_length_m"),
+          lengthCount: getActualMetric(input.actual, "length_count"),
+          paceZoneTimeSec: getActualMetric(input.actual, "pace_zone_time_sec"),
+          trainingStressScore,
+          aerobicTrainingEffect,
+          anaerobicTrainingEffect,
+          splitMetrics
+        }
+      };
+    case "bike":
+      return {
+        bike: {
+          avgPower: input.actual.avgPower ?? null,
+          normalizedPower: getActualMetric(input.actual, "normalized_power"),
+          maxPower: getActualMetric(input.actual, "max_power"),
+          intensityFactor: getActualMetric(input.actual, "intensity_factor"),
+          variabilityIndex: input.actual.variabilityIndex ?? null,
+          totalWorkKj: getActualMetric(input.actual, "total_work_kj"),
+          avgCadence: getActualMetric(input.actual, "avg_cadence"),
+          maxCadence: getActualMetric(input.actual, "max_cadence"),
+          avgHr,
+          maxHr,
+          hrZoneTimeSec: getActualMetric(input.actual, "hr_zone_time_sec"),
+          trainingStressScore,
+          aerobicTrainingEffect,
+          anaerobicTrainingEffect,
+          splitMetrics
+        }
+      };
+    case "strength":
+      return {
+        strength: {
+          durationSec: input.actual.durationSec ?? null,
+          intervalCompletionPct: input.actual.intervalCompletionPct ?? null,
+          avgHr,
+          maxHr,
+          timeAboveTargetPct: input.actual.timeAboveTargetPct ?? null,
+          trainingStressScore,
+          aerobicTrainingEffect,
+          anaerobicTrainingEffect
+        }
+      };
+    default:
+      return null;
+  }
+}
+
+function buildActualEvidence(input: SessionDiagnosisInput): ExecutionEvidence["actual"] {
+  return {
+    durationSec: input.actual.durationSec ?? null,
+    avgHr: input.actual.avgHr ?? null,
+    avgPower: input.actual.avgPower ?? null,
+    avgPaceSPerKm: input.actual.avgPaceSPerKm ?? null,
+    timeAboveTargetPct: input.actual.timeAboveTargetPct ?? null,
+    intervalCompletionPct: input.actual.intervalCompletionPct ?? null,
+    variabilityIndex: input.actual.variabilityIndex ?? null,
+    normalizedPower: getActualMetric(input.actual, "normalized_power"),
+    trainingStressScore: getActualMetric(input.actual, "training_stress_score"),
+    intensityFactor: getActualMetric(input.actual, "intensity_factor"),
+    totalWorkKj: getActualMetric(input.actual, "total_work_kj"),
+    avgCadence: getActualMetric(input.actual, "avg_cadence"),
+    maxCadence: getActualMetric(input.actual, "max_cadence"),
+    bestPaceSPerKm: getActualMetric(input.actual, "best_pace_s_per_km"),
+    normalizedGradedPaceSPerKm: getActualMetric(input.actual, "normalized_graded_pace_s_per_km"),
+    avgPacePer100mSec: getActualMetric(input.actual, "avg_pace_per_100m_sec"),
+    bestPacePer100mSec: getActualMetric(input.actual, "best_pace_per_100m_sec"),
+    avgStrokeRateSpm: getActualMetric(input.actual, "avg_stroke_rate_spm"),
+    maxStrokeRateSpm: getActualMetric(input.actual, "max_stroke_rate_spm"),
+    avgSwolf: getActualMetric(input.actual, "avg_swolf"),
+    elevationGainM: getActualMetric(input.actual, "elevation_gain_m"),
+    elevationLossM: getActualMetric(input.actual, "elevation_loss_m"),
+    poolLengthM: getActualMetric(input.actual, "pool_length_m"),
+    lengthCount: getActualMetric(input.actual, "length_count"),
+    hrZoneTimeSec: getActualMetric(input.actual, "hr_zone_time_sec"),
+    paceZoneTimeSec: getActualMetric(input.actual, "pace_zone_time_sec"),
+    maxHr: getActualMetric(input.actual, "max_hr"),
+    maxPower: getActualMetric(input.actual, "max_power"),
+    aerobicTrainingEffect: getActualMetric(input.actual, "aerobic_training_effect"),
+    anaerobicTrainingEffect: getActualMetric(input.actual, "anaerobic_training_effect"),
+    splitMetrics: input.actual.splitMetrics ?? null,
+    sportSpecific: buildSportSpecificEvidence(input)
+  };
+}
+
+function asObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => asString(item)).filter((item): item is string => item !== null)
+    : [];
+}
+
+function clip(text: string, max: number) {
+  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["nextCall"] | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (
+    normalized === "move_on" ||
+    normalized === "proceed_with_caution" ||
+    normalized === "repeat_session" ||
+    normalized === "protect_recovery" ||
+    normalized === "adjust_next_key_session"
+  ) {
+    return normalized;
+  }
+  if (normalized === "proceed" || normalized === "continue" || normalized === "carry_on") {
+    return "proceed_with_caution";
+  }
+  if (normalized === "moveon" || normalized === "move") {
+    return "move_on";
+  }
+  if (normalized === "repeat") {
+    return "repeat_session";
+  }
+  if (normalized === "recover" || normalized === "protect") {
+    return "protect_recovery";
+  }
+  if (normalized === "adjust_next_session" || normalized === "adjust") {
+    return "adjust_next_key_session";
+  }
+  return null;
+}
+
+function normalizeCoachVerdictPayload(
+  payload: unknown,
+  defaults?: {
+    intentMatch: CoachVerdict["sessionVerdict"]["intentMatch"];
+    executionCost: CoachVerdict["sessionVerdict"]["executionCost"];
+    nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
+  }
+): unknown {
+  const root = asObject(payload);
+  if (!root) return payload;
+
+  if ("sessionVerdict" in root || "explanation" in root || "uncertainty" in root || "citedEvidence" in root) {
+    const sessionVerdict = asObject(root.sessionVerdict);
+    if (!sessionVerdict) return root;
+    return {
+      ...root,
+      sessionVerdict: {
+        ...sessionVerdict,
+        nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
+      }
+    };
+  }
+
+  for (const key of ["verdict", "review", "coachVerdict", "coach_verdict", "result", "data", "output"]) {
+    const candidate = asObject(root[key]);
+    if (!candidate) continue;
+    if ("sessionVerdict" in candidate || "explanation" in candidate || "uncertainty" in candidate || "citedEvidence" in candidate) {
+      const sessionVerdict = asObject(candidate.sessionVerdict);
+      return {
+        ...candidate,
+        sessionVerdict: sessionVerdict
+          ? {
+            ...sessionVerdict,
+            nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
+          }
+          : candidate.sessionVerdict
+      };
+    }
+  }
+
+  const summary = asString(root.summary);
+  const whatHappened = asString(root.whatHappened);
+  const whyItMatters = asString(root.interpretation_for_session) ?? asString(root.interpretationForSession);
+  const whatToDoThisWeek = asString(root.what_this_means_for_the_week) ?? asString(root.whatThisMeansForTheWeek);
+  const practicalNextSteps = asObject(root.practical_next_steps) ?? asObject(root.practicalNextSteps);
+  const nextTime =
+    asString(practicalNextSteps?.next_session) ??
+    asString(practicalNextSteps?.nextSession) ??
+    asString(root.next_session) ??
+    asString(root.nextSession);
+  const thisWeek =
+    asString(practicalNextSteps?.this_week) ??
+    asString(practicalNextSteps?.thisWeek) ??
+    whatToDoThisWeek;
+  const uncertaintyBlock = asObject(root.constraints_and_uncertainties) ?? asObject(root.constraintsAndUncertainties);
+  const questionsBlock = asObject(root.questions_for_you) ?? asObject(root.questionsForYou);
+  const confidence = asString(root.confidence);
+
+  if (summary || whatHappened || whyItMatters || thisWeek || nextTime) {
+    const missingEvidence = [
+      ...asStringArray(uncertaintyBlock?.missingEvidence),
+      ...asStringArray(uncertaintyBlock?.missing_evidence)
+    ].slice(0, 8);
+    const uncertaintyDetailParts = [
+      asString(uncertaintyBlock?.summary),
+      asString(uncertaintyBlock?.detail),
+      ...asStringArray(questionsBlock?.items),
+      ...asStringArray(questionsBlock?.questions)
+    ].filter((item): item is string => item !== null);
+
+    return {
+      sessionVerdict: {
+        headline: clip(summary ?? "Session review", 160),
+        summary: clip(summary ?? whatHappened ?? "Execution evidence is available for review.", 500),
+        intentMatch: defaults?.intentMatch ?? "partial",
+        executionCost: defaults?.executionCost ?? "unknown",
+        confidence: confidence === "high" || confidence === "medium" || confidence === "low" ? confidence : "medium",
+        nextCall: defaults?.nextCall ?? "proceed_with_caution"
+      },
+      explanation: {
+        whatHappened: clip(whatHappened ?? summary ?? "Execution evidence is available for review.", 500),
+        whyItMatters: clip(whyItMatters ?? "Use this review conservatively and in the context of the rest of the week.", 500),
+        whatToDoNextTime: clip(nextTime ?? "Use one clear execution cue on the next similar session.", 500),
+        whatToDoThisWeek: clip(thisWeek ?? "Keep the rest of the week stable and use this review as guidance for the next similar session.", 500)
+      },
+      uncertainty: {
+        label: missingEvidence.length > 0 || uncertaintyDetailParts.length > 0 ? "early_read" : "confident_read",
+        detail: clip(
+          uncertaintyDetailParts.join(" ").trim() || "This read is grounded in the available execution evidence.",
+          500
+        ),
+        missingEvidence
+      },
+      citedEvidence: summary
+        ? [{
+            claim: clip(summary, 200),
+            support: [clip(whatHappened ?? whyItMatters ?? summary, 180)]
+          }]
+        : []
+    };
+  }
+
+  return payload;
+}
+
+function coerceCoachVerdictPayload(
+  payload: unknown,
+  defaults: {
+    intentMatch: CoachVerdict["sessionVerdict"]["intentMatch"];
+    executionCost: CoachVerdict["sessionVerdict"]["executionCost"];
+    nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
+  }
+) {
+  const normalizedPayload = normalizeCoachVerdictPayload(payload, defaults);
+  const parsed = coachVerdictSchema.safeParse(normalizedPayload);
+  return {
+    normalizedPayload,
+    parsed
+  };
+}
+
+export function coerceCoachVerdictPayloadForTest(
+  payload: unknown,
+  defaults: {
+    intentMatch: CoachVerdict["sessionVerdict"]["intentMatch"];
+    executionCost: CoachVerdict["sessionVerdict"]["executionCost"];
+    nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
+  }
+) {
+  return coerceCoachVerdictPayload(payload, defaults);
+}
+
+function buildCoachVerdictInstructions() {
+  return [
+    "You are an endurance coach helping athletes interpret completed workouts.",
+    "Use only the provided evidence and context.",
+    "Do not invent metrics, missing facts, unsupported causes, or unsupported comparisons.",
+    "Return exactly one JSON object that matches the required schema below.",
+    "Do not wrap the object in keys like data, review, result, output, or verdict.",
+    "Do not rename any keys.",
+    "Keep enum values exactly as specified.",
+    "Keep `citedEvidence` as an array of objects with `claim` and `support` only.",
+    "Keep each `support` entry as a plain string, not an object.",
+    "If evidence is limited, reflect that in `uncertainty` and keep recommendations conservative.",
+    "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
+    "Field requirements:",
+    "- `sessionVerdict.headline`: short label, max 160 chars.",
+    "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
+    "- `sessionVerdict.intentMatch`: must match the provided deterministic intent result.",
+    "- `sessionVerdict.executionCost`: must stay consistent with the provided deterministic execution cost.",
+    "- `sessionVerdict.nextCall`: choose one allowed enum only.",
+    "- `explanation.whatHappened`: factual session read, max 500 chars.",
+    "- `explanation.whyItMatters`: what it means for adaptation or the week, max 500 chars.",
+    "- `explanation.whatToDoNextTime`: one practical cue for the next similar session, max 500 chars.",
+    "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
+    "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
+    "- `uncertainty.detail`: explain the confidence level plainly, max 500 chars.",
+    "- `uncertainty.missingEvidence`: array of missing evidence strings, max 8 items.",
+    "- `citedEvidence`: max 4 items.",
+    "- `citedEvidence[].claim`: max 200 chars.",
+    "- `citedEvidence[].support`: max 4 short support strings, each max 180 chars.",
+    "Required output schema example:",
+    COACH_VERDICT_JSON_EXAMPLE
+  ].join("\n");
 }
 
 function deriveExecutionCost(params: {
@@ -378,23 +843,7 @@ export function buildExecutionEvidence(args: {
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
-      actual: {
-        durationSec: args.diagnosisInput.actual.durationSec ?? null,
-        avgHr: args.diagnosisInput.actual.avgHr ?? null,
-        avgPower: args.diagnosisInput.actual.avgPower ?? null,
-        avgPaceSPerKm: args.diagnosisInput.actual.avgPaceSPerKm ?? null,
-        timeAboveTargetPct: args.diagnosisInput.actual.timeAboveTargetPct ?? null,
-        intervalCompletionPct: args.diagnosisInput.actual.intervalCompletionPct ?? null,
-        variabilityIndex: args.diagnosisInput.actual.variabilityIndex ?? null,
-        normalizedPower: getActualMetric(args.diagnosisInput.actual, "normalized_power"),
-        trainingStressScore: getActualMetric(args.diagnosisInput.actual, "training_stress_score"),
-        intensityFactor: getActualMetric(args.diagnosisInput.actual, "intensity_factor"),
-        totalWorkKj: getActualMetric(args.diagnosisInput.actual, "total_work_kj"),
-        avgCadence: getActualMetric(args.diagnosisInput.actual, "avg_cadence"),
-        maxHr: getActualMetric(args.diagnosisInput.actual, "max_hr"),
-        maxPower: getActualMetric(args.diagnosisInput.actual, "max_power"),
-        splitMetrics: args.diagnosisInput.actual.splitMetrics ?? null
-      },
+      actual: buildActualEvidence(args.diagnosisInput),
       detectedIssues: [],
       missingEvidence: [],
       rulesSummary: {
@@ -432,23 +881,7 @@ export function buildExecutionEvidence(args: {
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
-      actual: {
-        durationSec: args.diagnosisInput.actual.durationSec ?? null,
-        avgHr: args.diagnosisInput.actual.avgHr ?? null,
-        avgPower: args.diagnosisInput.actual.avgPower ?? null,
-        avgPaceSPerKm: args.diagnosisInput.actual.avgPaceSPerKm ?? null,
-        timeAboveTargetPct: args.diagnosisInput.actual.timeAboveTargetPct ?? null,
-        intervalCompletionPct: args.diagnosisInput.actual.intervalCompletionPct ?? null,
-        variabilityIndex: args.diagnosisInput.actual.variabilityIndex ?? null,
-        normalizedPower: getActualMetric(args.diagnosisInput.actual, "normalized_power"),
-        trainingStressScore: getActualMetric(args.diagnosisInput.actual, "training_stress_score"),
-        intensityFactor: getActualMetric(args.diagnosisInput.actual, "intensity_factor"),
-        totalWorkKj: getActualMetric(args.diagnosisInput.actual, "total_work_kj"),
-        avgCadence: getActualMetric(args.diagnosisInput.actual, "avg_cadence"),
-        maxHr: getActualMetric(args.diagnosisInput.actual, "max_hr"),
-        maxPower: getActualMetric(args.diagnosisInput.actual, "max_power"),
-        splitMetrics: args.diagnosisInput.actual.splitMetrics ?? null
-      },
+      actual: buildActualEvidence(args.diagnosisInput),
       detectedIssues: issues,
       missingEvidence: deriveMissingEvidence(args.diagnosisInput),
       rulesSummary: {
@@ -471,15 +904,17 @@ export async function generateCoachVerdict(args: {
 }) {
   const deterministicFallback = buildDeterministicVerdict(args.evidence);
   if (!process.env.OPENAI_API_KEY) {
-    return deterministicFallback;
+    console.warn("[session-review-ai] Falling back to deterministic review: missing OPENAI_API_KEY", {
+      sessionId: args.evidence.sessionId
+    });
+    return { verdict: deterministicFallback, source: "fallback" as const };
   }
 
   try {
     const client = getOpenAIClient();
     const response = await client.responses.create({
       model: getCoachModel(),
-      instructions:
-        "You are an endurance coach helping athletes interpret completed workouts. Use only the provided evidence and context. Do not invent metrics, missing facts, or unsupported causes. If evidence is limited, explain that clearly and keep recommendations conservative. Prefer practical next steps over generic motivation. Separate what happened in the session from what it means for the week. Return valid JSON only.",
+      instructions: buildCoachVerdictInstructions(),
       input: [
         {
           role: "user",
@@ -498,18 +933,54 @@ export async function generateCoachVerdict(args: {
     });
     const text = response.output_text?.trim();
     if (!text) {
-      return deterministicFallback;
+      console.warn("[session-review-ai] Falling back to deterministic review: empty model output", {
+        sessionId: args.evidence.sessionId
+      });
+      return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    const parsed = coachVerdictSchema.safeParse(JSON.parse(text));
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(text);
+    } catch (error) {
+      console.warn("[session-review-ai] Falling back to deterministic review: could not parse model output as JSON", {
+        sessionId: args.evidence.sessionId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return { verdict: deterministicFallback, source: "fallback" as const };
+    }
+
+    const { normalizedPayload, parsed } = coerceCoachVerdictPayload(parsedJson, {
+      intentMatch: args.evidence.rulesSummary.intentMatch,
+      executionCost: args.evidence.rulesSummary.executionCost,
+      nextCall: nextCallFromEvidence(args.evidence.rulesSummary.intentMatch, args.evidence.rulesSummary.executionCost)
+    });
     if (!parsed.success) {
-      return deterministicFallback;
+      const payloadKeys = Object.keys(asObject(parsedJson) ?? {});
+      const normalizedKeys = Object.keys(asObject(normalizedPayload) ?? {});
+      console.warn("[session-review-ai] Falling back to deterministic review: model JSON failed schema validation", {
+        sessionId: args.evidence.sessionId,
+        payloadKeys,
+        normalizedKeys,
+        formErrors: parsed.error.flatten().formErrors,
+        fieldErrors: parsed.error.flatten().fieldErrors
+      });
+      return { verdict: deterministicFallback, source: "fallback" as const };
     }
     if (parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
-      return deterministicFallback;
+      console.warn("[session-review-ai] Falling back to deterministic review: model intent match disagreed with deterministic diagnosis", {
+        sessionId: args.evidence.sessionId,
+        modelIntentMatch: parsed.data.sessionVerdict.intentMatch,
+        deterministicIntentMatch: args.evidence.rulesSummary.intentMatch
+      });
+      return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    return parsed.data;
-  } catch {
-    return deterministicFallback;
+    return { verdict: parsed.data, source: "ai" as const };
+  } catch (error) {
+    console.warn("[session-review-ai] Falling back to deterministic review: model request failed", {
+      sessionId: args.evidence.sessionId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return { verdict: deterministicFallback, source: "fallback" as const };
   }
 }
 
@@ -517,6 +988,7 @@ export function toPersistedExecutionReview(args: {
   linkedActivityId: string | null;
   evidence: ExecutionEvidence;
   verdict: CoachVerdict | null;
+  narrativeSource?: "ai" | "fallback" | "legacy_unknown";
   createdAt?: string;
   updatedAt?: string;
 }): PersistedExecutionReview {
@@ -531,6 +1003,7 @@ export function toPersistedExecutionReview(args: {
     linkedActivityId: args.linkedActivityId,
     deterministic: args.evidence,
     verdict: args.verdict,
+    narrativeSource: args.narrativeSource ?? (args.verdict ? "fallback" : "legacy_unknown"),
     weeklyImpact: {
       suggestedWeekAction,
       suggestedNextCall: nextCall
@@ -563,21 +1036,45 @@ export function toPersistedExecutionReview(args: {
     intensityFactor: args.evidence.actual.intensityFactor ?? null,
     totalWorkKj: args.evidence.actual.totalWorkKj ?? null,
     avgCadence: args.evidence.actual.avgCadence ?? null,
+    avgPacePer100mSec: args.evidence.actual.avgPacePer100mSec ?? null,
+    bestPacePer100mSec: args.evidence.actual.bestPacePer100mSec ?? null,
+    avgStrokeRateSpm: args.evidence.actual.avgStrokeRateSpm ?? null,
+    maxStrokeRateSpm: args.evidence.actual.maxStrokeRateSpm ?? null,
+    avgSwolf: args.evidence.actual.avgSwolf ?? null,
+    elevationGainM: args.evidence.actual.elevationGainM ?? null,
+    elevationLossM: args.evidence.actual.elevationLossM ?? null,
+    poolLengthM: args.evidence.actual.poolLengthM ?? null,
+    lengthCount: args.evidence.actual.lengthCount ?? null,
+    hrZoneTimeSec: args.evidence.actual.hrZoneTimeSec ?? null,
+    paceZoneTimeSec: args.evidence.actual.paceZoneTimeSec ?? null,
     maxHr: args.evidence.actual.maxHr ?? null,
     maxPower: args.evidence.actual.maxPower ?? null,
     firstHalfAvgHr: args.evidence.actual.splitMetrics?.firstHalfAvgHr ?? null,
     lastHalfAvgHr: args.evidence.actual.splitMetrics?.lastHalfAvgHr ?? null,
     firstHalfPaceSPerKm: args.evidence.actual.splitMetrics?.firstHalfPaceSPerKm ?? null,
     lastHalfPaceSPerKm: args.evidence.actual.splitMetrics?.lastHalfPaceSPerKm ?? null,
+    firstHalfAvgCadence: args.evidence.actual.splitMetrics?.firstHalfAvgCadence ?? null,
+    lastHalfAvgCadence: args.evidence.actual.splitMetrics?.lastHalfAvgCadence ?? null,
+    firstHalfPacePer100mSec: args.evidence.actual.splitMetrics?.firstHalfPacePer100mSec ?? null,
+    lastHalfPacePer100mSec: args.evidence.actual.splitMetrics?.lastHalfPacePer100mSec ?? null,
+    firstHalfStrokeRate: args.evidence.actual.splitMetrics?.firstHalfStrokeRate ?? null,
+    lastHalfStrokeRate: args.evidence.actual.splitMetrics?.lastHalfStrokeRate ?? null,
     executionCost: args.evidence.rulesSummary.executionCost,
     missingEvidence: args.evidence.missingEvidence
   };
 }
 
-export function parsePersistedExecutionReview(payload: Record<string, unknown> | null | undefined) {
+export function parsePersistedExecutionReview(payload: Record<string, unknown> | null | undefined): PersistedExecutionReview | null {
   if (!payload || typeof payload !== "object") return null;
   if (payload.version === 2 && payload.deterministic && typeof payload.deterministic === "object") {
-    return payload as unknown as PersistedExecutionReview;
+    const narrativeSource: PersistedExecutionReview["narrativeSource"] =
+      payload.narrativeSource === "ai" || payload.narrativeSource === "fallback" || payload.narrativeSource === "legacy_unknown"
+        ? payload.narrativeSource
+        : "legacy_unknown";
+    return {
+      ...(payload as unknown as PersistedExecutionReview),
+      narrativeSource
+    };
   }
   return null;
 }

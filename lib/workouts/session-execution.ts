@@ -63,9 +63,17 @@ function getNestedNumber(sources: Array<Record<string, unknown> | null | undefin
   return null;
 }
 
+function sumZoneDurations(zones: unknown[] | undefined) {
+  if (!Array.isArray(zones)) return null;
+  return zones.reduce<number>((sum, zone) => sum + (getNumber(asRecord(zone), ["durationSec", "duration_sec"]) ?? 0), 0);
+}
+
 function deriveCompletedIntervals(activity: SessionExecutionActivityRow) {
   const lapMetrics = getMetricsV2Laps(activity.metrics_v2);
-  if (lapMetrics.length > 0) return lapMetrics.length;
+  if (lapMetrics.length > 0) {
+    const workLaps = lapMetrics.filter((lap) => (lap.distanceM ?? 0) > 0);
+    return workLaps.length > 0 ? workLaps.length : lapMetrics.length;
+  }
   return activity.laps_count ?? null;
 }
 
@@ -170,6 +178,12 @@ function extractSplitMetrics(activity: SessionExecutionActivityRow): SplitMetric
   const lastHalfAvgPower = getNestedNumber(sources, [["lastHalfAvgPower"], ["last_half_avg_power"], ["lastHalf", "avgPower"], ["last_half", "avg_power"]]);
   const firstHalfPaceSPerKm = getNestedNumber(sources, [["firstHalfPaceSPerKm"], ["first_half_pace_s_per_km"], ["firstHalf", "avgPaceSecPerKm"], ["first_half", "avg_pace_sec_per_km"]]);
   const lastHalfPaceSPerKm = getNestedNumber(sources, [["lastHalfPaceSPerKm"], ["last_half_pace_s_per_km"], ["lastHalf", "avgPaceSecPerKm"], ["last_half", "avg_pace_sec_per_km"]]);
+  const firstHalfAvgCadence = getNestedNumber(sources, [["firstHalfAvgCadence"], ["first_half_avg_cadence"], ["firstHalf", "avgCadence"], ["first_half", "avg_cadence"]]);
+  const lastHalfAvgCadence = getNestedNumber(sources, [["lastHalfAvgCadence"], ["last_half_avg_cadence"], ["lastHalf", "avgCadence"], ["last_half", "avg_cadence"]]);
+  const firstHalfPacePer100mSec = getNestedNumber(sources, [["firstHalfPacePer100mSec"], ["first_half_pace_per_100m_sec"], ["firstHalf", "avgPacePer100mSec"], ["first_half", "avg_pace_per_100m_sec"]]);
+  const lastHalfPacePer100mSec = getNestedNumber(sources, [["lastHalfPacePer100mSec"], ["last_half_pace_per_100m_sec"], ["lastHalf", "avgPacePer100mSec"], ["last_half", "avg_pace_per_100m_sec"]]);
+  const firstHalfStrokeRate = getNestedNumber(sources, [["firstHalfStrokeRate"], ["first_half_stroke_rate"], ["firstHalf", "strokeRate"], ["first_half", "stroke_rate"]]);
+  const lastHalfStrokeRate = getNestedNumber(sources, [["lastHalfStrokeRate"], ["last_half_stroke_rate"], ["lastHalf", "strokeRate"], ["last_half", "stroke_rate"]]);
 
   const splitMetrics: SplitMetrics = {};
   if (firstHalfAvgHr !== null) splitMetrics.firstHalfAvgHr = firstHalfAvgHr;
@@ -178,6 +192,12 @@ function extractSplitMetrics(activity: SessionExecutionActivityRow): SplitMetric
   if (lastHalfAvgPower !== null) splitMetrics.lastHalfAvgPower = lastHalfAvgPower;
   if (firstHalfPaceSPerKm !== null) splitMetrics.firstHalfPaceSPerKm = firstHalfPaceSPerKm;
   if (lastHalfPaceSPerKm !== null) splitMetrics.lastHalfPaceSPerKm = lastHalfPaceSPerKm;
+  if (firstHalfAvgCadence !== null) (splitMetrics as SplitMetrics & Record<string, number>).firstHalfAvgCadence = firstHalfAvgCadence;
+  if (lastHalfAvgCadence !== null) (splitMetrics as SplitMetrics & Record<string, number>).lastHalfAvgCadence = lastHalfAvgCadence;
+  if (firstHalfPacePer100mSec !== null) (splitMetrics as SplitMetrics & Record<string, number>).firstHalfPacePer100mSec = firstHalfPacePer100mSec;
+  if (lastHalfPacePer100mSec !== null) (splitMetrics as SplitMetrics & Record<string, number>).lastHalfPacePer100mSec = lastHalfPacePer100mSec;
+  if (firstHalfStrokeRate !== null) (splitMetrics as SplitMetrics & Record<string, number>).firstHalfStrokeRate = firstHalfStrokeRate;
+  if (lastHalfStrokeRate !== null) (splitMetrics as SplitMetrics & Record<string, number>).lastHalfStrokeRate = lastHalfStrokeRate;
 
   return Object.keys(splitMetrics).length > 0 ? splitMetrics : null;
 }
@@ -203,11 +223,26 @@ export function shouldRefreshExecutionResultFromActivity(
   const avgCadence =
     getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]) ??
     getNumber(metrics, ["avgCadence", "avg_cadence"]);
+  const elevationGainM = getMetricsNestedNumber(metrics, [["elevation", "gainM"], ["elevation", "gain_m"]]);
+  const avgStrokeRateSpm = getMetricsNestedNumber(metrics, [["stroke", "avgStrokeRateSpm"], ["stroke", "avg_stroke_rate_spm"]]);
+  const avgSwolf = getMetricsNestedNumber(metrics, [["stroke", "avgSwolf"], ["stroke", "avg_swolf"]]);
+  const poolLengthM = getMetricsNestedNumber(metrics, [["pool", "poolLengthM"], ["pool", "pool_length_m"]]);
+  const hrZones = (asRecord(metrics?.zones)?.hr as unknown[] | undefined) ?? (asRecord(metrics?.zones)?.heartRate as unknown[] | undefined);
+  const paceZones = asRecord(metrics?.zones)?.pace as unknown[] | undefined;
+  const hasHrZones = Array.isArray(hrZones) && hrZones.length > 0;
+  const hasPaceZones = Array.isArray(paceZones) && paceZones.length > 0;
+  const hasLapStructure = getMetricsV2Laps(activity.metrics_v2).some((lap) => (lap.distanceM ?? 0) > 0);
 
   if (normalizedPower !== null && getNumber(current, ["normalizedPower", "normalized_power"]) === null) return true;
   if (variabilityIndex !== null && getNumber(current, ["variabilityIndex", "variability_index"]) === null) return true;
   if (trainingStressScore !== null && getNumber(current, ["trainingStressScore", "training_stress_score"]) === null) return true;
   if (avgCadence !== null && getNumber(current, ["avgCadence", "avg_cadence"]) === null) return true;
+  if (elevationGainM !== null && getNumber(current, ["elevationGainM", "elevation_gain_m"]) === null) return true;
+  if (avgStrokeRateSpm !== null && getNumber(current, ["avgStrokeRateSpm", "avg_stroke_rate_spm"]) === null) return true;
+  if (avgSwolf !== null && getNumber(current, ["avgSwolf", "avg_swolf"]) === null) return true;
+  if (poolLengthM !== null && getNumber(current, ["poolLengthM", "pool_length_m"]) === null) return true;
+  if (hasHrZones && getNumber(current, ["hrZoneTimeSec", "hr_zone_time_sec"]) === null) return true;
+  if (hasPaceZones && getNumber(current, ["paceZoneTimeSec", "pace_zone_time_sec"]) === null) return true;
 
   if (splitMetrics) {
     const hasSplitMetricsInResult = [
@@ -216,10 +251,18 @@ export function shouldRefreshExecutionResultFromActivity(
       getNumber(current, ["firstHalfAvgPower", "first_half_avg_power"]),
       getNumber(current, ["lastHalfAvgPower", "last_half_avg_power"]),
       getNumber(current, ["firstHalfPaceSPerKm", "first_half_pace_s_per_km"]),
-      getNumber(current, ["lastHalfPaceSPerKm", "last_half_pace_s_per_km"])
+      getNumber(current, ["lastHalfPaceSPerKm", "last_half_pace_s_per_km"]),
+      getNumber(current, ["firstHalfPacePer100mSec", "first_half_pace_per_100m_sec"]),
+      getNumber(current, ["lastHalfPacePer100mSec", "last_half_pace_per_100m_sec"]),
+      getNumber(current, ["firstHalfStrokeRate", "first_half_stroke_rate"]),
+      getNumber(current, ["lastHalfStrokeRate", "last_half_stroke_rate"])
     ].some((value) => value !== null);
 
     if (!hasSplitMetricsInResult) return true;
+  }
+
+  if (activity.sport_type === "swim" && hasLapStructure && getNumber(current, ["lengthCount", "length_count"]) === null) {
+    return true;
   }
 
   return false;
@@ -247,6 +290,10 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
     getMetricsNestedNumber(metrics, [["power", "normalizedPower"], ["power", "normalized_power"]]);
   const trainingStressScore =
     getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]]);
+  const aerobicTrainingEffect =
+    getMetricsNestedNumber(metrics, [["load", "aerobicTrainingEffect"], ["load", "aerobic_training_effect"], ["load", "trainingEffect"], ["load", "training_effect"]]);
+  const anaerobicTrainingEffect =
+    getMetricsNestedNumber(metrics, [["load", "anaerobicTrainingEffect"], ["load", "anaerobic_training_effect"]]);
   const intensityFactor =
     getMetricsNestedNumber(metrics, [["power", "intensityFactor"], ["power", "intensity_factor"]]);
   const totalWorkKj =
@@ -254,6 +301,37 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
   const avgCadence =
     getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]) ??
     getNumber(metrics, ["avgCadence", "avg_cadence"]);
+  const maxCadence =
+    getMetricsNestedNumber(metrics, [["cadence", "maxCadence"], ["cadence", "max_cadence"]]) ??
+    getNumber(metrics, ["maxCadence", "max_cadence"]);
+  const bestPaceSPerKm =
+    getMetricsNestedNumber(metrics, [["pace", "bestPaceSecPerKm"], ["pace", "best_pace_sec_per_km"]]);
+  const normalizedGradedPaceSPerKm =
+    getMetricsNestedNumber(metrics, [["pace", "normalizedGradedPaceSecPerKm"], ["pace", "normalized_graded_pace_sec_per_km"]]);
+  const avgPacePer100mSec =
+    getMetricsNestedNumber(metrics, [["pace", "avgPacePer100mSec"], ["pace", "avg_pace_per_100m_sec"]]) ??
+    activity.avg_pace_per_100m_sec ??
+    null;
+  const bestPacePer100mSec =
+    getMetricsNestedNumber(metrics, [["pace", "bestPacePer100mSec"], ["pace", "best_pace_per_100m_sec"]]);
+  const avgStrokeRateSpm =
+    getMetricsNestedNumber(metrics, [["stroke", "avgStrokeRateSpm"], ["stroke", "avg_stroke_rate_spm"]]);
+  const maxStrokeRateSpm =
+    getMetricsNestedNumber(metrics, [["stroke", "maxStrokeRateSpm"], ["stroke", "max_stroke_rate_spm"]]);
+  const avgSwolf =
+    getMetricsNestedNumber(metrics, [["stroke", "avgSwolf"], ["stroke", "avg_swolf"]]);
+  const elevationGainM =
+    getMetricsNestedNumber(metrics, [["elevation", "gainM"], ["elevation", "gain_m"]]);
+  const elevationLossM =
+    getMetricsNestedNumber(metrics, [["elevation", "lossM"], ["elevation", "loss_m"]]);
+  const poolLengthM =
+    getMetricsNestedNumber(metrics, [["pool", "poolLengthM"], ["pool", "pool_length_m"]]);
+  const lengthCount =
+    getMetricsNestedNumber(metrics, [["pool", "lengthCount"], ["pool", "length_count"]]);
+  const hrZoneTimeSec = sumZoneDurations(
+    (asRecord(metrics?.zones)?.hr as unknown[] | undefined) ?? (asRecord(metrics?.zones)?.heartRate as unknown[] | undefined)
+  );
+  const paceZoneTimeSec = sumZoneDurations(asRecord(metrics?.zones)?.pace as unknown[] | undefined);
   const maxHr =
     getMetricsNestedNumber(metrics, [["heartRate", "maxHr"], ["heart_rate", "max_hr"]]) ??
     getNumber(parseSummary, ["maxHr", "max_hr"]);
@@ -285,9 +363,25 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
         normalized_power: normalizedPower,
         variability_index: variabilityIndex,
         training_stress_score: trainingStressScore,
+        aerobic_training_effect: aerobicTrainingEffect,
+        anaerobic_training_effect: anaerobicTrainingEffect,
         intensity_factor: intensityFactor,
         total_work_kj: totalWorkKj,
         avg_cadence: avgCadence,
+        max_cadence: maxCadence,
+        best_pace_s_per_km: bestPaceSPerKm,
+        normalized_graded_pace_s_per_km: normalizedGradedPaceSPerKm,
+        avg_pace_per_100m_sec: avgPacePer100mSec,
+        best_pace_per_100m_sec: bestPacePer100mSec,
+        avg_stroke_rate_spm: avgStrokeRateSpm,
+        max_stroke_rate_spm: maxStrokeRateSpm,
+        avg_swolf: avgSwolf,
+        elevation_gain_m: elevationGainM,
+        elevation_loss_m: elevationLossM,
+        pool_length_m: poolLengthM,
+        length_count: lengthCount,
+        hr_zone_time_sec: hrZoneTimeSec,
+        pace_zone_time_sec: paceZoneTimeSec,
         max_hr: maxHr,
         max_power: maxPower
       }
@@ -308,6 +402,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
   return toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,
+    narrativeSource: "fallback",
     verdict: {
       sessionVerdict: {
         headline: diagnosis.intentMatchStatus === "matched_intent" ? "Intent landed" : diagnosis.intentMatchStatus === "missed_intent" ? "Intent came up short" : "Intent partially landed",
@@ -395,7 +490,7 @@ export async function syncSessionExecutionFromActivityLink(args: {
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });
-  const verdict = await generateCoachVerdict({
+  const generated = await generateCoachVerdict({
     evidence,
     athleteContext,
     recentReviewedSessions: []
@@ -403,7 +498,8 @@ export async function syncSessionExecutionFromActivityLink(args: {
   const executionResult = toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,
-    verdict
+    verdict: generated.verdict,
+    narrativeSource: generated.source
   });
 
   const { error } = await args.supabase
@@ -472,6 +568,12 @@ export async function backfillPendingSessionExecutions(args: {
   limit?: number;
   force?: boolean;
 }) {
+  console.info("[execution-review-backfill] Starting backfill", {
+    userId: args.userId,
+    limit: args.limit ?? null,
+    force: args.force === true
+  });
+
   const { data: links, error: linkError } = await args.supabase
     .from("session_activity_links")
     .select("planned_session_id,completed_activity_id,confirmation_status,created_at")
@@ -484,7 +586,13 @@ export async function backfillPendingSessionExecutions(args: {
     (link) => link.planned_session_id && link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
   );
 
+  console.info("[execution-review-backfill] Loaded links", {
+    totalLinks: (links ?? []).length,
+    confirmedLinks: confirmedLinks.length
+  });
+
   if (confirmedLinks.length === 0) {
+    console.info("[execution-review-backfill] No confirmed links found; nothing to do");
     return { updated: 0, attempted: 0 };
   }
 
@@ -492,6 +600,7 @@ export async function backfillPendingSessionExecutions(args: {
 
   if (!args.force) {
     const sessionIds = [...new Set(confirmedLinks.map((link) => link.planned_session_id as string))];
+    const activityIds = [...new Set(confirmedLinks.map((link) => link.completed_activity_id as string))];
     const { data: sessions, error: sessionError } = await args.supabase
       .from("sessions")
       .select("id,execution_result")
@@ -499,33 +608,112 @@ export async function backfillPendingSessionExecutions(args: {
       .in("id", sessionIds);
 
     if (sessionError) throw new Error(sessionError.message);
+    const { data: activities, error: activityError } = await args.supabase
+      .from("completed_activities")
+      .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+      .eq("user_id", args.userId)
+      .in("id", activityIds);
 
-    const pendingSessionIds = new Set(
+    if (activityError) throw new Error(activityError.message);
+
+    const sessionById = new Map(
       ((sessions ?? []) as Array<{ id: string; execution_result?: Record<string, unknown> | null }>)
-        .filter((session) => !session.execution_result)
-        .map((session) => session.id)
+        .map((session) => [session.id, session])
+    );
+    const activityById = new Map(
+      ((activities ?? []) as SessionExecutionActivityRow[])
+        .map((activity) => [activity.id, activity])
     );
 
-    candidateLinks = confirmedLinks.filter((link) => pendingSessionIds.has(link.planned_session_id as string));
+    const selectionLog: Array<{
+      sessionId: string;
+      activityId: string;
+      action: "selected" | "skipped";
+      reason: string;
+    }> = [];
+
+    candidateLinks = confirmedLinks.filter((link) => {
+      const session = sessionById.get(link.planned_session_id as string);
+      const activity = activityById.get(link.completed_activity_id as string);
+      const sessionId = link.planned_session_id as string;
+      const activityId = link.completed_activity_id as string;
+
+      if (!session) {
+        selectionLog.push({ sessionId, activityId, action: "skipped", reason: "session_not_found" });
+        return false;
+      }
+
+      if (!activity) {
+        selectionLog.push({ sessionId, activityId, action: "skipped", reason: "activity_not_found" });
+        return false;
+      }
+
+      if (!session.execution_result) {
+        selectionLog.push({ sessionId, activityId, action: "selected", reason: "missing_execution_result" });
+        return true;
+      }
+
+      const shouldRefresh = shouldRefreshExecutionResultFromActivity(session.execution_result, activity);
+      selectionLog.push({
+        sessionId,
+        activityId,
+        action: shouldRefresh ? "selected" : "skipped",
+        reason: shouldRefresh ? "stale_execution_result" : "already_fresh"
+      });
+      return shouldRefresh;
+    });
+
+    console.info("[execution-review-backfill] Candidate selection complete", {
+      selected: selectionLog.filter((entry) => entry.action === "selected").length,
+      skipped: selectionLog.filter((entry) => entry.action === "skipped").length,
+      sample: selectionLog.slice(0, 20)
+    });
   }
 
   const dedupedLinks = [...new Map(candidateLinks.map((link) => [link.planned_session_id as string, link])).values()];
   const linksToProcess = typeof args.limit === "number" ? dedupedLinks.slice(0, args.limit) : dedupedLinks;
 
+  console.info("[execution-review-backfill] Prepared batch", {
+    candidateLinks: candidateLinks.length,
+    dedupedLinks: dedupedLinks.length,
+    processing: linksToProcess.length
+  });
+
   let updated = 0;
   for (const link of linksToProcess) {
+    const sessionId = link.planned_session_id as string;
+    const activityId = link.completed_activity_id as string;
+    console.info("[execution-review-backfill] Rebuilding execution review", {
+      sessionId,
+      activityId
+    });
+
     try {
       await syncSessionExecutionFromActivityLink({
         supabase: args.supabase,
         userId: args.userId,
-        sessionId: link.planned_session_id as string,
-        activityId: link.completed_activity_id as string
+        sessionId,
+        activityId
       });
       updated += 1;
-    } catch {
+      console.info("[execution-review-backfill] Rebuild complete", {
+        sessionId,
+        activityId
+      });
+    } catch (error) {
+      console.warn("[execution-review-backfill] Rebuild failed", {
+        sessionId,
+        activityId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       // Skip failed sessions so one bad row does not block the rest of the batch.
     }
   }
+
+  console.info("[execution-review-backfill] Backfill finished", {
+    updated,
+    attempted: linksToProcess.length
+  });
 
   return {
     updated,

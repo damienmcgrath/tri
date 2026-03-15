@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isMissingCompletedActivityColumnError } from "@/lib/activities/completed-activities";
 import { createClient } from "@/lib/supabase/server";
+import { RegenerateReviewButton } from "./regenerate-review-button";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
@@ -75,6 +76,22 @@ function toSessionRow(row: SessionRow | SessionsMinimalRow): SessionRow {
 }
 
 const reviewDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") return "AI review";
+  if (source === "fallback") return "Fallback review";
+  return "Source unknown";
+}
+
+function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") {
+    return "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-accent)]";
+  }
+  if (source === "fallback") {
+    return "rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--warning))]";
+  }
+  return "rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
+}
 
 async function loadActivityReviewRow(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -383,8 +400,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
-          <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
-            {reviewVm.reviewModeLabel}
+          <div className="flex flex-col items-end gap-2">
+            <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
+              {reviewVm.reviewModeLabel}
+            </div>
+            {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
           </div>
         </div>
 
@@ -396,6 +416,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <span className={intentBadgeClass}>
               {reviewVm.intent.label}
             </span>
+            {reviewVm.isReviewable ? (
+              <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
+                {narrativeSourceLabel(reviewVm.narrativeSource)}
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -453,7 +478,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                 <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
               </div>
               <div className="border-t border-[hsl(var(--border))] pt-5">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Main gap</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
               </div>
             </div>

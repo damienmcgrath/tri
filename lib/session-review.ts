@@ -43,6 +43,7 @@ export type ReviewViewModel = {
   confidenceLabel: string | null;
   plannedIntent: string;
   actualExecutionSummary: string;
+  mainGapLabel: string;
   mainGap: string;
   usefulMetrics: Array<{ label: string; value: string }>;
   whyItMatters: string;
@@ -55,6 +56,7 @@ export type ReviewViewModel = {
   unlockDetail: string;
   followUpIntro: string;
   followUpPrompts: string[];
+  narrativeSource: "ai" | "fallback" | "legacy_unknown";
 };
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
@@ -410,6 +412,15 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     ["recommendedNextAction", "recommended_next_action"],
     defaultNextAction
   );
+  const aiWhatHappened = v2Review?.narrativeSource === "ai"
+    ? getString(
+      v2Review.verdict?.explanation
+        ? { actualExecutionSummary: v2Review.verdict.explanation.whatHappened }
+        : null,
+      ["actualExecutionSummary"],
+      ""
+    )
+    : "";
 
   const score = getNumber(diagnosis, ["executionScore", "execution_score"]);
   const explicitBand = getString(diagnosis, ["executionScoreBand", "execution_score_band"]) || null;
@@ -426,28 +437,48 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const variabilityIndex = getNumber(diagnosis, ["variabilityIndex", "variability_index"]);
   const trainingStressScore = getNumber(diagnosis, ["trainingStressScore", "training_stress_score"]);
   const avgCadence = getNumber(diagnosis, ["avgCadence", "avg_cadence"]);
+  const avgPacePer100mSec = getNumber(diagnosis, ["avgPacePer100mSec", "avg_pace_per_100m_sec"]);
+  const bestPacePer100mSec = getNumber(diagnosis, ["bestPacePer100mSec", "best_pace_per_100m_sec"]);
+  const avgStrokeRateSpm = getNumber(diagnosis, ["avgStrokeRateSpm", "avg_stroke_rate_spm"]);
+  const avgSwolf = getNumber(diagnosis, ["avgSwolf", "avg_swolf"]);
+  const elevationGainM = getNumber(diagnosis, ["elevationGainM", "elevation_gain_m"]);
   const firstHalfHr = getNumber(diagnosis, ["firstHalfAvgHr", "first_half_avg_hr"]);
   const lastHalfHr = getNumber(diagnosis, ["lastHalfAvgHr", "last_half_avg_hr"]);
   const firstHalfPace = getNumber(diagnosis, ["firstHalfPaceSPerKm", "first_half_pace_s_per_km"]);
   const lastHalfPace = getNumber(diagnosis, ["lastHalfPaceSPerKm", "last_half_pace_s_per_km"]);
+  const firstHalfSwimPace = getNumber(diagnosis, ["firstHalfPacePer100mSec", "first_half_pace_per_100m_sec"]);
+  const lastHalfSwimPace = getNumber(diagnosis, ["lastHalfPacePer100mSec", "last_half_pace_per_100m_sec"]);
 
   const hrDrift = firstHalfHr && lastHalfHr ? lastHalfHr / firstHalfHr : null;
   const paceFade = firstHalfPace && lastHalfPace ? lastHalfPace / firstHalfPace : null;
+  const swimPaceFade = firstHalfSwimPace && lastHalfSwimPace ? lastHalfSwimPace / firstHalfSwimPace : null;
+  const durationCompleted = durationCompletion !== null && session.duration_minutes
+    ? durationLabel(Math.round((session.duration_minutes ?? 0) * durationCompletion))
+    : null;
+  const cadenceUnit = session.sport === "bike" ? "rpm" : "spm";
+  const formatPace100 = (seconds: number) => {
+    const rounded = Math.round(seconds);
+    const minutes = Math.floor(rounded / 60);
+    const secs = rounded % 60;
+    return `${minutes}:${secs.toString().padStart(2, "0")}/100m`;
+  };
 
-  const actualExecutionSummary = isExtra
-    ? executionSummary || "This extra session added training load outside the original plan."
-    : summarizeActualExecution({
-    bucket,
-    intentLabel: intent.label,
-    executionSummary,
-    timeAbove,
-    intervalCompletion,
-    durationCompletion,
-    avgHr,
-    avgPower,
-    hrDrift,
-    paceFade
-  });
+  const actualExecutionSummary = aiWhatHappened || (
+    isExtra
+      ? executionSummary || "This extra session added training load outside the original plan."
+      : summarizeActualExecution({
+        bucket,
+        intentLabel: intent.label,
+        executionSummary,
+        timeAbove,
+        intervalCompletion,
+        durationCompletion,
+        avgHr,
+        avgPower,
+        hrDrift,
+        paceFade
+      })
+  );
 
   const mainGap = isExtra
     ? reviewState.isReviewable
@@ -463,6 +494,11 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     hrDrift,
     paceFade
   });
+  const mainGapLabel = isExtra
+    ? "Weekly context"
+    : intent.label === "Matched intent"
+      ? "Key confirmation"
+      : "Main gap";
 
   const scoreHeadline =
     score !== null
@@ -504,8 +540,32 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
           ? "warning"
           : "risk";
 
-  const usefulMetrics = [
-    durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
+  const runMetrics = [
+    durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
+    avgHr || avgPower
+      ? {
+          label: "Average load",
+          value: `${avgHr ? `${Math.round(avgHr)} bpm` : ""}${avgHr && avgPower ? " · " : ""}${avgPower ? `${Math.round(avgPower)} w` : ""}`
+        }
+      : null,
+    hrDrift !== null ? { label: "Late HR drift", value: pct(hrDrift - 1) } : null,
+    paceFade !== null ? { label: "Late pace fade", value: pct(paceFade - 1) } : null,
+    avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} ${cadenceUnit}` } : null,
+    elevationGainM !== null ? { label: "Elevation gain", value: `${Math.round(elevationGainM)} m` } : null,
+    timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null
+  ];
+  const swimMetrics = [
+    durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
+    avgPacePer100mSec !== null ? { label: "Average pace /100m", value: formatPace100(avgPacePer100mSec) } : null,
+    bestPacePer100mSec !== null ? { label: "Best pace /100m", value: formatPace100(bestPacePer100mSec) } : null,
+    avgStrokeRateSpm !== null ? { label: "Average stroke rate", value: `${Math.round(avgStrokeRateSpm)} spm` } : null,
+    avgSwolf !== null ? { label: "Average SWOLF", value: `${Math.round(avgSwolf)}` } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
+    swimPaceFade !== null ? { label: "Late pace fade", value: pct(swimPaceFade - 1) } : null
+  ];
+  const defaultMetrics = [
+    durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
     intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
     hrDrift !== null && bucket !== "threshold" ? { label: "Late HR drift", value: pct(hrDrift - 1) } : null,
@@ -513,14 +573,11 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     normalizedPower !== null ? { label: "Normalized power", value: `${Math.round(normalizedPower)} w` } : null,
     variabilityIndex !== null ? { label: "Variability Index", value: variabilityIndex.toFixed(2) } : null,
     trainingStressScore !== null ? { label: "Training Stress", value: `${Math.round(trainingStressScore)} TSS` } : null,
-    avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} rpm` } : null,
-    avgHr || avgPower
-      ? {
-          label: "Average load",
-          value: `${avgHr ? `${Math.round(avgHr)} bpm` : ""}${avgHr && avgPower ? " · " : ""}${avgPower ? `${Math.round(avgPower)} w` : ""}`
-        }
-      : null
-  ].filter((metric): metric is { label: string; value: string } => metric !== null);
+    avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} ${cadenceUnit}` } : null
+  ];
+  const usefulMetrics = (session.sport === "run" ? runMetrics : session.sport === "swim" ? swimMetrics : defaultMetrics)
+    .filter((metric): metric is { label: string; value: string } => metric !== null)
+    .slice(0, 8);
 
   const plannedIntent = isExtra ? "No planned target. Treat this as completed load added on top of the week." : session.intent_category?.trim() || `${getDisciplineMeta(session.sport).label} session intent`;
   const weekAction = getString(
@@ -549,7 +606,10 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const uncertaintyDetail = v2Review?.verdict?.uncertainty.label && v2Review.verdict.uncertainty.label !== "confident_read"
     ? v2Review.verdict.uncertainty.detail
     : null;
-  const missingEvidence = v2Review?.verdict?.uncertainty.missingEvidence ?? (Array.isArray(diagnosis?.missingEvidence) ? diagnosis.missingEvidence.filter((item): item is string => typeof item === "string") : []);
+  const rawMissingEvidence = v2Review?.verdict?.uncertainty.missingEvidence ?? (Array.isArray(diagnosis?.missingEvidence) ? diagnosis.missingEvidence.filter((item): item is string => typeof item === "string") : []);
+  const hasRichSplitEvidence = Boolean(firstHalfHr || lastHalfHr || firstHalfPace || lastHalfPace || firstHalfSwimPace || lastHalfSwimPace);
+  const missingEvidence = rawMissingEvidence.filter((item) => !(hasRichSplitEvidence && item.toLowerCase().includes("split comparison")));
+  const narrativeSource: ReviewViewModel["narrativeSource"] = v2Review?.narrativeSource ?? "legacy_unknown";
 
   const unlockTitle = isExtra ? "Weekly context" : reviewState.isReviewable ? "Review evidence" : "What unlocks review";
   const unlockDetail = isExtra
@@ -602,6 +662,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     confidenceLabel,
     plannedIntent,
     actualExecutionSummary,
+    mainGapLabel,
     mainGap,
     usefulMetrics,
     whyItMatters,
@@ -612,6 +673,7 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     missingEvidence,
     unlockTitle,
     unlockDetail,
+    narrativeSource,
     followUpIntro: isExtra
       ? "Use coach follow-up to decide whether this extra session should change the rest of the week."
       : reviewState.isReviewable

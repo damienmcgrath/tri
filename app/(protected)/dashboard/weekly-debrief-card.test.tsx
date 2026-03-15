@@ -79,6 +79,7 @@ describe("WeeklyDebriefCard", () => {
               metrics: [],
               factualBullets: ["6 of 7 sessions were completed.", "All key sessions landed.", "Run carried the most work."],
               confidenceNote: null,
+              narrativeSource: "ai",
               artifactStateLabel: "final",
               artifactStateNote: null,
               provisionalReviewCount: 0,
