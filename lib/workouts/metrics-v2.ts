@@ -19,6 +19,13 @@ export type ActivityLapMetrics = {
   trigger: string | null;
   avgPaceSecPerKm?: number | null;
   avgPacePer100mSec?: number | null;
+  avgStrokeRateSpm?: number | null;
+  maxStrokeRateSpm?: number | null;
+  avgSwolf?: number | null;
+  restSec?: number | null;
+  isRest?: boolean | null;
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
 };
 
 export type ZoneMetrics = {
@@ -29,6 +36,8 @@ export type ZoneMetrics = {
   powerMax?: number | null;
   heartRateMin?: number | null;
   heartRateMax?: number | null;
+  paceMin?: number | null;
+  paceMax?: number | null;
 };
 
 export function asMetricsRecord(value: unknown): MetricsRecord | null {
@@ -87,7 +96,14 @@ function coerceLapMetrics(value: unknown): ActivityLapMetrics | null {
     intensity: getNestedValue(lap, ["intensity"]) as string | number | null,
     trigger: getNestedString(lap, [["trigger"]]),
     avgPaceSecPerKm: getNestedNumber(lap, [["avgPaceSecPerKm"], ["avg_pace_sec_per_km"]]),
-    avgPacePer100mSec: getNestedNumber(lap, [["avgPacePer100mSec"], ["avg_pace_per_100m_sec"]])
+    avgPacePer100mSec: getNestedNumber(lap, [["avgPacePer100mSec"], ["avg_pace_per_100m_sec"]]),
+    avgStrokeRateSpm: getNestedNumber(lap, [["avgStrokeRateSpm"], ["avg_stroke_rate_spm"]]),
+    maxStrokeRateSpm: getNestedNumber(lap, [["maxStrokeRateSpm"], ["max_stroke_rate_spm"]]),
+    avgSwolf: getNestedNumber(lap, [["avgSwolf"], ["avg_swolf"]]),
+    restSec: getNestedNumber(lap, [["restSec"], ["rest_sec"]]),
+    isRest: getNestedValue(lap, ["isRest"]) as boolean | null,
+    elevationGainM: getNestedNumber(lap, [["elevationGainM"], ["elevation_gain_m"]]),
+    elevationLossM: getNestedNumber(lap, [["elevationLossM"], ["elevation_loss_m"]])
   };
 }
 
@@ -106,7 +122,9 @@ function coerceZoneMetrics(value: unknown): ZoneMetrics | null {
     powerMin: getNestedNumber(zone, [["powerMin"], ["power_min"]]),
     powerMax: getNestedNumber(zone, [["powerMax"], ["power_max"]]),
     heartRateMin: getNestedNumber(zone, [["heartRateMin"], ["heart_rate_min"]]),
-    heartRateMax: getNestedNumber(zone, [["heartRateMax"], ["heart_rate_max"]])
+    heartRateMax: getNestedNumber(zone, [["heartRateMax"], ["heart_rate_max"]]),
+    paceMin: getNestedNumber(zone, [["paceMin"], ["pace_min"]]),
+    paceMax: getNestedNumber(zone, [["paceMax"], ["pace_max"]])
   };
 }
 
@@ -125,7 +143,14 @@ export function getMetricsV2PowerZones(metrics: unknown) {
 }
 
 export function getMetricsV2HrZones(metrics: unknown) {
-  const zones = getNestedValue(metrics, ["zones", "heartRate"]);
+  const zones = getNestedValue(metrics, ["zones", "hr"]) ?? getNestedValue(metrics, ["zones", "heartRate"]);
+  return Array.isArray(zones)
+    ? zones.map((zone) => coerceZoneMetrics(zone)).filter((zone): zone is ZoneMetrics => zone !== null)
+    : [];
+}
+
+export function getMetricsV2PaceZones(metrics: unknown) {
+  const zones = getNestedValue(metrics, ["zones", "pace"]);
   return Array.isArray(zones)
     ? zones.map((zone) => coerceZoneMetrics(zone)).filter((zone): zone is ZoneMetrics => zone !== null)
     : [];

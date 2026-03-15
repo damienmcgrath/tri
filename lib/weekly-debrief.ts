@@ -6,9 +6,10 @@ import { parsePersistedExecutionReview, type PersistedExecutionReview } from "@/
 import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
+import { asMetricsRecord, getMetricsV2Laps, getMetricsV2PaceZones, getMetricsV2HrZones, getNestedNumber as getMetricsNestedNumber, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
 import { addDays, weekRangeLabel } from "@/app/(protected)/week-context";
 
-export const WEEKLY_DEBRIEF_GENERATION_VERSION = 5;
+export const WEEKLY_DEBRIEF_GENERATION_VERSION = 6;
 
 const weeklyDebriefEvidenceItemSchema = z.object({
   id: z.string().min(1),
@@ -67,6 +68,7 @@ const weeklyDebriefFactsSchema = z.object({
   })).min(3).max(6),
   factualBullets: z.array(z.string().min(1).max(160)).min(2).max(4),
   confidenceNote: z.string().min(1).max(220).nullable(),
+  narrativeSource: z.enum(["ai", "fallback", "legacy_unknown"]).default("legacy_unknown"),
   artifactStateLabel: z.enum(["final", "provisional"]).default("provisional"),
   artifactStateNote: z.string().min(1).max(200).nullable().default(null),
   provisionalReviewCount: z.number().int().min(0).default(0),
@@ -222,6 +224,25 @@ type WeeklyDebriefComputed = {
   sourceUpdatedAt: string;
 };
 
+type WeeklyDebriefActivityEvidence = {
+  context: "linked_session" | "extra_activity";
+  label: string;
+  sport: string;
+  activityId: string;
+  sessionId?: string;
+  summary: {
+    durationSec: number | null;
+    distanceM: number | null;
+    avgHr: number | null;
+    avgPower: number | null;
+    qualityWarnings: string[];
+  };
+  run?: Record<string, unknown>;
+  swim?: Record<string, unknown>;
+  bike?: Record<string, unknown>;
+  other?: Record<string, unknown>;
+};
+
 type WeeklyDebriefRecord = {
   week_start: string;
   week_end: string;
@@ -273,18 +294,255 @@ function formatMinutes(minutes: number) {
   return `${mins}m`;
 }
 
+function compactZoneEvidence(zones: ReturnType<typeof getMetricsV2HrZones | typeof getMetricsV2PaceZones>) {
+  return zones
+    .filter((zone) => zone.durationSec > 0)
+    .map((zone) => ({
+      zone: zone.zone,
+      durationSec: zone.durationSec,
+      pctOfSession: zone.pctOfSession,
+      heartRateMin: zone.heartRateMin ?? null,
+      heartRateMax: zone.heartRateMax ?? null,
+      paceMin: zone.paceMin ?? null,
+      paceMax: zone.paceMax ?? null
+    }))
+    .slice(0, 6);
+}
+
+function toCompactLap(lap: ReturnType<typeof getMetricsV2Laps>[number]) {
+  return {
+    index: lap.index,
+    durationSec: lap.durationSec,
+    distanceM: lap.distanceM,
+    avgHr: lap.avgHr,
+    avgCadence: lap.avgCadence,
+    avgPaceSecPerKm: lap.avgPaceSecPerKm ?? null,
+    avgPacePer100mSec: lap.avgPacePer100mSec ?? null,
+    avgStrokeRateSpm: lap.avgStrokeRateSpm ?? null,
+    avgSwolf: lap.avgSwolf ?? null,
+    restSec: lap.restSec ?? null,
+    elevationGainM: lap.elevationGainM ?? null,
+    elevationLossM: lap.elevationLossM ?? null,
+    trigger: lap.trigger,
+    isRest: lap.isRest ?? null
+  };
+}
+
+function compactRunLapEvidence(activity: WeeklyDebriefActivity) {
+  const laps = getMetricsV2Laps(activity.metrics_v2);
+  const sorted = [...laps].sort((a, b) => {
+    const distanceDelta = (b.distanceM ?? 0) - (a.distanceM ?? 0);
+    if (distanceDelta !== 0) return distanceDelta;
+    return (b.durationSec ?? 0) - (a.durationSec ?? 0);
+  });
+  const selected = [
+    sorted[0],
+    sorted[Math.max(0, Math.floor(sorted.length / 2) - 1)],
+    sorted[sorted.length - 1]
+  ].filter((lap, index, all): lap is NonNullable<typeof lap> => Boolean(lap) && all.indexOf(lap) === index);
+  return selected.map(toCompactLap).slice(0, 4);
+}
+
+function compactSwimLapEvidence(activity: WeeklyDebriefActivity) {
+  const laps = getMetricsV2Laps(activity.metrics_v2);
+  const workLaps = laps.filter((lap) => (lap.distanceM ?? 0) > 0);
+  const restLaps = laps.filter((lap) => lap.isRest === true || (lap.restSec ?? 0) > 0);
+  const selected = [
+    ...workLaps.slice(0, 4),
+    ...restLaps.slice(0, 2)
+  ].filter((lap, index, all) => all.indexOf(lap) === index);
+  return selected.map(toCompactLap).slice(0, 6);
+}
+
+function compactBikeLapEvidence(activity: WeeklyDebriefActivity) {
+  return getMetricsV2Laps(activity.metrics_v2)
+    .slice(0, 4)
+    .map(toCompactLap);
+}
+
+function compactGenericLapEvidence(activity: WeeklyDebriefActivity) {
+  return getMetricsV2Laps(activity.metrics_v2)
+    .slice(0, 4)
+    .map(toCompactLap);
+}
+
+function compactLapEvidence(activity: WeeklyDebriefActivity) {
+  if (activity.sport_type === "run") return compactRunLapEvidence(activity);
+  if (activity.sport_type === "swim") return compactSwimLapEvidence(activity);
+  if (activity.sport_type === "bike") return compactBikeLapEvidence(activity);
+  return compactGenericLapEvidence(activity);
+}
+
+function trimNullishEntries<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, entry]) => {
+      if (entry === null || typeof entry === "undefined") return [];
+      if (Array.isArray(entry)) return entry.length > 0 ? [[key, entry]] : [];
+      if (typeof entry === "object") {
+        const cleaned = trimNullishEntries(entry as Record<string, unknown>);
+        return Object.keys(cleaned).length > 0 ? [[key, cleaned]] : [];
+      }
+      return [[key, entry]];
+    })
+  );
+}
+
+function compactMetricBlock<T extends Record<string, unknown>>(value: T) {
+  return trimNullishEntries(value);
+}
+
+function buildActivityEvidenceEntry(args: {
+  activity: WeeklyDebriefActivity;
+  label: string;
+  context: "linked_session" | "extra_activity";
+  sessionId?: string;
+}) {
+  const metrics = asMetricsRecord(args.activity.metrics_v2);
+  const quality = asMetricsRecord(getNestedValue(metrics, ["quality"]));
+  const qualityWarnings = Array.isArray(quality?.warnings)
+    ? quality.warnings.filter((value): value is string => typeof value === "string")
+    : [];
+  const hrZones = compactZoneEvidence(getMetricsV2HrZones(args.activity.metrics_v2));
+  const paceZones = compactZoneEvidence(getMetricsV2PaceZones(args.activity.metrics_v2));
+  const laps = compactLapEvidence(args.activity);
+
+  const base: WeeklyDebriefActivityEvidence = {
+    context: args.context,
+    label: args.label,
+    sport: args.activity.sport_type,
+    activityId: args.activity.id,
+    sessionId: args.sessionId,
+    summary: {
+      durationSec: args.activity.duration_sec ?? null,
+      distanceM: args.activity.distance_m ?? null,
+      avgHr: args.activity.avg_hr ?? null,
+      avgPower: args.activity.avg_power ?? null,
+      qualityWarnings
+    }
+  };
+
+  if (args.activity.sport_type === "run") {
+    base.run = compactMetricBlock({
+      pace: {
+        avgPaceSecPerKm: getMetricsNestedNumber(metrics, [["pace", "avgPaceSecPerKm"], ["pace", "avg_pace_sec_per_km"]]),
+        bestPaceSecPerKm: getMetricsNestedNumber(metrics, [["pace", "bestPaceSecPerKm"], ["pace", "best_pace_sec_per_km"]]),
+        normalizedGradedPaceSecPerKm: getMetricsNestedNumber(metrics, [["pace", "normalizedGradedPaceSecPerKm"], ["pace", "normalized_graded_pace_sec_per_km"]])
+      },
+      heartRate: {
+        avgHr: getMetricsNestedNumber(metrics, [["heartRate", "avgHr"], ["heart_rate", "avg_hr"]]) ?? args.activity.avg_hr ?? null,
+        maxHr: getMetricsNestedNumber(metrics, [["heartRate", "maxHr"], ["heart_rate", "max_hr"]])
+      },
+      cadence: {
+        avgCadence: getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]),
+        maxCadence: getMetricsNestedNumber(metrics, [["cadence", "maxCadence"], ["cadence", "max_cadence"]])
+      },
+      elevation: {
+        gainM: getMetricsNestedNumber(metrics, [["elevation", "gainM"], ["elevation", "gain_m"]]),
+        lossM: getMetricsNestedNumber(metrics, [["elevation", "lossM"], ["elevation", "loss_m"]])
+      },
+      load: {
+        trainingStressScore: getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]]),
+        aerobicTrainingEffect: getMetricsNestedNumber(metrics, [["load", "aerobicTrainingEffect"], ["load", "aerobic_training_effect"]]),
+        anaerobicTrainingEffect: getMetricsNestedNumber(metrics, [["load", "anaerobicTrainingEffect"], ["load", "anaerobic_training_effect"]])
+      },
+      splits: {
+        firstHalfAvgHr: getMetricsNestedNumber(metrics, [["splits", "firstHalfAvgHr"], ["halves", "firstHalfAvgHr"]]),
+        lastHalfAvgHr: getMetricsNestedNumber(metrics, [["splits", "lastHalfAvgHr"], ["halves", "lastHalfAvgHr"]]),
+        hrDriftPct: getMetricsNestedNumber(metrics, [["splits", "hrDriftPct"], ["halves", "hrDriftPct"]]),
+        firstHalfPaceSPerKm: getMetricsNestedNumber(metrics, [["splits", "firstHalfPaceSPerKm"], ["halves", "firstHalfPaceSPerKm"]]),
+        lastHalfPaceSPerKm: getMetricsNestedNumber(metrics, [["splits", "lastHalfPaceSPerKm"], ["halves", "lastHalfPaceSPerKm"]]),
+        paceFadePct: getMetricsNestedNumber(metrics, [["splits", "paceFadePct"], ["halves", "paceFadePct"]]),
+        firstHalfAvgCadence: getMetricsNestedNumber(metrics, [["splits", "firstHalfAvgCadence"], ["halves", "firstHalfAvgCadence"]]),
+        lastHalfAvgCadence: getMetricsNestedNumber(metrics, [["splits", "lastHalfAvgCadence"], ["halves", "lastHalfAvgCadence"]])
+      },
+      zones: {
+        hr: hrZones.slice(0, 4),
+        pace: paceZones.slice(0, 4)
+      },
+      laps
+    });
+  } else if (args.activity.sport_type === "swim") {
+    base.swim = compactMetricBlock({
+      pace: {
+        avgPacePer100mSec: getMetricsNestedNumber(metrics, [["pace", "avgPacePer100mSec"], ["pace", "avg_pace_per_100m_sec"]]),
+        bestPacePer100mSec: getMetricsNestedNumber(metrics, [["pace", "bestPacePer100mSec"], ["pace", "best_pace_per_100m_sec"]])
+      },
+      stroke: {
+        avgStrokeRateSpm: getMetricsNestedNumber(metrics, [["stroke", "avgStrokeRateSpm"], ["stroke", "avg_stroke_rate_spm"]]),
+        maxStrokeRateSpm: getMetricsNestedNumber(metrics, [["stroke", "maxStrokeRateSpm"], ["stroke", "max_stroke_rate_spm"]]),
+        avgSwolf: getMetricsNestedNumber(metrics, [["stroke", "avgSwolf"], ["stroke", "avg_swolf"]]),
+        strokeType: getNestedString(metrics, [["stroke", "strokeType"], ["stroke", "stroke_type"]])
+      },
+      load: {
+        trainingEffect: getMetricsNestedNumber(metrics, [["load", "aerobicTrainingEffect"], ["load", "trainingEffect"], ["load", "training_effect"]])
+      },
+      pool: {
+        poolLengthM: getMetricsNestedNumber(metrics, [["pool", "poolLengthM"], ["pool", "pool_length_m"]]),
+        lengthCount: getMetricsNestedNumber(metrics, [["pool", "lengthCount"], ["pool", "length_count"]])
+      },
+      splits: {
+        firstHalfPacePer100mSec: getMetricsNestedNumber(metrics, [["splits", "firstHalfPacePer100mSec"], ["halves", "firstHalfPacePer100mSec"]]),
+        lastHalfPacePer100mSec: getMetricsNestedNumber(metrics, [["splits", "lastHalfPacePer100mSec"], ["halves", "lastHalfPacePer100mSec"]]),
+        paceFadePct: getMetricsNestedNumber(metrics, [["splits", "paceFadePct"], ["halves", "paceFadePct"]]),
+        firstHalfStrokeRate: getMetricsNestedNumber(metrics, [["splits", "firstHalfStrokeRate"], ["halves", "firstHalfStrokeRate"]]),
+        lastHalfStrokeRate: getMetricsNestedNumber(metrics, [["splits", "lastHalfStrokeRate"], ["halves", "lastHalfStrokeRate"]])
+      },
+      zones: {
+        pace: paceZones.slice(0, 4)
+      },
+      laps
+    });
+  } else if (args.activity.sport_type === "bike") {
+    base.bike = compactMetricBlock({
+      power: {
+        normalizedPower: getMetricsNestedNumber(metrics, [["power", "normalizedPower"], ["power", "normalized_power"]]),
+        intensityFactor: getMetricsNestedNumber(metrics, [["power", "intensityFactor"], ["power", "intensity_factor"]]),
+        variabilityIndex: getMetricsNestedNumber(metrics, [["power", "variabilityIndex"], ["power", "variability_index"]])
+      },
+      load: {
+        trainingStressScore: getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]])
+      },
+      cadence: {
+        avgCadence: getMetricsNestedNumber(metrics, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]])
+      },
+      zones: {
+        hr: hrZones.slice(0, 4)
+      },
+      laps
+    });
+  } else {
+    base.other = compactMetricBlock({
+      activityType: getNestedString(metrics, [["activity", "normalizedType"], ["activity", "normalized_type"]]),
+      load: {
+        trainingStressScore: getMetricsNestedNumber(metrics, [["load", "trainingStressScore"], ["load", "training_stress_score"]])
+      },
+      laps
+    });
+  }
+
+  return base;
+}
+
 function describeExtraActivityLoad(activity: ReturnType<typeof buildExtraCompletedActivities>[number]) {
   const parts: string[] = [];
   if (activity.trainingStressScore !== null) parts.push(`${Math.round(activity.trainingStressScore)} TSS`);
   if (activity.intensityFactor !== null) parts.push(`IF ${activity.intensityFactor.toFixed(2)}`);
   if (activity.normalizedPower !== null) parts.push(`NP ${Math.round(activity.normalizedPower)} w`);
+  if (activity.sport === "run" && activity.hrDriftPct !== null) parts.push(`HR drift ${Math.round(activity.hrDriftPct * 100)}%`);
+  if (activity.sport === "run" && activity.elevationGainM !== null) parts.push(`${Math.round(activity.elevationGainM)} m climb`);
+  if (activity.sport === "swim" && activity.avgPacePer100mSec !== null) {
+    const rounded = Math.round(activity.avgPacePer100mSec);
+    parts.push(`pace ${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}/100m`);
+  }
+  if (activity.sport === "swim" && activity.avgStrokeRateSpm !== null) parts.push(`${Math.round(activity.avgStrokeRateSpm)} spm`);
+  if (activity.sport === "swim" && activity.avgSwolf !== null) parts.push(`SWOLF ${Math.round(activity.avgSwolf)}`);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function getHardestExtraActivity(extraActivities: ReturnType<typeof buildExtraCompletedActivities>) {
   return [...extraActivities].sort((a, b) => {
-    const scoreA = a.trainingStressScore ?? a.durationMinutes;
-    const scoreB = b.trainingStressScore ?? b.durationMinutes;
+    const scoreA = (a.trainingStressScore ?? 0) + (a.hrDriftPct ?? 0) * 100 + (a.paceFadePct ?? 0) * 100 + a.durationMinutes;
+    const scoreB = (b.trainingStressScore ?? 0) + (b.hrDriftPct ?? 0) * 100 + (b.paceFadePct ?? 0) * 100 + b.durationMinutes;
     return scoreB - scoreA;
   })[0] ?? null;
 }
@@ -435,23 +693,122 @@ function buildDeterministicNarrative(args: {
 }
 
 function buildCoachShare(args: { facts: WeeklyDebriefFacts; narrative: WeeklyDebriefNarrative }) {
+  const clip = (value: string, max: number) => value.trim().slice(0, max);
   return weeklyDebriefCoachShareSchema.parse({
-    headline: args.facts.title,
-    summary: args.narrative.executiveSummary,
-    wins: args.narrative.highlights.slice(0, 3),
-    concerns: args.narrative.observations.slice(0, 3),
-    carryForward: args.narrative.carryForward.slice(0, 2)
+    headline: clip(args.facts.title, 120),
+    summary: clip(args.narrative.executiveSummary, 320),
+    wins: args.narrative.highlights.slice(0, 3).map((item) => clip(item, 180)),
+    concerns: args.narrative.observations.slice(0, 3).map((item) => clip(item, 180)),
+    carryForward: args.narrative.carryForward.slice(0, 2).map((item) => clip(item, 160))
   });
+}
+
+function extractJsonObject(text: string) {
+  const trimmed = text.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Fall through to fence/object extraction.
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) {
+    try {
+      return JSON.parse(fenced[1].trim());
+    } catch {
+      // Fall through to brace extraction.
+    }
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const candidate = trimmed.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function coerceNarrativeString(value: unknown, maxLength: number) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed.slice(0, maxLength) : null;
+  }
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const candidate =
+      (typeof record.text === "string" && record.text) ||
+      (typeof record.summary === "string" && record.summary) ||
+      (typeof record.detail === "string" && record.detail) ||
+      (typeof record.observation === "string" && record.observation) ||
+      (typeof record.highlight === "string" && record.highlight) ||
+      (typeof record.title === "string" && record.title) ||
+      (typeof record.label === "string" && record.label) ||
+      (typeof record.claim === "string" && record.claim) ||
+      null;
+
+    if (candidate) {
+      const trimmed = candidate.trim();
+      return trimmed.length > 0 ? trimmed.slice(0, maxLength) : null;
+    }
+  }
+
+  return null;
+}
+
+function coerceNarrativeList(value: unknown, maxItems: number, maxItemLength: number) {
+  if (!Array.isArray(value)) return [];
+  const items = value
+    .map((entry) => coerceNarrativeString(entry, maxItemLength))
+    .filter((entry): entry is string => Boolean(entry));
+
+  return items.slice(0, maxItems);
+}
+
+function normalizeNarrativePayload(payload: unknown) {
+  const record = payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : {};
+
+  return {
+    executiveSummary: coerceNarrativeString(record.executiveSummary, 420),
+    highlights: coerceNarrativeList(record.highlights, 3, 220),
+    observations: coerceNarrativeList(record.observations, 3, 220),
+    carryForward: coerceNarrativeList(record.carryForward, 2, 160)
+  };
+}
+
+function hydrateNarrativePayload(
+  normalized: ReturnType<typeof normalizeNarrativePayload>,
+  fallback: WeeklyDebriefNarrative
+) {
+  return {
+    executiveSummary: normalized.executiveSummary ?? fallback.executiveSummary,
+    highlights: normalized.highlights.length > 0 ? normalized.highlights : fallback.highlights.slice(0, 3),
+    observations: normalized.observations.length > 0 ? normalized.observations : fallback.observations.slice(0, 3),
+    carryForward: normalized.carryForward.length > 0 ? normalized.carryForward : fallback.carryForward.slice(0, 2)
+  };
 }
 
 async function generateNarrative(args: {
   facts: WeeklyDebriefFacts;
   evidence: WeeklyDebriefEvidenceItem[];
+  activityEvidence: WeeklyDebriefActivityEvidence[];
   athleteContext: AthleteContextSnapshot | null;
   deterministicFallback: WeeklyDebriefNarrative;
 }) {
   if (!process.env.OPENAI_API_KEY) {
-    return args.deterministicFallback;
+    return {
+      narrative: args.deterministicFallback,
+      source: "fallback" as const
+    };
   }
 
   try {
@@ -459,7 +816,7 @@ async function generateNarrative(args: {
     const response = await client.responses.create({
       model: getCoachModel(),
       instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
       input: [
         {
           role: "user",
@@ -469,6 +826,7 @@ async function generateNarrative(args: {
               text: JSON.stringify({
                 facts: args.facts,
                 evidence: args.evidence,
+                activityEvidence: args.activityEvidence,
                 athleteContext: args.athleteContext ? {
                   weeklyState: args.athleteContext.weeklyState,
                   declared: {
@@ -483,12 +841,41 @@ async function generateNarrative(args: {
       ]
     });
     const text = response.output_text?.trim();
-    if (!text) return args.deterministicFallback;
-    const parsed = weeklyDebriefNarrativeSchema.safeParse(JSON.parse(text));
-    if (!parsed.success) return args.deterministicFallback;
-    return parsed.data;
-  } catch {
-    return args.deterministicFallback;
+    if (!text) {
+      console.warn("[weekly-debrief] Falling back to deterministic narrative: empty model output");
+      return {
+        narrative: args.deterministicFallback,
+        source: "fallback" as const
+      };
+    }
+    const payload = extractJsonObject(text);
+    if (!payload) {
+      console.warn("[weekly-debrief] Falling back to deterministic narrative: could not parse model output as JSON");
+      return {
+        narrative: args.deterministicFallback,
+        source: "fallback" as const
+      };
+    }
+    const parsed = weeklyDebriefNarrativeSchema.safeParse(
+      hydrateNarrativePayload(normalizeNarrativePayload(payload), args.deterministicFallback)
+    );
+    if (!parsed.success) {
+      console.warn("[weekly-debrief] Falling back to deterministic narrative: model JSON failed schema validation", parsed.error.flatten());
+      return {
+        narrative: args.deterministicFallback,
+        source: "fallback" as const
+      };
+    }
+    return {
+      narrative: parsed.data,
+      source: "ai" as const
+    };
+  } catch (error) {
+    console.warn("[weekly-debrief] Falling back to deterministic narrative: model request failed", error);
+    return {
+      narrative: args.deterministicFallback,
+      source: "fallback" as const
+    };
   }
 }
 
@@ -1016,6 +1403,10 @@ function buildDeterministicObservations(args: {
   }
   if (args.hardestExtraActivity && (args.hardestExtraActivity.trainingStressScore ?? 0) >= 70) {
     observations.push(`${capitalize(args.hardestExtraActivity.sport)} extra work was a meaningful load addition, not just extra minutes.`);
+  } else if (args.hardestExtraActivity?.sport === "run" && ((args.hardestExtraActivity.hrDriftPct ?? 0) >= 0.05 || (args.hardestExtraActivity.paceFadePct ?? 0) >= 0.04)) {
+    observations.push("The added run looked costly enough to matter for recovery, not just for volume.");
+  } else if (args.hardestExtraActivity?.sport === "swim" && (args.hardestExtraActivity.avgPacePer100mSec ?? 0) > 0) {
+    observations.push("The added swim looked more like supportive aerobic work than random extra minutes.");
   }
   if (args.reviewedSessionsCount === 0 && observations.length === 0) {
     observations.push("This week reads more through overall rhythm than through one standout session.");
@@ -1034,11 +1425,14 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
 
   const confirmedLinks = input.links.filter(hasConfirmedPlannedSessionLink);
   const linkedActivityBySessionId = new Map<string, WeeklyDebriefActivity>();
+  const linkedSessionByActivityId = new Map<string, WeeklyDebriefSession>();
   for (const link of confirmedLinks) {
     if (!link.planned_session_id || linkedActivityBySessionId.has(link.planned_session_id)) continue;
     const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
+    const session = input.sessions.find((candidate) => candidate.id === link.planned_session_id);
     if (activity) {
       linkedActivityBySessionId.set(link.planned_session_id, activity);
+      if (session) linkedSessionByActivityId.set(activity.id, session);
     }
   }
 
@@ -1166,6 +1560,32 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
 
   const reviewedSessions = sessionSummaries.filter((session) => Boolean(session.review));
   const hardestExtraActivity = getHardestExtraActivity(extraActivities);
+  const activityEvidence = [
+    ...sessionSummaries
+      .map((session) => {
+        const linkedActivity = linkedActivityBySessionId.get(session.id);
+        if (!linkedActivity) return null;
+        return buildActivityEvidenceEntry({
+          activity: linkedActivity,
+          label: session.label,
+          context: "linked_session",
+          sessionId: session.id
+        });
+      })
+      .filter((item): item is WeeklyDebriefActivityEvidence => item !== null),
+    ...extraActivities
+      .map((extra) => {
+        const source = input.activities.find((activity) => activity.id === extra.id);
+        if (!source) return null;
+        return buildActivityEvidenceEntry({
+          activity: source,
+          label: `${capitalize(extra.sport)} extra workout`,
+          context: "extra_activity",
+          sessionId: linkedSessionByActivityId.get(source.id)?.id
+        });
+      })
+      .filter((item): item is WeeklyDebriefActivityEvidence => item !== null)
+  ].slice(0, 10);
   const strongestExecutionSession =
     reviewedSessions
       .filter((session) => session.review?.deterministic.rulesSummary.intentMatch === "on_target")
@@ -1318,8 +1738,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     }] : [])
   ];
 
-  const deterministicNarrative = buildDeterministicNarrative({
-    facts: weeklyDebriefFactsSchema.parse({
+  const draftFacts = weeklyDebriefFactsSchema.parse({
       weekLabel: `Week of ${input.weekStart}`,
       weekRange: weekRangeLabel(input.weekStart),
       title: finalTitle,
@@ -1346,12 +1765,16 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
       metrics,
       factualBullets,
       confidenceNote: getConfidenceNote(input),
+      narrativeSource: "legacy_unknown",
       artifactStateLabel: artifactState.label,
       artifactStateNote: artifactState.note,
       provisionalReviewCount,
       weekShape,
       reflectionsSparse
-    }),
+    });
+
+  const deterministicNarrative = buildDeterministicNarrative({
+    facts: draftFacts,
     topHighlights: positiveHighlights,
     observations,
     carryForward
@@ -1359,37 +1782,10 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
 
   const evidence = buildFallbackEvidenceSummaries(sessionSummaries, extraActivities);
   const facts = weeklyDebriefFactsSchema.parse({
-    weekLabel: `Week of ${input.weekStart}`,
-    weekRange: weekRangeLabel(input.weekStart),
-    title: finalTitle,
-    statusLine,
-    primaryTakeawayTitle: primaryTakeaway.title,
-    primaryTakeawayDetail: primaryTakeaway.detail,
-    plannedSessions,
-    completedPlannedSessions,
-    completedSessions,
-    addedSessions,
-    skippedSessions,
-    remainingSessions,
-    keySessionsCompleted,
-    keySessionsMissed,
-    keySessionsTotal: keySessions.length,
-    plannedMinutes,
-    completedPlannedMinutes,
-    completedMinutes,
-    skippedMinutes,
-    extraMinutes,
+    ...draftFacts,
     completionPct: clamp(completionPct, 0, 999),
-    dominantSport: getDominantSport(sportMinutes),
-    keySessionStatus: keySessions.length > 0 ? "Priority sessions influenced the week." : "Consistency and execution quality explained the week better than one priority session.",
-    metrics,
-    factualBullets,
-    confidenceNote: getConfidenceNote(input),
-    artifactStateLabel: artifactState.label,
-    artifactStateNote: artifactState.note,
-    provisionalReviewCount,
-    weekShape,
-    reflectionsSparse
+    primaryTakeawayTitle: primaryTakeaway.title,
+    primaryTakeawayDetail: primaryTakeaway.detail
   });
   const evidenceGroups = buildEvidenceGroups({
     facts,
@@ -1406,6 +1802,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     facts,
     deterministicNarrative,
     evidence,
+    activityEvidence,
     evidenceGroups,
     sourceUpdatedAt: getSourceUpdatedAt([
       ...input.sessions.map((session) => session.updated_at ?? session.created_at),
@@ -1613,20 +2010,26 @@ export async function computeWeeklyDebrief(args: {
 }) {
   const inputs = await loadWeeklyDebriefInputs(args);
   const base = buildWeeklyDebriefFacts(inputs);
-  const narrative = await generateNarrative({
+  const generated = await generateNarrative({
     facts: base.facts,
     evidence: base.evidence,
+    activityEvidence: base.activityEvidence,
     athleteContext: inputs.athleteContext,
     deterministicFallback: base.deterministicNarrative
   });
+  const narrative = generated.narrative;
+  const facts = weeklyDebriefFactsSchema.parse({
+    ...base.facts,
+    narrativeSource: generated.source
+  });
   const coachShare = buildCoachShare({
-    facts: base.facts,
+    facts,
     narrative
   });
 
   return {
     readiness: base.readiness,
-    facts: base.facts,
+    facts,
     narrative,
     coachShare,
     evidence: base.evidence,

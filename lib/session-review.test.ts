@@ -120,10 +120,157 @@ describe("createReviewViewModel", () => {
     expect(vm.intent.label).toBe("Matched intent");
     expect(vm.scoreHeadline).toBe("91 · On target");
     expect(vm.actualExecutionSummary).toMatch(/delivered the intended training stimulus|planned quality stimulus/i);
+    expect(vm.mainGapLabel).toBe("Key confirmation");
     expect(vm.mainGap).toBe("Session matched intent well. Keep the same execution approach next time.");
     expect(vm.weekAction).toMatch(/Keep the next key session as planned/i);
     expect(vm.whyItMatters).toMatch(/Matching the planned session intent|planned quality stimulus/i);
     expect(vm.nextAction).toMatch(/Good control|Keep the same execution approach/i);
+  });
+
+  test("exposes whether a persisted review was AI or fallback generated", () => {
+    const aiVm = createReviewViewModel({
+      id: "ai-1",
+      date: "2026-03-12",
+      sport: "bike",
+      type: "Bike",
+      intent_category: "Tempo ride",
+      duration_minutes: 60,
+      status: "completed",
+      execution_result: {
+        version: 2,
+        linkedActivityId: "activity-1",
+        deterministic: {
+          sessionId: "ai-1",
+          athleteId: "athlete-1",
+          sport: "bike",
+          planned: {
+            title: "Tempo ride",
+            intentCategory: "Tempo ride",
+            durationSec: 3600,
+            targetBands: null,
+            plannedIntervals: null,
+            sessionRole: "supporting"
+          },
+          actual: {
+            durationSec: 3600,
+            avgHr: 142,
+            avgPower: 210,
+            avgPaceSPerKm: null,
+            timeAboveTargetPct: 0.08,
+            intervalCompletionPct: 1,
+            variabilityIndex: 1.05,
+            splitMetrics: null,
+            sportSpecific: {
+              bike: {
+                avgPower: 210,
+                normalizedPower: 220,
+                maxPower: 440,
+                intensityFactor: 0.8,
+                variabilityIndex: 1.05,
+                totalWorkKj: 760,
+                avgCadence: 88,
+                maxCadence: 102,
+                avgHr: 142,
+                maxHr: 161,
+                hrZoneTimeSec: 2100,
+                trainingStressScore: 64,
+                aerobicTrainingEffect: 3.1,
+                anaerobicTrainingEffect: 0.8,
+                splitMetrics: null
+              }
+            }
+          },
+          detectedIssues: [],
+          missingEvidence: [],
+          rulesSummary: {
+            intentMatch: "on_target",
+            executionScore: 88,
+            executionScoreBand: "On target",
+            confidence: "high",
+            provisional: false,
+            evidenceCount: 5,
+            executionCost: "low"
+          }
+        },
+        verdict: {
+          sessionVerdict: {
+            headline: "Intent landed",
+            summary: "Tempo ride stayed controlled and delivered the intended aerobic load.",
+            intentMatch: "on_target",
+            executionCost: "low",
+            confidence: "high",
+            nextCall: "move_on"
+          },
+          explanation: {
+            whatHappened: "Power stayed steady and controlled through the main work.",
+            whyItMatters: "Controlled aerobic load supports the rest of the week.",
+            whatToDoNextTime: "Repeat the same pacing setup.",
+            whatToDoThisWeek: "Move through the rest of the week as planned."
+          },
+          uncertainty: {
+            label: "confident_read",
+            detail: "Enough evidence is present for a confident read.",
+            missingEvidence: []
+          },
+          citedEvidence: []
+        },
+        narrativeSource: "ai",
+        weeklyImpact: null,
+        createdAt: "2026-03-12T10:00:00.000Z",
+        updatedAt: "2026-03-12T10:00:00.000Z",
+        status: "matched_intent",
+        intentMatchStatus: "matched_intent",
+        executionScore: 88,
+        executionScoreBand: "On target",
+        executionScoreSummary: "Tempo ride stayed controlled and delivered the intended aerobic load.",
+        executionSummary: "Power stayed steady and controlled through the main work.",
+        summary: "Tempo ride stayed controlled and delivered the intended aerobic load.",
+        whyItMatters: "Controlled aerobic load supports the rest of the week.",
+        recommendedNextAction: "Repeat the same pacing setup.",
+        diagnosisConfidence: "high",
+        executionScoreProvisional: false,
+        suggestedWeekAdjustment: "Move through the rest of the week as planned.",
+        evidence: [],
+        durationCompletion: 1,
+        intervalCompletionPct: 1,
+        timeAboveTargetPct: 0.08,
+        avgHr: 142,
+        avgPower: 210,
+        normalizedPower: 220,
+        trainingStressScore: 64,
+        intensityFactor: 0.8,
+        totalWorkKj: 760,
+        avgCadence: 88,
+        maxHr: 161,
+        maxPower: 440,
+        firstHalfAvgHr: null,
+        lastHalfAvgHr: null,
+        firstHalfPaceSPerKm: null,
+        lastHalfPaceSPerKm: null,
+        executionCost: "low",
+        missingEvidence: []
+      }
+    });
+
+    const legacyVm = createReviewViewModel({
+      id: "legacy-1",
+      date: "2026-03-12",
+      sport: "run",
+      type: "Run",
+      intent_category: "Easy run",
+      duration_minutes: 45,
+      status: "completed",
+      execution_result: {
+        status: "matched_intent",
+        executionScore: 90
+      }
+    });
+
+    expect(aiVm.narrativeSource).toBe("ai");
+    expect(aiVm.actualExecutionSummary).toBe("Power stayed steady and controlled through the main work.");
+    expect(aiVm.mainGapLabel).toBe("Key confirmation");
+    expect(aiVm.mainGap).toMatch(/Session matched intent well|Keep the same execution approach/i);
+    expect(legacyVm.narrativeSource).toBe("legacy_unknown");
   });
 
   test("uses extra-session framing instead of planned-intent framing for unplanned work", () => {

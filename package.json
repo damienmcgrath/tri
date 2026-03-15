@@ -18,6 +18,8 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.49.1",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "fast-xml-parser": "^5.3.7",
     "fit-file-parser": "^2.3.3",
     "geist": "^1.7.0",

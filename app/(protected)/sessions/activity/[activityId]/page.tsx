@@ -22,6 +22,22 @@ type ActivityReviewRow = {
   metrics_v2?: Record<string, unknown> | null;
 };
 
+function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") return "AI review";
+  if (source === "fallback") return "Fallback review";
+  return "Source unknown";
+}
+
+function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") {
+    return "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-accent)]";
+  }
+  if (source === "fallback") {
+    return "rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--warning))]";
+  }
+  return "rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
+}
+
 async function loadActivityReviewRow(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -162,6 +178,11 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
               <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`}>
                 {reviewVm.intent.label}
               </span>
+              {reviewVm.isReviewable ? (
+                <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
+                  {narrativeSourceLabel(reviewVm.narrativeSource)}
+                </span>
+              ) : null}
             </div>
             <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]">{reviewVm.reviewModeDetail}</p>
             <p className="mt-2 text-sm text-muted">{reviewVm.sessionStatusDetail}</p>
@@ -210,7 +231,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
 
             <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Main gap</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
               </div>
 

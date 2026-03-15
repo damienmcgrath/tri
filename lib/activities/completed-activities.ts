@@ -34,6 +34,13 @@ export type ExtraCompletedActivity = {
   trainingStressScore: number | null;
   intensityFactor: number | null;
   totalWorkKj: number | null;
+  avgCadence: number | null;
+  elevationGainM: number | null;
+  hrDriftPct: number | null;
+  paceFadePct: number | null;
+  avgPacePer100mSec: number | null;
+  avgStrokeRateSpm: number | null;
+  avgSwolf: number | null;
 };
 
 export function localIsoDate(utcIso: string, timeZone: string) {
@@ -86,7 +93,14 @@ export function buildExtraCompletedActivities(params: {
       normalizedPower: getNestedNumber(activity.metrics_v2, [["power", "normalizedPower"], ["power", "normalized_power"]]),
       trainingStressScore: getNestedNumber(activity.metrics_v2, [["load", "trainingStressScore"], ["load", "training_stress_score"]]),
       intensityFactor: getNestedNumber(activity.metrics_v2, [["power", "intensityFactor"], ["power", "intensity_factor"]]),
-      totalWorkKj: getNestedNumber(activity.metrics_v2, [["power", "totalWorkKj"], ["power", "total_work_kj"]])
+      totalWorkKj: getNestedNumber(activity.metrics_v2, [["power", "totalWorkKj"], ["power", "total_work_kj"]]),
+      avgCadence: getNestedNumber(activity.metrics_v2, [["cadence", "avgCadence"], ["cadence", "avg_cadence"]]),
+      elevationGainM: getNestedNumber(activity.metrics_v2, [["elevation", "gainM"], ["elevation", "gain_m"]]),
+      hrDriftPct: getNestedNumber(activity.metrics_v2, [["splits", "hrDriftPct"], ["halves", "hrDriftPct"], ["splits", "hr_drift_pct"]]),
+      paceFadePct: getNestedNumber(activity.metrics_v2, [["splits", "paceFadePct"], ["halves", "paceFadePct"], ["splits", "pace_fade_pct"]]),
+      avgPacePer100mSec: getNestedNumber(activity.metrics_v2, [["pace", "avgPacePer100mSec"], ["pace", "avg_pace_per_100m_sec"]]),
+      avgStrokeRateSpm: getNestedNumber(activity.metrics_v2, [["stroke", "avgStrokeRateSpm"], ["stroke", "avg_stroke_rate_spm"]]),
+      avgSwolf: getNestedNumber(activity.metrics_v2, [["stroke", "avgSwolf"], ["stroke", "avg_swolf"]])
     }))
     .filter((activity) => activity.date >= weekStart && activity.date < weekEndExclusive)
     .filter((activity) => !confirmedLinkedActivityIds.has(activity.id));

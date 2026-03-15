@@ -42,6 +42,11 @@ function buildPaceSummary(durationSec: number, distanceM: number) {
   };
 }
 
+function paceFromSpeed(speedMetersPerSecond: number | undefined, unitMeters: number) {
+  if (!speedMetersPerSecond || speedMetersPerSecond <= 0) return undefined;
+  return roundNumber(unitMeters / speedMetersPerSecond, 2);
+}
+
 function roundNumber(value: unknown, decimals = 2): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Number(parsed.toFixed(decimals)) : undefined;
@@ -65,6 +70,7 @@ function positiveNumber(value: unknown): number | undefined {
 }
 
 function nonNegativeNumber(value: unknown): number | undefined {
+  if (value === null || typeof value === "undefined" || value === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
@@ -149,6 +155,16 @@ function buildLapSummaries(laps: unknown[], sport: string) {
 
       const durationSec = roundNumber(source.total_timer_time ?? source.total_elapsed_time, 3);
       const distanceM = roundNumber(source.total_distance, 2);
+      const avgCadence = positiveInt(source.avg_cadence);
+      const maxCadence = positiveInt(source.max_cadence);
+      const avgStrokeRateSpm = sport === "swim"
+        ? positiveInt(firstPositiveNumber([source.avg_stroke_rate, source.avg_cadence]))
+        : undefined;
+      const maxStrokeRateSpm = sport === "swim"
+        ? positiveInt(firstPositiveNumber([source.max_stroke_rate, source.max_cadence]))
+        : undefined;
+      const avgSwolf = sport === "swim" ? positiveInt(firstPositiveNumber([source.avg_swolf])) : undefined;
+      const isRest = sport === "swim" && distanceM !== undefined && distanceM <= 0;
       const lapSummary: Record<string, unknown> = {
         index: index + 1,
         startTime: typeof source.start_time === "string" ? source.start_time : null,
@@ -160,12 +176,19 @@ function buildLapSummaries(laps: unknown[], sport: string) {
         avgPower: positiveInt(source.avg_power) ?? null,
         normalizedPower: positiveInt(source.normalized_power) ?? null,
         maxPower: positiveInt(source.max_power) ?? null,
-        avgCadence: positiveInt(source.avg_cadence) ?? null,
-        maxCadence: positiveInt(source.max_cadence) ?? null,
+        avgCadence: avgCadence ?? null,
+        maxCadence: maxCadence ?? null,
         calories: positiveInt(source.total_calories) ?? null,
         workKj: source.total_work ? roundNumber(Number(source.total_work) / 1000, 1) ?? null : null,
         intensity: typeof source.intensity === "string" ? source.intensity : source.intensity ?? null,
-        trigger: typeof source.lap_trigger === "string" ? source.lap_trigger : source.event_type ?? null
+        trigger: typeof source.lap_trigger === "string" ? source.lap_trigger : source.event_type ?? null,
+        avgStrokeRateSpm: avgStrokeRateSpm ?? null,
+        maxStrokeRateSpm: maxStrokeRateSpm ?? null,
+        avgSwolf: avgSwolf ?? null,
+        restSec: isRest ? durationSec ?? null : null,
+        isRest,
+        elevationGainM: roundNumber(source.total_ascent, 1) ?? null,
+        elevationLossM: roundNumber(source.total_descent, 1) ?? null
       };
 
       if (durationSec && distanceM && distanceM > 0) {
@@ -243,8 +266,8 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
   let elapsedSec = 0;
 
   const buckets = {
-    first: { durationSec: 0, hr: 0, power: 0, cadence: 0, distanceM: 0 },
-    second: { durationSec: 0, hr: 0, power: 0, cadence: 0, distanceM: 0 }
+    first: { durationSec: 0, distanceM: 0, hr: 0, hrDuration: 0, power: 0, powerDuration: 0, cadence: 0, cadenceDuration: 0, stroke: 0, strokeDuration: 0 },
+    second: { durationSec: 0, distanceM: 0, hr: 0, hrDuration: 0, power: 0, powerDuration: 0, cadence: 0, cadenceDuration: 0, stroke: 0, strokeDuration: 0 }
   };
 
   for (const lap of laps) {
@@ -255,6 +278,7 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
     const lapAvgHr = nonNegativeNumber(lap.avgHr);
     const lapAvgPower = nonNegativeNumber(lap.avgPower);
     const lapAvgCadence = nonNegativeNumber(lap.avgCadence);
+    const lapAvgStrokeRate = nonNegativeNumber(lap.avgStrokeRateSpm) ?? (sport === "swim" ? lapAvgCadence : undefined);
     const lapStart = elapsedSec;
     const lapEnd = elapsedSec + lapDurationSec;
     const firstOverlapSec = Math.max(0, Math.min(lapEnd, halfwaySec) - lapStart);
@@ -263,17 +287,43 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
     if (firstOverlapSec > 0) {
       buckets.first.durationSec += firstOverlapSec;
       buckets.first.distanceM += lapDistanceM * (firstOverlapSec / lapDurationSec);
-      if (lapAvgHr !== undefined) buckets.first.hr += lapAvgHr * firstOverlapSec;
-      if (lapAvgPower !== undefined) buckets.first.power += lapAvgPower * firstOverlapSec;
-      if (lapAvgCadence !== undefined) buckets.first.cadence += lapAvgCadence * firstOverlapSec;
+      if (lapAvgHr !== undefined) {
+        buckets.first.hr += lapAvgHr * firstOverlapSec;
+        buckets.first.hrDuration += firstOverlapSec;
+      }
+      if (lapAvgPower !== undefined) {
+        buckets.first.power += lapAvgPower * firstOverlapSec;
+        buckets.first.powerDuration += firstOverlapSec;
+      }
+      if (lapAvgCadence !== undefined) {
+        buckets.first.cadence += lapAvgCadence * firstOverlapSec;
+        buckets.first.cadenceDuration += firstOverlapSec;
+      }
+      if (lapAvgStrokeRate !== undefined) {
+        buckets.first.stroke += lapAvgStrokeRate * firstOverlapSec;
+        buckets.first.strokeDuration += firstOverlapSec;
+      }
     }
 
     if (secondOverlapSec > 0) {
       buckets.second.durationSec += secondOverlapSec;
       buckets.second.distanceM += lapDistanceM * (secondOverlapSec / lapDurationSec);
-      if (lapAvgHr !== undefined) buckets.second.hr += lapAvgHr * secondOverlapSec;
-      if (lapAvgPower !== undefined) buckets.second.power += lapAvgPower * secondOverlapSec;
-      if (lapAvgCadence !== undefined) buckets.second.cadence += lapAvgCadence * secondOverlapSec;
+      if (lapAvgHr !== undefined) {
+        buckets.second.hr += lapAvgHr * secondOverlapSec;
+        buckets.second.hrDuration += secondOverlapSec;
+      }
+      if (lapAvgPower !== undefined) {
+        buckets.second.power += lapAvgPower * secondOverlapSec;
+        buckets.second.powerDuration += secondOverlapSec;
+      }
+      if (lapAvgCadence !== undefined) {
+        buckets.second.cadence += lapAvgCadence * secondOverlapSec;
+        buckets.second.cadenceDuration += secondOverlapSec;
+      }
+      if (lapAvgStrokeRate !== undefined) {
+        buckets.second.stroke += lapAvgStrokeRate * secondOverlapSec;
+        buckets.second.strokeDuration += secondOverlapSec;
+      }
     }
 
     elapsedSec = lapEnd;
@@ -283,12 +333,14 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
     return duration > 0 ? roundNumber(total / duration, 1) ?? null : null;
   }
 
-  const firstHalfAvgHr = weightedAverage(buckets.first.hr, buckets.first.durationSec);
-  const lastHalfAvgHr = weightedAverage(buckets.second.hr, buckets.second.durationSec);
-  const firstHalfAvgPower = weightedAverage(buckets.first.power, buckets.first.durationSec);
-  const lastHalfAvgPower = weightedAverage(buckets.second.power, buckets.second.durationSec);
-  const firstHalfAvgCadence = weightedAverage(buckets.first.cadence, buckets.first.durationSec);
-  const lastHalfAvgCadence = weightedAverage(buckets.second.cadence, buckets.second.durationSec);
+  const firstHalfAvgHr = weightedAverage(buckets.first.hr, buckets.first.hrDuration);
+  const lastHalfAvgHr = weightedAverage(buckets.second.hr, buckets.second.hrDuration);
+  const firstHalfAvgPower = weightedAverage(buckets.first.power, buckets.first.powerDuration);
+  const lastHalfAvgPower = weightedAverage(buckets.second.power, buckets.second.powerDuration);
+  const firstHalfAvgCadence = weightedAverage(buckets.first.cadence, buckets.first.cadenceDuration);
+  const lastHalfAvgCadence = weightedAverage(buckets.second.cadence, buckets.second.cadenceDuration);
+  const firstHalfStrokeRate = weightedAverage(buckets.first.stroke, buckets.first.strokeDuration);
+  const lastHalfStrokeRate = weightedAverage(buckets.second.stroke, buckets.second.strokeDuration);
 
   const summary: Record<string, unknown> = {
     firstHalfAvgHr,
@@ -297,6 +349,8 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
     lastHalfAvgPower,
     firstHalfAvgCadence,
     lastHalfAvgCadence,
+    firstHalfStrokeRate,
+    lastHalfStrokeRate,
     hrDriftPct:
       firstHalfAvgHr && lastHalfAvgHr
         ? roundNumber(lastHalfAvgHr / firstHalfAvgHr - 1, 4) ?? null
@@ -307,14 +361,90 @@ function buildHalfSummaries(laps: Array<Record<string, unknown>>, durationSec: n
         : null
   };
 
+  if (sport === "swim" && buckets.first.durationSec > 0 && buckets.first.distanceM > 0) {
+    summary.firstHalfPacePer100mSec = roundNumber(buckets.first.durationSec / (buckets.first.distanceM / 100), 2) ?? null;
+  }
+  if (sport === "swim" && buckets.second.durationSec > 0 && buckets.second.distanceM > 0) {
+    summary.lastHalfPacePer100mSec = roundNumber(buckets.second.durationSec / (buckets.second.distanceM / 100), 2) ?? null;
+    if (summary.firstHalfPacePer100mSec && summary.lastHalfPacePer100mSec) {
+      summary.paceFadePct = roundNumber(
+        Number(summary.lastHalfPacePer100mSec) / Number(summary.firstHalfPacePer100mSec) - 1,
+        4
+      ) ?? null;
+    }
+  }
   if (sport !== "swim" && buckets.first.durationSec > 0 && buckets.first.distanceM > 0) {
     summary.firstHalfPaceSPerKm = roundNumber(buckets.first.durationSec / (buckets.first.distanceM / 1000), 2) ?? null;
   }
   if (sport !== "swim" && buckets.second.durationSec > 0 && buckets.second.distanceM > 0) {
     summary.lastHalfPaceSPerKm = roundNumber(buckets.second.durationSec / (buckets.second.distanceM / 1000), 2) ?? null;
+    if (summary.firstHalfPaceSPerKm && summary.lastHalfPaceSPerKm) {
+      summary.paceFadePct = roundNumber(
+        Number(summary.lastHalfPaceSPerKm) / Number(summary.firstHalfPaceSPerKm) - 1,
+        4
+      ) ?? null;
+    }
   }
 
   return summary;
+}
+
+function buildPaceZoneSummaries(laps: Array<Record<string, unknown>>, sport: string, totalDurationSec: number) {
+  const valueKey = sport === "swim" ? "avgPacePer100mSec" : "avgPaceSecPerKm";
+  const validLaps = laps
+    .map((lap) => ({
+      pace: nonNegativeNumber(lap[valueKey]),
+      durationSec: nonNegativeNumber(lap.durationSec)
+    }))
+    .filter((lap): lap is { pace: number; durationSec: number } => lap.pace !== undefined && lap.durationSec !== undefined && lap.durationSec > 0);
+
+  if (validLaps.length < 3) return [];
+
+  const minPace = Math.min(...validLaps.map((lap) => lap.pace));
+  const maxPace = Math.max(...validLaps.map((lap) => lap.pace));
+  if (!Number.isFinite(minPace) || !Number.isFinite(maxPace) || maxPace <= minPace) return [];
+
+  const bandSize = (maxPace - minPace) / 5;
+  if (bandSize <= 0) return [];
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const lower = minPace + bandSize * index;
+    const upper = index === 4 ? maxPace : minPace + bandSize * (index + 1);
+    const durationSec = validLaps.reduce((sum, lap) => {
+      const inBand = index === 4 ? lap.pace >= lower && lap.pace <= upper : lap.pace >= lower && lap.pace < upper;
+      return inBand ? sum + lap.durationSec : sum;
+    }, 0);
+
+    return {
+      zone: index + 1,
+      durationSec: roundNumber(durationSec, 3) ?? 0,
+      pctOfSession: totalDurationSec > 0 ? roundNumber(durationSec / totalDurationSec, 4) ?? null : null,
+      paceMin: roundNumber(lower, 2) ?? null,
+      paceMax: roundNumber(upper, 2) ?? null
+    };
+  });
+}
+
+function buildSwimQualityWarnings(args: {
+  subSportRaw?: string;
+  poolLengthM?: number;
+  lapSummaries: Array<Record<string, unknown>>;
+  avgStrokeRateSpm?: number;
+  avgSwolf?: number;
+}) {
+  const warnings: string[] = [];
+  const isOpenWater = `${args.subSportRaw ?? ""}`.toLowerCase().includes("open");
+  const restLaps = args.lapSummaries.filter((lap) => lap.isRest === true).length;
+  const workLaps = args.lapSummaries.filter((lap) => (nonNegativeNumber(lap.distanceM) ?? 0) > 0).length;
+
+  if (isOpenWater) warnings.push("openWaterDerivedMetricsLimited");
+  if (!args.poolLengthM) warnings.push("poolLengthUnavailable");
+  if (workLaps < 3) warnings.push("sparseSwimLapData");
+  if (args.avgStrokeRateSpm === undefined) warnings.push("strokeRateUnavailable");
+  if (args.avgSwolf === undefined) warnings.push("swolfUnavailable");
+  if (restLaps === 0 && workLaps > 6) warnings.push("restStructureInferableOnly");
+
+  return warnings;
 }
 
 export function sha256Hex(content: Buffer | string) {
@@ -353,12 +483,17 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   const avgPacePer100mSec = normalizedSport === "swim" && durationSec > 0 && distanceM > 0
     ? Math.round(durationSec / (distanceM / 100))
     : undefined;
+  const avgPaceSecPerKm = normalizedSport === "run" && durationSec > 0 && distanceM > 0
+    ? roundNumber(durationSec / (distanceM / 1000), 2)
+    : undefined;
 
   const lapsCount = positiveInt(firstPositiveNumber([session.num_laps, fit?.laps?.length]));
   const maxHr = positiveInt(firstPositiveNumber([session.max_heart_rate]));
   const maxPower = positiveInt(firstPositiveNumber([session.max_power]));
   const avgCadence = positiveInt(firstPositiveNumber([session.avg_cadence, session.avg_running_cadence, session.avg_bike_cadence]));
-  const avgStrokeRateSpm = positiveInt(firstPositiveNumber([session.avg_stroke_rate]));
+  const maxCadence = positiveInt(firstPositiveNumber([session.max_cadence, session.max_running_cadence, session.max_bike_cadence]));
+  const avgStrokeRateSpm = positiveInt(firstPositiveNumber([session.avg_stroke_rate, normalizedSport === "swim" ? session.avg_cadence : undefined]));
+  const maxStrokeRateSpm = positiveInt(firstPositiveNumber([session.max_stroke_rate, normalizedSport === "swim" ? session.max_cadence : undefined]));
   const avgSwolf = positiveInt(firstPositiveNumber([session.avg_swolf]));
   const elevationGainM = positiveInt(firstPositiveNumber([session.total_ascent]));
   const elevationLossM = positiveInt(firstPositiveNumber([session.total_descent]));
@@ -377,8 +512,13 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   const anaerobicTrainingEffect = roundNumber(session.total_anaerobic_training_effect, 1);
   const trainingLoadPeak = roundNumber(session.training_load_peak, 1);
   const totalCycles = positiveInt(firstPositiveNumber([session.total_cycles]));
+  const maxSpeed = firstPositiveNumber([session.enhanced_max_speed, session.max_speed]);
+  const avgGradeAdjustedSpeed = firstPositiveNumber([session.avg_grade_adjusted_speed, session.enhanced_avg_grade_adjusted_speed]);
+  const bestPaceSecPerKm = normalizedSport === "run" ? paceFromSpeed(maxSpeed, 1000) : undefined;
+  const bestPacePer100mSec = normalizedSport === "swim" ? paceFromSpeed(maxSpeed, 100) : undefined;
+  const normalizedGradedPaceSecPerKm = normalizedSport === "run" ? paceFromSpeed(avgGradeAdjustedSpeed, 1000) : undefined;
   const lapSummaries = buildLapSummaries(Array.isArray(fit?.laps) ? fit.laps : [], normalizedSport);
-  const halfSummaries = buildHalfSummaries(lapSummaries, durationSec, normalizedSport);
+  const splitSummaries = buildHalfSummaries(lapSummaries, durationSec, normalizedSport);
   const pauseSummary = buildPauseSummary(Array.isArray(fit?.events) ? fit.events : [], elapsedDurationSec, movingDurationSec);
   const sessionTimeInZone = pickSessionTimeInZoneEntry(fit as Record<string, unknown>);
   const timeInZoneRecord = asRecord(sessionTimeInZone);
@@ -398,6 +538,7 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
         valueKey: "heartRate"
       })
     : [];
+  const paceZoneSummaries = buildPaceZoneSummaries(lapSummaries, normalizedSport, movingDurationSec ?? durationSec);
   const activityMetrics = Array.isArray(fit?.activity_metrics) ? asRecord(fit.activity_metrics[0]) : null;
   const recoveryTimeSec = positiveInt(firstPositiveNumber([activityMetrics?.recovery_time]));
   const vo2Max = roundNumber(activityMetrics?.vo2_max, 2);
@@ -421,6 +562,7 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     ["avgStrokeRateSpm", avgStrokeRateSpm],
     ["avgSwolf", avgSwolf],
     ["avgCadence", avgCadence],
+    ["maxCadence", maxCadence],
     ["maxHr", maxHr],
     ["maxPower", maxPower],
     ["elevationGainM", elevationGainM],
@@ -428,8 +570,19 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     ["normalizedPower", normalizedPower],
     ["trainingStressScore", trainingStressScore],
     ["intensityFactor", intensityFactor],
-    ["thresholdPower", thresholdPower]
+    ["thresholdPower", thresholdPower],
+    ["bestPaceSecPerKm", bestPaceSecPerKm],
+    ["bestPacePer100mSec", bestPacePer100mSec]
   ].filter(([, value]) => value === undefined).map(([name]) => name);
+  const qualityWarnings = normalizedSport === "swim"
+    ? buildSwimQualityWarnings({
+        subSportRaw,
+        poolLengthM,
+        lapSummaries,
+        avgStrokeRateSpm,
+        avgSwolf
+      })
+    : [];
 
   const end = new Date(start.getTime() + durationSec * 1000);
   const pauseCount = pauseSummary.count > 0 ? pauseSummary.count : undefined;
@@ -459,6 +612,7 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     poolLengthM,
     lapsCount,
     avgPacePer100mSec,
+    bestPacePer100mSec,
     avgStrokeRateSpm,
     avgSwolf,
     avgCadence,
@@ -481,17 +635,26 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
       },
       quality: {
         missing: qualityMissing,
-        warnings: []
+        warnings: qualityWarnings
       },
       summary: {
         durationSec,
         movingDurationSec: movingDurationSec ?? null,
         elapsedDurationSec: elapsedDurationSec ?? null,
         distanceM: roundNumber(distanceM, 2) ?? null,
+        avgPaceSecPerKm: avgPaceSecPerKm ?? null,
+        avgPacePer100mSec: avgPacePer100mSec ?? null,
         recordsCount: Array.isArray(fit?.records) ? fit.records.length : 0,
         lapsCount: lapsCount ?? lapSummaries.length,
         pauseCount: pauseCount ?? 0,
         pausedDurationSec: pausedDurationSec ?? null
+      },
+      pace: {
+        avgPaceSecPerKm: avgPaceSecPerKm ?? null,
+        bestPaceSecPerKm: bestPaceSecPerKm ?? null,
+        normalizedGradedPaceSecPerKm: normalizedGradedPaceSecPerKm ?? null,
+        avgPacePer100mSec: avgPacePer100mSec ?? null,
+        bestPacePer100mSec: bestPacePer100mSec ?? null
       },
       power: {
         avgPower: session.avg_power ? Number(session.avg_power) : null,
@@ -519,10 +682,23 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
       },
       cadence: {
         avgCadence: avgCadence ?? null,
-        maxCadence: positiveInt(firstPositiveNumber([session.max_cadence])) ?? null,
+        maxCadence: maxCadence ?? null,
         totalCycles: totalCycles ?? null
       },
+      stroke: normalizedSport === "swim"
+        ? {
+            avgStrokeRateSpm: avgStrokeRateSpm ?? null,
+            maxStrokeRateSpm: maxStrokeRateSpm ?? null,
+            avgSwolf: avgSwolf ?? null,
+            strokeType: subSportRaw ?? null
+          }
+        : null,
+      elevation: {
+        gainM: elevationGainM ?? null,
+        lossM: elevationLossM ?? null
+      },
       environment: {
+        temperature: avgTemperature ?? null,
         avgTemperature: avgTemperature ?? null,
         minTemperature: minTemperature ?? null,
         maxTemperature: maxTemperature ?? null,
@@ -539,9 +715,18 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
         thresholdHeartRate: positiveInt(firstPositiveNumber([timeInZoneRecord?.threshold_heart_rate])) ?? null,
         powerCalcType: typeof timeInZoneRecord?.pwr_calc_type === "string" ? timeInZoneRecord.pwr_calc_type : null,
         power: powerZoneSummaries,
-        heartRate: hrZoneSummaries
+        hr: hrZoneSummaries,
+        heartRate: hrZoneSummaries,
+        pace: paceZoneSummaries
       },
-      halves: halfSummaries,
+      pool: normalizedSport === "swim"
+        ? {
+            poolLengthM: poolLengthM ?? null,
+            lengthCount: totalCycles ?? null
+          }
+        : null,
+      splits: splitSummaries,
+      halves: splitSummaries,
       laps: lapSummaries,
       events: pauseSummary.events
     },
@@ -581,6 +766,7 @@ export function parseTcxFile(xml: string): ParsedActivity {
   const trackpoints = laps.flatMap((lap) => asArray(lap.Track?.Trackpoint));
   const cadenceValues = trackpoints.map((trackpoint) => Number(trackpoint.Cadence ?? 0)).filter((value) => value > 0);
   const avgCadence = cadenceValues.length ? Math.round(cadenceValues.reduce((a, b) => a + b, 0) / cadenceValues.length) : undefined;
+  const maxCadence = cadenceValues.length ? Math.max(...cadenceValues) : undefined;
 
   const altitudeValues = trackpoints
     .map((trackpoint) => Number(trackpoint.AltitudeMeters ?? Number.NaN))
@@ -607,11 +793,71 @@ export function parseTcxFile(xml: string): ParsedActivity {
   const avgPacePer100mSec = normalizedSport === "swim" && durationSec > 0 && distanceM > 0
     ? Math.round(durationSec / (distanceM / 100))
     : undefined;
+  const avgPaceSecPerKm = normalizedSport === "run" && durationSec > 0 && distanceM > 0
+    ? roundNumber(durationSec / (distanceM / 1000), 2)
+    : undefined;
+  const lapSummaries = laps.map((lap, index) => {
+    const lapTrackpoints = asArray(lap.Track?.Trackpoint);
+    const lapCadenceValues = lapTrackpoints.map((trackpoint) => Number(trackpoint.Cadence ?? 0)).filter((value) => value > 0);
+    const lapAltitudes = lapTrackpoints
+      .map((trackpoint) => Number(trackpoint.AltitudeMeters ?? Number.NaN))
+      .filter((value) => Number.isFinite(value));
+    let lapGain = 0;
+    let lapLoss = 0;
+    for (let i = 1; i < lapAltitudes.length; i += 1) {
+      const delta = lapAltitudes[i] - lapAltitudes[i - 1];
+      if (delta > 0) lapGain += delta;
+      if (delta < 0) lapLoss += Math.abs(delta);
+    }
+
+    const lapDurationSec = roundNumber(lap.TotalTimeSeconds, 3);
+    const lapDistanceM = roundNumber(lap.DistanceMeters, 2);
+    const lapPace = lapDurationSec && lapDistanceM && lapDistanceM > 0
+      ? normalizedSport === "swim"
+        ? roundNumber(lapDurationSec / (lapDistanceM / 100), 2)
+        : roundNumber(lapDurationSec / (lapDistanceM / 1000), 2)
+      : null;
+
+    return {
+      index: index + 1,
+      startTime: typeof lap.StartTime === "string" ? lap.StartTime : null,
+      durationSec: lapDurationSec ?? null,
+      elapsedDurationSec: lapDurationSec ?? null,
+      distanceM: lapDistanceM ?? null,
+      avgHr: positiveInt(lap.AverageHeartRateBpm?.Value) ?? null,
+      maxHr: positiveInt(lap.MaximumHeartRateBpm?.Value) ?? null,
+      avgPower: null,
+      normalizedPower: null,
+      maxPower: null,
+      avgCadence: lapCadenceValues.length ? Math.round(lapCadenceValues.reduce((sum, value) => sum + value, 0) / lapCadenceValues.length) : null,
+      maxCadence: lapCadenceValues.length ? Math.max(...lapCadenceValues) : null,
+      calories: positiveInt(lap.Calories) ?? null,
+      workKj: null,
+      intensity: null,
+      trigger: index === laps.length - 1 ? "session_end" : "lap",
+      avgPaceSecPerKm: normalizedSport === "run" ? lapPace : null,
+      avgPacePer100mSec: normalizedSport === "swim" ? lapPace : null,
+      elevationGainM: roundNumber(lapGain, 1) ?? null,
+      elevationLossM: roundNumber(lapLoss, 1) ?? null
+    };
+  });
+  const splitSummaries = buildHalfSummaries(lapSummaries, durationSec, normalizedSport);
+  const paceZoneSummaries = buildPaceZoneSummaries(lapSummaries, normalizedSport, durationSec);
+  const qualityWarnings = normalizedSport === "swim"
+    ? buildSwimQualityWarnings({
+        subSportRaw: undefined,
+        poolLengthM,
+        lapSummaries,
+        avgStrokeRateSpm: undefined,
+        avgSwolf: undefined
+      })
+    : (avgCadence === undefined ? ["cadenceSparseFromTcx"] : []);
 
   const missing = [
     ["movingDurationSec", movingDurationSec],
     ["poolLengthM", poolLengthM],
     ["avgCadence", avgCadence],
+    ["maxCadence", maxCadence],
     ["maxHr", maxHr],
     ["elevationGainM", elevationGainM],
     ["elevationLossM", elevationLossM]
@@ -648,8 +894,61 @@ export function parseTcxFile(xml: string): ParsedActivity {
       },
       quality: {
         missing,
-        warnings: movingDurationSec === undefined ? ["movingDurationUnavailableInTcx"] : []
-      }
+        warnings: [
+          ...(movingDurationSec === undefined ? ["movingDurationUnavailableInTcx"] : []),
+          ...qualityWarnings
+        ]
+      },
+      summary: {
+        durationSec,
+        movingDurationSec: movingDurationSec ?? null,
+        elapsedDurationSec: elapsedDurationSec ?? null,
+        distanceM: roundNumber(distanceM, 2) ?? null,
+        avgPaceSecPerKm: avgPaceSecPerKm ?? null,
+        avgPacePer100mSec: avgPacePer100mSec ?? null,
+        lapsCount: lapsCount ?? lapSummaries.length
+      },
+      pace: {
+        avgPaceSecPerKm: avgPaceSecPerKm ?? null,
+        bestPaceSecPerKm: lapSummaries
+          .map((lap) => nonNegativeNumber(lap.avgPaceSecPerKm))
+          .filter((value): value is number => value !== undefined)
+          .reduce<number | null>((best, value) => best === null ? value : Math.min(best, value), null),
+        avgPacePer100mSec: avgPacePer100mSec ?? null,
+        bestPacePer100mSec: lapSummaries
+          .map((lap) => nonNegativeNumber(lap.avgPacePer100mSec))
+          .filter((value): value is number => value !== undefined)
+          .reduce<number | null>((best, value) => best === null ? value : Math.min(best, value), null)
+      },
+      heartRate: {
+        avgHr,
+        maxHr: maxHr ?? null
+      },
+      cadence: {
+        avgCadence: avgCadence ?? null,
+        maxCadence: maxCadence ?? null
+      },
+      elevation: {
+        gainM: elevationGainM ?? null,
+        lossM: elevationLossM ?? null
+      },
+      environment: {
+        temperature: null
+      },
+      zones: {
+        hr: [],
+        heartRate: [],
+        pace: paceZoneSummaries
+      },
+      splits: splitSummaries,
+      halves: splitSummaries,
+      laps: lapSummaries,
+      pool: normalizedSport === "swim"
+        ? {
+            poolLengthM: null,
+            lengthCount: null
+          }
+        : null
     },
     parseSummary: {
       lapCount: laps.length,

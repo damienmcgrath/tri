@@ -24,6 +24,18 @@ function stateLabel(state: "final" | "provisional", stale: boolean) {
   return state === "provisional" ? "Provisional" : "Final";
 }
 
+function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") return "AI narrative";
+  if (source === "fallback") return "Fallback narrative";
+  return "Source unknown";
+}
+
+function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") {
+  if (source === "ai") return "debrief-pill border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]";
+  if (source === "fallback") return "debrief-pill border-[hsl(var(--warning)/0.32)] bg-[hsl(var(--warning)/0.08)] text-[hsl(var(--text-primary))]";
+  return "debrief-pill";
+}
+
 function metricGridClass(count: number) {
   if (count <= 2) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2";
   if (count === 3) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-3";
@@ -159,6 +171,7 @@ export default async function DebriefPage({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="debrief-pill debrief-pill--accent">{artifact.facts.weekRange}</span>
               <span className={statePillClass(artifact.facts.artifactStateLabel, snapshot.stale)}>{stateLabel(artifact.facts.artifactStateLabel, snapshot.stale)}</span>
+              <span className={narrativeSourcePillClass(artifact.facts.narrativeSource)}>{narrativeSourceLabel(artifact.facts.narrativeSource)}</span>
             </div>
             <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] md:text-[3.25rem]">{artifact.facts.title}</h1>
             <p className="mt-3 max-w-3xl text-[15px] leading-7 text-[hsl(var(--text-primary))]">{artifact.facts.statusLine}</p>
