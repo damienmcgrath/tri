@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { signOutAction } from "./actions";
 import { GlobalHeader } from "./global-header";
 import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
@@ -38,12 +39,14 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const daysToRace = profile?.race_date
     ? Math.max(0, Math.ceil((new Date(`${profile.race_date}T00:00:00.000Z`).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
+  const previewMode = isAgentPreviewEnabled() && user?.email === "preview@tri.ai";
 
   return (
     <div className="app-shell">
       <GlobalHeader
         raceName={raceName}
         daysToRace={daysToRace}
+        previewMode={previewMode}
         account={{
           avatarUrl: profile?.avatar_url ?? null,
           initials,
@@ -65,7 +68,21 @@ export default async function ProtectedLayout({ children }: { children: React.Re
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-4">{children}</main>
+        <main className="min-w-0 space-y-4">
+          {previewMode ? (
+            <div className="surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <p className="label">Agent Preview</p>
+                <p className="mt-1 text-sm text-muted">You are browsing seeded local data. Reset the workspace whenever you want a clean UI state.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a href="/dev/agent-reset" className="btn-secondary px-3 py-1.5 text-xs">Reset data</a>
+                <a href="/dev/agent-preview" className="btn-secondary px-3 py-1.5 text-xs">Preview guide</a>
+              </div>
+            </div>
+          ) : null}
+          {children}
+        </main>
       </div>
 
       <MobileBottomTabs />

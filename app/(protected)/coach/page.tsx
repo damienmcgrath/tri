@@ -186,12 +186,12 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
   const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
   const confirmedLinkedSessionIds = new Set(
     (links ?? [])
-      .filter((link) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-      .map((link) => link.planned_session_id as string)
+      .filter((link: any) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link: any) => link.planned_session_id as string)
   );
 
   const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
-  const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId)).length;
+  const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId as string)).length;
 
   return {
     uploadedSessionCount: (activities ?? []).length,

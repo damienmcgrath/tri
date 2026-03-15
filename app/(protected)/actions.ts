@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
+import { AGENT_PREVIEW_COOKIE, isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { createClient } from "@/lib/supabase/server";
 
 function isMissingProfilesTable(error: { code?: string; message?: string } | null) {
@@ -23,6 +25,20 @@ const raceSettingsSchema = z.object({
 });
 
 export async function signOutAction() {
+  if (isAgentPreviewEnabled()) {
+    const cookieStore = await cookies();
+    if (cookieStore.get(AGENT_PREVIEW_COOKIE)?.value === "active") {
+      cookieStore.set(AGENT_PREVIEW_COOKIE, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        path: "/",
+        expires: new Date(0)
+      });
+      redirect("/auth/sign-in");
+    }
+  }
+
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/auth/sign-in");

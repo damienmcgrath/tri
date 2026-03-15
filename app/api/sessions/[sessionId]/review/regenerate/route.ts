@@ -32,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   }
 
   const confirmedLink = (links ?? []).find(
-    (link) => link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
+    (link: any) => link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
   );
 
   if (!confirmedLink?.completed_activity_id) {

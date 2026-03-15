@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createAgentPreviewClient } from "@/lib/agent-preview/client";
+import { AGENT_PREVIEW_COOKIE, isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 
-export async function createClient() {
+export async function createClient(): Promise<any> {
+  const cookieStore = await cookies();
+
+  if (isAgentPreviewEnabled() && cookieStore.get(AGENT_PREVIEW_COOKIE)?.value === "active") {
+    return createAgentPreviewClient();
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabasePublishableKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
@@ -12,8 +20,6 @@ export async function createClient() {
       "Missing NEXT_PUBLIC_SUPABASE_URL or Supabase public key. Set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY (preferred) or NEXT_PUBLIC_SUPABASE_ANON_KEY (legacy)."
     );
   }
-
-  const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
