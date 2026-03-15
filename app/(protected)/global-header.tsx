@@ -6,10 +6,12 @@ import { AccountMenu } from "./account-menu";
 export function GlobalHeader({
   raceName,
   daysToRace,
-  account
+  account,
+  previewMode = false
 }: {
   raceName: string;
   daysToRace: number | null;
+  previewMode?: boolean;
   account: {
     avatarUrl: string | null;
     initials: string;
@@ -24,6 +26,7 @@ export function GlobalHeader({
         <span className="label">tri.ai</span>
 
         <div className="flex items-center gap-2">
+          {previewMode ? <Link href="/dev/agent-preview" className="status-badge-passive"><span aria-hidden="true">⌁</span><span className="stat">Agent preview</span></Link> : null}
           {daysToRace !== null ? <span role="status" aria-live="polite" className="status-badge-passive"><span aria-hidden="true">◷</span><span className="stat">{raceName} • {daysToRace} days</span></span> : null}
           <Link href="/coach" className="btn-header-cta px-2.5 py-1 text-xs">Ask tri.ai</Link>
           <AccountMenu

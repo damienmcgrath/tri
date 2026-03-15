@@ -48,7 +48,7 @@ export default async function IntegrationsPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  const uploadIds = (uploadRows ?? []).map((item) => item.id);
+  const uploadIds = (uploadRows ?? []).map((item: any) => item.id);
 
   const [{ data: activities }, { data: links }, sessionsQuery] = await Promise.all([
     uploadIds.length

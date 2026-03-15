@@ -1,7 +1,11 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { SignInForm } from "./sign-in-form";
 
 export default function SignInPage() {
+  const showAgentPreview = isAgentPreviewEnabled();
+
   return (
     <main className="app-shell auth-shell">
       <div className="auth-panel auth-stack">
@@ -15,6 +19,20 @@ export default function SignInPage() {
             <SignInForm />
           </div>
         </Suspense>
+        {showAgentPreview ? (
+          <div className="surface space-y-3 p-6">
+            <p className="label">Local Preview</p>
+            <p className="text-sm text-muted">For agent screenshots and UI inspection, skip live auth and enter the seeded preview workspace.</p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/dev/agent-login" className="btn-primary">
+                Enter preview mode
+              </Link>
+              <Link href="/dev/agent-preview" className="btn-secondary">
+                Open preview guide
+              </Link>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );

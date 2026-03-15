@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { AGENT_PREVIEW_COOKIE, isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 
 const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings", "/sessions", "/activities"];
 
@@ -8,6 +9,10 @@ function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
     .getAll()
     .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+}
+
+function hasAgentPreviewCookie(request: NextRequest) {
+  return isAgentPreviewEnabled() && request.cookies.get(AGENT_PREVIEW_COOKIE)?.value === "active";
 }
 
 function applySecurityHeaders(response: NextResponse) {
@@ -27,11 +32,18 @@ function applySecurityHeaders(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const hasPreviewSession = hasAgentPreviewCookie(request);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabasePublishableKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (request.nextUrl.pathname.startsWith("/dev/agent-") && !isAgentPreviewEnabled()) {
+    const notFoundResponse = new NextResponse("Not found", { status: 404 });
+    applySecurityHeaders(notFoundResponse);
+    return notFoundResponse;
+  }
 
   if (!supabaseUrl || !supabasePublishableKey) {
     applySecurityHeaders(response);
@@ -40,13 +52,27 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route));
 
-  if (isProtectedRoute && !hasSupabaseAuthCookie(request)) {
+  if (isProtectedRoute && !hasPreviewSession && !hasSupabaseAuthCookie(request)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth/sign-in";
     redirectUrl.searchParams.set("next", request.nextUrl.pathname);
     const redirectResponse = NextResponse.redirect(redirectUrl);
     applySecurityHeaders(redirectResponse);
     return redirectResponse;
+  }
+
+  if (hasPreviewSession && request.nextUrl.pathname.startsWith("/auth/sign-in")) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    applySecurityHeaders(redirectResponse);
+    return redirectResponse;
+  }
+
+  if (hasPreviewSession) {
+    applySecurityHeaders(response);
+    return response;
   }
 
   const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
@@ -89,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/activities/:path*", "/auth/sign-in"]
+  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/activities/:path*", "/auth/sign-in", "/dev/agent-:path*"]
 };

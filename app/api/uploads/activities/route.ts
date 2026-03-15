@@ -47,9 +47,9 @@ export async function GET() {
 
   if (legacyError) return NextResponse.json({ error: legacyError.message }, { status: 400 });
 
-  const uploads = (legacyData ?? []).map((upload) => ({
+  const uploads = (legacyData ?? []).map((upload: any) => ({
     ...upload,
-    completed_activities: (upload.completed_activities ?? []).map((activity) => ({
+    completed_activities: (upload.completed_activities ?? []).map((activity: any) => ({
       ...activity,
       schedule_status: "unscheduled" as const
     }))
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
         durationSec: createdActivity.duration_sec,
         distanceM: Number(createdActivity.distance_m ?? 0)
       },
-      (candidates ?? []).map((candidate) => ({
+      (candidates ?? []).map((candidate: any) => ({
         id: candidate.id,
         userId: user.id,
         date: candidate.date,

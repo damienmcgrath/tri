@@ -89,6 +89,33 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+### 7) Agent preview mode for UI inspection
+
+When you want coding agents to view protected UI pages without real Supabase sign-in, enable the local preview workspace:
+
+```bash
+# in .env.local
+AGENT_PREVIEW=true
+```
+
+Then:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000/dev/agent-preview](http://localhost:3000/dev/agent-preview) and use:
+
+- `Enter preview mode` to create a local seeded session
+- `Reset preview data` to restore the sample workspace
+- direct links to `/dashboard`, `/plan`, `/calendar`, `/coach`, `/settings`, `/activities/...`, and `/sessions/...`
+
+Notes:
+
+- preview mode is local-only and disabled in production
+- it uses seeded in-memory data, so it is ideal for screenshots, layout review, and navigation checks
+- resetting preview mode restores the original sample state for repeatable agent runs
+
 ### Notes
 
 - Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
