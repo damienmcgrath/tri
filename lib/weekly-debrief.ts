@@ -175,11 +175,19 @@ type WeeklyDebriefLink = {
   created_at?: string | null;
 };
 
+type WeeklyDebriefCheckIn = {
+  fatigueScore: number | null;
+  stressScore: number | null;
+  motivationScore: number | null;
+  weekNotes: string | null;
+};
+
 type WeeklyDebriefInputs = {
   sessions: WeeklyDebriefSession[];
   activities: WeeklyDebriefActivity[];
   links: WeeklyDebriefLink[];
   athleteContext: AthleteContextSnapshot | null;
+  checkIn: WeeklyDebriefCheckIn | null;
   timeZone: string;
   weekStart: string;
   weekEnd: string;
@@ -802,6 +810,7 @@ async function generateNarrative(args: {
   evidence: WeeklyDebriefEvidenceItem[];
   activityEvidence: WeeklyDebriefActivityEvidence[];
   athleteContext: AthleteContextSnapshot | null;
+  checkIn: WeeklyDebriefCheckIn | null;
   deterministicFallback: WeeklyDebriefNarrative;
 }) {
   if (!process.env.OPENAI_API_KEY) {
@@ -833,6 +842,12 @@ async function generateNarrative(args: {
                     weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
                     limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
                   }
+                } : null,
+                checkIn: args.checkIn ? {
+                  fatigue: args.checkIn.fatigueScore,
+                  stress: args.checkIn.stressScore,
+                  motivation: args.checkIn.motivationScore,
+                  notes: args.checkIn.weekNotes
                 } : null
               })
             }
@@ -1824,7 +1839,7 @@ async function loadWeeklyDebriefInputs(args: {
   const activityRangeStart = `${addDays(args.weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(args.weekEnd, 2)}T00:00:00.000Z`;
 
-  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext] = await Promise.all([
+  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }] = await Promise.all([
     args.supabase
       .from("sessions")
       .select("id,athlete_id,user_id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
@@ -1843,7 +1858,13 @@ async function loadWeeklyDebriefInputs(args: {
       .from("session_activity_links")
       .select("completed_activity_id,planned_session_id,confirmation_status,created_at")
       .eq("user_id", args.athleteId),
-    getAthleteContextSnapshot(args.supabase, args.athleteId)
+    getAthleteContextSnapshot(args.supabase, args.athleteId),
+    args.supabase
+      .from("athlete_checkins")
+      .select("fatigue_score,stress_score,motivation_score,week_notes")
+      .eq("user_id", args.athleteId)
+      .eq("week_start", args.weekStart)
+      .maybeSingle()
   ]);
 
   if (sessionsError) {
@@ -1853,11 +1874,21 @@ async function loadWeeklyDebriefInputs(args: {
     throw new Error(linksError.message);
   }
 
+  const checkIn: WeeklyDebriefCheckIn | null = checkInData
+    ? {
+        fatigueScore: (checkInData as { fatigue_score?: number | null }).fatigue_score ?? null,
+        stressScore: (checkInData as { stress_score?: number | null }).stress_score ?? null,
+        motivationScore: (checkInData as { motivation_score?: number | null }).motivation_score ?? null,
+        weekNotes: (checkInData as { week_notes?: string | null }).week_notes ?? null
+      }
+    : null;
+
   return {
     sessions: (sessionsData ?? []) as WeeklyDebriefSession[],
     activities: activities as WeeklyDebriefActivity[],
     links: (linksData ?? []) as WeeklyDebriefLink[],
     athleteContext,
+    checkIn,
     timeZone: args.timeZone,
     weekStart: args.weekStart,
     weekEnd: args.weekEnd,
@@ -2015,6 +2046,7 @@ export async function computeWeeklyDebrief(args: {
     evidence: base.evidence,
     activityEvidence: base.activityEvidence,
     athleteContext: inputs.athleteContext,
+    checkIn: inputs.checkIn,
     deterministicFallback: base.deterministicNarrative
   });
   const narrative = generated.narrative;

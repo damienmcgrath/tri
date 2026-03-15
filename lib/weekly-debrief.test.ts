@@ -290,7 +290,8 @@ describe("weekly debrief helpers", () => {
       timeZone: "UTC",
       weekStart: "2026-03-09",
       weekEnd: "2026-03-15",
-      todayIso: "2026-03-15"
+      todayIso: "2026-03-15",
+      checkIn: null
     });
 
     expect(result.facts.weekShape).toBe("disrupted");

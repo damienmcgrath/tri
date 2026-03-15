@@ -196,12 +196,19 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .filter((uploadId): uploadId is string => Boolean(uploadId))
   });
 
-  const [{ data: legacyCompleted }, { data: links }] = await Promise.all([
+  const [{ data: legacyCompleted }, { data: links }, { data: pendingAdaptationsData }] = await Promise.all([
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("session_activity_links")
       .select("planned_session_id,completed_activity_id,confirmation_status")
-      .eq("user_id", user.id)
+      .eq("user_id", user.id),
+    supabase
+      .from("adaptations")
+      .select("id,trigger_type,options")
+      .eq("athlete_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(3)
   ]);
 
   const timeZone =
@@ -267,12 +274,16 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;
 
+  type AdaptationRow = { id: string; trigger_type: string; options: unknown };
+  const pendingAdaptations = (pendingAdaptationsData ?? []) as AdaptationRow[];
 
   return (
     <section className="space-y-3">
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
+        pendingAdaptations={pendingAdaptations}
+        weekStart={weekStart}
         executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : plannedSessionCount > 0 ? "No planned session today" : "No planned sessions this week yet"}
         executionSubtext={unmatchedUploadCount > 0
           ? `${unmatchedUploadCount} upload${unmatchedUploadCount > 1 ? "s" : ""} not matched yet — keep them as extra work or assign them to a planned session.`

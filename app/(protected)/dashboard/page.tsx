@@ -13,6 +13,7 @@ import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 import { WeeklyDebriefCard } from "./weekly-debrief-card";
+import { WeekAheadCard } from "./components/week-ahead-card";
 
 type Session = {
   id: string;
@@ -455,6 +456,10 @@ export default async function DashboardPage({
   const activityRangeEnd = `${addDays(weekEnd, 1)}T00:00:00.000Z`;
   const showWeeklyDebriefCard = weekStart === currentWeekStart;
 
+  // Show Week Ahead card on Sunday (UTC day 0) or Monday (UTC day 1) of the current week
+  const todayDayOfWeek = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`).getUTCDay();
+  const showWeekAheadCard = weekStart === currentWeekStart && (todayDayOfWeek === 0 || todayDayOfWeek === 1);
+
   const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
     supabase.from("training_plans").select("id").order("start_date", { ascending: false }),
@@ -744,6 +749,19 @@ export default async function DashboardPage({
       })
     : null;
 
+  let weekAheadPreview = null;
+  if (showWeekAheadCard) {
+    try {
+      const { getMacroContext } = await import("@/lib/training/macro-context");
+      const { generateWeekPreview } = await import("@/lib/training/week-preview");
+      const nextWeekStart = addDays(weekStart, 7);
+      const macroCtx = await getMacroContext(supabase, user.id);
+      weekAheadPreview = await generateWeekPreview(supabase, user.id, nextWeekStart, macroCtx);
+    } catch {
+      // Week ahead preview is non-critical
+    }
+  }
+
   const contextualItems = [attentionItem, resolvedFocusItem].filter((item): item is ContextualItem => Boolean(item));
 
   if (!hasActivePlan && !hasAnyPlan) {
@@ -854,6 +872,19 @@ export default async function DashboardPage({
                 {nextPendingTodaySession ? <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Open session</Link> : null}
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
               </div>
+
+              {contextualItems.length > 0 ? (
+                <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
+                  {contextualItems.map((item) => (
+                    <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
+                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : completedTodaySessions.length > 0 || extraTodayActivities.length > 0 ? (
             <>
@@ -886,60 +917,49 @@ export default async function DashboardPage({
                   Review today
                 </Link>
               </div>
+
+              {contextualItems.length > 0 ? (
+                <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
+                  {contextualItems.map((item) => (
+                    <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
+                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)]">Today</p>
-              <h2 className="mt-2 text-xl font-semibold">Today</h2>
-              <p className="mt-1 text-sm text-[rgba(255,255,255,0.74)]">No sessions scheduled</p>
-              <h3 className="mt-2 text-lg font-semibold">No sessions scheduled today</h3>
+              <h2 className="mt-2 text-xl font-semibold">No sessions scheduled</h2>
               <p className="mt-2 text-sm text-[rgba(255,255,255,0.74)]">Use today for recovery and reset, then protect the next planned key session.</p>
               <div className="mt-4">
                 <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
               </div>
+
+              {contextualItems.length > 0 ? (
+                <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
+                  {contextualItems.map((item) => (
+                    <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
+                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </>
           )}
         </article>
       </div>
 
+      {weekAheadPreview ? <WeekAheadCard preview={weekAheadPreview} /> : null}
+
       {weeklyDebriefSnapshot ? <WeeklyDebriefCard snapshot={weeklyDebriefSnapshot} /> : null}
-
-      {contextualItems.length === 1 ? (
-        <article className={`surface p-4 md:p-5 ${contextualItems[0].kicker.toLowerCase() === "focus this week" ? "border-[rgba(190,255,0,0.14)] bg-[linear-gradient(180deg,rgba(190,255,0,0.05),rgba(255,255,255,0.01))]" : ""}`}>
-          <div className="flex flex-col gap-3">
-            <div className="min-w-0">
-              <p className={`text-[11px] uppercase tracking-[0.14em] ${kickerClassName(contextualItems[0].kicker)}`}>{contextualItems[0].kicker}</p>
-              <h3 className="mt-1 text-lg font-semibold text-white">{contextualItems[0].title}</h3>
-              <p className="mt-1 max-w-[44ch] text-sm text-[rgba(255,255,255,0.74)]">{contextualItems[0].detail}</p>
-            </div>
-            <div className="shrink-0">
-              <Link href={contextualItems[0].href} className={`${contextualItems[0].ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 py-1.5 text-xs`}>{contextualItems[0].cta}</Link>
-            </div>
-          </div>
-        </article>
-      ) : null}
-
-      {contextualItems.length === 2 ? (
-        <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
-          {contextualItems.map((item) => (
-            <article
-              key={item.kicker}
-              className={`surface p-4 md:p-5 ${item.kicker.toLowerCase() === "focus this week" ? "border-[rgba(190,255,0,0.14)] bg-[linear-gradient(180deg,rgba(190,255,0,0.05),rgba(255,255,255,0.01))]" : ""}`}
-            >
-              <div className="flex h-full flex-col gap-3">
-                <div className="min-w-0">
-                  <p className={`text-[11px] uppercase tracking-[0.14em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
-                  <h3 className="mt-1 text-lg font-semibold text-white">{item.title}</h3>
-                  <p className="mt-1 max-w-[42ch] text-sm text-[rgba(255,255,255,0.74)]">{item.detail}</p>
-                </div>
-                <div className="shrink-0">
-                  <Link href={item.href} className={`${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 py-1.5 text-xs`}>{item.cta}</Link>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : null}
     </section>
   );
 }

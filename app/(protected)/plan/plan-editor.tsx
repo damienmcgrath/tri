@@ -323,6 +323,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
 
+  const previousWeekTotalMinutes = useMemo(() => {
+    if (!previousWeek) return null;
+    const end = addDays(previousWeek.week_start_date, 6);
+    return sessions
+      .filter((s) => s.date >= previousWeek.week_start_date && s.date <= end)
+      .reduce((sum, s) => sum + s.duration_minutes, 0);
+  }, [previousWeek, sessions]);
+
+  const volumeDelta = previousWeekTotalMinutes !== null ? totalMinutes - previousWeekTotalMinutes : null;
+
   const disciplineTotals = ["swim", "bike", "run", "strength", "other"]
     .map((sport) => ({
       sport,
@@ -491,6 +501,50 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
       </section>
 
+      {weekDays.some((d) => d.totalMinutes > 0) ? (
+        <section className="surface-subtle px-4 py-3">
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Daily load shape</p>
+            {volumeDelta !== null ? (
+              <p className={`text-[11px] font-medium ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
+                {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta} min vs last week
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-end gap-1.5">
+            {(() => {
+              const maxMinutes = Math.max(...weekDays.map((d) => d.totalMinutes), 1);
+              return weekDays.map((day) => (
+                <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
+                  <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
+                    {(["swim", "bike", "run", "strength", "other"] as const).map((sport) => {
+                      const mins = day.sessions.filter((s) => s.sport === sport).reduce((sum, s) => sum + s.duration_minutes, 0);
+                      if (!mins) return null;
+                      const heightPct = (mins / maxMinutes) * 100;
+                      const colors: Record<string, string> = {
+                        swim: "#63b3ed",
+                        bike: "#34d399",
+                        run: "#ff5a28",
+                        strength: "#a78bfa",
+                        other: "rgba(255,255,255,0.25)"
+                      };
+                      return (
+                        <div
+                          key={sport}
+                          title={`${sport} · ${mins} min`}
+                          style={{ height: `${heightPct}%`, backgroundColor: colors[sport] }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-tertiary">{day.label}</p>
+                </div>
+              ));
+            })()}
+          </div>
+        </section>
+      ) : null}
+
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
@@ -557,9 +611,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{meta.label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          {session.is_key ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
+                              Key
+                            </span>
+                          ) : null}
+                          {roleCue ? (
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
@@ -609,9 +671,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          {session.is_key ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
+                              Key
+                            </span>
+                          ) : null}
+                          {roleCue ? (
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}

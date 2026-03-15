@@ -531,6 +531,35 @@ export async function updateSessionAction(input: {
   revalidatePath("/dashboard");
 }
 
+export async function acceptAdaptationAction(input: { adaptationId: string }) {
+  const { supabase, user } = await getAuthedClient();
+
+  const { error } = await supabase
+    .from("adaptations")
+    .update({ status: "applied", applied_at: new Date().toISOString() })
+    .eq("id", input.adaptationId)
+    .eq("athlete_id", user.id);
+
+  if (error) throw new Error(error.message ?? "Could not accept adaptation.");
+
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+}
+
+export async function dismissAdaptationAction(input: { adaptationId: string }) {
+  const { supabase, user } = await getAuthedClient();
+
+  const { error } = await supabase
+    .from("adaptations")
+    .update({ status: "dismissed" })
+    .eq("id", input.adaptationId)
+    .eq("athlete_id", user.id);
+
+  if (error) throw new Error(error.message ?? "Could not dismiss adaptation.");
+
+  revalidatePath("/calendar");
+}
+
 export async function quickAddSessionAction(input: {
   date: string;
   sport: "swim" | "bike" | "run" | "strength" | "other";

@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
-import { clearSkippedAction, confirmSkippedAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
+import { acceptAdaptationAction, clearSkippedAction, confirmSkippedAction, dismissAdaptationAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 import { hasConfirmedSkipTag } from "@/lib/plans/skip-notes";
 
 type SessionStatus = SessionLifecycleState;
@@ -220,13 +220,17 @@ function SessionActionMenu({
   );
 }
 
+type PendingAdaptation = { id: string; trigger_type: string; options: unknown };
+
 export function WeekCalendar({
   weekDays,
   sessions,
   completedCount,
   plannedRemainingCount,
   skippedCount,
-  extraSessionCount
+  extraSessionCount,
+  pendingAdaptations = [],
+  weekStart
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
@@ -240,6 +244,8 @@ export function WeekCalendar({
   plannedMinutes: number;
   completedMinutes: number;
   remainingMinutes: number;
+  pendingAdaptations?: PendingAdaptation[];
+  weekStart?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -253,6 +259,9 @@ export function WeekCalendar({
   const [toast, setToast] = useState<string | null>(null);
   const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
   const [loadedDismissedIssuesWeek, setLoadedDismissedIssuesWeek] = useState<string | null>(null);
+  const [localAdaptations, setLocalAdaptations] = useState<PendingAdaptation[]>(pendingAdaptations);
+  const [expandedAdaptationId, setExpandedAdaptationId] = useState<string | null>(null);
+  const [loadingAdaptations, setLoadingAdaptations] = useState(false);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -572,6 +581,103 @@ export function WeekCalendar({
                 <button onClick={() => setDismissedIssues((prev) => [...prev, getIssueId("extra_workout", item.id)])} className="text-muted hover:text-foreground">Dismiss</button>
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {localAdaptations.length > 0 ? (
+        <section className="rounded-xl border border-[rgba(190,255,0,0.22)] bg-[rgba(190,255,0,0.04)] px-3 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-accent)]">Adaptation suggestions</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (!weekStart) return;
+                setLoadingAdaptations(true);
+                void fetch("/api/coach/adaptation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ weekStart })
+                })
+                  .then((res) => res.json())
+                  .then((data: { adaptations?: PendingAdaptation[] }) => {
+                    if (data.adaptations) setLocalAdaptations(data.adaptations.map((a) => ({ id: a.id ?? "", trigger_type: (a as { trigger?: { type: string } }).trigger?.type ?? "", options: (a as { options?: unknown }).options })));
+                  })
+                  .finally(() => setLoadingAdaptations(false));
+              }}
+              disabled={loadingAdaptations}
+              className="text-[11px] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+            >
+              {loadingAdaptations ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {localAdaptations.map((adaptation) => {
+              const options = Array.isArray(adaptation.options) ? adaptation.options as Array<{ id: string; label: string; description: string; projectedCompletionPct: number; keySessionImpact: string }> : [];
+              const isExpanded = expandedAdaptationId === adaptation.id;
+              return (
+                <div key={adaptation.id} className="rounded-lg border border-[rgba(190,255,0,0.15)] bg-[rgba(190,255,0,0.03)] px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[hsl(var(--text-primary))]">{adaptation.trigger_type.replace(/_/g, " ")}</p>
+                      {options.length > 0 && !isExpanded ? (
+                        <p className="mt-0.5 text-[11px] text-tertiary">{options.length} option{options.length > 1 ? "s" : ""} available</p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedAdaptationId(isExpanded ? null : adaptation.id)}
+                        className="text-[var(--color-accent)] hover:underline"
+                      >
+                        {isExpanded ? "Hide" : "View options"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startTransition(() => {
+                            void dismissAdaptationAction({ adaptationId: adaptation.id }).then(() => {
+                              setLocalAdaptations((prev) => prev.filter((a) => a.id !== adaptation.id));
+                            });
+                          });
+                        }}
+                        className="text-tertiary hover:text-[hsl(var(--text-primary))]"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                  {isExpanded && options.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {options.map((option) => (
+                        <div key={option.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
+                          <p className="text-xs font-medium">{option.label}</p>
+                          <p className="mt-1 text-[11px] text-muted">{option.description}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-tertiary">~{option.projectedCompletionPct}% completion · Key sessions: {option.keySessionImpact}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startTransition(() => {
+                                  void acceptAdaptationAction({ adaptationId: adaptation.id }).then(() => {
+                                    setLocalAdaptations((prev) => prev.filter((a) => a.id !== adaptation.id));
+                                    setToast("Adaptation applied");
+                                    router.refresh();
+                                  });
+                                });
+                              }}
+                              className="rounded-md bg-[rgba(190,255,0,0.15)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)]"
+                            >
+                              Accept
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </section>
       ) : null}
