@@ -11,20 +11,28 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
   const [note, setNote] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (dismissed) return null;
 
   async function handleSave() {
     if (selectedRpe === null) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      await fetch("/api/session-feels", {
+      const res = await fetch("/api/session-feels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, rpe: selectedRpe, note: note.trim() || null, wasPrompted: true })
       });
-    } finally {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || "Failed to save — please try again.");
+      }
       setDismissed(true);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save — please try again.");
+      setSaving(false);
     }
   }
 
@@ -50,13 +58,16 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
       <p className="label">How did that feel?</p>
       <p className="mt-1 text-sm text-muted">Rate the effort for this session.</p>
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <div className="mt-4 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Rate perceived exertion (1-10)">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((rpe) => (
           <button
             key={rpe}
             type="button"
+            role="radio"
+            aria-checked={selectedRpe === rpe}
+            aria-label={`RPE ${rpe}: ${rpeLabels[rpe]}`}
             onClick={() => setSelectedRpe(rpe)}
-            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            className={`min-h-[44px] min-w-[44px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
               selectedRpe === rpe
                 ? "border-[rgba(190,255,0,0.6)] bg-[rgba(190,255,0,0.15)] text-[var(--color-accent)]"
                 : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-[hsl(var(--text-primary))]"
@@ -81,6 +92,12 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
         />
         <p className="mt-1 text-right text-[11px] text-tertiary">{note.length}/200</p>
       </div>
+
+      {saveError ? (
+        <p className="mt-3 rounded-lg border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] px-3 py-2 text-xs text-danger" role="alert">
+          {saveError}
+        </p>
+      ) : null}
 
       <div className="mt-4 flex items-center gap-3">
         <button

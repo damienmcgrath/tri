@@ -713,6 +713,17 @@ export function WeekCalendar({
                         : getDayStateLabel("planned");
           const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
 
+          // Day context note — single-line contextual hint per the spec
+          const hasKeySession = daySessions.some((s) => s.is_key || s.role === "key");
+          const allRecovery = daySessions.length > 0 && daySessions.every((s) => s.role === "recovery" || s.role === "optional");
+          const dayContextNote = hasKeySession
+            ? "Key session today"
+            : daySessions.length === 0 && !needsAttention
+              ? "Rest day"
+              : allRecovery
+                ? "Recovery day"
+                : null;
+
           return (
             <section
               key={day.iso}
@@ -731,6 +742,9 @@ export function WeekCalendar({
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
+                {dayContextNote ? (
+                  <p className={`text-[10px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
+                ) : null}
                 {attentionReason ? <p className="text-[10px] text-muted">{attentionReason}</p> : null}
               </div>
 

@@ -146,6 +146,37 @@ function buildBikeMetrics(current: ActivityMetrics, previous: ActivityMetrics, p
   return deltas;
 }
 
+function buildStrengthMetrics(current: ActivityMetrics, previous: ActivityMetrics, previousDate: string): MetricDelta[] {
+  const deltas: MetricDelta[] = [];
+
+  if (current.durationSec != null && previous.durationSec != null) {
+    const diffSec = current.durationSec - previous.durationSec;
+    const diffMin = Math.round(diffSec / 60);
+    deltas.push({
+      metric: "Duration",
+      current: `${Math.round(current.durationSec / 60)} min`,
+      previous: `${Math.round(previous.durationSec / 60)} min`,
+      delta: `${diffMin > 0 ? "+" : ""}${diffMin} min`,
+      direction: "neutral",
+      previousDate
+    });
+  }
+
+  if (current.avgHr != null && previous.avgHr != null) {
+    const diff = current.avgHr - previous.avgHr;
+    deltas.push({
+      metric: "Avg HR",
+      current: `${Math.round(current.avgHr)} bpm`,
+      previous: `${Math.round(previous.avgHr)} bpm`,
+      delta: `${diff > 0 ? "+" : ""}${Math.round(diff)} bpm`,
+      direction: Math.abs(diff) < 3 ? "neutral" : diff < 0 ? "better" : "worse",
+      previousDate
+    });
+  }
+
+  return deltas;
+}
+
 function buildSwimMetrics(current: ActivityMetrics, previous: ActivityMetrics, previousDate: string): MetricDelta[] {
   const deltas: MetricDelta[] = [];
 
@@ -273,6 +304,8 @@ export async function getSessionComparison(
     metricDeltas = buildBikeMetrics(currentMetrics, previousMetrics, previousSession.date);
   } else if (sport === "swim") {
     metricDeltas = buildSwimMetrics(currentMetrics, previousMetrics, previousSession.date);
+  } else if (sport === "strength") {
+    metricDeltas = buildStrengthMetrics(currentMetrics, previousMetrics, previousSession.date);
   }
 
   if (metricDeltas.length === 0) return null;

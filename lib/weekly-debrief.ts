@@ -812,6 +812,7 @@ async function generateNarrative(args: {
   athleteContext: AthleteContextSnapshot | null;
   checkIn: WeeklyDebriefCheckIn | null;
   deterministicFallback: WeeklyDebriefNarrative;
+  recentFeedback?: Array<{ weekStart: string; helpful: boolean | null; accurate: boolean | null; note: string | null }>;
 }) {
   if (!process.env.OPENAI_API_KEY) {
     return {
@@ -822,10 +823,25 @@ async function generateNarrative(args: {
 
   try {
     const client = getOpenAIClient();
+
+    // Build calibration note from recent feedback
+    let calibrationNote = "";
+    if (args.recentFeedback && args.recentFeedback.length > 0) {
+      const inaccurateCount = args.recentFeedback.filter((f) => f.accurate === false).length;
+      const unhelpfulCount = args.recentFeedback.filter((f) => f.helpful === false).length;
+      const notes = args.recentFeedback.filter((f) => f.note).map((f) => f.note);
+      if (inaccurateCount > 0 || unhelpfulCount > 0) {
+        calibrationNote = ` CALIBRATION: The athlete rated ${inaccurateCount} of the last ${args.recentFeedback.length} debriefs as inaccurate and ${unhelpfulCount} as unhelpful. Be more conservative in claims and stick closer to the data.`;
+        if (notes.length > 0) {
+          calibrationNote += ` Athlete notes: ${notes.slice(0, 2).join("; ")}.`;
+        }
+      }
+    }
+
     const response = await client.responses.create({
       model: getCoachModel(),
       instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
       input: [
         {
           role: "user",
@@ -848,7 +864,8 @@ async function generateNarrative(args: {
                   stress: args.checkIn.stressScore,
                   motivation: args.checkIn.motivationScore,
                   notes: args.checkIn.weekNotes
-                } : null
+                } : null,
+                recentFeedback: args.recentFeedback ?? null,
               })
             }
           ]
@@ -2041,13 +2058,32 @@ export async function computeWeeklyDebrief(args: {
 }) {
   const inputs = await loadWeeklyDebriefInputs(args);
   const base = buildWeeklyDebriefFacts(inputs);
+
+  // Load recent feedback from previous debriefs for AI calibration
+  const { data: feedbackRows } = await args.supabase
+    .from("weekly_debriefs")
+    .select("week_start, helpful, accurate, feedback_note")
+    .eq("athlete_id", args.athleteId)
+    .lt("week_start", args.weekStart)
+    .or("helpful.is.not.null,accurate.is.not.null")
+    .order("week_start", { ascending: false })
+    .limit(4);
+
+  const recentFeedback = (feedbackRows ?? []).map((r) => ({
+    weekStart: r.week_start as string,
+    helpful: r.helpful as boolean | null,
+    accurate: r.accurate as boolean | null,
+    note: r.feedback_note as string | null,
+  }));
+
   const generated = await generateNarrative({
     facts: base.facts,
     evidence: base.evidence,
     activityEvidence: base.activityEvidence,
     athleteContext: inputs.athleteContext,
     checkIn: inputs.checkIn,
-    deterministicFallback: base.deterministicNarrative
+    deterministicFallback: base.deterministicNarrative,
+    recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
   });
   const narrative = generated.narrative;
   const facts = weeklyDebriefFactsSchema.parse({

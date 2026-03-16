@@ -449,6 +449,7 @@ export function CoachChat({
   }, [summary?.completionPct, sessionDiagnoses, flaggedSessions, strongestTheme]);
 
   const quickPrompts = useMemo(() => {
+    // No diagnosis data — generic but useful starters
     if (sessionDiagnoses.length < 2) {
       return [
         "Which session should I protect this week?",
@@ -457,15 +458,45 @@ export function CoachChat({
       ];
     }
 
-    // Theme-specific lead question (most relevant first), then two universal follow-ups
+    const prompts: string[] = [];
+
+    // Context-aware lead question based on week state
+    const skippedCount = sessionDiagnoses.filter((s) => s.status === "missed").length;
+    const completionPct = summary?.completionPct ?? 100;
+
+    if (skippedCount > 0) {
+      prompts.push(`How should I make up for the ${skippedCount} missed session${skippedCount > 1 ? "s" : ""}?`);
+    } else if (completionPct >= 90) {
+      prompts.push("Am I ready to increase volume next week?");
+    }
+
+    // Theme-specific question
     const themeQuestion =
       strongestTheme === "easy_drift" ? "How do I keep Z2 truly easy?" :
       strongestTheme === "recovery_slip" ? "How do I protect recovery this week?" :
       strongestTheme === "threshold_inconsistent" ? "Was this fatigue or pacing?" :
-      "Why was this session flagged?";
+      latestScoredSession ? `Why was ${latestScoredSession.sessionName ?? "this session"} flagged?` :
+      null;
 
-    return [themeQuestion, "What would move this to On target?", "What matters most now?"];
-  }, [sessionDiagnoses, strongestTheme]);
+    if (themeQuestion && !prompts.includes(themeQuestion)) {
+      prompts.push(themeQuestion);
+    }
+
+    // Key session awareness
+    const upcomingKey = briefingContext.upcomingKeySessionNames?.[0];
+    if (upcomingKey && prompts.length < 3) {
+      prompts.push(`What should I focus on for ${upcomingKey}?`);
+    }
+
+    // Fill remaining with universal follow-ups
+    const fallbacks = ["What would move this to On target?", "What matters most now?"];
+    for (const fb of fallbacks) {
+      if (prompts.length >= 3) break;
+      prompts.push(fb);
+    }
+
+    return prompts.slice(0, 3);
+  }, [sessionDiagnoses, strongestTheme, summary?.completionPct, latestScoredSession, briefingContext.upcomingKeySessionNames]);
 
   const dataRecency = useMemo(() => {
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);

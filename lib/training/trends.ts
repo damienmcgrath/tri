@@ -226,6 +226,29 @@ export async function detectTrends(
   });
   if (swimPaceTrend) trends.push(swimPaceTrend);
 
+  // Trend 5: Strength session duration (longer = more consistent training)
+  const strengthDurPoints: Array<{ weekStart: string; value: number; label: string }> = [];
+  for (const week of weeks) {
+    const weekStrength = byWeek.get(week)!.filter((r) => r.sport_type === "strength" && r.duration_sec);
+    if (weekStrength.length === 0) continue;
+    const avgDur = weekStrength.reduce((s, r) => s + (r.duration_sec ?? 0), 0) / weekStrength.length;
+    const mins = Math.round(avgDur / 60);
+    strengthDurPoints.push({ weekStart: week, value: avgDur, label: `${mins} min` });
+  }
+
+  const strengthDurTrend = buildTrend({
+    metric: "Strength duration",
+    lowerIsBetter: false,
+    dataPoints: strengthDurPoints,
+    detail: (dir) =>
+      dir === "improving"
+        ? "Strength session duration is increasing — good consistency."
+        : dir === "declining"
+          ? "Strength sessions are getting shorter — consider protecting this time."
+          : "Strength session duration is stable."
+  });
+  if (strengthDurTrend) trends.push(strengthDurTrend);
+
   // Return top 3 most confident trends
   return trends
     .sort((a, b) => {
