@@ -198,7 +198,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
                 </span>
               ) : null}
             </div>
-            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]">{reviewVm.reviewModeDetail}</p>
+            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.reviewModeDetail}</p>
             <p className="mt-2 text-sm text-muted">{reviewVm.sessionStatusDetail}</p>
           </div>
 
