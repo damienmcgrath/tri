@@ -344,8 +344,6 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
         </article>
       ) : null}
 
-      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
-
       <section className="space-y-2.5">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.25)]">Coach tools</p>
@@ -390,6 +388,8 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
           ) : null}
         </div>
       </section>
+
+      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
     </section>
   );
 }

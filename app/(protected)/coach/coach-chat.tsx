@@ -451,28 +451,20 @@ export function CoachChat({
   const quickPrompts = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
       return [
-        "What does my execution score mean?",
         "Which session should I protect this week?",
         "How should I adjust this week?",
-        "Missed workout recovery",
         "What should stay easy vs key?"
       ];
     }
 
-    const prompts = ["Why was this session flagged?", "What would move this to On target?", "Should I repeat this workout?", "How should I adjust the rest of the week?"];
+    // Theme-specific lead question (most relevant first), then two universal follow-ups
+    const themeQuestion =
+      strongestTheme === "easy_drift" ? "How do I keep Z2 truly easy?" :
+      strongestTheme === "recovery_slip" ? "How do I protect recovery this week?" :
+      strongestTheme === "threshold_inconsistent" ? "Was this fatigue or pacing?" :
+      "Why was this session flagged?";
 
-    if (strongestTheme === "easy_drift") {
-      prompts.splice(1, 0, "How do I keep Z2 truly easy?");
-    }
-    if (strongestTheme === "recovery_slip") {
-      prompts.splice(1, 0, "How do I protect recovery this week?");
-    }
-    if (strongestTheme === "threshold_inconsistent") {
-      prompts.splice(1, 0, "Was this fatigue or pacing?");
-    }
-
-    prompts.push("What matters most now?");
-    return prompts;
+    return [themeQuestion, "What would move this to On target?", "What matters most now?"];
   }, [sessionDiagnoses, strongestTheme]);
 
   const dataRecency = useMemo(() => {

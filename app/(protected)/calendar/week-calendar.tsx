@@ -690,6 +690,11 @@ export function WeekCalendar({
           const isFuture = day.iso > todayIso;
           const isPast = day.iso < todayIso;
           const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
+          const attentionReason = needsAttention && metrics
+            ? metrics.skipped > 0
+              ? `${metrics.skipped} session${metrics.skipped > 1 ? "s" : ""} skipped`
+              : `${metrics.remainingPlanned} min not done`
+            : null;
           const dayLabel = isToday
             ? getDayStateLabel("today")
             : needsAttention
@@ -725,6 +730,7 @@ export function WeekCalendar({
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
+                {attentionReason ? <p className="text-[10px] text-muted">{attentionReason}</p> : null}
               </div>
 
               <div className="space-y-1.5 pt-0.5">

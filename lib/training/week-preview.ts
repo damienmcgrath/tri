@@ -7,6 +7,7 @@ export type WeekPreview = {
   totalPlannedMinutes: number;
   keySessionCount: number;
   keySessions: Array<{ date: string; sport: string; type: string; durationMinutes: number | null }>;
+  allSessions: Array<{ date: string; sport: string; type: string; durationMinutes: number; isKey: boolean }>;
   sportDistribution: Record<string, number>; // sport -> planned minutes
   carryForwardNote: string | null;
   macroContext: MacroContext;
@@ -82,6 +83,15 @@ export async function generateWeekPreview(
       type: s.type,
       durationMinutes: s.durationMinutes
     })),
+    allSessions: sessions
+      .filter((s) => s.status !== "skipped")
+      .map((s) => ({
+        date: s.date,
+        sport: s.sport,
+        type: s.type,
+        durationMinutes: s.durationMinutes,
+        isKey: s.isKey
+      })),
     sportDistribution,
     carryForwardNote,
     macroContext: macroCtx,

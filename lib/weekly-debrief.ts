@@ -82,7 +82,7 @@ const weeklyDebriefNarrativeSchema = z.object({
   executiveSummary: z.string().min(1).max(420),
   highlights: z.array(z.string().min(1).max(220)).min(3).max(3),
   observations: z.array(z.string().min(1).max(220)).min(1).max(3),
-  carryForward: z.array(z.string().min(1).max(160)).min(2).max(2)
+  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2)
 });
 
 export type WeeklyDebriefNarrative = z.infer<typeof weeklyDebriefNarrativeSchema>;
@@ -92,7 +92,7 @@ const weeklyDebriefCoachShareSchema = z.object({
   summary: z.string().min(1).max(320),
   wins: z.array(z.string().min(1).max(180)).min(1).max(3),
   concerns: z.array(z.string().min(1).max(180)).min(1).max(3),
-  carryForward: z.array(z.string().min(1).max(160)).min(2).max(2)
+  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2)
 });
 
 export type WeeklyDebriefCoachShare = z.infer<typeof weeklyDebriefCoachShareSchema>;
@@ -707,7 +707,7 @@ function buildCoachShare(args: { facts: WeeklyDebriefFacts; narrative: WeeklyDeb
     summary: clip(args.narrative.executiveSummary, 320),
     wins: args.narrative.highlights.slice(0, 3).map((item) => clip(item, 180)),
     concerns: args.narrative.observations.slice(0, 3).map((item) => clip(item, 180)),
-    carryForward: args.narrative.carryForward.slice(0, 2).map((item) => clip(item, 160))
+    carryForward: args.narrative.carryForward.slice(0, 2).map((item) => clip(item, 280))
   });
 }
 
@@ -789,7 +789,7 @@ function normalizeNarrativePayload(payload: unknown) {
     executiveSummary: coerceNarrativeString(record.executiveSummary, 420),
     highlights: coerceNarrativeList(record.highlights, 3, 220),
     observations: coerceNarrativeList(record.observations, 3, 220),
-    carryForward: coerceNarrativeList(record.carryForward, 2, 160)
+    carryForward: coerceNarrativeList(record.carryForward, 2, 280)
   };
 }
 
@@ -825,7 +825,7 @@ async function generateNarrative(args: {
     const response = await client.responses.create({
       model: getCoachModel(),
       instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
       input: [
         {
           role: "user",
@@ -947,9 +947,9 @@ function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiveStatus
     evidence: Array.isArray((normalizedFacts as { evidence?: unknown })?.evidence) ? (normalizedFacts as { evidence: WeeklyDebriefEvidenceItem[] }).evidence : [],
     evidenceGroups: Array.isArray((normalizedFacts as { evidenceGroups?: unknown })?.evidenceGroups) ? (normalizedFacts as { evidenceGroups: WeeklyDebriefEvidenceGroup[] }).evidenceGroups : [],
     feedback: {
-      helpful: record.helpful,
-      accurate: record.accurate,
-      note: record.feedback_note,
+      helpful: record.helpful ?? null,
+      accurate: record.accurate ?? null,
+      note: record.feedback_note ?? null,
       updatedAt: normalizeTimestamp(record.feedback_updated_at)
     }
   });
@@ -1502,7 +1502,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
         sport: session.sport,
         durationMinutes: Math.max(0, session.duration_minutes ?? 0),
         status,
-        isKey: Boolean(session.is_key) || session.session_role === "key",
+        isKey: Boolean(session.is_key) || session.session_role?.toLowerCase() === "key",
         review,
         completedMinutes: status === "completed" ? Math.max(0, session.duration_minutes ?? 0) : 0
       };
@@ -1974,7 +1974,7 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
     .map((session) => ({
       ...session,
       resolvedStatus: inferSessionStatus(session as WeeklyDebriefSession, completionLedger),
-      isKey: Boolean(session.is_key) || session.session_role === "key",
+      isKey: Boolean(session.is_key) || session.session_role?.toLowerCase() === "key",
       durationMinutes: Math.max(0, session.duration_minutes ?? 0)
     }));
 

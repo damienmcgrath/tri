@@ -516,6 +516,9 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               const maxMinutes = Math.max(...weekDays.map((d) => d.totalMinutes), 1);
               return weekDays.map((day) => (
                 <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
+                  <p className="text-[8px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
+                    {day.totalMinutes}
+                  </p>
                   <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
                     {(["swim", "bike", "run", "strength", "other"] as const).map((sport) => {
                       const mins = day.sessions.filter((s) => s.sport === sport).reduce((sum, s) => sum + s.duration_minutes, 0);

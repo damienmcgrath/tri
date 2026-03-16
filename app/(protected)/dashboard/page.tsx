@@ -762,7 +762,11 @@ export default async function DashboardPage({
     }
   }
 
-  const contextualItems = [attentionItem, resolvedFocusItem].filter((item): item is ContextualItem => Boolean(item));
+  // Show at most one signal. Attention takes priority; focus only shows when there is no attention item,
+  // or when attention is about a missed key session (structural) while focus is about a different sport gap.
+  const attentionIsAboutKeySession = attentionItem?.title.startsWith("Missed key session");
+  const showFocusItem = resolvedFocusItem && (!attentionItem || attentionIsAboutKeySession);
+  const contextualItems = [attentionItem, showFocusItem ? resolvedFocusItem : null].filter((item): item is ContextualItem => Boolean(item));
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
