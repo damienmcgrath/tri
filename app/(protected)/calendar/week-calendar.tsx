@@ -690,7 +690,7 @@ export function WeekCalendar({
           const isToday = day.iso === todayIso;
           const isFuture = day.iso > todayIso;
           const isPast = day.iso < todayIso;
-          const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
+          const needsAttention = Boolean(metrics && (isPast || isToday) && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
           const attentionReason = needsAttention && metrics
             ? metrics.skipped > 0
               ? `${metrics.skipped} session${metrics.skipped > 1 ? "s" : ""} skipped`
