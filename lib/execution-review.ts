@@ -1135,6 +1135,7 @@ export async function buildWeeklyExecutionBrief(args: {
   weekStart: string;
   weekEnd: string;
   athleteContext: AthleteContextSnapshot | null;
+  extraActivityCount?: number;
 }) {
   const { data: sessions, error } = await args.supabase
     .from("sessions")
@@ -1187,11 +1188,15 @@ export async function buildWeeklyExecutionBrief(args: {
         : "Keep the current structure and carry the same execution control into next week.";
 
   const contextCue = args.athleteContext?.declared.weeklyConstraints[0] ?? args.athleteContext?.declared.limiters[0]?.value ?? null;
+  const extraCount = args.extraActivityCount ?? 0;
+  const extraNote = extraCount > 0 ? ` ${extraCount} extra session${extraCount === 1 ? "" : "s"} also logged this week.` : "";
 
   return {
     weekHeadline:
       reviewedCount === 0
-        ? "Reviews are still building, so keep the week steady"
+        ? extraCount > 0
+          ? `${extraCount} extra session${extraCount === 1 ? "" : "s"} logged — reviews building`
+          : "Reviews are still building, so keep the week steady"
         : missedCount > 0
           ? "Execution is mostly on track, but one key session came up short"
           : partialCount > 0
@@ -1199,8 +1204,8 @@ export async function buildWeeklyExecutionBrief(args: {
             : "Execution is on track this week",
     weekSummary:
       reviewedCount === 0
-        ? "Early uploads are in. Hold the current structure for now, then let the next reviewed sessions sharpen the call."
-        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
+        ? `Early uploads are in.${extraNote} Hold the current structure for now, then let the next reviewed sessions sharpen the call.`
+        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${extraNote}${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
     keyPositive,
     keyRisk,
     nextWeekDecision,

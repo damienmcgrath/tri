@@ -153,7 +153,8 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
       uploadedSessionCount: 0,
       linkedSessionCount: 0,
       reviewedSessionCount: 0,
-      pendingReviewCount: 0
+      pendingReviewCount: 0,
+      extraActivityCount: 0
     };
   }
 
@@ -173,7 +174,7 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
       .lte("date", weekEnd),
     supabase
       .from("session_activity_links")
-      .select("planned_session_id,confirmation_status")
+      .select("planned_session_id,completed_activity_id,confirmation_status")
       .eq("user_id", userId),
     supabase
       .from("sessions")
@@ -195,6 +196,12 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
   ]);
 
   const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
+  const confirmedLinkedActivityIds = new Set(
+    (links ?? [])
+      .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link: any) => link.completed_activity_id as string)
+      .filter(Boolean)
+  );
   const confirmedLinkedSessionIds = new Set(
     (links ?? [])
       .filter((link: any) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
@@ -203,6 +210,9 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
 
   const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
   const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId as string)).length;
+
+  const allActivityIds = ((activities ?? []) as Array<{ id: string }>).map((a) => a.id);
+  const extraActivityCount = allActivityIds.filter((id) => !confirmedLinkedActivityIds.has(id)).length;
 
   const upcomingKeyNames = ((upcomingKeySessions ?? []) as Array<{ session_name: string | null; type: string; sport: string }>)
     .map((s) => s.session_name || `${s.type} ${s.sport}`)
@@ -213,6 +223,7 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
     linkedSessionCount: confirmedLinkedSessionIds.size,
     reviewedSessionCount: reviewedSessionIds.size,
     pendingReviewCount,
+    extraActivityCount,
     upcomingKeySessionNames: upcomingKeyNames.length > 0 ? upcomingKeyNames : undefined
   };
 }
@@ -261,7 +272,8 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
       athleteId: user.id,
       weekStart,
       weekEnd,
-      athleteContext
+      athleteContext,
+      extraActivityCount: briefingContext.extraActivityCount
     })
     : null;
   const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;

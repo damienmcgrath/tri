@@ -209,7 +209,7 @@ function SessionActionMenu({
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
-          {session.displayType === "completed_activity" ? (
+          {session.displayType === "completed_activity" && session.source?.uploadId ? (
             <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
               Assign to session
             </button>
@@ -766,7 +766,7 @@ export function WeekCalendar({
 
                   const stateBadge =
                     state === "extra" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-success"><span aria-hidden="true">✓</span>Extra</span>
                     ) : state === "unmatched_upload" ? (
                       <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
                     ) : state === "moved" ? (
@@ -1117,8 +1117,8 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
-      <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
+    <div className="fixed inset-0 z-40 overflow-hidden bg-black/55 backdrop-blur-[2px]">
+      <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>
   );

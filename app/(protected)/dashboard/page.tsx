@@ -105,22 +105,32 @@ function toHoursAndMinutes(minutes: number) {
 }
 
 function getNextImportantSession(sessions: Session[], todayIso: string) {
-  const upcoming = sessions
-    .filter((session) => session.status === "planned" && session.date >= todayIso)
-    .sort((a, b) => {
+  const upcoming = sessions.filter((session) => session.status === "planned" && session.date >= todayIso);
+  if (upcoming.length === 0) return null;
+
+  const tomorrowIso = (() => {
+    const d = new Date(`${todayIso}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  upcoming.sort((a, b) => {
+    const aIsNear = a.date <= tomorrowIso;
+    const bIsNear = b.date <= tomorrowIso;
+
+    // Today and tomorrow: sort by priority within the same date
+    if (aIsNear || bIsNear) {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
       const aPriority = Number(Boolean(a.is_key)) * 3 + Number(/long run|race prep|brick/i.test(getSessionDisplayName(a))) * 2;
       const bPriority = Number(Boolean(b.is_key)) * 3 + Number(/long run|race prep|brick/i.test(getSessionDisplayName(b))) * 2;
-
-      if (aPriority !== bPriority) {
-        return bPriority - aPriority;
-      }
-
-      if (a.date !== b.date) {
-        return a.date.localeCompare(b.date);
-      }
-
+      if (aPriority !== bPriority) return bPriority - aPriority;
       return (a.created_at ?? "").localeCompare(b.created_at ?? "");
-    });
+    }
+
+    // Sessions further out: purely chronological
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return (a.created_at ?? "").localeCompare(b.created_at ?? "");
+  });
 
   return upcoming[0] ?? null;
 }
@@ -824,7 +834,7 @@ export default async function DashboardPage({
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[rgba(255,255,255,0.08)] pt-3 text-sm">
-            <p className="px-1 text-[rgba(255,255,255,0.68)]">Completed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(totals.completed)}</span></p>
+            <p className="px-1 text-[rgba(255,255,255,0.68)]">Completed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(totals.completed)}</span>{extraCompletedCount > 0 ? <span className="mt-0.5 block text-[11px] text-success">{extraCompletedCount} extra</span> : null}</p>
             <p className="px-1 text-[rgba(255,255,255,0.68)]">Remaining <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(remainingMinutes)}</span></p>
             <p className="px-1 text-[rgba(255,255,255,0.68)]">Missed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(missedMinutes)}</span></p>
           </div>

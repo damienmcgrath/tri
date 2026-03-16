@@ -246,7 +246,7 @@ export function buildCalendarDisplayItems(input: {
       workoutType: null,
       intentCategory: null,
       role: null,
-      source: { uploadId: item.upload_id ?? item.id, assignedBy: "upload" },
+      source: { uploadId: item.upload_id ?? null, assignedBy: "upload" },
       executionResult: null,
       duration: item.duration_min,
       notes: null,
