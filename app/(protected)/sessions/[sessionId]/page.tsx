@@ -7,6 +7,9 @@ import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
+import { FeelCaptureBanner } from "./components/feel-capture-banner";
+import { SessionComparisonCard } from "./components/session-comparison-card";
+import { DetailsAccordion } from "../../details-accordion";
 
 type SessionRow = SessionReviewRow;
 
@@ -363,6 +366,31 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   session.has_linked_activity = hasLinkedActivity;
 
+  // Query session_feels for completed sessions (skip for activity-route synthetic sessions)
+  let hasExistingFeel = false;
+  if (session.status === "completed" && !activityId) {
+    const { data: existingFeel } = await supabase
+      .from("session_feels")
+      .select("id")
+      .eq("session_id", session.id)
+      .maybeSingle();
+    hasExistingFeel = Boolean(existingFeel);
+  }
+
+  const showFeelCapture = session.status === "completed" && !activityId && !hasExistingFeel;
+
+  // Load session comparison and trends for completed sessions
+  let sessionComparison = null;
+  let sessionTrends = null;
+  if (session.status === "completed" && !activityId) {
+    const [comparisonResult, trendsResult] = await Promise.allSettled([
+      import("@/lib/training/session-comparison").then(({ getSessionComparison }) => getSessionComparison(supabase, session.id, user.id)),
+      import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6))
+    ]);
+    sessionComparison = comparisonResult.status === "fulfilled" ? comparisonResult.value : null;
+    sessionTrends = trendsResult.status === "fulfilled" ? trendsResult.value : null;
+  }
+
   const reviewVm = createReviewViewModel(session);
 
   const sessionTitle = getSessionDisplayName({
@@ -379,10 +407,10 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   const plannedColumnLabel = session.is_extra ? "Weekly context" : "Planned";
   const ghostPillClass =
     "rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[11px] font-medium text-[rgba(255,255,255,0.6)]";
-  const quietLabelClass = "text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary";
+  const quietLabelClass = "card-kicker";
   const sessionStatusBadgeClass =
     reviewVm.sessionStatusLabel.toLowerCase() === "completed"
-      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[#34D399]"
+      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-success"
       : "rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
   const intentBadgeClass =
     reviewVm.intent.label === "Matched intent"
@@ -392,6 +420,8 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   return (
     <section className="space-y-4">
       <Link href="/calendar" className="text-sm text-cyan-300 underline-offset-2 hover:underline">← Back to Calendar</Link>
+
+      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} /> : null}
 
       <article className="surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -490,7 +520,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p
-                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-[#34D399]" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
+                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
                         style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-primary))" }}
                       >
                         {metric.value}
@@ -535,6 +565,60 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           </div>
         </section>
       ) : null}
+
+      {reviewVm.isReviewable && reviewVm.score !== null ? (
+        <DetailsAccordion
+          title="How is this scored?"
+          summaryDetail={
+            <span className="rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.08)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-accent)]">
+              {reviewVm.score}/100
+            </span>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-xs text-muted">
+              Execution scores compare what actually happened against what was planned —
+              across duration, intensity, intent alignment, and consistency. A higher score means the
+              session delivered the intended training stimulus.
+            </p>
+            {reviewVm.usefulMetrics.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {reviewVm.usefulMetrics.map((metric) => (
+                  <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">{metric.label}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-[hsl(var(--text-primary))]">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {reviewVm.missingEvidence.length > 0 ? (
+              <div className="rounded-xl border border-[rgba(255,179,60,0.20)] bg-[rgba(255,179,60,0.06)] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Missing evidence</p>
+                <p className="mt-0.5 text-xs text-muted">{reviewVm.missingEvidence.join(" · ")}</p>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {reviewVm.scoreBand ? (
+                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
+                  Band: {reviewVm.scoreBand}
+                </span>
+              ) : null}
+              {reviewVm.executionCostLabel ? (
+                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
+                  Execution cost: {reviewVm.executionCostLabel}
+                </span>
+              ) : null}
+              {reviewVm.confidenceLabel ? (
+                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
+                  Confidence: {reviewVm.confidenceLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </DetailsAccordion>
+      ) : null}
+
+      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} /> : null}
 
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

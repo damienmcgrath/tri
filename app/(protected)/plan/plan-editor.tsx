@@ -122,10 +122,10 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
 function disciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(99,179,237,0.10)", text: "#63B3ED", dot: "#63B3ED", border: "transparent" },
-    bike: { bg: "rgba(52,211,153,0.10)", text: "#34D399", dot: "#34D399", border: "transparent" },
-    run: { bg: "rgba(255,90,40,0.10)", text: "#FF5A28", dot: "#FF5A28", border: "transparent" },
-    strength: { bg: "rgba(167,139,250,0.10)", text: "#A78BFA", dot: "#A78BFA", border: "transparent" },
+    swim: { bg: "rgba(99,179,237,0.10)", text: "var(--color-swim)", dot: "var(--color-swim)", border: "transparent" },
+    bike: { bg: "rgba(52,211,153,0.10)", text: "var(--color-bike)", dot: "var(--color-bike)", border: "transparent" },
+    run: { bg: "rgba(255,90,40,0.10)", text: "var(--color-run)", dot: "var(--color-run)", border: "transparent" },
+    strength: { bg: "rgba(167,139,250,0.10)", text: "var(--color-strength)", dot: "var(--color-strength)", border: "transparent" },
     other: { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.65)", dot: "rgba(255,255,255,0.65)", border: "transparent" }
   };
 
@@ -134,10 +134,10 @@ function disciplineChipTone(sport: string) {
 
 function disciplineBorderColor(sport: string) {
   const tones: Record<string, string> = {
-    run: "#FF5A28",
-    swim: "#63B3ED",
-    bike: "#34D399",
-    strength: "#A78BFA"
+    run: "var(--color-run)",
+    swim: "var(--color-swim)",
+    bike: "var(--color-bike)",
+    strength: "var(--color-strength)"
   };
 
   return tones[sport] ?? "rgba(255,255,255,0.24)";
@@ -323,6 +323,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
 
+  const previousWeekTotalMinutes = useMemo(() => {
+    if (!previousWeek) return null;
+    const end = addDays(previousWeek.week_start_date, 6);
+    return sessions
+      .filter((s) => s.date >= previousWeek.week_start_date && s.date <= end)
+      .reduce((sum, s) => sum + s.duration_minutes, 0);
+  }, [previousWeek, sessions]);
+
+  const volumeDelta = previousWeekTotalMinutes !== null ? totalMinutes - previousWeekTotalMinutes : null;
+
   const disciplineTotals = ["swim", "bike", "run", "strength", "other"]
     .map((sport) => ({
       sport,
@@ -440,6 +450,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              aria-label="Previous week"
               className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
               onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
               disabled={!previousWeek}
@@ -453,6 +464,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             </select>
             <button
               type="button"
+              aria-label="Next week"
               className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
               onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
               disabled={!nextWeek}
@@ -468,28 +480,75 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       <section className="surface-subtle px-4 py-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Block</p>
+            <p className="card-kicker">Block</p>
             <p className="mt-1 text-sm font-medium text-white">{weekDraft.focus}</p>
           </div>
           {displayWeekFocus ? (
             <div className="md:col-span-2">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
+              <p className="card-kicker">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
               <p className="mt-1 text-sm font-medium text-white">{displayWeekFocus}</p>
             </div>
           ) : null}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Rest days</p>
+            <p className="card-kicker">Rest days</p>
             <p className="mt-1 text-sm font-medium text-white">{restDays}</p>
           </div>
           {keySessions > 0 ? (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Key sessions</p>
+              <p className="card-kicker">Key sessions</p>
               <p className="mt-1 text-sm font-medium text-white">{keySessions}</p>
             </div>
           ) : null}
         </div>
         {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
       </section>
+
+      {weekDays.some((d) => d.totalMinutes > 0) ? (
+        <section className="surface-subtle px-4 py-3">
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="card-kicker">Daily load shape</p>
+            {volumeDelta !== null ? (
+              <p className={`text-[11px] font-medium ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
+                {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta} min vs last week
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-end gap-1.5">
+            {(() => {
+              const maxMinutes = Math.max(...weekDays.map((d) => d.totalMinutes), 1);
+              return weekDays.map((day) => (
+                <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
+                  <p className="text-[8px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
+                    {day.totalMinutes}
+                  </p>
+                  <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
+                    {(["swim", "bike", "run", "strength", "other"] as const).map((sport) => {
+                      const mins = day.sessions.filter((s) => s.sport === sport).reduce((sum, s) => sum + s.duration_minutes, 0);
+                      if (!mins) return null;
+                      const heightPct = (mins / maxMinutes) * 100;
+                      const colors: Record<string, string> = {
+                        swim: "var(--color-swim)",
+                        bike: "var(--color-bike)",
+                        run: "var(--color-run)",
+                        strength: "var(--color-strength)",
+                        other: "rgba(255,255,255,0.25)"
+                      };
+                      return (
+                        <div
+                          key={sport}
+                          title={`${sport} · ${mins} min`}
+                          style={{ height: `${heightPct}%`, backgroundColor: colors[sport] }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-tertiary">{day.label}</p>
+                </div>
+              ));
+            })()}
+          </div>
+        </section>
+      ) : null}
 
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
@@ -557,9 +616,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{meta.label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          {session.is_key ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
+                              Key
+                            </span>
+                          ) : null}
+                          {roleCue ? (
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}
@@ -609,9 +676,17 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
                           <span>{getDisciplineMeta(session.sport).label}</span>
                         </span>
-                        {roleCue ? (
-                          <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          {session.is_key ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
+                              Key
+                            </span>
+                          ) : null}
+                          {roleCue ? (
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? <p className="text-[11px] text-muted">Intent: {intentCue}</p> : null}

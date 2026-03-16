@@ -74,6 +74,45 @@ function createMessageId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function getMondayOf(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + offset);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+function getWeekGroup(updatedAt: string): "this_week" | "last_week" | "older" {
+  const date = new Date(updatedAt);
+  const thisMonday = getMondayOf(new Date());
+  const lastMonday = new Date(thisMonday);
+  lastMonday.setUTCDate(lastMonday.getUTCDate() - 7);
+
+  if (date >= thisMonday) return "this_week";
+  if (date >= lastMonday) return "last_week";
+  return "older";
+}
+
+function groupConversations(conversations: Conversation[]): {
+  thisWeek: Conversation[];
+  lastWeek: Conversation[];
+  older: Conversation[];
+} {
+  const thisWeek: Conversation[] = [];
+  const lastWeek: Conversation[] = [];
+  const older: Conversation[] = [];
+
+  for (const conv of conversations) {
+    const group = getWeekGroup(conv.updated_at);
+    if (group === "this_week") thisWeek.push(conv);
+    else if (group === "last_week") lastWeek.push(conv);
+    else older.push(conv);
+  }
+
+  return { thisWeek, lastWeek, older };
+}
+
 function formatRecencyLabel(updatedAt?: string): string {
   if (!updatedAt) {
     return "Ready to start";
@@ -329,6 +368,7 @@ export function CoachChat({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [hasRequestedReviewBackfill, setHasRequestedReviewBackfill] = useState(false);
+  const [showOlderConversations, setShowOlderConversations] = useState(false);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -411,28 +451,20 @@ export function CoachChat({
   const quickPrompts = useMemo(() => {
     if (sessionDiagnoses.length < 2) {
       return [
-        "What does my execution score mean?",
         "Which session should I protect this week?",
         "How should I adjust this week?",
-        "Missed workout recovery",
         "What should stay easy vs key?"
       ];
     }
 
-    const prompts = ["Why was this session flagged?", "What would move this to On target?", "Should I repeat this workout?", "How should I adjust the rest of the week?"];
+    // Theme-specific lead question (most relevant first), then two universal follow-ups
+    const themeQuestion =
+      strongestTheme === "easy_drift" ? "How do I keep Z2 truly easy?" :
+      strongestTheme === "recovery_slip" ? "How do I protect recovery this week?" :
+      strongestTheme === "threshold_inconsistent" ? "Was this fatigue or pacing?" :
+      "Why was this session flagged?";
 
-    if (strongestTheme === "easy_drift") {
-      prompts.splice(1, 0, "How do I keep Z2 truly easy?");
-    }
-    if (strongestTheme === "recovery_slip") {
-      prompts.splice(1, 0, "How do I protect recovery this week?");
-    }
-    if (strongestTheme === "threshold_inconsistent") {
-      prompts.splice(1, 0, "Was this fatigue or pacing?");
-    }
-
-    prompts.push("What matters most now?");
-    return prompts;
+    return [themeQuestion, "What would move this to On target?", "What matters most now?"];
   }, [sessionDiagnoses, strongestTheme]);
 
   const dataRecency = useMemo(() => {
@@ -849,30 +881,67 @@ export function CoachChat({
             <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
               New conversation
             </button>
-            <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-              {conversations.map((conversation, index) => {
-                const isActive = conversation.id === conversationId;
+            <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {(() => {
+                const groups = groupConversations(conversations);
+                const allIndex = conversations.slice();
+
+                function renderConversation(conversation: Conversation) {
+                  const isActive = conversation.id === conversationId;
+                  const idx = allIndex.indexOf(conversation);
+                  return (
+                    <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+                      <div className="flex items-start justify-between gap-1">
+                        <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
+                          <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[rgba(255,255,255,0.55)]"}`}>
+                            {conversationTitle(conversation, idx)}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
+                        </button>
+                        <details className="relative">
+                          <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
+                          <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
+                            <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
+                            <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
-                  <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
-                    <div className="flex items-start justify-between gap-1">
-                      <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-                        <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-[hsl(var(--text-primary))]" : "text-[rgba(255,255,255,0.55)]"}`}>
-                          {conversationTitle(conversation, index)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
-                      </button>
-                      <details className="relative">
-                        <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-[hsl(var(--text-primary))]">⋯</summary>
-                        <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
-                          <button type="button" onClick={() => void handleRenameConversation(conversation, index)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
-                          <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
-                        </div>
-                      </details>
-                    </div>
-                  </div>
+                  <>
+                    {groups.thisWeek.length > 0 ? (
+                      <div>
+                        <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">This week</p>
+                        <div className="space-y-1">{groups.thisWeek.slice(0, 5).map(renderConversation)}</div>
+                      </div>
+                    ) : null}
+                    {groups.lastWeek.length > 0 ? (
+                      <div>
+                        <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">Last week</p>
+                        <div className="space-y-1">{groups.lastWeek.slice(0, 3).map(renderConversation)}</div>
+                      </div>
+                    ) : null}
+                    {groups.older.length > 0 ? (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowOlderConversations((prev) => !prev)}
+                          className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
+                        >
+                          <span>Older</span>
+                          <span className="rounded-full border border-[rgba(255,255,255,0.12)] px-1.5 py-0.5 text-[9px]">{groups.older.length}</span>
+                        </button>
+                        {showOlderConversations ? (
+                          <div className="space-y-1">{groups.older.map(renderConversation)}</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
                 );
-              })}
+              })()}
             </div>
           </aside>
 

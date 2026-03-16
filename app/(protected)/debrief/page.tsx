@@ -5,6 +5,9 @@ import { DebriefRefreshButton } from "./debrief-refresh-button";
 import { DetailsAccordion } from "../details-accordion";
 import { WEEKLY_DEBRIEF_GENERATION_VERSION, getAdjacentWeeklyDebriefs, getWeeklyDebriefSnapshot, refreshWeeklyDebrief } from "@/lib/weekly-debrief";
 import { localIsoDate } from "@/lib/activities/completed-activities";
+import { getMacroContext } from "@/lib/training/macro-context";
+import type { MacroContext } from "@/lib/training/macro-context";
+import { ShareSummaryButton } from "./components/share-summary-button";
 
 function metricToneClass(tone: "neutral" | "positive" | "muted" | "caution") {
   if (tone === "positive") return "debrief-metric-card debrief-metric-card--emphasis";
@@ -37,10 +40,48 @@ function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") 
 }
 
 function metricGridClass(count: number) {
-  if (count <= 2) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2";
-  if (count === 3) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-3";
-  if (count === 4) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4";
-  return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5";
+  if (count <= 2) return "relative mt-6 grid gap-3 md:grid-cols-2";
+  if (count === 3) return "relative mt-6 grid gap-3 md:grid-cols-3";
+  if (count === 4) return "relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4";
+  return "relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5";
+}
+
+function formatMacroArcLine(ctx: MacroContext): string {
+  const parts: string[] = [];
+
+  parts.push(`Week ${ctx.currentPlanWeek} of ${ctx.totalPlanWeeks}`);
+
+  if (ctx.currentBlock) {
+    parts.push(`${ctx.currentBlock} Phase`);
+  }
+
+  if (ctx.raceName && ctx.daysToRace !== null) {
+    parts.push(`${ctx.raceName} in ${ctx.daysToRace} days`);
+  }
+
+  return parts.join(" · ");
+}
+
+function formatCumulativeVolume(ctx: MacroContext): string | null {
+  const parts: string[] = [];
+  const { swim, bike, run } = ctx.cumulativeVolumeByDiscipline;
+
+  if (bike.plannedMinutes > 0) {
+    const label = bike.deltaPct >= -5 ? "on track" : `${Math.abs(bike.deltaPct)}% behind`;
+    parts.push(`Bike: ${label}`);
+  }
+
+  if (run.plannedMinutes > 0) {
+    const label = run.deltaPct >= -5 ? "on track" : `${Math.abs(run.deltaPct)}% behind`;
+    parts.push(`Run: ${label}`);
+  }
+
+  if (swim.plannedMinutes > 0) {
+    const label = swim.deltaPct >= -5 ? "on track" : `${Math.abs(swim.deltaPct)}% behind`;
+    parts.push(`Swim: ${label}`);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function evidencePreviewLabel(claim: string) {
@@ -155,17 +196,43 @@ export default async function DebriefPage({
   }
 
   const artifact = snapshot.artifact;
-  const adjacent = await getAdjacentWeeklyDebriefs({
-    supabase,
-    athleteId: user.id,
-    weekStart
-  });
+  const weekEnd = addDays(weekStart, 6);
+  const [adjacent, macroCtx, trends, sessionsForSportMinutes] = await Promise.all([
+    getAdjacentWeeklyDebriefs({ supabase, athleteId: user.id, weekStart }),
+    getMacroContext(supabase, user.id),
+    import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6)).catch(() => []),
+    supabase
+      .from("sessions")
+      .select("sport,duration_minutes,status")
+      .eq("user_id", user.id)
+      .gte("date", weekStart)
+      .lte("date", weekEnd)
+  ]);
+  type SportRow = { sport: string; duration_minutes: number | null; status: string | null };
+  const rawSessions: SportRow[] = (sessionsForSportMinutes.data ?? []) as SportRow[];
+  const completedSessionsForWeek = rawSessions.filter((s) => s.status === "completed");
+  const sportMinutes = {
+    swim: completedSessionsForWeek.filter((s) => s.sport === "swim").reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0),
+    bike: completedSessionsForWeek.filter((s) => s.sport === "bike").reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0),
+    run: completedSessionsForWeek.filter((s) => s.sport === "run").reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0)
+  };
   const evidenceSupportCount = artifact.evidenceGroups.reduce((sum, group) => sum + group.supports.length, 0);
+
+  const macroArcLine = formatMacroArcLine(macroCtx);
+  const cumulativeVolumeLine = formatCumulativeVolume(macroCtx);
 
   return (
     <section className="space-y-4">
       <article className="debrief-hero surface p-6 md:p-7">
-        <div className="relative z-[1] flex flex-wrap items-start gap-4">
+        {macroArcLine ? (
+          <div className="relative mb-4 flex flex-wrap items-center gap-3 border-b border-[rgba(255,255,255,0.07)] pb-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">{macroArcLine}</p>
+            {cumulativeVolumeLine ? (
+              <p className="text-[11px] text-[rgba(255,255,255,0.45)]">{cumulativeVolumeLine}</p>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="relative flex flex-wrap items-start gap-4">
           <div className="max-w-4xl">
             <p className="label">Weekly Debrief</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -181,13 +248,25 @@ export default async function DebriefPage({
               <p className="mt-3 max-w-2xl text-sm text-muted">{artifact.facts.artifactStateNote}</p>
             ) : null}
           </div>
-          <div className="relative z-[1] flex min-w-[220px] flex-col items-start gap-3">
+          <div className="relative flex min-w-[220px] flex-col items-start gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
                 Coach brief
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
             </div>
+            <ShareSummaryButton
+              data={{
+                weekLabel: artifact.facts.weekLabel,
+                weekRange: artifact.facts.weekRange,
+                completionPct: artifact.facts.completionPct,
+                title: artifact.facts.title,
+                executiveSummary: artifact.narrative.executiveSummary,
+                raceName: macroCtx.raceName,
+                daysToRace: macroCtx.daysToRace,
+                sportMinutes
+              }}
+            />
           </div>
         </div>
 
@@ -195,7 +274,7 @@ export default async function DebriefPage({
           {artifact.facts.metrics.map((metric) => (
             <div key={metric.label} className={`${metricToneClass(metric.tone)} min-h-[110px]`}>
               <p className="debrief-kicker">{metric.label}</p>
-              <p className="mt-4 text-[1.35rem] font-semibold leading-tight text-[hsl(var(--text-primary))]">{metric.value}</p>
+              <p className="mt-4 text-xl font-semibold leading-tight text-[hsl(var(--text-primary))]">{metric.value}</p>
               {metric.detail ? <p className="mt-2 text-xs text-muted">{metric.detail}</p> : null}
             </div>
           ))}
@@ -263,6 +342,32 @@ export default async function DebriefPage({
           ))}
         </div>
       </article>
+
+      {trends.length > 0 ? (
+        <article className="debrief-section-card p-5">
+          <p className="debrief-kicker">Trends</p>
+          <p className="mt-2 text-sm text-muted">Patterns observed over the last 6 weeks.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {trends.map((trend) => (
+              <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-muted">{trend.metric}</p>
+                  <span className={`text-[10px] font-medium uppercase tracking-[0.1em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
+                    {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{trend.detail}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {trend.dataPoints.slice(-4).map((pt) => (
+                    <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-tertiary">Confidence: {trend.confidence}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+      ) : null}
 
       <article className="debrief-section-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

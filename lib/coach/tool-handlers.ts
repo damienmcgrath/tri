@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CoachAuthContext } from "@/lib/coach/types";
 import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
+import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
+import { detectAmbientSignals } from "@/lib/training/ambient-signals";
 import {
   coachToolSchemas,
   type CoachToolName
@@ -36,9 +38,16 @@ function derivePace(durationSec: number | null | undefined, distanceM: number | 
 }
 
 async function getAthleteSnapshot({ supabase, ctx }: ToolDeps) {
-  const snapshot = await getAthleteContextSnapshot(supabase, ctx.athleteId);
+  const [snapshot, macroCtx, ambientSignals] = await Promise.all([
+    getAthleteContextSnapshot(supabase, ctx.athleteId),
+    getMacroContext(supabase, ctx.athleteId),
+    detectAmbientSignals(supabase, ctx.athleteId).catch(() => [])
+  ]);
   return {
-    athleteContext: snapshot
+    athleteContext: snapshot,
+    macroContext: macroCtx,
+    macroContextSummary: formatMacroContextSummary(macroCtx),
+    ambientSignals
   };
 }
 

@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
-import { clearSkippedAction, confirmSkippedAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
+import { acceptAdaptationAction, clearSkippedAction, confirmSkippedAction, dismissAdaptationAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
 import { hasConfirmedSkipTag } from "@/lib/plans/skip-notes";
 
 type SessionStatus = SessionLifecycleState;
@@ -61,10 +61,10 @@ function calendarDisciplineChipTone(sport: string) {
 
 function calendarDisciplineBorderColor(sport: string) {
   const tones: Record<string, string> = {
-    run: "#FF5A28",
-    swim: "#63B3ED",
-    bike: "#34D399",
-    strength: "#A78BFA"
+    run: "var(--color-run)",
+    swim: "var(--color-swim)",
+    bike: "var(--color-bike)",
+    strength: "var(--color-strength)"
   };
 
   return tones[sport] ?? "rgba(255,255,255,0.24)";
@@ -178,7 +178,7 @@ function SessionActionMenu({
     <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
+        className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] text-muted hover:text-foreground"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
@@ -220,13 +220,17 @@ function SessionActionMenu({
   );
 }
 
+type PendingAdaptation = { id: string; trigger_type: string; options: unknown };
+
 export function WeekCalendar({
   weekDays,
   sessions,
   completedCount,
   plannedRemainingCount,
   skippedCount,
-  extraSessionCount
+  extraSessionCount,
+  pendingAdaptations = [],
+  weekStart
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
@@ -240,6 +244,8 @@ export function WeekCalendar({
   plannedMinutes: number;
   completedMinutes: number;
   remainingMinutes: number;
+  pendingAdaptations?: PendingAdaptation[];
+  weekStart?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -253,6 +259,9 @@ export function WeekCalendar({
   const [toast, setToast] = useState<string | null>(null);
   const [dismissedIssues, setDismissedIssues] = useState<string[]>([]);
   const [loadedDismissedIssuesWeek, setLoadedDismissedIssuesWeek] = useState<string | null>(null);
+  const [localAdaptations, setLocalAdaptations] = useState<PendingAdaptation[]>(pendingAdaptations);
+  const [expandedAdaptationId, setExpandedAdaptationId] = useState<string | null>(null);
+  const [loadingAdaptations, setLoadingAdaptations] = useState(false);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -453,14 +462,15 @@ export function WeekCalendar({
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
         </div>
       </header>
 
       {hasLoadedDismissalsForActiveWeek && hasAdaptation ? (
         <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FF5A28]">Needs attention</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-danger">Needs attention</p>
             <p className="text-[11px] text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
@@ -576,7 +586,104 @@ export function WeekCalendar({
         </section>
       ) : null}
 
-      <article className="grid gap-2 lg:grid-cols-7">
+      {localAdaptations.length > 0 ? (
+        <section className="rounded-xl border border-[rgba(190,255,0,0.22)] bg-[rgba(190,255,0,0.04)] px-3 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-accent)]">Adaptation suggestions</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (!weekStart) return;
+                setLoadingAdaptations(true);
+                void fetch("/api/coach/adaptation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ weekStart })
+                })
+                  .then((res) => res.json())
+                  .then((data: { adaptations?: PendingAdaptation[] }) => {
+                    if (data.adaptations) setLocalAdaptations(data.adaptations.map((a) => ({ id: a.id ?? "", trigger_type: (a as { trigger?: { type: string } }).trigger?.type ?? "", options: (a as { options?: unknown }).options })));
+                  })
+                  .finally(() => setLoadingAdaptations(false));
+              }}
+              disabled={loadingAdaptations}
+              className="text-[11px] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+            >
+              {loadingAdaptations ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {localAdaptations.map((adaptation) => {
+              const options = Array.isArray(adaptation.options) ? adaptation.options as Array<{ id: string; label: string; description: string; projectedCompletionPct: number; keySessionImpact: string }> : [];
+              const isExpanded = expandedAdaptationId === adaptation.id;
+              return (
+                <div key={adaptation.id} className="rounded-lg border border-[rgba(190,255,0,0.15)] bg-[rgba(190,255,0,0.03)] px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[hsl(var(--text-primary))]">{adaptation.trigger_type.replace(/_/g, " ")}</p>
+                      {options.length > 0 && !isExpanded ? (
+                        <p className="mt-0.5 text-[11px] text-tertiary">{options.length} option{options.length > 1 ? "s" : ""} available</p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedAdaptationId(isExpanded ? null : adaptation.id)}
+                        className="text-[var(--color-accent)] hover:underline"
+                      >
+                        {isExpanded ? "Hide" : "View options"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startTransition(() => {
+                            void dismissAdaptationAction({ adaptationId: adaptation.id }).then(() => {
+                              setLocalAdaptations((prev) => prev.filter((a) => a.id !== adaptation.id));
+                            });
+                          });
+                        }}
+                        className="text-tertiary hover:text-[hsl(var(--text-primary))]"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                  {isExpanded && options.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {options.map((option) => (
+                        <div key={option.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
+                          <p className="text-xs font-medium">{option.label}</p>
+                          <p className="mt-1 text-[11px] text-muted">{option.description}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-tertiary">~{option.projectedCompletionPct}% completion · Key sessions: {option.keySessionImpact}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startTransition(() => {
+                                  void acceptAdaptationAction({ adaptationId: adaptation.id }).then(() => {
+                                    setLocalAdaptations((prev) => prev.filter((a) => a.id !== adaptation.id));
+                                    setToast("Adaptation applied");
+                                    router.refresh();
+                                  });
+                                });
+                              }}
+                              className="rounded-md bg-[rgba(190,255,0,0.15)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)]"
+                            >
+                              Accept
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <article className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -584,6 +691,11 @@ export function WeekCalendar({
           const isFuture = day.iso > todayIso;
           const isPast = day.iso < todayIso;
           const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
+          const attentionReason = needsAttention && metrics
+            ? metrics.skipped > 0
+              ? `${metrics.skipped} session${metrics.skipped > 1 ? "s" : ""} skipped`
+              : `${metrics.remainingPlanned} min not done`
+            : null;
           const dayLabel = isToday
             ? getDayStateLabel("today")
             : needsAttention
@@ -619,6 +731,7 @@ export function WeekCalendar({
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
+                {attentionReason ? <p className="text-[10px] text-muted">{attentionReason}</p> : null}
               </div>
 
               <div className="space-y-1.5 pt-0.5">
@@ -676,10 +789,15 @@ export function WeekCalendar({
                       tabIndex={reviewableCompleted ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
-                          {discipline.label}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
+                            {discipline.label}
+                          </span>
+                          {(session.is_key || session.role?.toLowerCase() === "key") ? (
+                            <span className="rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.08)] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--warning))]">Key</span>
+                          ) : null}
+                        </div>
                         <SessionActionMenu
                           session={session}
                           state={state}
@@ -711,7 +829,7 @@ export function WeekCalendar({
                       ) : null}
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-[#34D399]">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>

@@ -82,7 +82,7 @@ const weeklyDebriefNarrativeSchema = z.object({
   executiveSummary: z.string().min(1).max(420),
   highlights: z.array(z.string().min(1).max(220)).min(3).max(3),
   observations: z.array(z.string().min(1).max(220)).min(1).max(3),
-  carryForward: z.array(z.string().min(1).max(160)).min(2).max(2)
+  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2)
 });
 
 export type WeeklyDebriefNarrative = z.infer<typeof weeklyDebriefNarrativeSchema>;
@@ -92,7 +92,7 @@ const weeklyDebriefCoachShareSchema = z.object({
   summary: z.string().min(1).max(320),
   wins: z.array(z.string().min(1).max(180)).min(1).max(3),
   concerns: z.array(z.string().min(1).max(180)).min(1).max(3),
-  carryForward: z.array(z.string().min(1).max(160)).min(2).max(2)
+  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2)
 });
 
 export type WeeklyDebriefCoachShare = z.infer<typeof weeklyDebriefCoachShareSchema>;
@@ -175,11 +175,19 @@ type WeeklyDebriefLink = {
   created_at?: string | null;
 };
 
+type WeeklyDebriefCheckIn = {
+  fatigueScore: number | null;
+  stressScore: number | null;
+  motivationScore: number | null;
+  weekNotes: string | null;
+};
+
 type WeeklyDebriefInputs = {
   sessions: WeeklyDebriefSession[];
   activities: WeeklyDebriefActivity[];
   links: WeeklyDebriefLink[];
   athleteContext: AthleteContextSnapshot | null;
+  checkIn: WeeklyDebriefCheckIn | null;
   timeZone: string;
   weekStart: string;
   weekEnd: string;
@@ -699,7 +707,7 @@ function buildCoachShare(args: { facts: WeeklyDebriefFacts; narrative: WeeklyDeb
     summary: clip(args.narrative.executiveSummary, 320),
     wins: args.narrative.highlights.slice(0, 3).map((item) => clip(item, 180)),
     concerns: args.narrative.observations.slice(0, 3).map((item) => clip(item, 180)),
-    carryForward: args.narrative.carryForward.slice(0, 2).map((item) => clip(item, 160))
+    carryForward: args.narrative.carryForward.slice(0, 2).map((item) => clip(item, 280))
   });
 }
 
@@ -781,7 +789,7 @@ function normalizeNarrativePayload(payload: unknown) {
     executiveSummary: coerceNarrativeString(record.executiveSummary, 420),
     highlights: coerceNarrativeList(record.highlights, 3, 220),
     observations: coerceNarrativeList(record.observations, 3, 220),
-    carryForward: coerceNarrativeList(record.carryForward, 2, 160)
+    carryForward: coerceNarrativeList(record.carryForward, 2, 280)
   };
 }
 
@@ -802,6 +810,7 @@ async function generateNarrative(args: {
   evidence: WeeklyDebriefEvidenceItem[];
   activityEvidence: WeeklyDebriefActivityEvidence[];
   athleteContext: AthleteContextSnapshot | null;
+  checkIn: WeeklyDebriefCheckIn | null;
   deterministicFallback: WeeklyDebriefNarrative;
 }) {
   if (!process.env.OPENAI_API_KEY) {
@@ -816,7 +825,7 @@ async function generateNarrative(args: {
     const response = await client.responses.create({
       model: getCoachModel(),
       instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward.",
       input: [
         {
           role: "user",
@@ -833,6 +842,12 @@ async function generateNarrative(args: {
                     weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
                     limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
                   }
+                } : null,
+                checkIn: args.checkIn ? {
+                  fatigue: args.checkIn.fatigueScore,
+                  stress: args.checkIn.stressScore,
+                  motivation: args.checkIn.motivationScore,
+                  notes: args.checkIn.weekNotes
                 } : null
               })
             }
@@ -932,9 +947,9 @@ function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiveStatus
     evidence: Array.isArray((normalizedFacts as { evidence?: unknown })?.evidence) ? (normalizedFacts as { evidence: WeeklyDebriefEvidenceItem[] }).evidence : [],
     evidenceGroups: Array.isArray((normalizedFacts as { evidenceGroups?: unknown })?.evidenceGroups) ? (normalizedFacts as { evidenceGroups: WeeklyDebriefEvidenceGroup[] }).evidenceGroups : [],
     feedback: {
-      helpful: record.helpful,
-      accurate: record.accurate,
-      note: record.feedback_note,
+      helpful: record.helpful ?? null,
+      accurate: record.accurate ?? null,
+      note: record.feedback_note ?? null,
       updatedAt: normalizeTimestamp(record.feedback_updated_at)
     }
   });
@@ -1487,7 +1502,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
         sport: session.sport,
         durationMinutes: Math.max(0, session.duration_minutes ?? 0),
         status,
-        isKey: Boolean(session.is_key) || session.session_role === "key",
+        isKey: Boolean(session.is_key) || session.session_role?.toLowerCase() === "key",
         review,
         completedMinutes: status === "completed" ? Math.max(0, session.duration_minutes ?? 0) : 0
       };
@@ -1824,7 +1839,7 @@ async function loadWeeklyDebriefInputs(args: {
   const activityRangeStart = `${addDays(args.weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(args.weekEnd, 2)}T00:00:00.000Z`;
 
-  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext] = await Promise.all([
+  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }] = await Promise.all([
     args.supabase
       .from("sessions")
       .select("id,athlete_id,user_id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
@@ -1843,7 +1858,13 @@ async function loadWeeklyDebriefInputs(args: {
       .from("session_activity_links")
       .select("completed_activity_id,planned_session_id,confirmation_status,created_at")
       .eq("user_id", args.athleteId),
-    getAthleteContextSnapshot(args.supabase, args.athleteId)
+    getAthleteContextSnapshot(args.supabase, args.athleteId),
+    args.supabase
+      .from("athlete_checkins")
+      .select("fatigue_score,stress_score,motivation_score,week_notes")
+      .eq("user_id", args.athleteId)
+      .eq("week_start", args.weekStart)
+      .maybeSingle()
   ]);
 
   if (sessionsError) {
@@ -1853,11 +1874,21 @@ async function loadWeeklyDebriefInputs(args: {
     throw new Error(linksError.message);
   }
 
+  const checkIn: WeeklyDebriefCheckIn | null = checkInData
+    ? {
+        fatigueScore: (checkInData as { fatigue_score?: number | null }).fatigue_score ?? null,
+        stressScore: (checkInData as { stress_score?: number | null }).stress_score ?? null,
+        motivationScore: (checkInData as { motivation_score?: number | null }).motivation_score ?? null,
+        weekNotes: (checkInData as { week_notes?: string | null }).week_notes ?? null
+      }
+    : null;
+
   return {
     sessions: (sessionsData ?? []) as WeeklyDebriefSession[],
     activities: activities as WeeklyDebriefActivity[],
     links: (linksData ?? []) as WeeklyDebriefLink[],
     athleteContext,
+    checkIn,
     timeZone: args.timeZone,
     weekStart: args.weekStart,
     weekEnd: args.weekEnd,
@@ -1943,7 +1974,7 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
     .map((session) => ({
       ...session,
       resolvedStatus: inferSessionStatus(session as WeeklyDebriefSession, completionLedger),
-      isKey: Boolean(session.is_key) || session.session_role === "key",
+      isKey: Boolean(session.is_key) || session.session_role?.toLowerCase() === "key",
       durationMinutes: Math.max(0, session.duration_minutes ?? 0)
     }));
 
@@ -2015,6 +2046,7 @@ export async function computeWeeklyDebrief(args: {
     evidence: base.evidence,
     activityEvidence: base.activityEvidence,
     athleteContext: inputs.athleteContext,
+    checkIn: inputs.checkIn,
     deterministicFallback: base.deterministicNarrative
   });
   const narrative = generated.narrative;
