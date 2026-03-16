@@ -510,6 +510,27 @@ function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["next
   return null;
 }
 
+function normalizeSessionVerdictFields(
+  sessionVerdict: Record<string, unknown>,
+  defaults?: {
+    intentMatch: CoachVerdict["sessionVerdict"]["intentMatch"];
+    executionCost: CoachVerdict["sessionVerdict"]["executionCost"];
+    nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
+  }
+): Record<string, unknown> {
+  const validIntentMatch = (v: unknown): v is CoachVerdict["sessionVerdict"]["intentMatch"] =>
+    v === "on_target" || v === "partial" || v === "missed";
+  const validExecutionCost = (v: unknown): v is CoachVerdict["sessionVerdict"]["executionCost"] =>
+    v === "low" || v === "moderate" || v === "high" || v === "unknown";
+
+  return {
+    ...sessionVerdict,
+    intentMatch: validIntentMatch(sessionVerdict.intentMatch) ? sessionVerdict.intentMatch : (defaults?.intentMatch ?? sessionVerdict.intentMatch),
+    executionCost: validExecutionCost(sessionVerdict.executionCost) ? sessionVerdict.executionCost : (defaults?.executionCost ?? sessionVerdict.executionCost),
+    nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall ?? defaults?.nextCall
+  };
+}
+
 function normalizeCoachVerdictPayload(
   payload: unknown,
   defaults?: {
@@ -526,10 +547,7 @@ function normalizeCoachVerdictPayload(
     if (!sessionVerdict) return root;
     return {
       ...root,
-      sessionVerdict: {
-        ...sessionVerdict,
-        nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
-      }
+      sessionVerdict: normalizeSessionVerdictFields(sessionVerdict, defaults)
     };
   }
 
@@ -541,10 +559,7 @@ function normalizeCoachVerdictPayload(
       return {
         ...candidate,
         sessionVerdict: sessionVerdict
-          ? {
-            ...sessionVerdict,
-            nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
-          }
+          ? normalizeSessionVerdictFields(sessionVerdict, defaults)
           : candidate.sessionVerdict
       };
     }
