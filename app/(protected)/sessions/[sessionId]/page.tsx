@@ -407,10 +407,10 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   const plannedColumnLabel = session.is_extra ? "Weekly context" : "Planned";
   const ghostPillClass =
     "rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[11px] font-medium text-[rgba(255,255,255,0.6)]";
-  const quietLabelClass = "text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary";
+  const quietLabelClass = "card-kicker";
   const sessionStatusBadgeClass =
     reviewVm.sessionStatusLabel.toLowerCase() === "completed"
-      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[#34D399]"
+      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-success"
       : "rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
   const intentBadgeClass =
     reviewVm.intent.label === "Matched intent"
@@ -520,7 +520,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p
-                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-[#34D399]" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
+                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
                         style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-primary))" }}
                       >
                         {metric.value}

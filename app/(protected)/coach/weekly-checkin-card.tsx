@@ -234,7 +234,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
             <span
               className={`rounded-full border px-3 py-1 text-xs ${
                 completedCount === METRICS.length
-                  ? "border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] text-[#34D399]"
+                  ? "border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] text-success"
                   : "border-[hsl(var(--border))] text-tertiary"
               }`}
             >

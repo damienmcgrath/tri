@@ -61,10 +61,10 @@ function calendarDisciplineChipTone(sport: string) {
 
 function calendarDisciplineBorderColor(sport: string) {
   const tones: Record<string, string> = {
-    run: "#FF5A28",
-    swim: "#63B3ED",
-    bike: "#34D399",
-    strength: "#A78BFA"
+    run: "var(--color-run)",
+    swim: "var(--color-swim)",
+    bike: "var(--color-bike)",
+    strength: "var(--color-strength)"
   };
 
   return tones[sport] ?? "rgba(255,255,255,0.24)";
@@ -178,7 +178,7 @@ function SessionActionMenu({
     <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-1.5 py-0.5 text-[11px] text-muted hover:text-foreground"
+        className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] text-muted hover:text-foreground"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
@@ -462,14 +462,15 @@ export function WeekCalendar({
             <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
           </select>
           <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+          <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
         </div>
       </header>
 
       {hasLoadedDismissalsForActiveWeek && hasAdaptation ? (
         <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FF5A28]">Needs attention</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-danger">Needs attention</p>
             <p className="text-[11px] text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
@@ -682,7 +683,7 @@ export function WeekCalendar({
         </section>
       ) : null}
 
-      <article className="grid gap-2 lg:grid-cols-7">
+      <article className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -788,10 +789,15 @@ export function WeekCalendar({
                       tabIndex={reviewableCompleted ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
-                          {discipline.label}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
+                            {discipline.label}
+                          </span>
+                          {(session.is_key || session.role?.toLowerCase() === "key") ? (
+                            <span className="rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.08)] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--warning))]">Key</span>
+                          ) : null}
+                        </div>
                         <SessionActionMenu
                           session={session}
                           state={state}
@@ -823,7 +829,7 @@ export function WeekCalendar({
                       ) : null}
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-[#34D399]">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
                             <span aria-hidden="true">✓</span>
                             Completed
                           </span>

@@ -21,13 +21,23 @@ type Props = {
   data: ShareData;
 };
 
-const SPORT_COLORS: Record<string, string> = {
-  swim: "#63b3ed",
-  bike: "#34d399",
-  run: "#ff5a28"
-};
+/** Resolve a CSS custom property to its computed value so canvas fillStyle works. */
+function resolveCSSVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function getSportColors(): Record<string, string> {
+  return {
+    swim: resolveCSSVar("--color-swim", "#63b3ed"),
+    bike: resolveCSSVar("--color-bike", "#34d399"),
+    run: resolveCSSVar("--color-run", "#ff5a28")
+  };
+}
 
 function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: "story" | "square") {
+  const SPORT_COLORS = getSportColors();
   const W = 1080;
   const H = variant === "story" ? 1920 : 1080;
   canvas.width = W;
@@ -115,7 +125,12 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
       const segW = Math.round((mins / total) * barW);
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.roundRect(x, y, segW - 4, barH, 4);
+      // roundRect landed in Chrome 99 / Firefox 112 / Safari 15.4 — fall back to fillRect on older engines
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(x, y, segW - 4, barH, 4);
+      } else {
+        ctx.rect(x, y, segW - 4, barH);
+      }
       ctx.fill();
       x += segW;
     }
@@ -202,15 +217,23 @@ export function ShareSummaryButton({ data }: Props) {
         type="button"
         onClick={() => void handleShare("story")}
         disabled={generating}
-        className="rounded-lg border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.08)] px-3 py-1.5 text-xs font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.14)] disabled:opacity-40"
+        className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs disabled:opacity-40"
       >
-        {generating ? "Generating…" : "Share (story)"}
+        {generating ? (
+          <>
+            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+            Generating…
+          </>
+        ) : "Share (story)"}
       </button>
       <button
         type="button"
         onClick={() => void handleShare("square")}
         disabled={generating}
-        className="rounded-lg border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-medium text-muted hover:text-[hsl(var(--text-primary))] disabled:opacity-40"
+        className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40"
       >
         Square
       </button>

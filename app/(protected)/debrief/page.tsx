@@ -40,10 +40,10 @@ function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") 
 }
 
 function metricGridClass(count: number) {
-  if (count <= 2) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2";
-  if (count === 3) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-3";
-  if (count === 4) return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4";
-  return "relative z-[1] mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5";
+  if (count <= 2) return "relative mt-6 grid gap-3 md:grid-cols-2";
+  if (count === 3) return "relative mt-6 grid gap-3 md:grid-cols-3";
+  if (count === 4) return "relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4";
+  return "relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5";
 }
 
 function formatMacroArcLine(ctx: MacroContext): string {
@@ -225,14 +225,14 @@ export default async function DebriefPage({
     <section className="space-y-4">
       <article className="debrief-hero surface p-6 md:p-7">
         {macroArcLine ? (
-          <div className="relative z-[1] mb-4 flex flex-wrap items-center gap-3 border-b border-[rgba(255,255,255,0.07)] pb-4">
+          <div className="relative mb-4 flex flex-wrap items-center gap-3 border-b border-[rgba(255,255,255,0.07)] pb-4">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">{macroArcLine}</p>
             {cumulativeVolumeLine ? (
               <p className="text-[11px] text-[rgba(255,255,255,0.45)]">{cumulativeVolumeLine}</p>
             ) : null}
           </div>
         ) : null}
-        <div className="relative z-[1] flex flex-wrap items-start gap-4">
+        <div className="relative flex flex-wrap items-start gap-4">
           <div className="max-w-4xl">
             <p className="label">Weekly Debrief</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -248,7 +248,7 @@ export default async function DebriefPage({
               <p className="mt-3 max-w-2xl text-sm text-muted">{artifact.facts.artifactStateNote}</p>
             ) : null}
           </div>
-          <div className="relative z-[1] flex min-w-[220px] flex-col items-start gap-3">
+          <div className="relative flex min-w-[220px] flex-col items-start gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
                 Coach brief
@@ -274,7 +274,7 @@ export default async function DebriefPage({
           {artifact.facts.metrics.map((metric) => (
             <div key={metric.label} className={`${metricToneClass(metric.tone)} min-h-[110px]`}>
               <p className="debrief-kicker">{metric.label}</p>
-              <p className="mt-4 text-[1.35rem] font-semibold leading-tight text-[hsl(var(--text-primary))]">{metric.value}</p>
+              <p className="mt-4 text-xl font-semibold leading-tight text-[hsl(var(--text-primary))]">{metric.value}</p>
               {metric.detail ? <p className="mt-2 text-xs text-muted">{metric.detail}</p> : null}
             </div>
           ))}
@@ -352,7 +352,7 @@ export default async function DebriefPage({
               <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-medium text-muted">{trend.metric}</p>
-                  <span className={`text-[10px] font-medium uppercase tracking-[0.1em] ${trend.direction === "improving" ? "text-[#34D399]" : trend.direction === "declining" ? "text-[#ff5a28]" : "text-tertiary"}`}>
+                  <span className={`text-[10px] font-medium uppercase tracking-[0.1em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
                     {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
                   </span>
                 </div>

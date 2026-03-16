@@ -37,9 +37,9 @@ export function SessionComparisonCard({ comparison, trends = [] }: Props) {
               <span
                 className={`text-sm font-medium ${
                   m.direction === "better"
-                    ? "text-[#34D399]"
+                    ? "text-success"
                     : m.direction === "worse"
-                    ? "text-[#ff5a28]"
+                    ? "text-danger"
                     : "text-tertiary"
                 }`}
               >
@@ -64,7 +64,7 @@ export function SessionComparisonCard({ comparison, trends = [] }: Props) {
                     <span key={pt.weekStart} className="rounded border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-tertiary">{pt.label}</span>
                   ))}
                 </span>
-                <span className={`font-medium ${trend.direction === "improving" ? "text-[#34D399]" : trend.direction === "declining" ? "text-[#ff5a28]" : "text-tertiary"}`}>
+                <span className={`font-medium ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
                   {trend.direction === "improving" ? "▲" : trend.direction === "declining" ? "▼" : "—"}
                 </span>
               </div>

@@ -8,10 +8,10 @@ type Props = {
 };
 
 const SPORT_COLORS: Record<string, string> = {
-  swim: "#63b3ed",
-  bike: "#34d399",
-  run: "#ff5a28",
-  strength: "#a78bfa"
+  swim: "var(--color-swim)",
+  bike: "var(--color-bike)",
+  run: "var(--color-run)",
+  strength: "var(--color-strength)"
 };
 
 function addDays(isoDate: string, days: number) {

@@ -91,7 +91,7 @@ type DayTone = "rest" | "upcoming" | "today-remaining" | "today-complete" | "com
 
 function kickerClassName(kicker: string) {
   const normalized = kicker.trim().toLowerCase();
-  if (normalized === "needs attention") return "text-[#FF5A28]";
+  if (normalized === "needs attention") return "text-danger";
   if (normalized === "focus this week") return "text-accent";
   if (normalized === "this week") return "text-accent";
   return "text-tertiary";

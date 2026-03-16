@@ -122,10 +122,10 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
 function disciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(99,179,237,0.10)", text: "#63B3ED", dot: "#63B3ED", border: "transparent" },
-    bike: { bg: "rgba(52,211,153,0.10)", text: "#34D399", dot: "#34D399", border: "transparent" },
-    run: { bg: "rgba(255,90,40,0.10)", text: "#FF5A28", dot: "#FF5A28", border: "transparent" },
-    strength: { bg: "rgba(167,139,250,0.10)", text: "#A78BFA", dot: "#A78BFA", border: "transparent" },
+    swim: { bg: "rgba(99,179,237,0.10)", text: "var(--color-swim)", dot: "var(--color-swim)", border: "transparent" },
+    bike: { bg: "rgba(52,211,153,0.10)", text: "var(--color-bike)", dot: "var(--color-bike)", border: "transparent" },
+    run: { bg: "rgba(255,90,40,0.10)", text: "var(--color-run)", dot: "var(--color-run)", border: "transparent" },
+    strength: { bg: "rgba(167,139,250,0.10)", text: "var(--color-strength)", dot: "var(--color-strength)", border: "transparent" },
     other: { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.65)", dot: "rgba(255,255,255,0.65)", border: "transparent" }
   };
 
@@ -134,10 +134,10 @@ function disciplineChipTone(sport: string) {
 
 function disciplineBorderColor(sport: string) {
   const tones: Record<string, string> = {
-    run: "#FF5A28",
-    swim: "#63B3ED",
-    bike: "#34D399",
-    strength: "#A78BFA"
+    run: "var(--color-run)",
+    swim: "var(--color-swim)",
+    bike: "var(--color-bike)",
+    strength: "var(--color-strength)"
   };
 
   return tones[sport] ?? "rgba(255,255,255,0.24)";
@@ -450,6 +450,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              aria-label="Previous week"
               className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
               onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
               disabled={!previousWeek}
@@ -463,6 +464,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             </select>
             <button
               type="button"
+              aria-label="Next week"
               className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
               onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
               disabled={!nextWeek}
@@ -478,22 +480,22 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       <section className="surface-subtle px-4 py-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Block</p>
+            <p className="card-kicker">Block</p>
             <p className="mt-1 text-sm font-medium text-white">{weekDraft.focus}</p>
           </div>
           {displayWeekFocus ? (
             <div className="md:col-span-2">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
+              <p className="card-kicker">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
               <p className="mt-1 text-sm font-medium text-white">{displayWeekFocus}</p>
             </div>
           ) : null}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Rest days</p>
+            <p className="card-kicker">Rest days</p>
             <p className="mt-1 text-sm font-medium text-white">{restDays}</p>
           </div>
           {keySessions > 0 ? (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Key sessions</p>
+              <p className="card-kicker">Key sessions</p>
               <p className="mt-1 text-sm font-medium text-white">{keySessions}</p>
             </div>
           ) : null}
@@ -504,7 +506,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       {weekDays.some((d) => d.totalMinutes > 0) ? (
         <section className="surface-subtle px-4 py-3">
           <div className="mb-2.5 flex items-center justify-between">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Daily load shape</p>
+            <p className="card-kicker">Daily load shape</p>
             {volumeDelta !== null ? (
               <p className={`text-[11px] font-medium ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
                 {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta} min vs last week
@@ -525,10 +527,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       if (!mins) return null;
                       const heightPct = (mins / maxMinutes) * 100;
                       const colors: Record<string, string> = {
-                        swim: "#63b3ed",
-                        bike: "#34d399",
-                        run: "#ff5a28",
-                        strength: "#a78bfa",
+                        swim: "var(--color-swim)",
+                        bike: "var(--color-bike)",
+                        run: "var(--color-run)",
+                        strength: "var(--color-strength)",
                         other: "rgba(255,255,255,0.25)"
                       };
                       return (

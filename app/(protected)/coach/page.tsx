@@ -283,7 +283,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
             <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Key positive</p>
+                  <p className="card-kicker">Key positive</p>
                   <p className="mt-2 text-sm">{weeklyBrief.keyPositive ?? "No strong positive yet. More reviewed sessions will sharpen the read."}</p>
                 </div>
                 <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
@@ -298,14 +298,14 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
               </div>
 
               <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Trend line</p>
+                <p className="card-kicker">Trend line</p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
                     <p className="font-mono text-[22px] font-medium text-white">{weeklyBrief.trend.reviewedCount}</p>
                     <p className="text-xs text-muted">Reviewed</p>
                   </div>
                   <div>
-                    <p className="font-mono text-[22px] font-medium text-[#34D399]">{weeklyBrief.trend.onTargetCount}</p>
+                    <p className="font-mono text-[22px] font-medium text-success">{weeklyBrief.trend.onTargetCount}</p>
                     <p className="text-xs text-muted">On target</p>
                   </div>
                   <div>
@@ -313,7 +313,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
                     <p className="text-xs text-muted">Partial</p>
                   </div>
                   <div>
-                    <p className={`font-mono text-[22px] font-medium ${weeklyBrief.trend.missedCount > 0 ? "text-[#FF5A28]" : "text-[rgba(255,255,255,0.35)]"}`}>{weeklyBrief.trend.missedCount}</p>
+                    <p className={`font-mono text-[22px] font-medium ${weeklyBrief.trend.missedCount > 0 ? "text-danger" : "text-[rgba(255,255,255,0.35)]"}`}>{weeklyBrief.trend.missedCount}</p>
                     <p className="text-xs text-muted">Missed</p>
                   </div>
                 </div>
@@ -329,7 +329,7 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
 
           {weeklyBrief.sessionsNeedingAttention.length > 0 ? (
             <div className="mt-4">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-tertiary">Sessions needing attention</p>
+              <p className="card-kicker">Sessions needing attention</p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 {weeklyBrief.sessionsNeedingAttention.map((session) => (
                   <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#18181C] p-4 transition hover:border-[rgba(255,255,255,0.12)]" style={{ borderLeftWidth: "2px", borderLeftColor: "#FFB43C" }}>
