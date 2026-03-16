@@ -765,9 +765,8 @@ export function WeekCalendar({
                   const leftBorderColor = isNeedsAttentionCard ? "#FF5A28" : calendarDisciplineBorderColor(session.sport);
 
                   const stateBadge =
-                    state === "extra" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-success"><span aria-hidden="true">✓</span>Extra</span>
-                    ) : state === "unmatched_upload" ? (
+                    state === "extra" ? null
+                    : state === "unmatched_upload" ? (
                       <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
@@ -776,7 +775,7 @@ export function WeekCalendar({
                     );
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
-                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload";
+                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload" || state === "extra";
                   const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
 
                   return (
@@ -843,9 +842,9 @@ export function WeekCalendar({
                       ) : null}
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
+                          <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
                             <span aria-hidden="true">✓</span>
-                            Completed
+                            {state === "extra" ? "Extra" : "Completed"}
                           </span>
                         </div>
                       ) : state === "unmatched_upload" ? (
