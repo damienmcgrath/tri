@@ -981,7 +981,8 @@ export async function generateCoachVerdict(args: {
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    if (parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
+    const deterministicConfidence = args.evidence.rulesSummary.confidence;
+    if (deterministicConfidence !== "low" && parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
       console.warn("[session-review-ai] Falling back to deterministic review: model intent match disagreed with deterministic diagnosis", {
         sessionId: args.evidence.sessionId,
         modelIntentMatch: parsed.data.sessionVerdict.intentMatch,
