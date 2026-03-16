@@ -66,7 +66,7 @@ export function WeekAheadCard({ preview }: Props) {
           <div className="flex items-end gap-1">
             {weekDays.map((day) => (
               <div key={day.iso} className="flex flex-1 flex-col items-center gap-0.5">
-                <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "32px" }}>
+                <div className="flex h-8 w-full flex-col-reverse overflow-hidden rounded-sm sm:h-10">
                   {(["swim", "bike", "run", "strength", "other"] as const).map((sport) => {
                     const mins = day.sessions.filter((s) => s.sport === sport).reduce((sum, s) => sum + s.durationMinutes, 0);
                     if (!mins) return null;
@@ -80,7 +80,7 @@ export function WeekAheadCard({ preview }: Props) {
                     );
                   })}
                 </div>
-                <p className="text-[8px] text-tertiary">{day.label.slice(0, 2)}</p>
+                <p className="text-[10px] text-tertiary">{day.label.slice(0, 2)}</p>
               </div>
             ))}
           </div>

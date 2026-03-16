@@ -441,7 +441,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   return (
     <section className="space-y-4">
       <header className="surface-subtle px-4 py-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             <p className="label-base text-[10px] text-accent">Plan</p>
             <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
@@ -451,13 +451,13 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <button
               type="button"
               aria-label="Previous week"
-              className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
               onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
               disabled={!previousWeek}
             >
               ←
             </button>
-            <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base w-auto py-1.5 text-xs" aria-label="Select plan week">
+            <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base flex-1 py-1.5 text-xs sm:flex-none sm:w-auto" aria-label="Select plan week">
               {planWeeks.map((week) => (
                 <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>
               ))}
@@ -465,14 +465,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
             <button
               type="button"
               aria-label="Next week"
-              className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
               onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
               disabled={!nextWeek}
             >
               →
             </button>
-            {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 py-1.5 text-xs">Save</button> : null}
-            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md">Actions</button>
+            {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 text-xs">Save</button> : null}
+            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="inline-flex min-h-[44px] items-center rounded-md border border-[rgba(255,255,255,0.20)] bg-transparent px-3 text-xs text-[rgba(255,255,255,0.7)] lg:min-h-0 lg:py-1.5">Actions</button>
           </div>
         </div>
       </header>
@@ -518,7 +518,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
               const maxMinutes = Math.max(...weekDays.map((d) => d.totalMinutes), 1);
               return weekDays.map((day) => (
                 <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
-                  <p className="text-[8px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
+                  <p className="text-[10px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
                     {day.totalMinutes}
                   </p>
                   <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
@@ -542,7 +542,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       );
                     })}
                   </div>
-                  <p className="text-[9px] text-tertiary">{day.label}</p>
+                  <p className="text-[11px] text-tertiary">{day.label}</p>
                 </div>
               ));
             })()}
@@ -696,14 +696,14 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                 })}
                 {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 inline-flex min-h-[44px] items-center text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)] lg:min-h-0">＋ Add</button>
             </section>
           ))}
         </div>
       </article>
 
       <details className="surface-subtle p-3">
-        <summary className="cursor-pointer text-sm font-medium">Week notes & settings</summary>
+        <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-medium lg:min-h-0">Week notes & settings</summary>
         <div className="mt-2">
           <p className="text-xs text-muted">Discipline totals: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
         </div>
@@ -724,8 +724,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       </details>
 
       {quickAddDay ? (
-        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
+        <div className="fixed inset-0 z-20 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
+          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 text-xs">Close</button></div>
           <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
           <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
             <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
@@ -742,8 +742,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       ) : null}
 
       {activeSession ? (
-        <div className="fixed bottom-0 right-0 top-14 z-20 w-full max-w-md border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl overflow-y-auto">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 py-1 text-xs">Close</button></div>
+        <div className="fixed inset-0 z-20 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
+          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 text-xs">Close</button></div>
           <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
             <label className="label-base">Discipline</label><select name="sport" defaultValue={activeSession.sport} className="input-base" required>{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>

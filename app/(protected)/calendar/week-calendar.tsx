@@ -452,18 +452,22 @@ export function WeekCalendar({
           </Link>
           <Link href={withWeek(addDays(activeWeekStart, 7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Next</Link>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-          <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
-            <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
-          </select>
-          <label className="sr-only" htmlFor="status-filter">Status filter</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1">
-            <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
-          </select>
-          <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-2 py-1 text-xs">Add session</button>
-          <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
-          <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
+        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center gap-2">
+            <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
+            <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="flex-1 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:flex-none sm:py-1">
+              <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
+            </select>
+            <label className="sr-only" htmlFor="status-filter">Status filter</label>
+            <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="flex-1 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:flex-none sm:py-1">
+              <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-3 text-xs">Add session</button>
+            <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+            <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
+          </div>
         </div>
       </header>
 
@@ -667,7 +671,7 @@ export function WeekCalendar({
                                   });
                                 });
                               }}
-                              className="rounded-md bg-[rgba(190,255,0,0.15)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)]"
+                              className="inline-flex min-h-[44px] items-center rounded-md bg-[rgba(190,255,0,0.15)] px-3 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)] lg:min-h-0 lg:px-2.5 lg:py-1"
                             >
                               Accept
                             </button>
@@ -683,7 +687,7 @@ export function WeekCalendar({
         </section>
       ) : null}
 
-      <article className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+      <article className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {weekDays.map((day) => {
           const daySessions = sessionsByDay[day.iso] ?? [];
           const metrics = dayMetrics.find((metric) => metric.day === day.iso);
@@ -738,14 +742,14 @@ export function WeekCalendar({
                 <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[10px] text-accent">Today</span> : null}
+                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[11px] text-accent">Today</span> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
                 <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
                 {dayContextNote ? (
-                  <p className={`text-[10px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
+                  <p className={`text-[11px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
                 ) : null}
-                {attentionReason ? <p className="text-[10px] text-muted">{attentionReason}</p> : null}
+                {attentionReason ? <p className="text-[11px] text-muted">{attentionReason}</p> : null}
               </div>
 
               <div className="space-y-1.5 pt-0.5">
@@ -1108,7 +1112,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
         )}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
         <div className="sticky bottom-0 pt-2 text-right">
-          <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
+          <button onClick={onClose} className="btn-secondary px-3 text-xs">Close</button>
         </div>
       </div>
     </TaskSheet>
@@ -1127,8 +1131,8 @@ function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose
 function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <aside className="relative ml-auto flex min-h-screen w-full max-w-xl flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl">
-        <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-5 py-4">
+      <aside className="relative ml-auto flex min-h-screen w-full flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl sm:max-w-xl">
+        <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Calendar task</p>
@@ -1139,10 +1143,10 @@ function TaskSheet({ children, title, description, onClose }: { children: React.
                 </p>
               ) : null}
             </div>
-            <button type="button" onClick={onClose} className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs text-muted hover:text-foreground">Close</button>
+            <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] rounded-md border border-[hsl(var(--border))] px-3 text-xs text-muted hover:text-foreground lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1">Close</button>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
       </aside>
     </TaskOverlay>
   );

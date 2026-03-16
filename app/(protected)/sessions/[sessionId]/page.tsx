@@ -419,18 +419,18 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   return (
     <section className="space-y-4">
-      <Link href="/calendar" className="text-sm text-cyan-300 underline-offset-2 hover:underline">← Back to Calendar</Link>
+      <Link href="/calendar" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-cyan-300 underline-offset-2 hover:underline lg:min-h-0">← Back to Calendar</Link>
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} /> : null}
 
       <article className="surface p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <p className="label">Session review</p>
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
             <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
               {reviewVm.reviewModeLabel}
             </div>
@@ -455,14 +455,14 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
           <div className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
-              <h2 className={`text-[22px] font-medium leading-tight ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
+              <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
                 {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
               </h2>
               <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.actualExecutionSummary}</p>
               <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
             </div>
 
-            <div className="border-l border-[hsl(var(--border))] pl-5">
+            <div className="border-t border-[hsl(var(--border))] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
               <p className={quietLabelClass}>What to do next</p>
               <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
               <p className={`mt-4 ${quietLabelClass}`}>This week</p>
@@ -493,7 +493,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         </div>
       </article>
 
-      <section className="surface p-5">
+      <section className="surface p-4 md:p-5">
         {reviewVm.isReviewable ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-5">
@@ -513,11 +513,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               </div>
             </div>
 
-            <div className="space-y-5 border-l border-[hsl(var(--border))] pl-5">
+            <div className="space-y-5 border-t border-[hsl(var(--border))] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
               {reviewVm.usefulMetrics.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {reviewVm.usefulMetrics.map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3 sm:p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p
                         className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-[hsl(var(--text-primary))]"}`}
@@ -628,7 +628,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           </div>
           <Link
             href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
-            className="btn-primary px-3 py-1.5 text-xs"
+            className="btn-primary px-3 text-xs"
           >
             Ask coach
           </Link>
@@ -638,7 +638,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <Link
               key={prompt}
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
+              className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
             >
               {prompt}
             </Link>

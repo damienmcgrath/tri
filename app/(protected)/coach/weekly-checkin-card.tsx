@@ -279,13 +279,13 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="weekly-checkin-title"
-            className="relative z-10 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface)),hsl(var(--surface-subtle)))] shadow-[0_30px_120px_hsl(222_40%_4%/0.55)]"
+            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface)),hsl(var(--surface-subtle)))] shadow-[0_30px_120px_hsl(222_40%_4%/0.55)] sm:max-w-xl sm:rounded-[28px] md:max-w-4xl"
           >
-            <div className="border-b border-[hsl(var(--border))] p-5">
+            <div className="border-b border-[hsl(var(--border))] p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-accent">Weekly check-in</p>
-                  <h3 id="weekly-checkin-title" className="mt-1 text-2xl font-semibold">How does the week feel?</h3>
+                  <h3 id="weekly-checkin-title" className="mt-1 text-xl font-semibold sm:text-2xl">How does the week feel?</h3>
                   <p className="mt-1 text-sm text-muted">Keep this short. The goal is to give Coach the right caution level before your next key session.</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -302,7 +302,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
               </div>
             </div>
 
-            <div className="space-y-5 p-5">
+            <div className="space-y-4 p-4 sm:p-5">
               <div className="grid gap-3 lg:grid-cols-2">
                 {METRICS.map((metric) => (
                   <ModalMetricRow
@@ -332,7 +332,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:p-5">
               <div className="flex flex-wrap gap-2 text-xs text-tertiary">
                 <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1">Fast update</span>
                 <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1">Used for coaching tone</span>

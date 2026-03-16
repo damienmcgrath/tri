@@ -46,7 +46,7 @@ export function MobileBottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 py-1 backdrop-blur lg:hidden">
+    <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -57,9 +57,10 @@ export function MobileBottomTabs() {
               aria-label={item.label}
               aria-current={active ? "page" : undefined}
               prefetch
-              className={`relative flex min-h-[44px] items-center justify-center rounded-md border border-transparent px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
+              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-md border border-transparent px-2 py-2 text-center transition ${active ? "nav-item-active nav-item-active--mobile pl-3" : "text-[hsl(var(--fg-muted))]"}`}
             >
-              <span className="block">{item.label}</span>
+              <span aria-hidden="true" className={`text-base leading-none ${active ? "" : "opacity-60"}`}>{item.icon}</span>
+              <span className={`block text-[10px] font-medium leading-none ${active ? "" : "opacity-70"}`}>{item.label}</span>
             </Link>
           );
         })}
