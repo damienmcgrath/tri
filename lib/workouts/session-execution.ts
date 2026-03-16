@@ -720,3 +720,68 @@ export async function backfillPendingSessionExecutions(args: {
     attempted: linksToProcess.length
   };
 }
+
+export async function syncExtraActivityExecution(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  activityId: string;
+}): Promise<PersistedExecutionReview> {
+  const { data: activity, error: activityError } = await args.supabase
+    .from("completed_activities")
+    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+    .eq("id", args.activityId)
+    .eq("user_id", args.userId)
+    .maybeSingle();
+
+  if (activityError) throw new Error(activityError.message);
+  if (!activity) throw new Error("Activity not found.");
+
+  const syntheticSession: SessionExecutionSessionRow = {
+    id: `activity:${activity.id}`,
+    user_id: args.userId,
+    sport: activity.sport_type,
+    type: "Extra workout",
+    duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+    target: null,
+    intent_category: "extra workout",
+    session_name: "Extra workout",
+    session_role: null,
+    status: "completed"
+  };
+
+  const diagnosisInput = buildDiagnosisInput(syntheticSession, activity as SessionExecutionActivityRow);
+
+  let athleteContext = null;
+  try {
+    athleteContext = await getAthleteContextSnapshot(args.supabase, args.userId);
+  } catch {
+    athleteContext = null;
+  }
+
+  const { evidence } = buildExecutionEvidence({
+    athleteId: args.userId,
+    sessionId: syntheticSession.id,
+    sessionTitle: "Extra workout",
+    sessionRole: null,
+    diagnosisInput,
+    weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
+  });
+
+  const generated = await generateCoachVerdict({ evidence, athleteContext, recentReviewedSessions: [] });
+  const executionResult = toPersistedExecutionReview({
+    linkedActivityId: activity.id,
+    evidence,
+    verdict: generated.verdict,
+    narrativeSource: generated.source
+  });
+
+  const { error: saveError } = await args.supabase
+    .from("completed_activities")
+    .update({ execution_result: executionResult })
+    .eq("id", activity.id)
+    .eq("user_id", args.userId);
+
+  if (saveError) throw new Error(saveError.message);
+
+  return executionResult;
+}
