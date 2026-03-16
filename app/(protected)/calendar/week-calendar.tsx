@@ -1067,6 +1067,8 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
   const executionSummary = session.executionResult?.executionScoreSummary ?? session.executionResult?.summary;
   const nextAction = session.executionResult?.recommendedNextAction ?? session.executionResult?.recommended_next_action;
   const provisional = Boolean(session.executionResult?.executionScoreProvisional ?? session.executionResult?.execution_score_provisional);
+  const [markingExtra, setMarkingExtra] = useState(false);
+  const [markedExtra, setMarkedExtra] = useState(false);
 
   return (
     <TaskSheet
@@ -1106,6 +1108,32 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
           </div>
         )}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
+        {session.displayType === "completed_activity" ? (
+          <div className="pt-1">
+            {markedExtra ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-3 py-1.5 text-xs font-medium text-success">
+                <span aria-hidden="true">✓</span> Marked as extra
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={markingExtra}
+                onClick={async () => {
+                  setMarkingExtra(true);
+                  try {
+                    await markActivityExtraAction({ activityId: session.id });
+                    setMarkedExtra(true);
+                  } catch {
+                    setMarkingExtra(false);
+                  }
+                }}
+                className="rounded-full border border-[rgba(255,255,255,0.16)] bg-transparent px-3 py-1.5 text-xs text-muted transition hover:border-[rgba(255,255,255,0.3)] hover:text-foreground disabled:opacity-50"
+              >
+                {markingExtra ? "Marking…" : "Mark as extra"}
+              </button>
+            )}
+          </div>
+        ) : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Close</button>
         </div>

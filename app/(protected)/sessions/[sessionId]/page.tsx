@@ -10,7 +10,6 @@ import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivit
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionComparisonCard } from "./components/session-comparison-card";
-import { MarkAsExtraButton } from "./components/mark-as-extra-button";
 import { DetailsAccordion } from "../../details-accordion";
 
 type SessionRow = SessionReviewRow;
@@ -445,7 +444,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
               {reviewVm.reviewModeLabel}
             </div>
-            {hasLinkedActivity && linkedActivityId ? <MarkAsExtraButton activityId={linkedActivityId} /> : null}
             {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
           </div>
         </div>
