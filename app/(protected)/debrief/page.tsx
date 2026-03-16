@@ -27,6 +27,11 @@ function stateLabel(state: "final" | "provisional", stale: boolean) {
   return state === "provisional" ? "Provisional" : "Final";
 }
 
+const debriefDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+function formatDebriefDate(iso: string) {
+  return debriefDateFormatter.format(new Date(`${iso}T00:00:00.000Z`));
+}
+
 function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
   if (source === "ai") return "AI narrative";
   if (source === "fallback") return "Fallback narrative";
@@ -170,23 +175,23 @@ export default async function DebriefPage({
           <h1 className="mt-1 text-2xl font-semibold">Not enough signal yet</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">{snapshot.readiness.reason}</p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Week</p>
-              <p className="mt-2 text-sm font-medium">{snapshot.weekStart} to {snapshot.weekEnd}</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Week</p>
+              <p className="mt-2 text-sm font-medium">{formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Key sessions</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Key sessions</p>
               <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedKeySessions}/{snapshot.readiness.totalKeySessions} resolved</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Resolved time</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Resolved time</p>
               <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedMinutes}m / {snapshot.readiness.plannedMinutes}m</p>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <a href="/dashboard" className="btn-secondary px-3 py-1.5 text-xs">
+            <a href="/dashboard" className="btn-secondary px-3 text-xs">
               Back to dashboard
             </a>
           </div>
@@ -236,7 +241,7 @@ export default async function DebriefPage({
 
   return (
     <section className="space-y-4">
-      <article className="debrief-hero surface p-6 md:p-7">
+      <article className="debrief-hero surface p-4 sm:p-6 md:p-7">
         {macroArcLine ? (
           <div className="relative mb-4 flex flex-wrap items-center gap-3 border-b border-[rgba(255,255,255,0.07)] pb-4">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">{macroArcLine}</p>
@@ -253,7 +258,7 @@ export default async function DebriefPage({
               <span className={statePillClass(artifact.facts.artifactStateLabel, snapshot.stale)}>{stateLabel(artifact.facts.artifactStateLabel, snapshot.stale)}</span>
               <span className={narrativeSourcePillClass(artifact.facts.narrativeSource)}>{narrativeSourceLabel(artifact.facts.narrativeSource)}</span>
             </div>
-            <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] md:text-[3.25rem]">{artifact.facts.title}</h1>
+            <h1 className="mt-4 max-w-4xl text-2xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">{artifact.facts.title}</h1>
             <p className="mt-3 max-w-3xl text-[15px] leading-7 text-[hsl(var(--text-primary))]">{artifact.facts.statusLine}</p>
             {snapshot.stale ? (
               <p className="mt-3 max-w-2xl text-sm text-muted">The week changed after this version was saved.</p>
@@ -263,7 +268,7 @@ export default async function DebriefPage({
           </div>
           <div className="relative flex min-w-[220px] flex-col items-start gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
+              <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 text-xs">
                 Coach brief
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
@@ -285,7 +290,7 @@ export default async function DebriefPage({
 
         <div className={metricGridClass(artifact.facts.metrics.length)}>
           {artifact.facts.metrics.map((metric) => (
-            <div key={metric.label} className={`${metricToneClass(metric.tone)} min-h-[110px]`}>
+            <div key={metric.label} className={`${metricToneClass(metric.tone)} sm:min-h-[110px]`}>
               <p className="debrief-kicker">{metric.label}</p>
               <p className="mt-4 text-xl font-semibold leading-tight text-[hsl(var(--text-primary))]">{metric.value}</p>
               {metric.detail ? <p className="mt-2 text-xs text-muted">{metric.detail}</p> : null}
@@ -308,19 +313,19 @@ export default async function DebriefPage({
         const qualityColor = completionDelta > 5 ? "text-success" : completionDelta < -5 ? "text-danger" : "text-muted";
 
         return (
-          <article className="grid gap-3 sm:grid-cols-3">
+          <article className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Sessions completed</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Sessions completed</p>
               <p className="mt-2 text-sm font-medium">{sessionsLabel}</p>
               <p className="mt-1 text-[11px] text-muted">vs {prevSessionsLabel} last week</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Training time</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Training time</p>
               <p className="mt-2 text-sm font-medium">{timeLabel}</p>
               <p className="mt-1 text-[11px] text-muted">vs {prevTimeLabel} last week</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Execution quality</p>
               <p className={`mt-2 text-sm font-medium ${qualityColor}`}>{qualityTrend}</p>
               <p className="mt-1 text-[11px] text-muted">{artifact.facts.completionPct}% vs {prevFacts.completionPct ?? 0}% last week</p>
             </div>
@@ -399,7 +404,7 @@ export default async function DebriefPage({
               <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-medium text-muted">{trend.metric}</p>
-                  <span className={`text-[10px] font-medium uppercase tracking-[0.1em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
+                  <span className={`text-[11px] font-medium uppercase tracking-[0.08em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
                     {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
                   </span>
                 </div>
@@ -409,7 +414,7 @@ export default async function DebriefPage({
                     <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
                   ))}
                 </div>
-                <p className="mt-2 text-[10px] text-tertiary">Confidence: {trend.confidence}</p>
+                <p className="mt-2 text-[11px] text-tertiary">Confidence: {trend.confidence}</p>
               </div>
             ))}
           </div>
@@ -490,17 +495,17 @@ export default async function DebriefPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {adjacent.previousWeekStart ? (
-              <a href={`/debrief?weekStart=${adjacent.previousWeekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
+              <a href={`/debrief?weekStart=${adjacent.previousWeekStart}`} className="btn-secondary w-full px-3 text-xs sm:w-auto">
                 Previous saved week
               </a>
             ) : null}
             {adjacent.nextWeekStart ? (
-              <a href={`/debrief?weekStart=${adjacent.nextWeekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
+              <a href={`/debrief?weekStart=${adjacent.nextWeekStart}`} className="btn-secondary w-full px-3 text-xs sm:w-auto">
                 Next saved week
               </a>
             ) : null}
           </div>
-          <a href="/dashboard" className="text-xs text-muted underline-offset-2 hover:text-[hsl(var(--text-primary))] hover:underline">
+          <a href="/dashboard" className="inline-flex min-h-[44px] items-center text-xs text-muted underline-offset-2 hover:text-[hsl(var(--text-primary))] hover:underline lg:min-h-0">
             Back to dashboard
           </a>
         </div>

@@ -11,7 +11,7 @@ export function DetailsAccordion({
 }) {
   return (
     <details className="surface-subtle rounded-[18px] p-3.5">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:hidden">
+      <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 marker:hidden lg:min-h-0">
         <span className="text-sm font-medium text-accent">{title}</span>
         {summaryDetail ? <span className="flex flex-wrap items-center justify-end gap-2">{summaryDetail}</span> : null}
       </summary>

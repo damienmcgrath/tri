@@ -225,11 +225,11 @@ class PreviewQueryBuilder {
   }
 
   private getRows() {
-    return getPreviewDatabase()[this.table];
+    return getPreviewDatabase()[this.table] ?? [];
   }
 
   private applyFilters(rows: Array<Record<string, unknown>>) {
-    return rows.filter((row) => this.filters.every((filter) => rowMatchesFilter(row, filter)));
+    return (rows ?? []).filter((row) => this.filters.every((filter) => rowMatchesFilter(row, filter)));
   }
 
   private applyOrderAndLimit(rows: Array<Record<string, unknown>>) {

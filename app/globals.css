@@ -177,6 +177,17 @@
     backdrop-filter: blur(16px);
   }
 
+  /* Main content grid — enough bottom padding to clear fixed mobile nav + home bar */
+  .shell-content-grid {
+    padding-bottom: max(6rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));
+  }
+
+  @media (min-width: 1024px) {
+    .shell-content-grid {
+      padding-bottom: 2rem;
+    }
+  }
+
   .surface {
     background: var(--color-surface);
     border: 1px solid var(--border-subtle);
@@ -318,6 +329,7 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-md);
+    min-height: 44px;
     padding: 9px 18px;
     font-size: 13px;
     font-weight: 500;
@@ -326,6 +338,15 @@
       background-color var(--motion-fast) var(--motion-ease),
       color var(--motion-fast) var(--motion-ease),
       opacity var(--motion-fast) var(--motion-ease);
+  }
+
+  @media (min-width: 1024px) {
+    .btn-primary,
+    .btn-secondary,
+    .btn-ghost,
+    .btn-header-cta {
+      min-height: 36px;
+    }
   }
 
   .btn-primary {
@@ -513,13 +534,19 @@
 
   .debrief-metric-card {
     display: flex;
-    min-height: 110px;
     flex-direction: column;
     justify-content: flex-start;
     border: 1px solid var(--border-subtle);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.02);
-    padding: 16px;
+    padding: 14px;
+  }
+
+  @media (min-width: 640px) {
+    .debrief-metric-card {
+      min-height: 110px;
+      padding: 16px;
+    }
   }
 
   .debrief-metric-card--emphasis {
@@ -561,9 +588,9 @@
     padding: 18px 20px;
   }
 
-  /* General-purpose card section kicker — 10px caps, tight tracking, tertiary color */
+  /* General-purpose card section kicker — 11px caps, tight tracking, tertiary color */
   .card-kicker {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -571,9 +598,9 @@
   }
 
   .debrief-kicker {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-tertiary);
   }

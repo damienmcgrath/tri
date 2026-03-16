@@ -788,8 +788,8 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <article className="surface p-5 md:p-6">
+      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
+        <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
@@ -800,8 +800,8 @@ export default async function DashboardPage({
 
           <div className="mt-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="min-w-0">
-              <p className="text-6xl font-semibold leading-none tracking-[-0.03em]">{completionPct}%</p>
-              <p className="mt-3 text-xl font-medium leading-tight text-[rgba(255,255,255,0.94)]">{toHoursAndMinutes(remainingMinutes)} left this week</p>
+              <p className="text-4xl font-semibold leading-none tracking-[-0.03em] sm:text-5xl lg:text-6xl">{completionPct}%</p>
+              <p className="mt-3 text-lg font-medium leading-tight text-[rgba(255,255,255,0.94)] sm:text-xl">{toHoursAndMinutes(remainingMinutes)} left this week</p>
               <p className="mt-1 text-sm text-[rgba(255,255,255,0.74)]">{toHoursAndMinutes(totals.completed)} completed of {toHoursAndMinutes(totals.planned)} planned</p>
             </div>
           </div>
@@ -810,12 +810,12 @@ export default async function DashboardPage({
             <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${totals.planned > 0 ? (totals.completed / totals.planned) * 100 : 0}%` }} />
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {dailyStates.map((day) => {
               const chip = getDayChipContent(day);
               return (
-                <div key={day.iso} className={`min-h-[60px] overflow-hidden rounded-2xl border px-3 py-2 ${getDayToneClass(day.tone)}`}>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[rgba(255,255,255,0.6)]">{day.label}</p>
+                <div key={day.iso} className={`min-h-[52px] overflow-hidden rounded-2xl border px-3 py-2 sm:min-h-[60px] ${getDayToneClass(day.tone)}`}>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[rgba(255,255,255,0.6)]">{day.label}</p>
                   <p className={getDayChipTitleClass(day)}>{chip.title}</p>
                   {chip.meta ? <p className="mt-0.5 truncate text-[11px] leading-tight text-[rgba(255,255,255,0.62)]">{chip.meta}</p> : null}
                 </div>
@@ -830,7 +830,7 @@ export default async function DashboardPage({
           </div>
         </article>
 
-        <article className="surface p-5 md:p-6">
+        <article className="surface p-4 md:p-5 lg:p-6">
           {pendingTodaySessions.length > 0 ? (
             <>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)]">Today</p>
@@ -873,8 +873,8 @@ export default async function DashboardPage({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {nextPendingTodaySession ? <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 py-1.5 text-xs">Open session</Link> : null}
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
+                {nextPendingTodaySession ? <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 text-xs">Open session</Link> : null}
+                <Link href="/calendar" className="btn-secondary px-3 text-xs">View plan</Link>
               </div>
 
               {contextualItems.length > 0 ? (
@@ -884,7 +884,7 @@ export default async function DashboardPage({
                       <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
                       <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
                       <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>
@@ -904,7 +904,7 @@ export default async function DashboardPage({
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   href={nextImportantSession ? `/calendar?focus=${nextImportantSession.id}` : "/calendar"}
-                  className="btn-primary px-3 py-1.5 text-xs"
+                  className="btn-primary px-3 text-xs"
                 >
                   {nextImportantSession ? `Prepare ${getSessionDisplayName(nextImportantSession)}` : "Open weekly plan"}
                 </Link>
@@ -916,7 +916,7 @@ export default async function DashboardPage({
                         ? `/sessions/activity/${extraTodayActivities[0].id}`
                         : "/calendar"
                   }
-                  className="btn-secondary px-3 py-1.5 text-xs"
+                  className="btn-secondary px-3 text-xs"
                 >
                   Review today
                 </Link>
@@ -929,7 +929,7 @@ export default async function DashboardPage({
                       <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
                       <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
                       <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>
@@ -941,7 +941,7 @@ export default async function DashboardPage({
               <h2 className="mt-2 text-xl font-semibold">No sessions scheduled</h2>
               <p className="mt-2 text-sm text-[rgba(255,255,255,0.74)]">Use today for recovery and reset, then protect the next planned key session.</p>
               <div className="mt-4">
-                <Link href="/calendar" className="btn-secondary px-3 py-1.5 text-xs">View plan</Link>
+                <Link href="/calendar" className="btn-secondary px-3 text-xs">View plan</Link>
               </div>
 
               {contextualItems.length > 0 ? (
@@ -951,7 +951,7 @@ export default async function DashboardPage({
                       <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
                       <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
                       <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-block ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-2.5 py-1 text-[11px]`}>{item.cta}</Link>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>

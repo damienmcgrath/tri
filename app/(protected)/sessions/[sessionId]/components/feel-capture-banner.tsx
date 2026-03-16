@@ -58,7 +58,7 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
       <p className="label">How did that feel?</p>
       <p className="mt-1 text-sm text-muted">Rate the effort for this session.</p>
 
-      <div className="mt-4 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Rate perceived exertion (1-10)">
+      <div className="mt-4 grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Rate perceived exertion (1-10)">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((rpe) => (
           <button
             key={rpe}
@@ -67,7 +67,7 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
             aria-checked={selectedRpe === rpe}
             aria-label={`RPE ${rpe}: ${rpeLabels[rpe]}`}
             onClick={() => setSelectedRpe(rpe)}
-            className={`min-h-[44px] min-w-[44px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            className={`min-h-[44px] w-full rounded-lg border text-sm font-medium transition-colors ${
               selectedRpe === rpe
                 ? "border-[rgba(190,255,0,0.6)] bg-[rgba(190,255,0,0.15)] text-[var(--color-accent)]"
                 : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-[hsl(var(--text-primary))]"
