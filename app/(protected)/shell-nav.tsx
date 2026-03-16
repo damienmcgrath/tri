@@ -14,14 +14,15 @@ export function ShellNavRail({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav className={compact ? "flex flex-col gap-2" : "space-y-1"}>
+    <nav aria-label="Main navigation" className={compact ? "flex flex-col gap-2" : "space-y-1"}>
       {navItems.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}
             href={item.href}
-            title={item.label}
+            aria-label={item.label}
+            aria-current={active ? "page" : undefined}
             prefetch
             className={`relative rounded-md border border-transparent px-3 py-2 text-[13px] transition ${
               active
@@ -45,7 +46,7 @@ export function MobileBottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 py-2 backdrop-blur lg:hidden">
+    <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 py-1 backdrop-blur lg:hidden">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -53,9 +54,10 @@ export function MobileBottomTabs() {
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               prefetch
-              className={`relative rounded-md border border-transparent px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
+              className={`relative flex min-h-[44px] items-center justify-center rounded-md border border-transparent px-2 py-2 text-center text-xs font-medium ${active ? "nav-item-active nav-item-active--mobile pl-4" : "text-[hsl(var(--fg-muted))]"}`}
             >
               <span className="block">{item.label}</span>
             </Link>

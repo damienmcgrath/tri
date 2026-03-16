@@ -590,9 +590,24 @@ export async function POST(request: Request) {
           return;
         }
 
+        // Update conversation timestamp and improve title from AI headline on first message
+        const conversationUpdate: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+          last_response_id: result.responseId ?? null
+        };
+
+        // If this is a new conversation (only 1 user message so far), derive a better title
+        // from the AI's structured headline rather than just truncating the user's message
+        if (recentMessages && recentMessages.length === 0 && result.structured?.headline) {
+          const headline = (result.structured.headline as string).slice(0, 80);
+          if (headline.length > 0) {
+            conversationUpdate.title = headline;
+          }
+        }
+
         await supabase
           .from("ai_conversations")
-          .update({ updated_at: new Date().toISOString(), last_response_id: result.responseId ?? null })
+          .update(conversationUpdate)
           .eq("id", resolvedConversationId);
 
         logCoachAudit("info", "coach.chat.response_success", {

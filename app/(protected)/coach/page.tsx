@@ -157,7 +157,8 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
     };
   }
 
-  const [{ data: activities }, { data: weeklySessions }, { data: links }, { data: reviewedSessions }] = await Promise.all([
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [{ data: activities }, { data: weeklySessions }, { data: links }, { data: reviewedSessions }, { data: upcomingKeySessions }] = await Promise.all([
     supabase
       .from("completed_activities")
       .select("id")
@@ -180,7 +181,17 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
       .eq("user_id", userId)
       .gte("date", weekStart)
       .lte("date", weekEnd)
-      .not("execution_result", "is", null)
+      .not("execution_result", "is", null),
+    supabase
+      .from("sessions")
+      .select("session_name,type,sport")
+      .eq("user_id", userId)
+      .eq("is_key", true)
+      .eq("status", "planned")
+      .gte("date", todayIso)
+      .lte("date", weekEnd)
+      .order("date", { ascending: true })
+      .limit(3)
   ]);
 
   const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
@@ -193,11 +204,16 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
   const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
   const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId as string)).length;
 
+  const upcomingKeyNames = ((upcomingKeySessions ?? []) as Array<{ session_name: string | null; type: string; sport: string }>)
+    .map((s) => s.session_name || `${s.type} ${s.sport}`)
+    .filter((name): name is string => Boolean(name));
+
   return {
     uploadedSessionCount: (activities ?? []).length,
     linkedSessionCount: confirmedLinkedSessionIds.size,
     reviewedSessionCount: reviewedSessionIds.size,
-    pendingReviewCount
+    pendingReviewCount,
+    upcomingKeySessionNames: upcomingKeyNames.length > 0 ? upcomingKeyNames : undefined
   };
 }
 

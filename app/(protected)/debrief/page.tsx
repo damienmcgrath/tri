@@ -197,7 +197,7 @@ export default async function DebriefPage({
 
   const artifact = snapshot.artifact;
   const weekEnd = addDays(weekStart, 6);
-  const [adjacent, macroCtx, trends, sessionsForSportMinutes] = await Promise.all([
+  const [adjacent, macroCtx, trends, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
     getAdjacentWeeklyDebriefs({ supabase, athleteId: user.id, weekStart }),
     getMacroContext(supabase, user.id),
     import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6)).catch(() => []),
@@ -206,7 +206,15 @@ export default async function DebriefPage({
       .select("sport,duration_minutes,status")
       .eq("user_id", user.id)
       .gte("date", weekStart)
-      .lte("date", weekEnd)
+      .lte("date", weekEnd),
+    supabase
+      .from("weekly_debriefs")
+      .select("facts")
+      .eq("athlete_id", user.id)
+      .lt("week_start", weekStart)
+      .order("week_start", { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
   type SportRow = { sport: string; duration_minutes: number | null; status: string | null };
   const rawSessions: SportRow[] = (sessionsForSportMinutes.data ?? []) as SportRow[];
@@ -217,6 +225,11 @@ export default async function DebriefPage({
     run: completedSessionsForWeek.filter((s) => s.sport === "run").reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0)
   };
   const evidenceSupportCount = artifact.evidenceGroups.reduce((sum, group) => sum + group.supports.length, 0);
+
+  // Week-over-week comparison data
+  type PreviousFacts = { completedSessions?: number; plannedSessions?: number; completedMinutes?: number; completionPct?: number };
+  const prevFacts = (previousDebriefRow?.data?.facts ?? null) as PreviousFacts | null;
+  const hasWeekOverWeek = prevFacts != null && typeof prevFacts.completedSessions === "number";
 
   const macroArcLine = formatMacroArcLine(macroCtx);
   const cumulativeVolumeLine = formatCumulativeVolume(macroCtx);
@@ -280,6 +293,40 @@ export default async function DebriefPage({
           ))}
         </div>
       </article>
+
+      {hasWeekOverWeek && prevFacts ? (() => {
+        const sessionsLabel = `${artifact.facts.completedSessions}/${artifact.facts.plannedSessions}`;
+        const prevSessionsLabel = `${prevFacts.completedSessions}/${prevFacts.plannedSessions}`;
+        const totalHours = Math.floor(artifact.facts.completedMinutes / 60);
+        const totalMins = artifact.facts.completedMinutes % 60;
+        const timeLabel = totalMins > 0 ? `${totalHours}h ${totalMins}m` : `${totalHours}h`;
+        const prevTotalHours = Math.floor((prevFacts.completedMinutes ?? 0) / 60);
+        const prevTotalMins = (prevFacts.completedMinutes ?? 0) % 60;
+        const prevTimeLabel = prevTotalMins > 0 ? `${prevTotalHours}h ${prevTotalMins}m` : `${prevTotalHours}h`;
+        const completionDelta = artifact.facts.completionPct - (prevFacts.completionPct ?? 0);
+        const qualityTrend = completionDelta > 5 ? "Improving" : completionDelta < -5 ? "Declining" : "Stable";
+        const qualityColor = completionDelta > 5 ? "text-success" : completionDelta < -5 ? "text-danger" : "text-muted";
+
+        return (
+          <article className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Sessions completed</p>
+              <p className="mt-2 text-sm font-medium">{sessionsLabel}</p>
+              <p className="mt-1 text-[11px] text-muted">vs {prevSessionsLabel} last week</p>
+            </div>
+            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Training time</p>
+              <p className="mt-2 text-sm font-medium">{timeLabel}</p>
+              <p className="mt-1 text-[11px] text-muted">vs {prevTimeLabel} last week</p>
+            </div>
+            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
+              <p className={`mt-2 text-sm font-medium ${qualityColor}`}>{qualityTrend}</p>
+              <p className="mt-1 text-[11px] text-muted">{artifact.facts.completionPct}% vs {prevFacts.completionPct ?? 0}% last week</p>
+            </div>
+          </article>
+        );
+      })() : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article className="debrief-section-card p-6">

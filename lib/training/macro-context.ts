@@ -178,7 +178,7 @@ export function formatMacroContextSummary(ctx: MacroContext): string {
   const { swim, bike, run } = ctx.cumulativeVolumeByDiscipline;
 
   if (swim.plannedMinutes > 0) {
-    const label = swim.deltaPct >= -5 ? "on track" : `${swim.deltaPct}% behind`;
+    const label = swim.deltaPct >= -5 ? "on track" : `${Math.abs(swim.deltaPct)}% behind`;
     volumeParts.push(`swim ${label}`);
   }
 
