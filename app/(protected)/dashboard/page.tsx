@@ -586,7 +586,7 @@ export default async function DashboardPage({
     id: session.id,
     date: session.date,
     sport: session.sport,
-    durationMinutes: session.duration_minutes ?? 0,
+    durationMinutes: session.status === "completed" ? getCompletedMinutes(session) : (session.duration_minutes ?? 0),
     status: session.status,
     isKey: session.is_key
   }));
