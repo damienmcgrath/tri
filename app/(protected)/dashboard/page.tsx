@@ -834,7 +834,7 @@ export default async function DashboardPage({
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[rgba(255,255,255,0.08)] pt-3 text-sm">
-            <p className="px-1 text-[rgba(255,255,255,0.68)]">Completed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(totals.completed)}</span>{extraCompletedCount > 0 ? <span className="mt-0.5 block text-[11px] text-success">{extraCompletedCount} extra</span> : null}</p>
+            <p className="px-1 text-[rgba(255,255,255,0.68)]">Completed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(totals.completed)}</span></p>
             <p className="px-1 text-[rgba(255,255,255,0.68)]">Remaining <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(remainingMinutes)}</span></p>
             <p className="px-1 text-[rgba(255,255,255,0.68)]">Missed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(missedMinutes)}</span></p>
           </div>
