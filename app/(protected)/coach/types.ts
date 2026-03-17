@@ -19,5 +19,6 @@ export type CoachBriefingContext = {
   linkedSessionCount: number;
   reviewedSessionCount: number;
   pendingReviewCount: number;
+  extraActivityCount: number;
   upcomingKeySessionNames?: string[];
 };

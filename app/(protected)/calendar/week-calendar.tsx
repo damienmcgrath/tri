@@ -94,7 +94,7 @@ function getMovedFromDate(notes: string | null) {
 }
 
 function getActivityId(sessionId: string) {
-  return sessionId.startsWith("activity:") ? sessionId.replace("activity:", "") : null;
+  return sessionId.startsWith("activity-") ? sessionId.replace("activity-", "") : null;
 }
 
 function getSessionTitle(session: CalendarSession) {
@@ -187,7 +187,7 @@ function SessionActionMenu({
       {open ? (
         <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
           {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity-${activityId}`}>
               Open details
             </Link>
           ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
@@ -209,7 +209,7 @@ function SessionActionMenu({
               {state === "skipped" ? "Mark planned" : "Mark skipped"}
             </button>
           ) : null}
-          {session.displayType === "completed_activity" ? (
+          {session.displayType === "completed_activity" && session.source?.uploadId ? (
             <button className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-subtle))]" onClick={() => { onAssign(); setOpen(false); }}>
               Assign to session
             </button>
@@ -694,7 +694,7 @@ export function WeekCalendar({
           const isToday = day.iso === todayIso;
           const isFuture = day.iso > todayIso;
           const isPast = day.iso < todayIso;
-          const needsAttention = Boolean(metrics && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
+          const needsAttention = Boolean(metrics && (isPast || isToday) && (metrics.skipped > 0 || (isPast && metrics.hasPlanned && !metrics.fullyDone)));
           const attentionReason = needsAttention && metrics
             ? metrics.skipped > 0
               ? `${metrics.skipped} session${metrics.skipped > 1 ? "s" : ""} skipped`
@@ -769,9 +769,8 @@ export function WeekCalendar({
                   const leftBorderColor = isNeedsAttentionCard ? "#FF5A28" : calendarDisciplineBorderColor(session.sport);
 
                   const stateBadge =
-                    state === "extra" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Extra</span>
-                    ) : state === "unmatched_upload" ? (
+                    state === "extra" ? null
+                    : state === "unmatched_upload" ? (
                       <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
@@ -780,13 +779,15 @@ export function WeekCalendar({
                     );
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
-                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload";
+                  const extraActivityId = state === "extra" ? getActivityId(session.id) : null;
+                  const isClickable = reviewableCompleted || Boolean(extraActivityId);
+                  const showCompletedFooter = state === "completed" || state === "assigned_from_upload" || state === "extra";
                   const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
 
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${reviewableCompleted ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
+                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${isClickable ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
                       style={{
                         background: cardBackground,
                         border: "1px solid rgba(255,255,255,0.06)",
@@ -795,16 +796,18 @@ export function WeekCalendar({
                       }}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                        else if (extraActivityId) router.push(`/sessions/activity-${extraActivityId}`);
                       }}
                       onKeyDown={(event) => {
-                        if (!reviewableCompleted) return;
+                        if (!isClickable) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          router.push(`/sessions/${session.id}`);
+                          if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                          else if (extraActivityId) router.push(`/sessions/activity-${extraActivityId}`);
                         }
                       }}
-                      role={reviewableCompleted ? "link" : undefined}
-                      tabIndex={reviewableCompleted ? 0 : undefined}
+                      role={isClickable ? "link" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
@@ -847,9 +850,9 @@ export function WeekCalendar({
                       ) : null}
                       {showCompletedFooter ? (
                         <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
+                          <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
                             <span aria-hidden="true">✓</span>
-                            Completed
+                            {state === "extra" ? "Extra" : "Completed"}
                           </span>
                         </div>
                       ) : state === "unmatched_upload" ? (
@@ -1072,6 +1075,8 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
   const executionSummary = session.executionResult?.executionScoreSummary ?? session.executionResult?.summary;
   const nextAction = session.executionResult?.recommendedNextAction ?? session.executionResult?.recommended_next_action;
   const provisional = Boolean(session.executionResult?.executionScoreProvisional ?? session.executionResult?.execution_score_provisional);
+  const [markingExtra, setMarkingExtra] = useState(false);
+  const [markedExtra, setMarkedExtra] = useState(false);
 
   return (
     <TaskSheet
@@ -1111,6 +1116,32 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
           </div>
         )}
         {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
+        {session.displayType === "completed_activity" ? (
+          <div className="pt-1">
+            {markedExtra ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-3 py-1.5 text-xs font-medium text-success">
+                <span aria-hidden="true">✓</span> Marked as extra
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={markingExtra}
+                onClick={async () => {
+                  setMarkingExtra(true);
+                  try {
+                    await markActivityExtraAction({ activityId: session.id });
+                    setMarkedExtra(true);
+                  } catch {
+                    setMarkingExtra(false);
+                  }
+                }}
+                className="rounded-full border border-[rgba(255,255,255,0.16)] bg-transparent px-3 py-1.5 text-xs text-muted transition hover:border-[rgba(255,255,255,0.3)] hover:text-foreground disabled:opacity-50"
+              >
+                {markingExtra ? "Marking…" : "Mark as extra"}
+              </button>
+            )}
+          </div>
+        ) : null}
         <div className="sticky bottom-0 pt-2 text-right">
           <button onClick={onClose} className="btn-secondary px-3 text-xs">Close</button>
         </div>
@@ -1121,8 +1152,8 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/55 backdrop-blur-[2px]">
-      <button type="button" aria-label="Close overlay" className="absolute inset-0 min-h-full w-full cursor-default" onClick={onClose} />
+    <div className="fixed inset-0 z-40 overflow-hidden bg-black/55 backdrop-blur-[2px]">
+      <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
       {children}
     </div>
   );

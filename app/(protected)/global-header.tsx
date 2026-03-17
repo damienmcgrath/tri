@@ -23,7 +23,7 @@ export function GlobalHeader({
   return (
     <div className="shell-header">
       <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between gap-2 px-4 py-3 md:px-6">
-        <span className="label">tri.ai</span>
+        <span className="tracking-tight text-white" style={{ fontSize: "2rem", fontWeight: 600 }}>tri.ai</span>
 
         <div className="flex items-center gap-2">
           {previewMode ? <Link href="/dev/agent-preview" className="status-badge-passive"><span aria-hidden="true">⌁</span><span className="stat">Agent preview</span></Link> : null}

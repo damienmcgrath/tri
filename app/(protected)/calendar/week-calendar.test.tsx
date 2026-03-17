@@ -41,7 +41,7 @@ const sessions = [
     is_key: false
   },
   {
-    id: "activity:a1",
+    id: "activity-a1",
     date: "2026-03-02",
     sport: "run",
     type: "Completed activity",
@@ -219,7 +219,7 @@ describe("WeekCalendar", () => {
     const openDetailsLinks = screen.getAllByRole("link", { name: "Open details" });
     const activityLink = openDetailsLinks[openDetailsLinks.length - 1];
 
-    expect(activityLink).toHaveAttribute("href", "/sessions/activity/a1");
+    expect(activityLink).toHaveAttribute("href", "/sessions/activity-a1");
   });
 
   it("prefers a same-day same-sport session when opening upload assignment from the sidebar", () => {

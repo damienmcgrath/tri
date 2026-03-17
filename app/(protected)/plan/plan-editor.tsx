@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
 import { getSessionIntentLabel } from "@/lib/training/semantics";
@@ -285,6 +285,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
   const [isSavingSession, setIsSavingSession] = useState(false);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
   const [weekActionOpen, setWeekActionOpen] = useState(false);
+  const [isDuplicating, startDuplicateTransition] = useTransition();
+  const [duplicateToast, setDuplicateToast] = useState<string | null>(null);
 
   const selectedWeek = planWeeks.find((week) => week.id === selectedWeekId) ?? planWeeks[0];
   const selectedWeekIndex = selectedWeek ? planWeeks.findIndex((week) => week.id === selectedWeek.id) : -1;
@@ -553,12 +555,16 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
-            <form action={duplicateWeekForwardAction} className="space-y-2"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><label className="label-base">Duplicate to week</label><select name="destinationWeekId" className="input-base" required>{duplicateTargets.map((week) => <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>)}</select><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copyMetadata" defaultChecked /> Copy metadata</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copySessions" defaultChecked /> Copy sessions</label><button className="btn-secondary w-full text-xs">Duplicate</button></form>
+            <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); setDuplicateToast(null); startDuplicateTransition(async () => { await duplicateWeekForwardAction(fd); setDuplicateToast("Week duplicated"); setWeekActionOpen(false); }); }} className="space-y-2"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><label className="label-base">Duplicate to week</label><select name="destinationWeekId" className="input-base" required>{duplicateTargets.map((week) => <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>)}</select><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copyMetadata" defaultChecked /> Copy metadata</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copySessions" defaultChecked /> Copy sessions</label><button disabled={isDuplicating} className="btn-secondary w-full text-xs">{isDuplicating ? "Duplicating…" : "Duplicate"}</button></form>
             <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by +7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="forward" /><button className="btn-secondary w-full text-xs">Shift +7d</button></form>
             <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by -7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="backward" /><button className="btn-secondary w-full text-xs">Shift -7d</button></form>
             <form action={deleteWeekAction} onSubmit={(event) => { if (!window.confirm("Delete this week and all sessions in it?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><button className="btn-secondary w-full text-xs text-rose-200">Delete week</button></form>
           </div>
         </div>
+      ) : null}
+
+      {duplicateToast ? (
+        <div className="px-3 py-2 text-xs text-success">{duplicateToast}</div>
       ) : null}
 
       <form id="week-details-form" action={updateWeekAction} className="hidden">

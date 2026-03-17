@@ -29,12 +29,26 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
 
   if (!activity) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
 
-  const { data: session } = await supabase
+  let session: { id: string } | null = null;
+
+  const { data: sessionData } = await supabase
     .from("sessions")
     .select("id")
     .eq("id", body.data.plannedSessionId)
     .eq("user_id", user.id)
     .maybeSingle();
+
+  if (sessionData) {
+    session = sessionData;
+  } else {
+    const { data: legacySession } = await supabase
+      .from("planned_sessions")
+      .select("id")
+      .eq("id", body.data.plannedSessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (legacySession) session = legacySession;
+  }
 
   if (!session) return NextResponse.json({ error: "Planned session not found" }, { status: 404 });
 

@@ -510,6 +510,27 @@ function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["next
   return null;
 }
 
+function normalizeSessionVerdictFields(
+  sessionVerdict: Record<string, unknown>,
+  defaults?: {
+    intentMatch: CoachVerdict["sessionVerdict"]["intentMatch"];
+    executionCost: CoachVerdict["sessionVerdict"]["executionCost"];
+    nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
+  }
+): Record<string, unknown> {
+  const validIntentMatch = (v: unknown): v is CoachVerdict["sessionVerdict"]["intentMatch"] =>
+    v === "on_target" || v === "partial" || v === "missed";
+  const validExecutionCost = (v: unknown): v is CoachVerdict["sessionVerdict"]["executionCost"] =>
+    v === "low" || v === "moderate" || v === "high" || v === "unknown";
+
+  return {
+    ...sessionVerdict,
+    intentMatch: validIntentMatch(sessionVerdict.intentMatch) ? sessionVerdict.intentMatch : (defaults?.intentMatch ?? sessionVerdict.intentMatch),
+    executionCost: validExecutionCost(sessionVerdict.executionCost) ? sessionVerdict.executionCost : (defaults?.executionCost ?? sessionVerdict.executionCost),
+    nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall ?? defaults?.nextCall
+  };
+}
+
 function normalizeCoachVerdictPayload(
   payload: unknown,
   defaults?: {
@@ -526,10 +547,7 @@ function normalizeCoachVerdictPayload(
     if (!sessionVerdict) return root;
     return {
       ...root,
-      sessionVerdict: {
-        ...sessionVerdict,
-        nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
-      }
+      sessionVerdict: normalizeSessionVerdictFields(sessionVerdict, defaults)
     };
   }
 
@@ -541,10 +559,7 @@ function normalizeCoachVerdictPayload(
       return {
         ...candidate,
         sessionVerdict: sessionVerdict
-          ? {
-            ...sessionVerdict,
-            nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall
-          }
+          ? normalizeSessionVerdictFields(sessionVerdict, defaults)
           : candidate.sessionVerdict
       };
     }
@@ -966,7 +981,8 @@ export async function generateCoachVerdict(args: {
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    if (parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
+    const deterministicConfidence = args.evidence.rulesSummary.confidence;
+    if (deterministicConfidence !== "low" && parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
       console.warn("[session-review-ai] Falling back to deterministic review: model intent match disagreed with deterministic diagnosis", {
         sessionId: args.evidence.sessionId,
         modelIntentMatch: parsed.data.sessionVerdict.intentMatch,
@@ -1135,6 +1151,7 @@ export async function buildWeeklyExecutionBrief(args: {
   weekStart: string;
   weekEnd: string;
   athleteContext: AthleteContextSnapshot | null;
+  extraActivityCount?: number;
 }) {
   const { data: sessions, error } = await args.supabase
     .from("sessions")
@@ -1187,11 +1204,15 @@ export async function buildWeeklyExecutionBrief(args: {
         : "Keep the current structure and carry the same execution control into next week.";
 
   const contextCue = args.athleteContext?.declared.weeklyConstraints[0] ?? args.athleteContext?.declared.limiters[0]?.value ?? null;
+  const extraCount = args.extraActivityCount ?? 0;
+  const extraNote = extraCount > 0 ? ` ${extraCount} extra session${extraCount === 1 ? "" : "s"} also logged this week.` : "";
 
   return {
     weekHeadline:
       reviewedCount === 0
-        ? "Reviews are still building, so keep the week steady"
+        ? extraCount > 0
+          ? `${extraCount} extra session${extraCount === 1 ? "" : "s"} logged — reviews building`
+          : "Reviews are still building, so keep the week steady"
         : missedCount > 0
           ? "Execution is mostly on track, but one key session came up short"
           : partialCount > 0
@@ -1199,8 +1220,8 @@ export async function buildWeeklyExecutionBrief(args: {
             : "Execution is on track this week",
     weekSummary:
       reviewedCount === 0
-        ? "Early uploads are in. Hold the current structure for now, then let the next reviewed sessions sharpen the call."
-        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
+        ? `Early uploads are in.${extraNote} Hold the current structure for now, then let the next reviewed sessions sharpen the call.`
+        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${extraNote}${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
     keyPositive,
     keyRisk,
     nextWeekDecision,

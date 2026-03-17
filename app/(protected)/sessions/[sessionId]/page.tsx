@@ -6,7 +6,8 @@ import { RegenerateReviewButton } from "./regenerate-review-button";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
+import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { DetailsAccordion } from "../../details-accordion";
@@ -36,6 +37,7 @@ type ActivityReviewRow = {
   laps_count?: number | null;
   parse_summary?: Record<string, unknown> | null;
   metrics_v2?: Record<string, unknown> | null;
+  execution_result?: Record<string, unknown> | null;
   updated_at?: string | null;
 };
 
@@ -107,6 +109,13 @@ async function loadActivityReviewRow(params: {
     () =>
       supabase
         .from("completed_activities")
+        .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,execution_result,updated_at")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("completed_activities")
         .select("id,user_id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,updated_at")
         .eq("id", activityId)
         .eq("user_id", userId)
@@ -121,7 +130,7 @@ async function loadActivityReviewRow(params: {
     () =>
       supabase
         .from("completed_activities")
-        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,updated_at")
+        .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,execution_result,updated_at")
         .eq("id", activityId)
         .maybeSingle(),
     () =>
@@ -154,12 +163,25 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   if (!user) redirect("/auth/sign-in");
 
   let session: SessionRow | null = null;
-  const activityRouteMatch = params.sessionId.match(/^activity:(.+)$/);
+  const activityRouteMatch = params.sessionId.match(/^activity-(.+)$/);
   const activityId = activityRouteMatch?.[1] ?? null;
 
   if (activityId) {
     const activity = await loadActivityReviewRow({ supabase, userId: user.id, activityId });
     if (!activity) redirect(`/activities/${activityId}`);
+
+    let storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
+
+    // Auto-generate AI review for extra sessions that don't have one yet
+    if (!storedExecutionResult) {
+      try {
+        const generated = await syncExtraActivityExecution({ supabase, userId: user.id, activityId });
+        storedExecutionResult = parsePersistedExecutionReview(generated);
+      } catch {
+        // Fall back to local review if AI generation fails
+        storedExecutionResult = null;
+      }
+    }
 
     const syntheticSession: SessionRow = {
       id: params.sessionId,
@@ -173,7 +195,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
       status: "completed",
       is_extra: true,
-      execution_result: buildExecutionResultForSession(
+      execution_result: storedExecutionResult ?? buildExecutionResultForSession(
         {
           id: params.sessionId,
           user_id: user.id,
@@ -382,7 +404,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   // Load session comparison and trends for completed sessions
   let sessionComparison = null;
   let sessionTrends = null;
-  if (session.status === "completed" && !activityId) {
+  if (session.status === "completed") {
     const [comparisonResult, trendsResult] = await Promise.allSettled([
       import("@/lib/training/session-comparison").then(({ getSessionComparison }) => getSessionComparison(supabase, session.id, user.id)),
       import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6))

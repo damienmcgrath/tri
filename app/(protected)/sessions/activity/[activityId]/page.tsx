@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { buildExecutionResultForSession } from "@/lib/workouts/session-execution";
+import { RegenerateReviewButton } from "@/app/(protected)/sessions/[sessionId]/regenerate-review-button";
 
 type ActivityReviewRow = {
   id: string;
@@ -20,6 +22,7 @@ type ActivityReviewRow = {
   laps_count?: number | null;
   parse_summary?: Record<string, unknown> | null;
   metrics_v2?: Record<string, unknown> | null;
+  execution_result?: Record<string, unknown> | null;
 };
 
 function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
@@ -46,6 +49,13 @@ async function loadActivityReviewRow(params: {
   const { supabase, userId, activityId } = params;
 
   const queries = [
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,user_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,execution_result")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
     () =>
       supabase
         .from("completed_activities")
@@ -100,8 +110,9 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
   const activity = await loadActivityReviewRow({ supabase, userId: user.id, activityId: params.activityId });
   if (!activity) notFound();
 
+  const storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
   const session: SessionReviewRow = {
-    id: `activity:${activity.id}`,
+    id: `activity-${activity.id}`,
     user_id: user.id,
     date: new Date(activity.start_time_utc).toISOString().slice(0, 10),
     sport: activity.sport_type,
@@ -112,9 +123,9 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
     duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
     status: "completed",
     is_extra: true,
-    execution_result: buildExecutionResultForSession(
+    execution_result: storedExecutionResult ?? buildExecutionResultForSession(
       {
-        id: `activity:${activity.id}`,
+        id: `activity-${activity.id}`,
         user_id: user.id,
         sport: activity.sport_type,
         type: "Extra workout",
@@ -164,8 +175,11 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
             <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
             <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
           </div>
-          <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
-            {reviewVm.reviewModeLabel}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
+              {reviewVm.reviewModeLabel}
+            </div>
+            <RegenerateReviewButton sessionId={`activity-${activity.id}`} />
           </div>
         </div>
 
@@ -184,7 +198,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
                 </span>
               ) : null}
             </div>
-            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]">{reviewVm.reviewModeDetail}</p>
+            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.reviewModeDetail}</p>
             <p className="mt-2 text-sm text-muted">{reviewVm.sessionStatusDetail}</p>
           </div>
 

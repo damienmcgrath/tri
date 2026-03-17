@@ -236,7 +236,7 @@ export function buildCalendarDisplayItems(input: {
   const unlinkedActivityItems: CalendarDisplayItem[] = [...activityById.values()]
     .filter((item) => !linkedActivityIds.has(item.id))
     .map((item) => ({
-      id: `activity:${item.id}`,
+      id: `activity-${item.id}`,
       date: item.date,
       sport: item.sport,
       type: "Completed activity",
@@ -246,7 +246,7 @@ export function buildCalendarDisplayItems(input: {
       workoutType: null,
       intentCategory: null,
       role: null,
-      source: { uploadId: item.upload_id ?? item.id, assignedBy: "upload" },
+      source: { uploadId: item.upload_id ?? null, assignedBy: "upload" },
       executionResult: null,
       duration: item.duration_min,
       notes: null,
