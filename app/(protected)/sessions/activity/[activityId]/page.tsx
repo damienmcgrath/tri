@@ -112,7 +112,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
 
   const storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
   const session: SessionReviewRow = {
-    id: `activity:${activity.id}`,
+    id: `activity-${activity.id}`,
     user_id: user.id,
     date: new Date(activity.start_time_utc).toISOString().slice(0, 10),
     sport: activity.sport_type,
@@ -125,7 +125,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
     is_extra: true,
     execution_result: storedExecutionResult ?? buildExecutionResultForSession(
       {
-        id: `activity:${activity.id}`,
+        id: `activity-${activity.id}`,
         user_id: user.id,
         sport: activity.sport_type,
         type: "Extra workout",
@@ -179,7 +179,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
             <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
               {reviewVm.reviewModeLabel}
             </div>
-            <RegenerateReviewButton sessionId={`activity:${activity.id}`} />
+            <RegenerateReviewButton sessionId={`activity-${activity.id}`} />
           </div>
         </div>
 

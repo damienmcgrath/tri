@@ -236,7 +236,7 @@ export function buildCalendarDisplayItems(input: {
   const unlinkedActivityItems: CalendarDisplayItem[] = [...activityById.values()]
     .filter((item) => !linkedActivityIds.has(item.id))
     .map((item) => ({
-      id: `activity:${item.id}`,
+      id: `activity-${item.id}`,
       date: item.date,
       sport: item.sport,
       type: "Completed activity",

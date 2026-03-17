@@ -19,14 +19,14 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Handle extra (unplanned) activities accessed via the synthetic activity:${activityId} session ID
-  const activityIdMatch = sessionId.match(/^activity:(.+)$/);
+  // Handle extra (unplanned) activities accessed via the synthetic activity-${activityId} session ID
+  const activityIdMatch = sessionId.match(/^activity-(.+)$/);
   if (activityIdMatch) {
     const activityId = activityIdMatch[1];
     try {
       const executionResult = await syncExtraActivityExecution({ supabase, userId: user.id, activityId });
       revalidatePath(`/sessions/${sessionId}`);
-      revalidatePath(`/sessions/activity/${activityId}`);
+      revalidatePath(`/sessions/activity-${activityId}`);
       revalidatePath("/dashboard");
       return NextResponse.json({ ok: true, narrativeSource: executionResult.narrativeSource });
     } catch (error) {
@@ -66,7 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
     });
 
     revalidatePath(`/sessions/${sessionId}`);
-    revalidatePath(`/sessions/activity/${confirmedLink.completed_activity_id}`);
+    revalidatePath(`/sessions/activity-${confirmedLink.completed_activity_id}`);
     revalidatePath("/dashboard");
 
     return NextResponse.json({

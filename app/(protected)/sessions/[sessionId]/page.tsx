@@ -6,7 +6,7 @@ import { RegenerateReviewButton } from "./regenerate-review-button";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
-import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionComparisonCard } from "./components/session-comparison-card";
@@ -163,14 +163,26 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   if (!user) redirect("/auth/sign-in");
 
   let session: SessionRow | null = null;
-  const activityRouteMatch = params.sessionId.match(/^activity:(.+)$/);
+  const activityRouteMatch = params.sessionId.match(/^activity-(.+)$/);
   const activityId = activityRouteMatch?.[1] ?? null;
 
   if (activityId) {
     const activity = await loadActivityReviewRow({ supabase, userId: user.id, activityId });
     if (!activity) redirect(`/activities/${activityId}`);
 
-    const storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
+    let storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
+
+    // Auto-generate AI review for extra sessions that don't have one yet
+    if (!storedExecutionResult) {
+      try {
+        const generated = await syncExtraActivityExecution({ supabase, userId: user.id, activityId });
+        storedExecutionResult = parsePersistedExecutionReview(generated);
+      } catch {
+        // Fall back to local review if AI generation fails
+        storedExecutionResult = null;
+      }
+    }
+
     const syntheticSession: SessionRow = {
       id: params.sessionId,
       user_id: user.id,
@@ -392,7 +404,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   // Load session comparison and trends for completed sessions
   let sessionComparison = null;
   let sessionTrends = null;
-  if (session.status === "completed" && !activityId) {
+  if (session.status === "completed") {
     const [comparisonResult, trendsResult] = await Promise.allSettled([
       import("@/lib/training/session-comparison").then(({ getSessionComparison }) => getSessionComparison(supabase, session.id, user.id)),
       import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6))

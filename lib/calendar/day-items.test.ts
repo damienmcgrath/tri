@@ -80,8 +80,8 @@ describe("buildCalendarDisplayItems", () => {
       status: "planned",
       linkedActivityCount: 0
     });
-    expect(items.find((item) => item.id === "activity:a-suggested")).toMatchObject({
-      id: "activity:a-suggested",
+    expect(items.find((item) => item.id === "activity-a-suggested")).toMatchObject({
+      id: "activity-a-suggested",
       status: "unmatched_upload",
       displayType: "completed_activity"
     });
@@ -111,7 +111,7 @@ describe("buildCalendarDisplayItems", () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: "activity:a2",
+      id: "activity-a2",
       date: "2026-03-03",
       status: "unmatched_upload",
       isUnplanned: false,
@@ -145,7 +145,7 @@ describe("buildCalendarDisplayItems", () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: "activity:a-extra",
+      id: "activity-a-extra",
       isUnplanned: true,
       displayType: "completed_activity"
     });
@@ -176,7 +176,7 @@ describe("buildCalendarDisplayItems", () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: "activity:a-upload-matched",
+      id: "activity-a-upload-matched",
       isUnplanned: true,
       displayType: "completed_activity"
     });
@@ -220,8 +220,8 @@ describe("buildCalendarDisplayItems", () => {
       status: "planned",
       linkedActivityCount: 0
     });
-    expect(items.find((item) => item.id === "activity:a-noted-extra")).toMatchObject({
-      id: "activity:a-noted-extra",
+    expect(items.find((item) => item.id === "activity-a-noted-extra")).toMatchObject({
+      id: "activity-a-noted-extra",
       isUnplanned: true,
       displayType: "completed_activity"
     });
@@ -261,7 +261,7 @@ describe("buildCalendarDisplayItems", () => {
 
     expect(items.map((item) => ({ id: item.id, date: item.date, displayType: item.displayType }))).toEqual([
       { id: "s3", date: "2026-03-02", displayType: "planned_session" },
-      { id: "activity:a3", date: "2026-03-02", displayType: "completed_activity" }
+      { id: "activity-a3", date: "2026-03-02", displayType: "completed_activity" }
     ]);
   });
 });

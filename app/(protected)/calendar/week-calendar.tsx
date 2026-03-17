@@ -94,7 +94,7 @@ function getMovedFromDate(notes: string | null) {
 }
 
 function getActivityId(sessionId: string) {
-  return sessionId.startsWith("activity:") ? sessionId.replace("activity:", "") : null;
+  return sessionId.startsWith("activity-") ? sessionId.replace("activity-", "") : null;
 }
 
 function getSessionTitle(session: CalendarSession) {
@@ -187,7 +187,7 @@ function SessionActionMenu({
       {open ? (
         <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
           {session.displayType === "completed_activity" && activityId ? (
-            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity/${activityId}`}>
+            <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity-${activityId}`}>
               Open details
             </Link>
           ) : session.displayType !== "completed_activity" && session.status === "completed" ? (
@@ -775,13 +775,15 @@ export function WeekCalendar({
                     );
 
                   const reviewableCompleted = session.displayType !== "completed_activity" && session.status === "completed";
+                  const extraActivityId = state === "extra" ? getActivityId(session.id) : null;
+                  const isClickable = reviewableCompleted || Boolean(extraActivityId);
                   const showCompletedFooter = state === "completed" || state === "assigned_from_upload" || state === "extra";
                   const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
 
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${reviewableCompleted ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
+                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${isClickable ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
                       style={{
                         background: cardBackground,
                         border: "1px solid rgba(255,255,255,0.06)",
@@ -790,16 +792,18 @@ export function WeekCalendar({
                       }}
                       onClick={() => {
                         if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                        else if (extraActivityId) router.push(`/sessions/activity-${extraActivityId}`);
                       }}
                       onKeyDown={(event) => {
-                        if (!reviewableCompleted) return;
+                        if (!isClickable) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          router.push(`/sessions/${session.id}`);
+                          if (reviewableCompleted) router.push(`/sessions/${session.id}`);
+                          else if (extraActivityId) router.push(`/sessions/activity-${extraActivityId}`);
                         }
                       }}
-                      role={reviewableCompleted ? "link" : undefined}
-                      tabIndex={reviewableCompleted ? 0 : undefined}
+                      role={isClickable ? "link" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
