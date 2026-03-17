@@ -906,6 +906,17 @@ export function WeekCalendar({
             router.refresh();
             setToast("Upload assigned to session");
           }}
+          onMarkedExtra={() => {
+            const id = assignSource.id;
+            setLocalSessions((prev) =>
+              prev.map((session) => (session.id === id ? { ...session, isUnplanned: true } : session))
+            );
+            setExtraActivityIds((prev) => [...prev, id]);
+            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", id)]);
+            setAssignSource(null);
+            router.refresh();
+            setToast("Marked as extra workout");
+          }}
           onError={() => setToast("Could not assign upload")}
         />
       ) : null}
@@ -992,6 +1003,7 @@ function AssignUploadModal({
   candidateSessions,
   onClose,
   onAssigned,
+  onMarkedExtra,
   onError
 }: {
   upload: CalendarSession;
@@ -999,6 +1011,7 @@ function AssignUploadModal({
   candidateSessions: CalendarSession[];
   onClose: () => void;
   onAssigned: (selectedSessionId: string) => void;
+  onMarkedExtra: () => void;
   onError: () => void;
 }) {
   const [selectedSessionId, setSelectedSessionId] = useState(() => getSuggestedSessionId(upload, candidateSessions));
@@ -1033,6 +1046,30 @@ function AssignUploadModal({
             ))}
           </select>
         )}
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+          <p className="text-xs font-medium text-[hsl(var(--text-primary))]">Mark as extra / unplanned</p>
+          <p className="mt-1 text-xs text-muted">This workout wasn&apos;t part of your training plan.</p>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={async () => {
+              const activityId = getActivityId(upload.id);
+              if (!activityId) { onError(); return; }
+              setIsSaving(true);
+              try {
+                await markActivityExtraAction({ activityId });
+                onMarkedExtra();
+              } catch {
+                onError();
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className="btn-secondary mt-2 px-2 py-1 text-xs"
+          >
+            Mark as extra
+          </button>
+        </div>
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
