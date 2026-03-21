@@ -7,8 +7,11 @@ const PREVIEW_UPLOAD_ID = "44444444-4444-4444-8444-444444444444";
 const PREVIEW_ACTIVITY_ONE_ID = "55555555-5555-4555-8555-555555555551";
 const PREVIEW_ACTIVITY_TWO_ID = "55555555-5555-4555-8555-555555555552";
 const PREVIEW_ACTIVITY_THREE_ID = "55555555-5555-4555-8555-555555555553";
+const PREVIEW_ACTIVITY_EXTRA_RUN_ID = "55555555-5555-4555-8555-555555555554";
+const PREVIEW_ACTIVITY_UNREVIEWED_ID = "55555555-5555-4555-8555-555555555555";
 const PREVIEW_LINK_ONE_ID = "66666666-6666-4666-8666-666666666661";
 const PREVIEW_LINK_TWO_ID = "66666666-6666-4666-8666-666666666662";
+const PREVIEW_LINK_EXTRA_RUN_ID = "66666666-6666-4666-8666-666666666663";
 
 type PreviewTableName =
   | "profiles"
@@ -475,6 +478,83 @@ export function createPreviewDatabase(): PreviewDatabase {
             avgCadence: 87
           }
         }
+      },
+      {
+        id: PREVIEW_ACTIVITY_EXTRA_RUN_ID,
+        user_id: PREVIEW_USER_ID,
+        upload_id: PREVIEW_UPLOAD_ID,
+        sport_type: "run",
+        start_time_utc: "2026-03-17T06:30:00.000Z",
+        end_time_utc: "2026-03-17T07:05:00.000Z",
+        duration_sec: 2100,
+        moving_duration_sec: 2080,
+        elapsed_duration_sec: 2100,
+        distance_m: 6200,
+        avg_hr: 142,
+        avg_power: null,
+        avg_cadence: 174,
+        max_hr: 156,
+        max_power: null,
+        elevation_gain_m: 35,
+        elevation_loss_m: 34,
+        calories: 390,
+        avg_pace_per_100m_sec: null,
+        avg_stroke_rate_spm: null,
+        avg_swolf: null,
+        pool_length_m: null,
+        laps_count: 3,
+        activity_vendor: "garmin",
+        activity_type_raw: "running",
+        activity_subtype_raw: "easy_run",
+        source: "upload",
+        parse_summary: null,
+        notes: "Squeezed in an extra morning jog.",
+        schedule_status: "unscheduled",
+        is_unplanned: true,
+        is_race: false,
+        created_at: "2026-03-17T07:10:00.000Z",
+        updated_at: "2026-03-17T07:10:00.000Z",
+        metrics_v2: {
+          cadence: { avgCadence: 174 },
+          elevation: { gainM: 35 }
+        }
+      },
+      {
+        id: PREVIEW_ACTIVITY_UNREVIEWED_ID,
+        user_id: PREVIEW_USER_ID,
+        upload_id: PREVIEW_UPLOAD_ID,
+        sport_type: "strength",
+        start_time_utc: "2026-03-18T12:00:00.000Z",
+        end_time_utc: "2026-03-18T12:40:00.000Z",
+        duration_sec: 2400,
+        moving_duration_sec: 2400,
+        elapsed_duration_sec: 2400,
+        distance_m: null,
+        avg_hr: 118,
+        avg_power: null,
+        avg_cadence: null,
+        max_hr: 138,
+        max_power: null,
+        elevation_gain_m: null,
+        elevation_loss_m: null,
+        calories: 220,
+        avg_pace_per_100m_sec: null,
+        avg_stroke_rate_spm: null,
+        avg_swolf: null,
+        pool_length_m: null,
+        laps_count: null,
+        activity_vendor: "garmin",
+        activity_type_raw: "strength_training",
+        activity_subtype_raw: null,
+        source: "upload",
+        parse_summary: null,
+        notes: null,
+        schedule_status: "unscheduled",
+        is_unplanned: false,
+        is_race: false,
+        created_at: "2026-03-18T12:45:00.000Z",
+        updated_at: "2026-03-18T12:45:00.000Z",
+        metrics_v2: null
       }
     ],
     session_activity_links: [
@@ -497,6 +577,16 @@ export function createPreviewDatabase(): PreviewDatabase {
         confirmation_status: "confirmed",
         matched_at: "2026-03-11T07:49:00.000Z",
         match_method: "preview"
+      },
+      {
+        id: PREVIEW_LINK_EXTRA_RUN_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: null,
+        completed_activity_id: PREVIEW_ACTIVITY_EXTRA_RUN_ID,
+        confidence: null,
+        confirmation_status: "rejected",
+        matched_at: "2026-03-17T07:12:00.000Z",
+        match_method: "unmatched"
       }
     ],
     activity_uploads: [

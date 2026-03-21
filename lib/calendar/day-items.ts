@@ -1,6 +1,7 @@
 import type { ExecutionResultState, SessionLifecycleState, SessionRoleState } from "@/lib/training/semantics";
 import { normalizeSessionModel } from "@/lib/training/session";
 import { hasConfirmedPlannedSessionLink, localIsoDate } from "@/lib/activities/completed-activities";
+import { classifyActivityStatus } from "@/lib/activities/activity-status";
 
 export type CalendarSessionRecord = {
   id: string;
@@ -122,11 +123,6 @@ export function buildCalendarDisplayItems(input: {
   weekEndExclusive?: string;
 }) {
   const { sessions, activities, links, legacyCompleted, timeZone, weekStart, weekEndExclusive } = input;
-  const explicitlyExtraActivityIds = new Set(
-    links
-      .filter((link) => link.confirmation_status === "rejected")
-      .map((link) => link.completed_activity_id)
-  );
   const confirmedLinkedActivityIds = new Set(
     links
       .filter(hasConfirmedPlannedSessionLink)
@@ -148,10 +144,11 @@ export function buildCalendarDisplayItems(input: {
         distance_km: activity.distance_m ? Number(activity.distance_m) / 1000 : null,
         avg_hr: activity.avg_hr,
         avg_power: activity.avg_power,
-        is_unplanned:
-          Boolean(activity.is_unplanned) ||
-          explicitlyExtraActivityIds.has(activity.id) ||
-          (activity.upload_status === "matched" && !confirmedLinkedActivityIds.has(activity.id)),
+        is_unplanned: classifyActivityStatus({
+          activityId: activity.id,
+          isUnplanned: Boolean(activity.is_unplanned),
+          links
+        }) === "extra",
         created_at: activity.start_time_utc
       }
     ])

@@ -111,7 +111,8 @@ function createSupabaseMock(params: { sessions: unknown[]; links?: unknown[] }) 
                 distance_m: 15000,
                 avg_hr: 135,
                 avg_power: 185,
-                schedule_status: "unscheduled"
+                schedule_status: "unscheduled",
+                is_unplanned: true
               }
             ]
           },

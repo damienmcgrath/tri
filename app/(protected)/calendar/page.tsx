@@ -239,6 +239,12 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   const extraActivityCount = extraActivities.length;
   const plannedSessionCount = plannedSessions.length;
 
+  const extraCompletionItems = extraActivities.map((activity) => ({
+    id: activity.id,
+    date: activity.date,
+    sport: activity.sport,
+    durationMinutes: activity.duration
+  }));
   const countMetrics = computeWeekSessionCounts(
     plannedSessions.map((session) => ({
       id: session.id,
@@ -248,12 +254,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       status: session.status,
       isKey: session.is_key
     })),
-    completedActivityItems.map((activity) => ({
-      id: activity.id,
-      date: activity.date,
-      sport: activity.sport,
-      durationMinutes: activity.duration
-    }))
+    extraCompletionItems
   );
   const minuteMetrics = computeWeekMinuteTotals(
     plannedSessions.map((session) => ({
@@ -264,12 +265,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       status: session.status,
       isKey: session.is_key
     })),
-    completedActivityItems.map((activity) => ({
-      id: activity.id,
-      date: activity.date,
-      sport: activity.sport,
-      durationMinutes: activity.duration
-    }))
+    extraCompletionItems
   );
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextTodaySession = sessions.find((session) => session.date === todayIso && session.status === "planned") ?? null;

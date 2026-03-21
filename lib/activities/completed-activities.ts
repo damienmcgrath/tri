@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNestedNumber } from "@/lib/workouts/metrics-v2";
+import { classifyActivityStatus } from "@/lib/activities/activity-status";
 
 export type SessionActivityLinkRecord = {
   planned_session_id?: string | null;
@@ -69,17 +70,22 @@ export function hasConfirmedPlannedSessionLink(link: {
 }
 
 export function buildExtraCompletedActivities(params: {
-  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "start_time_utc" | "duration_sec" | "avg_hr" | "avg_power" | "metrics_v2">>;
+  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "start_time_utc" | "duration_sec" | "avg_hr" | "avg_power" | "is_unplanned" | "metrics_v2">>;
   links: Array<Pick<SessionActivityLinkRecord, "completed_activity_id" | "planned_session_id" | "confirmation_status">>;
   timeZone: string;
   weekStart: string;
   weekEndExclusive: string;
 }) {
   const { activities, links, timeZone, weekStart, weekEndExclusive } = params;
-  const confirmedLinkedActivityIds = new Set(
-    links
-      .filter(hasConfirmedPlannedSessionLink)
-      .map((link) => link.completed_activity_id)
+
+  const extraActivityIds = new Set(
+    activities
+      .filter((activity) => classifyActivityStatus({
+        activityId: activity.id,
+        isUnplanned: Boolean(activity.is_unplanned),
+        links
+      }) === "extra")
+      .map((activity) => activity.id)
   );
 
   return activities
@@ -103,7 +109,7 @@ export function buildExtraCompletedActivities(params: {
       avgSwolf: getNestedNumber(activity.metrics_v2, [["stroke", "avgSwolf"], ["stroke", "avg_swolf"]])
     }))
     .filter((activity) => activity.date >= weekStart && activity.date < weekEndExclusive)
-    .filter((activity) => !confirmedLinkedActivityIds.has(activity.id));
+    .filter((activity) => extraActivityIds.has(activity.id));
 }
 
 export async function loadCompletedActivities(params: {
