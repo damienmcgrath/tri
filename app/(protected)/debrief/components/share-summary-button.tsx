@@ -50,15 +50,17 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
   ctx.fillStyle = "#0a0a0b";
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle grid lines
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  ctx.lineWidth = 1;
-  for (let y = 0; y < H; y += 120) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
+  // Subtle grid lines (drawn only in content area — deferred until content height is known)
+  const drawGridLines = (contentBottom: number) => {
+    ctx.strokeStyle = "rgba(255,255,255,0.03)";
+    ctx.lineWidth = 1;
+    for (let gy = 0; gy < contentBottom + 120; gy += 120) {
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(W, gy);
+      ctx.stroke();
+    }
+  };
 
   const pad = 80;
   let y = variant === "story" ? 220 : 140;
@@ -73,7 +75,7 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
   ctx.font = "500 32px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.fillText(data.weekRange, pad, y);
-  y += 80;
+  y += variant === "story" ? 80 : 60;
 
   // Headline
   const titleFontSize = variant === "story" ? 84 : 72;
@@ -100,7 +102,7 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
     ctx.fillText(tl, pad, y);
     y += titleFontSize * 1.2;
   }
-  y += 40;
+  y += variant === "story" ? 40 : 24;
 
   // Completion percentage — big number
   ctx.font = `bold ${variant === "story" ? 180 : 150}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
@@ -111,7 +113,7 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
   ctx.font = "500 36px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.fillText("weekly completion", pad, y);
-  y += 100;
+  y += variant === "story" ? 100 : 70;
 
   // Sport bar chart
   const total = data.sportMinutes.swim + data.sportMinutes.bike + data.sportMinutes.run;
@@ -179,13 +181,21 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
     y += 40;
   }
 
-  // Race countdown
+  // Race countdown — placed below content but gravitates toward bottom
   if (data.raceName && data.daysToRace !== null) {
-    y = variant === "story" ? H - 240 : H - 200;
+    const bottomTarget = variant === "story" ? H - 240 : H - 200;
+    y = Math.max(y + 80, bottomTarget);
     ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
     ctx.fillStyle = "#beff00";
     ctx.fillText(`${data.daysToRace} days to ${data.raceName}`, pad, y);
+    y += 60;
   }
+
+  // Draw grid lines scoped to content area (behind content, so draw first would be ideal,
+  // but we need content height — use globalCompositeOperation to draw behind)
+  ctx.globalCompositeOperation = "destination-over";
+  drawGridLines(y);
+  ctx.globalCompositeOperation = "source-over";
 }
 
 export function ShareSummaryButton({ data }: Props) {
