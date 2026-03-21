@@ -34,17 +34,19 @@ export function computeWeekSessionCounts(sessions: WeekMetricSession[], extraCom
 
 export function computeWeekMinuteTotals(sessions: WeekMetricSession[], extraCompletions: WeekExtraCompletion[] = []) {
   const plannedMinutes = sessions.reduce((sum, session) => sum + Math.max(session.durationMinutes, 0), 0);
-  const completedMinutes = sessions
+  const plannedCompletedMinutes = sessions
     .filter((session) => session.status === "completed")
     .reduce((sum, session) => sum + Math.max(session.durationMinutes, 0), 0);
   const extraCompletedMinutes = extraCompletions.reduce((sum, activity) => sum + Math.max(activity.durationMinutes, 0), 0);
 
-  const totalCompletedMinutes = completedMinutes + extraCompletedMinutes;
-  const remainingMinutes = Math.max(plannedMinutes - totalCompletedMinutes, 0);
+  const totalCompletedMinutes = plannedCompletedMinutes + extraCompletedMinutes;
+  const remainingMinutes = Math.max(plannedMinutes - plannedCompletedMinutes, 0);
 
   return {
     plannedMinutes,
     completedMinutes: totalCompletedMinutes,
+    plannedCompletedMinutes,
+    extraCompletedMinutes,
     remainingMinutes
   };
 }

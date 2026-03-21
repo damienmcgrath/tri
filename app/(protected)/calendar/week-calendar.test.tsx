@@ -127,8 +127,8 @@ describe("WeekCalendar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mark extra" }));
 
     expect(markActivityExtraAction).toHaveBeenCalledWith({ activityId: "a1" });
-    expect(await screen.findByText("Extra workout logged")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText(/Upload needs review/)).not.toBeInTheDocument());
+    expect(screen.queryByText("Extra workout logged")).not.toBeInTheDocument();
   });
 
   it("persists dismissed needs-attention items across refreshes", async () => {

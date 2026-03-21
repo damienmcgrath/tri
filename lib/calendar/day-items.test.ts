@@ -151,7 +151,7 @@ describe("buildCalendarDisplayItems", () => {
     });
   });
 
-  it("treats matched upload status without a confirmed link as extra", () => {
+  it("treats matched upload status without a confirmed link as unreviewed (not extra)", () => {
     const items = buildCalendarDisplayItems({
       sessions: [],
       activities: [
@@ -177,7 +177,7 @@ describe("buildCalendarDisplayItems", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       id: "activity-a-upload-matched",
-      isUnplanned: true,
+      isUnplanned: false,
       displayType: "completed_activity"
     });
   });
