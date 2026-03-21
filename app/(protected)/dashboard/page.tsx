@@ -607,7 +607,7 @@ export default async function DashboardPage({
   const missedMinutes = missedSessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
 
   const completionPct = totals.planned > 0 ? Math.round((totals.completed / totals.planned) * 100) : 0;
-  const remainingMinutes = Math.max(totals.planned - totals.completed, 0);
+  const remainingMinutes = minuteMetrics.remainingMinutes;
   const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
   const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
   const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
@@ -619,10 +619,10 @@ export default async function DashboardPage({
     const plannedCount = daySessions.filter((session) => session.status === "planned").length;
     const plannedMinutes = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const extraMinutesOnDay = extraMinutesByDay.get(iso) ?? 0;
-    const completedMinutesOnDay =
-      daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0) +
-      extraMinutesOnDay;
-    const remainingMinutesOnDay = Math.max(plannedMinutes - completedMinutesOnDay, 0);
+    const plannedCompletedMinutesOnDay =
+      daySessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + getCompletedMinutes(session), 0);
+    const completedMinutesOnDay = plannedCompletedMinutesOnDay + extraMinutesOnDay;
+    const remainingMinutesOnDay = Math.max(plannedMinutes - plannedCompletedMinutesOnDay, 0);
     const trainingMeaning = getDayMeaningLabel(daySessions);
 
     const label = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00.000Z`));
@@ -678,7 +678,7 @@ export default async function DashboardPage({
       const planned = sessions.filter((session) => session.sport === sport).reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
       const completed = sessions
         .filter((session) => session.sport === sport)
-        .reduce((sum, session) => sum + getCompletedMinutes(session), 0) + (extraMinutesBySport.get(sport) ?? 0);
+        .reduce((sum, session) => sum + getCompletedMinutes(session), 0);
       return { sport, label: getDisciplineMeta(sport).label, gap: Math.max(planned - completed, 0), planned, completed };
     })
     .sort((a, b) => b.gap - a.gap)[0];

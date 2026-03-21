@@ -21,6 +21,8 @@ describe("week metrics", () => {
     expect(computeWeekMinuteTotals(sessions)).toEqual({
       plannedMinutes: 225,
       completedMinutes: 45,
+      plannedCompletedMinutes: 45,
+      extraCompletedMinutes: 0,
       remainingMinutes: 180
     });
   });
@@ -41,8 +43,26 @@ describe("week metrics", () => {
     expect(computeWeekMinuteTotals(sessions, extras)).toEqual({
       plannedMinutes: 225,
       completedMinutes: 95,
-      remainingMinutes: 130
+      plannedCompletedMinutes: 45,
+      extraCompletedMinutes: 50,
+      remainingMinutes: 180
     });
+  });
+
+  it("does not reduce remaining minutes by extra session work", () => {
+    const allCompletedSessions = [
+      { id: "1", date: "2026-02-23", sport: "run", durationMinutes: 45, status: "completed" as const, isKey: false },
+      { id: "2", date: "2026-02-24", sport: "bike", durationMinutes: 60, status: "planned" as const, isKey: false }
+    ];
+    const extras = [
+      { id: "extra-1", date: "2026-02-23", sport: "run", durationMinutes: 100 }
+    ];
+
+    const result = computeWeekMinuteTotals(allCompletedSessions, extras);
+    expect(result.remainingMinutes).toBe(60);
+    expect(result.plannedCompletedMinutes).toBe(45);
+    expect(result.extraCompletedMinutes).toBe(100);
+    expect(result.completedMinutes).toBe(145);
   });
 
   it("returns key sessions remaining in chronological order", () => {

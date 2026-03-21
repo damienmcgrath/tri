@@ -506,7 +506,7 @@ export function WeekCalendar({
                               prev.map((session) => (session.id === upload.id ? { ...session, isUnplanned: true } : session))
                             );
                             setExtraActivityIds((prev) => [...prev, upload.id]);
-                            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id)]);
+                            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", upload.id), getIssueId("extra_workout", upload.id)]);
                             setToast("Marked as extra workout");
                             router.refresh();
                           } catch {
@@ -912,7 +912,7 @@ export function WeekCalendar({
               prev.map((session) => (session.id === id ? { ...session, isUnplanned: true } : session))
             );
             setExtraActivityIds((prev) => [...prev, id]);
-            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", id)]);
+            setDismissedIssues((prev) => [...prev, getIssueId("unmatched_upload", id), getIssueId("extra_workout", id)]);
             setAssignSource(null);
             router.refresh();
             setToast("Marked as extra workout");

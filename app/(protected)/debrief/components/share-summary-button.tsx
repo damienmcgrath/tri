@@ -304,7 +304,6 @@ function drawSummaryCanvas(canvas: HTMLCanvasElement, data: ShareData, variant: 
   setFont(ctx, 18, 600);
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.fillText("discipline load", metricCardX + 22, vizY + 34);
-
   const total = data.sportMinutes.swim + data.sportMinutes.bike + data.sportMinutes.run;
   const barX = metricCardX + 22;
   const barY = vizY + 58;
