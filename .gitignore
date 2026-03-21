@@ -12,3 +12,4 @@ pnpm-debug.log*
 .DS_Store
 .vercel
 output/
+.claude/worktrees/
