@@ -1,5 +1,11 @@
 jest.mock("../../../../lib/security/request", () => ({
-  isSameOrigin: jest.fn(() => true)
+  isSameOrigin: jest.fn(() => true),
+  getClientIp: jest.fn(() => "127.0.0.1")
+}));
+
+jest.mock("../../../../lib/security/rate-limit", () => ({
+  checkRateLimit: jest.fn(() => ({ allowed: true, remaining: 10, resetAt: Date.now() + 60000 })),
+  rateLimitHeaders: jest.fn(() => ({}))
 }));
 
 jest.mock("next/server", () => ({
@@ -15,9 +21,18 @@ jest.mock("../../../../lib/supabase/server", () => ({
   createClient: jest.fn()
 }));
 
-jest.mock("../../../../lib/weekly-debrief", () => ({
-  saveWeeklyDebriefFeedback: jest.fn()
-}));
+jest.mock("../../../../lib/weekly-debrief", () => {
+  const { z } = require("zod");
+  return {
+    saveWeeklyDebriefFeedback: jest.fn(),
+    weeklyDebriefFeedbackInputSchema: z.object({
+      weekStart: z.string(),
+      helpful: z.boolean().nullable(),
+      accurate: z.boolean().nullable(),
+      note: z.string().nullable().optional()
+    })
+  };
+});
 
 import { createClient } from "../../../../lib/supabase/server";
 import { saveWeeklyDebriefFeedback } from "../../../../lib/weekly-debrief";

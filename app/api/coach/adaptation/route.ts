@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
 import { evaluateAdaptationTriggers, buildAdaptationOptions, type SessionSummary, type CheckInData } from "@/lib/training/adaptation-rules";
@@ -15,6 +16,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
+  const ip = getClientIp(request);
+  const ipLimit = checkRateLimit("adapt-ip", ip, { maxRequests: 10, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(ipLimit) });
+  }
+
   const supabase = await createClient();
   const {
     data: { user }
@@ -22,6 +29,11 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userLimit = checkRateLimit("adapt-user", user.id, { maxRequests: 5, windowMs: 60_000 });
+  if (!userLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(userLimit) });
   }
 
   try {
@@ -156,6 +168,7 @@ Respond with a JSON array matching the input structure, but with each option.des
       }))
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not generate adaptations." }, { status: 400 });
+    console.error("[ADAPTATION]", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Could not generate adaptations." }, { status: 400 });
   }
 }
