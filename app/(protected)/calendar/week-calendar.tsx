@@ -1164,9 +1164,11 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
                 type="button"
                 disabled={markingExtra}
                 onClick={async () => {
+                  const activityId = getActivityId(session.id);
+                  if (!activityId) { setMarkingExtra(false); return; }
                   setMarkingExtra(true);
                   try {
-                    await markActivityExtraAction({ activityId: session.id });
+                    await markActivityExtraAction({ activityId });
                     setMarkedExtra(true);
                   } catch {
                     setMarkingExtra(false);
