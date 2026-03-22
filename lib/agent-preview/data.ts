@@ -654,13 +654,21 @@ export function createPreviewDatabase(): PreviewDatabase {
   };
 }
 
-let previewDatabase = createPreviewDatabase();
+const globalKey = "__tri_preview_database__" as const;
+
+function getOrCreateDatabase(): PreviewDatabase {
+  const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
+  if (existing) return existing;
+  const db = createPreviewDatabase();
+  (globalThis as Record<string, unknown>)[globalKey] = db;
+  return db;
+}
 
 export function getPreviewDatabase() {
-  return previewDatabase;
+  return getOrCreateDatabase();
 }
 
 export function resetPreviewDatabase() {
-  previewDatabase = createPreviewDatabase();
+  (globalThis as Record<string, unknown>)[globalKey] = createPreviewDatabase();
 }
 
