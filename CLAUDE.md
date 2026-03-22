@@ -111,3 +111,35 @@ Completed session linked to planned session → `lib/execution-review.ts` analys
 ## Branch Naming
 
 Use `feat/` for new features, `fix/` for bug fixes, `chore/` for non-functional changes. Example: `feat/recovery-tracking-ui`, `fix/session-matching-score`.
+
+## Working with Claude
+
+### Use plan mode before complex tasks
+Enter plan mode (`shift+tab` twice) before touching:
+- Activity matching logic (`lib/workouts/activity-matching.ts`) — scoring changes have wide blast radius
+- AI coach tools (`lib/coach/`) — tool schema + handler + prompt must stay in sync
+- Any database migration — RLS policies are easy to misconfigure
+- New auth-gated routes — middleware must be correct before wiring the page
+
+If something goes sideways mid-implementation, switch back to plan mode and re-plan rather than pushing forward. Also explicitly use plan mode for verification steps, not just the build.
+
+### Parallel worktrees
+Run multiple Claude sessions in parallel using git worktrees. Suggested layout for this project:
+
+```bash
+# Create worktrees
+git worktree add .claude/worktrees/feat-a -b feat/your-feature-a
+git worktree add .claude/worktrees/feat-b -b feat/your-feature-b
+git worktree add .claude/worktrees/analysis main  # read-only: logs, schema, grep
+```
+
+Good parallelisation splits: UI work vs. lib logic vs. migration authoring. Keep the `analysis` worktree on `main` and read-only — use it only for grepping, reading schema, and reviewing logs without risking uncommitted state.
+
+### Use subagents for large context tasks
+Append "use subagents" to any request that spans multiple large files simultaneously (e.g. refactoring across `lib/session-review.ts` + `lib/execution-review.ts` + `lib/weekly-debrief.ts`). This keeps the main context window focused and avoids context dilution on long tasks.
+
+### Slash commands
+- `/review` — lint + typecheck + test before pushing
+- `/migrate` — create and apply a Supabase migration
+- `/push` — commit, push, and open a PR
+- `/techdebt` — scan for duplication, dead code, and structural issues
