@@ -4,7 +4,7 @@ Follow these steps exactly:
 
 1. Run `git status` and `git diff` in parallel to understand what has changed.
 2. Run `git log --oneline -5` to understand the commit style used in this repo.
-3. Stage all modified/new tracked files relevant to the work (use specific file paths, not `git add -A`).
+3. Stage all changes with `git add -A`.
 4. Write a concise commit message based on the actual changes. Use imperative mood, focus on the "why". Pass via HEREDOC.
 5. Commit. If a pre-commit hook fails, fix the issue and recommit — do NOT use `--no-verify`.
 6. Push to the current branch with `-u origin <branch>` if not already tracking, otherwise `git push`.
