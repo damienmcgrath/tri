@@ -3,8 +3,31 @@ import { createClient } from "@/lib/supabase/server";
 
 type OtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change";
 
-function getSafeRedirectPath(next: string | null) {
+const ALLOWED_REDIRECT_PREFIXES = [
+  "/dashboard",
+  "/plan",
+  "/calendar",
+  "/coach",
+  "/settings",
+  "/sessions",
+  "/activities",
+  "/debrief"
+];
+
+function getSafeRedirectPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  try {
+    const decoded = decodeURIComponent(next);
+    if (decoded.includes("\\") || decoded.startsWith("//")) {
+      return "/dashboard";
+    }
+    if (!ALLOWED_REDIRECT_PREFIXES.some((p) => decoded.startsWith(p))) {
+      return "/dashboard";
+    }
+  } catch {
     return "/dashboard";
   }
 

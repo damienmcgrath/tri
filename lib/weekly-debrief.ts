@@ -2288,7 +2288,7 @@ export async function refreshWeeklyDebrief(args: {
   };
 }
 
-const weeklyDebriefFeedbackInputSchema = z.object({
+export const weeklyDebriefFeedbackInputSchema = z.object({
   weekStart: z.string().date(),
   helpful: z.boolean().nullable(),
   accurate: z.boolean().nullable(),
