@@ -87,3 +87,27 @@ Copy `.env.example` to `.env.local`. Required vars: `NEXT_PUBLIC_SUPABASE_URL`, 
 Jest + @testing-library/react + jsdom. Coverage targets: 75% lines/statements, 80% functions. Tests live alongside source as `*.test.ts` / `*.test.tsx`. Supabase and env directories are excluded from coverage.
 
 After making logic changes, run the tests for the affected module. Before pushing, run the full suite (`npm run test`) and fix any failures before committing. Also run `npm run typecheck` before pushing.
+
+## Key Data Flows
+
+**Activity upload → session matching:**
+File upload → SHA256 dedup check (`completed_sessions.source_hash`) → parse FIT/TCX → score against all planned sessions for that user (time proximity + sport + duration + distance) → auto-link if best score ≥ 0.85 AND ≥ 0.15 above second-best → otherwise surface in upload panel for manual linking. Core logic: `lib/workouts/activity-matching.ts`.
+
+**AI coach request:**
+User message → `lib/athlete-context.ts` (builds context: profile + active plan + recent activities) → `POST /api/coach/chat` → OpenAI streaming with tools defined in `lib/coach/tools.ts` → tool execution in `lib/coach/tool-handlers.ts` → persist to `ai_conversations` / `ai_messages`.
+
+**Session review generation:**
+Completed session linked to planned session → `lib/execution-review.ts` analyses execution vs. plan → `lib/session-review.ts` generates AI narrative → stored in `session_reviews`.
+
+## Gotchas
+
+- **Always use `lib/supabase/server.ts` in Server Components, Server Actions, and API routes.** Never import the browser client (`lib/supabase/browser.ts`) on the server — it won't have the user's auth session.
+- **RLS is the security boundary.** All user-owned tables enforce RLS. Never use the service role key to bypass it in application code — service role is for migrations only.
+- **`completed_sessions` requires SHA256 dedup.** Always check `source_hash` before inserting to avoid duplicate uploads per user.
+- **`lib/` is uni-directional.** Business logic in `lib/` must never import from `app/`. Data flows one way: `app/` → `lib/`.
+- **Agent Preview seeded data resets on server restart** unless `globalThis` persistence is in place (see recent HMR fix). Don't rely on preview state surviving a full restart.
+- **Routes most likely to need visual verification:** `/dashboard` (upload panel), `/sessions/[id]` (review + mark-as-extra), `/calendar` (week view), `/coach` (chat interface).
+
+## Branch Naming
+
+Use `feat/` for new features, `fix/` for bug fixes, `chore/` for non-functional changes. Example: `feat/recovery-tracking-ui`, `fix/session-matching-score`.

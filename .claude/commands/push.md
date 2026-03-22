@@ -8,7 +8,7 @@ Follow these steps exactly:
 4. Write a concise commit message based on the actual changes. Use imperative mood, focus on the "why". Pass via HEREDOC.
 5. Commit. If a pre-commit hook fails, fix the issue and recommit — do NOT use `--no-verify`.
 6. Push to the current branch with `-u origin <branch>` if not already tracking, otherwise `git push`.
-7. Create a PR against `main` using `gh pr create`. Write a brief summary (2-4 bullets) covering what changed and why. Include a short test plan checklist.
+7. Check if a PR already exists: `gh pr view --json url -q .url`. If one exists, skip creation and return that URL. If not, create a PR against `main` using `gh pr create` with a brief summary (2-4 bullets) covering what changed and why, and a short test plan checklist.
 8. Return the PR URL.
 
 Do not push to main directly. Do not force push. Confirm before proceeding if on an unexpected branch.
