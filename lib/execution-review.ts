@@ -927,25 +927,30 @@ export async function generateCoachVerdict(args: {
 
   try {
     const client = getOpenAIClient();
-    const response = await client.responses.create({
-      model: getCoachModel(),
-      instructions: buildCoachVerdictInstructions(),
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: JSON.stringify({
-                sessionEvidence: args.evidence,
-                athleteContext: args.athleteContext,
-                recentReviewedSessions: args.recentReviewedSessions
-              })
-            }
-          ]
-        }
-      ]
-    });
+    const response = await Promise.race([
+      client.responses.create({
+        model: getCoachModel(),
+        instructions: buildCoachVerdictInstructions(),
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: JSON.stringify({
+                  sessionEvidence: args.evidence,
+                  athleteContext: args.athleteContext,
+                  recentReviewedSessions: args.recentReviewedSessions
+                })
+              }
+            ]
+          }
+        ]
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("OpenAI request timed out after 30s")), 30_000)
+      )
+    ]);
     const text = response.output_text?.trim();
     if (!text) {
       console.warn("[session-review-ai] Falling back to deterministic review: empty model output", {
