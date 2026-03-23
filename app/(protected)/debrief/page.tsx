@@ -202,10 +202,11 @@ export default async function DebriefPage({
 
   const artifact = snapshot.artifact;
   const weekEnd = addDays(weekStart, 6);
-  const [adjacent, macroCtx, trends, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
+  const [adjacent, macroCtx, trends, benchmarks, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
     getAdjacentWeeklyDebriefs({ supabase, athleteId: user.id, weekStart }),
     getMacroContext(supabase, user.id),
     import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6)).catch(() => []),
+    import("@/lib/training/benchmarks").then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, user.id, weekStart, weekEnd)).catch(() => []),
     supabase
       .from("sessions")
       .select("sport,duration_minutes,status")
@@ -416,6 +417,31 @@ export default async function DebriefPage({
                 </div>
                 <p className="mt-2 text-[11px] text-tertiary">Confidence: {trend.confidence}</p>
               </div>
+            ))}
+          </div>
+        </article>
+      ) : null}
+
+      {benchmarks.length > 0 ? (
+        <article className="debrief-section-card p-5">
+          <p className="debrief-kicker">Best efforts</p>
+          <p className="mt-2 text-sm text-muted">Training-block bests from the last 12 weeks.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {benchmarks.map((benchmark) => (
+              <a key={benchmark.activityId} href={`/activities/${benchmark.activityId}`} className="block rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 transition hover:border-[hsl(var(--accent)/0.42)]">
+                <div className="flex items-center gap-2">
+                  <span>{benchmark.sport === "run" ? "🏃" : benchmark.sport === "bike" ? "🚴" : "🏊"}</span>
+                  <p className="text-xs font-medium text-muted">{benchmark.label}</p>
+                </div>
+                <p className="mt-2 text-xl font-semibold leading-tight text-[hsl(var(--text-primary))]">{benchmark.formattedValue}</p>
+                {benchmark.isThisWeek ? (
+                  <span className="mt-1 inline-block text-[11px] font-medium uppercase tracking-[0.08em] text-success">New this week</span>
+                ) : null}
+                <p className="mt-1 text-sm text-muted">{benchmark.detail}</p>
+                {benchmark.deltaLabel ? (
+                  <p className={`mt-1 text-[11px] ${(benchmark.deltaVsPriorBlock ?? 0) > 0 ? "text-success" : "text-muted"}`}>{benchmark.deltaLabel}</p>
+                ) : null}
+              </a>
             ))}
           </div>
         </article>

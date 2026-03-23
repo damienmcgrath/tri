@@ -82,6 +82,12 @@ export type AthleteContextSnapshot = {
     note: string | null;
     updatedAt: string | null;
   };
+  recentBests?: Array<{
+    sport: string;
+    label: string;
+    formattedValue: string;
+    date: string;
+  }>;
 };
 
 function asStringArray(value: unknown) {
@@ -122,6 +128,7 @@ function daysUntil(date: string | null) {
 
 export async function getAthleteContextSnapshot(supabase: SupabaseClient, athleteId: string): Promise<AthleteContextSnapshot> {
   const weekStart = getWeekStartUtc();
+  const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
   const todayIso = getTodayUtc();
 
   const [{ data: profile }, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }] = await Promise.all([
@@ -210,7 +217,11 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
       confidence: checkin?.confidence ?? null,
       note: checkin?.note ?? null,
       updatedAt: checkin?.updated_at ?? null
-    }
+    },
+    recentBests: await import("@/lib/training/benchmarks")
+      .then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, athleteId, weekStart, weekEnd))
+      .then((bests) => bests.slice(0, 3).map((b) => ({ sport: b.sport, label: b.label, formattedValue: b.formattedValue, date: b.activityDate })))
+      .catch(() => [])
   };
 }
 
