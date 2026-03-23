@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 
 const sessionFeelSchema = z.object({
@@ -15,6 +16,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
+  const ip = getClientIp(request);
+  const ipLimit = checkRateLimit("feels-ip", ip, { maxRequests: 30, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(ipLimit) });
+  }
+
   const supabase = await createClient();
   const {
     data: { user }
@@ -22,6 +29,11 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userLimit = checkRateLimit("feels-user", user.id, { maxRequests: 15, windowMs: 60_000 });
+  if (!userLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(userLimit) });
   }
 
   try {
@@ -39,7 +51,8 @@ export async function POST(request: Request) {
     );
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error("[SESSION_FEELS]", error.message);
+      return NextResponse.json({ error: "Could not save session feel." }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true });

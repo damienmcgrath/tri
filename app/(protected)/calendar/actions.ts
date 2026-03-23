@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/actions-utils";
 import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 
 const moveSessionSchema = z.object({
@@ -42,19 +43,6 @@ const quickAddSchema = z.object({
   duration: z.coerce.number().int().min(1).max(480),
   notes: z.string().trim().max(1000).optional()
 });
-
-async function getAuthedClient() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in.");
-  }
-
-  return { supabase, user };
-}
 
 function isMissingCompletedActivityColumnError(error: { code?: string; message?: string } | null | undefined) {
   if (!error) return false;
