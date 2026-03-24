@@ -30,13 +30,14 @@ function formatUploadDate(iso: string) {
   return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
-export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[] }) {
+export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialOccupiedSessionIds = [] }: { initialUploads: UploadRow[]; plannedSessions: PlannedSession[]; initialOccupiedSessionIds?: string[] }) {
   const router = useRouter();
   const [uploads, setUploads] = useState(initialUploads);
   const [message, setMessage] = useState<string>("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [attachFor, setAttachFor] = useState<UploadRow | null>(null);
   const [attachError, setAttachError] = useState<string>("");
+  const [occupiedSessionIds, setOccupiedSessionIds] = useState(() => new Set(initialOccupiedSessionIds));
   const [isPending, startTransition] = useTransition();
 
   const detail = uploads.find((item) => item.id === detailId) ?? null;
@@ -45,13 +46,6 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
     if (!attachFor) return [];
     const activity = attachFor.completed_activities[0];
     const day = attachFor.created_at.slice(0, 10);
-    const occupiedSessionIds = new Set(
-      uploads.flatMap((u) =>
-        u.session_activity_links
-          .filter((l) => l.confirmation_status === "confirmed" && l.planned_session_id !== null)
-          .map((l) => l.planned_session_id as string)
-      )
-    );
     return [...plannedSessions].filter((s) => !occupiedSessionIds.has(s.id)).sort((a, b) => {
       const aSame = a.date === day ? 0 : 1;
       const bSame = b.date === day ? 0 : 1;
@@ -203,18 +197,24 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                     disabled={isPending}
                     onClick={() => {
                       startTransition(async () => {
-                        const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ plannedSessionId: candidate.id, mode: "override", actor: "athlete" })
-                        });
+                        try {
+                          const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ plannedSessionId: candidate.id, mode: "override", actor: "athlete" })
+                          });
 
-                        if (!response.ok) {
-                          const payload = await response.json().catch(() => ({}));
-                          setAttachError(payload.error ?? "Could not attach activity to session");
+                          if (!response.ok) {
+                            const payload = await response.json().catch(() => ({}));
+                            setAttachError(payload.error ?? "Could not attach activity to session");
+                            return;
+                          }
+                        } catch {
+                          setAttachError("Network error — could not reach the server");
                           return;
                         }
 
+                        setOccupiedSessionIds((prev) => new Set([...prev, candidate.id]));
                         setUploads((current) =>
                           current.map((item) =>
                             item.id === attachFor.id

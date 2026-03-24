@@ -10,7 +10,7 @@ Run all of these in parallel:
 
 Also read:
 - `CLAUDE.md` — so you know what's already documented and don't duplicate it
-- `~/.claude/projects/-Users-Damien-Code-tri/memory/MEMORY.md` — same for personal memory
+- Your personal memory index for this project (run: `cat ~/.claude/projects/$(pwd | sed 's|/|-|g' | sed 's/^-//')/memory/MEMORY.md 2>/dev/null || echo "no memory file"`) — same for personal memory
 
 ## Step 2 — Reflect honestly
 
@@ -66,7 +66,7 @@ Ask: "Should I write any of these? You can approve all, pick specific ones, or a
 ## Step 5 — Write approved items
 
 For each approved item:
-- If personal memory: create or update the relevant file in `~/.claude/projects/-Users-Damien-Code-tri/memory/` following the frontmatter format, then update `MEMORY.md`
+- If personal memory: create or update the relevant file in your project memory directory (`~/.claude/projects/<repo-path-as-slug>/memory/`) following the frontmatter format, then update `MEMORY.md`
 - If `CLAUDE.md`: edit the file, placing the addition in the most relevant existing section (Gotchas, Working with Claude, etc.)
 
 Confirm what was written and where.
