@@ -2005,19 +2005,23 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
     weekEndExclusive
   });
 
-  const plannedMinutes = sessionSummaries.reduce((sum, session) => sum + session.durationMinutes, 0);
+  // For completed sessions use actual activity minutes (same as the main card) so both cards show the
+  // same effective total.  For skipped/planned sessions keep the planned duration.
+  const getEffectiveMinutes = (session: (typeof sessionSummaries)[number]) => {
+    if (session.resolvedStatus !== "completed") return session.durationMinutes;
+    const linkedMinutes = confirmedLinks
+      .filter((link) => link.planned_session_id === session.id)
+      .reduce((minutes, link) => {
+        const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
+        return minutes + Math.round((activity?.duration_sec ?? 0) / 60);
+      }, 0);
+    return linkedMinutes > 0 ? linkedMinutes : session.durationMinutes;
+  };
+  const plannedMinutes = sessionSummaries.reduce((sum, session) => sum + getEffectiveMinutes(session), 0);
   const completedMinutes =
     sessionSummaries
       .filter((session) => session.resolvedStatus === "completed")
-      .reduce((sum, session) => {
-        const linkedMinutes = confirmedLinks
-          .filter((link) => link.planned_session_id === session.id)
-          .reduce((minutes, link) => {
-            const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
-            return minutes + Math.round((activity?.duration_sec ?? 0) / 60);
-          }, 0);
-        return sum + (linkedMinutes > 0 ? linkedMinutes : session.durationMinutes);
-      }, 0) +
+      .reduce((sum, session) => sum + getEffectiveMinutes(session), 0) +
     extraActivities.reduce((sum, activity) => sum + activity.durationMinutes, 0);
   const skippedMinutes = sessionSummaries
     .filter((session) => session.resolvedStatus === "skipped")
