@@ -28,8 +28,9 @@ type ActivityRow = {
 };
 
 function formatPaceMinSec(secPerUnit: number, unit: string): string {
-  const mins = Math.floor(secPerUnit / 60);
-  const secs = Math.round(secPerUnit % 60);
+  const rounded = Math.round(secPerUnit);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
   return `${mins}:${secs.toString().padStart(2, "0")}${unit}`;
 }
 
@@ -264,8 +265,9 @@ export async function deriveBenchmarks(
   weekEnd: string,
   windowWeeks = 12
 ): Promise<BenchmarkHighlight[]> {
+  const windowDays = windowWeeks * 7;
   // Current block: weekEnd - windowWeeks → weekEnd
-  const currentFrom = new Date(new Date(`${weekEnd}T00:00:00.000Z`).getTime() - windowWeeks * 7 * 86400000)
+  const currentFrom = new Date(new Date(`${weekEnd}T00:00:00.000Z`).getTime() - (windowDays - 1) * 86400000)
     .toISOString()
     .slice(0, 10);
 
@@ -286,7 +288,7 @@ export async function deriveBenchmarks(
   const priorTo = new Date(new Date(`${currentFrom}T00:00:00.000Z`).getTime() - 86400000)
     .toISOString()
     .slice(0, 10);
-  const priorFrom = new Date(new Date(`${priorTo}T00:00:00.000Z`).getTime() - windowWeeks * 7 * 86400000)
+  const priorFrom = new Date(new Date(`${priorTo}T00:00:00.000Z`).getTime() - (windowDays - 1) * 86400000)
     .toISOString()
     .slice(0, 10);
 
