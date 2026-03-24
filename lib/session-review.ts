@@ -13,6 +13,7 @@ export type SessionReviewRow = {
   workout_type?: string | null;
   intent_category?: string | null;
   target?: string | null;
+  notes?: string | null;
   duration_minutes?: number | null;
   status?: "planned" | "completed" | "skipped" | null;
   execution_result?: Record<string, unknown> | null;

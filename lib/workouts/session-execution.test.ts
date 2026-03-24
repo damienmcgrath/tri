@@ -78,4 +78,57 @@ describe("buildExecutionResultForSession", () => {
     expect(result.executionScoreBand).toBe("On target");
     expect(result.summary).toMatch(/aligned|planned intent/i);
   });
+
+  test("threads session.target into the evidence plannedStructure", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-3",
+        user_id: "user-1",
+        sport: "run",
+        type: "Interval run",
+        duration_minutes: 40,
+        target: "3 x 2min on, 2min off",
+        status: "planned"
+      },
+      {
+        id: "activity-3",
+        sport_type: "run",
+        duration_sec: 2400,
+        distance_m: 8000,
+        avg_hr: 162,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    expect(result.deterministic.planned.plannedStructure).toBe("3 x 2min on, 2min off");
+  });
+
+  test("joins target and notes into plannedStructure when both are present", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-4",
+        user_id: "user-1",
+        sport: "run",
+        type: "Interval run",
+        duration_minutes: 40,
+        target: "3 x 2min on, 2min off",
+        notes: "Focus on effort not pace",
+        status: "planned"
+      },
+      {
+        id: "activity-4",
+        sport_type: "run",
+        duration_sec: 2400,
+        distance_m: 8000,
+        avg_hr: 162,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    expect(result.deterministic.planned.plannedStructure).toBe("3 x 2min on, 2min off | Focus on effort not pace");
+  });
 });
