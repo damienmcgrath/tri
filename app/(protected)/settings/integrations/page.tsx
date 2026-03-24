@@ -117,6 +117,12 @@ export default async function IntegrationsPage() {
     };
   });
 
+  const occupiedSessionIds = new Set<string>(
+    (links ?? [])
+      .filter((l: any) => l.confirmation_status === "confirmed" && l.planned_session_id !== null)
+      .map((l: any) => l.planned_session_id as string)
+  );
+
   return (
     <section className="space-y-4">
       <header className="surface p-6">
@@ -131,7 +137,7 @@ export default async function IntegrationsPage() {
       </div>
 
       <article className="surface p-5">
-        <ActivityUploadsPanel initialUploads={uploads} plannedSessions={plannedSessions} />
+        <ActivityUploadsPanel initialUploads={uploads} plannedSessions={plannedSessions} initialOccupiedSessionIds={Array.from(occupiedSessionIds)} />
       </article>
     </section>
   );
