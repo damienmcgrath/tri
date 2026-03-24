@@ -518,10 +518,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         {reviewVm.isReviewable ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-5">
-              {hasSpecificPlannedIntent ? (
+              {hasSpecificPlannedIntent || session.notes ? (
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{plannedColumnLabel}</p>
-                  <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
+                  {hasSpecificPlannedIntent ? <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p> : null}
+                  {session.notes ? <p className="mt-1.5 text-sm text-muted italic">{session.notes}</p> : null}
                 </div>
               ) : null}
               <div className={hasSpecificPlannedIntent ? "border-t border-[hsl(var(--border))] pt-5" : ""}>
@@ -531,6 +532,10 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               <div className="border-t border-[hsl(var(--border))] pt-5">
                 <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
+              </div>
+              <div className="border-t border-[hsl(var(--border))] pt-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
+                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
               </div>
             </div>
 
@@ -555,10 +560,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                   <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
                 </div>
               )}
-              <div className="border-t border-[hsl(var(--border))] pt-5">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
-                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
-              </div>
             </div>
           </div>
         ) : (

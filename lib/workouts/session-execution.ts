@@ -12,6 +12,7 @@ type SessionExecutionSessionRow = {
   type: string;
   duration_minutes: number | null;
   target?: string | null;
+  notes?: string | null;
   intent_category?: string | null;
   session_name?: string | null;
   session_role?: string | null;
@@ -396,7 +397,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
     sessionId: session.id,
     sessionTitle: session.session_name ?? session.type,
     sessionRole: session.session_role,
-    plannedStructure: session.target ?? null,
+    plannedStructure: [session.target, session.notes].filter(Boolean).join(" | ") || null,
     diagnosisInput
   });
 
@@ -446,7 +447,7 @@ async function loadSessionAndActivity(supabase: SupabaseClient, userId: string, 
   const [{ data: session, error: sessionError }, { data: activity, error: activityError }] = await Promise.all([
     supabase
       .from("sessions")
-      .select("id,athlete_id,user_id,sport,type,duration_minutes,target,intent_category,session_name,session_role,status")
+      .select("id,athlete_id,user_id,sport,type,duration_minutes,target,notes,intent_category,session_name,session_role,status")
       .eq("id", sessionId)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -488,7 +489,7 @@ export async function syncSessionExecutionFromActivityLink(args: {
     sessionId: session.id,
     sessionTitle: session.session_name ?? session.type,
     sessionRole: session.session_role,
-    plannedStructure: session.target ?? null,
+    plannedStructure: [session.target, session.notes].filter(Boolean).join(" | ") || null,
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });
