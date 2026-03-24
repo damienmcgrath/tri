@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/actions-utils";
 
 const uuidSchema = z.string().uuid();
 
@@ -91,19 +92,6 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
 function getOptionalFormValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return value === null ? undefined : value;
-}
-
-async function getAuthedClient() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in.");
-  }
-
-  return { supabase, user };
 }
 
 async function assertPlanOwnership(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, planId: string) {

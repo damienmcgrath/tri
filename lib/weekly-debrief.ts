@@ -7,7 +7,7 @@ import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 import { asMetricsRecord, getMetricsV2Laps, getMetricsV2PaceZones, getMetricsV2HrZones, getNestedNumber as getMetricsNestedNumber, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
-import { addDays, weekRangeLabel } from "@/app/(protected)/week-context";
+import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 6;
 
@@ -838,40 +838,45 @@ async function generateNarrative(args: {
       }
     }
 
-    const response = await client.responses.create({
-      model: getCoachModel(),
-      instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: JSON.stringify({
-                facts: args.facts,
-                evidence: args.evidence,
-                activityEvidence: args.activityEvidence,
-                athleteContext: args.athleteContext ? {
-                  weeklyState: args.athleteContext.weeklyState,
-                  declared: {
-                    weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
-                    limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
-                  }
-                } : null,
-                checkIn: args.checkIn ? {
-                  fatigue: args.checkIn.fatigueScore,
-                  stress: args.checkIn.stressScore,
-                  motivation: args.checkIn.motivationScore,
-                  notes: args.checkIn.weekNotes
-                } : null,
-                recentFeedback: args.recentFeedback ?? null,
-              })
-            }
-          ]
-        }
-      ]
-    });
+    const response = await Promise.race([
+      client.responses.create({
+        model: getCoachModel(),
+        instructions:
+          "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: JSON.stringify({
+                  facts: args.facts,
+                  evidence: args.evidence,
+                  activityEvidence: args.activityEvidence,
+                  athleteContext: args.athleteContext ? {
+                    weeklyState: args.athleteContext.weeklyState,
+                    declared: {
+                      weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
+                      limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
+                    }
+                  } : null,
+                  checkIn: args.checkIn ? {
+                    fatigue: args.checkIn.fatigueScore,
+                    stress: args.checkIn.stressScore,
+                    motivation: args.checkIn.motivationScore,
+                    notes: args.checkIn.weekNotes
+                  } : null,
+                  recentFeedback: args.recentFeedback ?? null,
+                })
+              }
+            ]
+          }
+        ]
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("OpenAI request timed out after 30s")), 30_000)
+      )
+    ]);
     const text = response.output_text?.trim();
     if (!text) {
       console.warn("[weekly-debrief] Falling back to deterministic narrative: empty model output");
@@ -2283,7 +2288,7 @@ export async function refreshWeeklyDebrief(args: {
   };
 }
 
-const weeklyDebriefFeedbackInputSchema = z.object({
+export const weeklyDebriefFeedbackInputSchema = z.object({
   weekStart: z.string().date(),
   helpful: z.boolean().nullable(),
   accurate: z.boolean().nullable(),

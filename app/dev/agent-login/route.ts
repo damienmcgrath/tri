@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   response.cookies.set(AGENT_PREVIEW_COOKIE, "active", {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     path: "/"
   });
   return response;
