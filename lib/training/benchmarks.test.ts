@@ -1,41 +1,27 @@
 import { deriveBenchmarks } from "./benchmarks";
-import type { BenchmarkHighlight } from "./benchmarks";
-
-function makeSupabase(currentRows: object[], priorRows: object[] = []) {
-  let callCount = 0;
-  return {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          in: () => ({
-            gte: () => ({
-              lte: () => ({
-                order: () => ({
-                  then: undefined,
-                  // Return currentRows on first call, priorRows on second
-                  async *[Symbol.asyncIterator]() {},
-                }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    }),
-  };
-}
 
 // Minimal Supabase mock that returns two sequential datasets
 function makeSeqSupabase(currentRows: object[], priorRows: object[] = []) {
   let callCount = 0;
   const makeChain = (rows: object[]) => {
     const chain: Record<string, unknown> = {};
-    const terminal = { data: rows, error: null };
-    const returnFn = () => Promise.resolve(terminal);
+    let filteredRows = [...rows];
+
     chain.eq = () => chain;
     chain.in = () => chain;
-    chain.gte = () => chain;
-    chain.lte = () => chain;
-    chain.order = returnFn;
+    chain.gte = (column: string, value: string) => {
+      if (column === "start_time_utc") {
+        filteredRows = filteredRows.filter((row) => String((row as { start_time_utc?: string }).start_time_utc ?? "") >= value);
+      }
+      return chain;
+    };
+    chain.lte = (column: string, value: string) => {
+      if (column === "start_time_utc") {
+        filteredRows = filteredRows.filter((row) => String((row as { start_time_utc?: string }).start_time_utc ?? "") <= value);
+      }
+      return chain;
+    };
+    chain.order = () => Promise.resolve({ data: filteredRows, error: null });
     return chain;
   };
 
@@ -205,7 +191,7 @@ describe("deriveBenchmarks", () => {
       makeRow({ id: "run-current", sport_type: "run", distance_m: 10000, duration_sec: 3000 }),  // 300 sec/km
     ];
     const priorRows = [
-      makeRow({ id: "run-prior", sport_type: "run", distance_m: 10000, duration_sec: 3120 }),    // 312 sec/km (slower)
+      makeRow({ id: "run-prior", sport_type: "run", start_time_utc: "2023-10-10T08:00:00.000Z", distance_m: 10000, duration_sec: 3120 }),    // 312 sec/km (slower)
     ];
     const supabase = makeSeqSupabase(currentRows, priorRows);
     const result = await deriveBenchmarks(supabase as never, "user-1", WEEK_START, WEEK_END);
@@ -241,6 +227,18 @@ describe("deriveBenchmarks", () => {
     expect(run!.formattedValue).toBe("4:32/km");
   });
 
+  it("formatting: pace rounding rolls over to the next minute", async () => {
+    // 2996 sec over 10km = 299.6 sec/km → 5:00/km after rounding
+    const rows = [
+      makeRow({ id: "run-rollover", sport_type: "run", distance_m: 10000, duration_sec: 2996 }),
+    ];
+    const supabase = makeSeqSupabase(rows);
+    const result = await deriveBenchmarks(supabase as never, "user-1", WEEK_START, WEEK_END);
+
+    const run = result.find((b) => b.sport === "run");
+    expect(run!.formattedValue).toBe("5:00/km");
+  });
+
   it("formatting: swim pace formats as M:SS/100m", async () => {
     // 95 sec/100m → 1:35/100m
     const rows = [
@@ -262,5 +260,24 @@ describe("deriveBenchmarks", () => {
 
     const bike = result.find((b) => b.sport === "bike");
     expect(bike!.formattedValue).toBe("246W");
+  });
+
+  it("uses an exact inclusive 12-week window for current and prior blocks", async () => {
+    const currentRows = [
+      makeRow({ id: "within-window", sport_type: "run", start_time_utc: "2023-12-25T08:00:00.000Z", distance_m: 10000, duration_sec: 3000 }),
+      makeRow({ id: "too-old-current", sport_type: "run", start_time_utc: "2023-12-24T08:00:00.000Z", distance_m: 10000, duration_sec: 2800 }),
+    ];
+    const priorRows = [
+      makeRow({ id: "within-prior-window", sport_type: "run", start_time_utc: "2023-10-02T08:00:00.000Z", distance_m: 10000, duration_sec: 3120 }),
+      makeRow({ id: "too-old-prior", sport_type: "run", start_time_utc: "2023-10-01T08:00:00.000Z", distance_m: 10000, duration_sec: 3300 }),
+    ];
+    const supabase = makeSeqSupabase(currentRows, priorRows);
+    const result = await deriveBenchmarks(supabase as never, "user-1", WEEK_START, WEEK_END);
+
+    const run = result.find((b) => b.sport === "run");
+    expect(run).toBeDefined();
+    expect(run!.activityId).toBe("within-window");
+    expect(run!.deltaLabel).toMatch(/faster/);
+    expect(run!.deltaVsPriorBlock).toBeCloseTo(12, 0);
   });
 });
