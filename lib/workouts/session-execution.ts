@@ -396,6 +396,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
     sessionId: session.id,
     sessionTitle: session.session_name ?? session.type,
     sessionRole: session.session_role,
+    plannedStructure: session.target ?? null,
     diagnosisInput
   });
 
@@ -487,6 +488,7 @@ export async function syncSessionExecutionFromActivityLink(args: {
     sessionId: session.id,
     sessionTitle: session.session_name ?? session.type,
     sessionRole: session.session_role,
+    plannedStructure: session.target ?? null,
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });

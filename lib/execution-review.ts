@@ -18,6 +18,7 @@ export type ExecutionEvidence = {
       pace?: { min?: number; max?: number };
     } | null;
     plannedIntervals: number | null;
+    plannedStructure: string | null;
     sessionRole: "key" | "supporting" | "recovery" | "unknown";
   };
   actual: {
@@ -670,6 +671,8 @@ function buildCoachVerdictInstructions() {
     "Keep each `support` entry as a plain string, not an object.",
     "If evidence is limited, reflect that in `uncertainty` and keep recommendations conservative.",
     "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
+    "Express durations in minutes (e.g. '37 min', '1 h 15 min'). Never write raw seconds.",
+    "Express run pace as min:sec/km (e.g. '5:41/km'). Never write raw seconds per km.",
     "Field requirements:",
     "- `sessionVerdict.headline`: short label, max 160 chars.",
     "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
@@ -829,6 +832,7 @@ export function buildExecutionEvidence(args: {
   sessionId: string;
   sessionTitle: string;
   sessionRole?: string | null;
+  plannedStructure?: string | null;
   diagnosisInput: SessionDiagnosisInput;
   weeklyState?: { fatigue: number | null } | null;
 }) {
@@ -856,6 +860,7 @@ export function buildExecutionEvidence(args: {
         durationSec: args.diagnosisInput.planned.plannedDurationSec ?? null,
         targetBands: args.diagnosisInput.planned.targetBands ?? null,
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
+        plannedStructure: args.plannedStructure ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
       actual: buildActualEvidence(args.diagnosisInput),
@@ -894,6 +899,7 @@ export function buildExecutionEvidence(args: {
         durationSec: args.diagnosisInput.planned.plannedDurationSec ?? null,
         targetBands: args.diagnosisInput.planned.targetBands ?? null,
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
+        plannedStructure: args.plannedStructure ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
       actual: buildActualEvidence(args.diagnosisInput),

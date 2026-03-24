@@ -480,8 +480,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
                 {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
               </h2>
-              <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.actualExecutionSummary}</p>
-              <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
             </div>
 
             <div className="border-t border-[hsl(var(--border))] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
