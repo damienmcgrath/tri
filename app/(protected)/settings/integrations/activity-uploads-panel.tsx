@@ -36,6 +36,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
   const [message, setMessage] = useState<string>("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [attachFor, setAttachFor] = useState<UploadRow | null>(null);
+  const [attachError, setAttachError] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
   const detail = uploads.find((item) => item.id === detailId) ?? null;
@@ -44,7 +45,14 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
     if (!attachFor) return [];
     const activity = attachFor.completed_activities[0];
     const day = attachFor.created_at.slice(0, 10);
-    return [...plannedSessions].sort((a, b) => {
+    const occupiedSessionIds = new Set(
+      uploads.flatMap((u) =>
+        u.session_activity_links
+          .filter((l) => l.confirmation_status === "confirmed" && l.planned_session_id !== null)
+          .map((l) => l.planned_session_id as string)
+      )
+    );
+    return [...plannedSessions].filter((s) => !occupiedSessionIds.has(s.id)).sort((a, b) => {
       const aSame = a.date === day ? 0 : 1;
       const bSame = b.date === day ? 0 : 1;
       const aSport = activity?.sport_type === a.sport ? 0 : 1;
@@ -141,7 +149,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                   <td className="space-x-2 text-xs">
                     {activity?.id ? <Link className="text-cyan-300 underline" href={`/activities/${activity.id}`}>View activity</Link> : <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>}
                     {!linked && upload.status !== "error" ? (
-                      <button className="text-cyan-300 underline" onClick={() => setAttachFor(upload)}>Attach to planned session</button>
+                      <button className="text-cyan-300 underline" onClick={() => { setAttachFor(upload); setAttachError(""); }}>Attach to planned session</button>
                     ) : null}
                     <button
                       className="text-rose-300 underline"
@@ -203,7 +211,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
 
                         if (!response.ok) {
                           const payload = await response.json().catch(() => ({}));
-                          setMessage(payload.error ?? "Could not attach activity to session");
+                          setAttachError(payload.error ?? "Could not attach activity to session");
                           return;
                         }
 
@@ -238,6 +246,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions }: { init
                 </li>
               ))}
             </ul>
+            {attachError ? <p className="mt-3 text-xs text-red-400">{attachError}</p> : null}
             <button className="mt-3 text-xs underline" onClick={() => setAttachFor(null)}>Close</button>
           </div>
         </div>
