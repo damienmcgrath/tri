@@ -1556,7 +1556,12 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
   const keySessions = sessionSummaries.filter((session) => session.isKey);
   const keySessionsCompleted = keySessions.filter((session) => session.status === "completed").length;
   const keySessionsMissed = keySessions.filter((session) => session.status === "skipped").length;
-  const plannedMinutes = sessionSummaries.reduce((sum, session) => sum + session.durationMinutes, 0);
+  // Use actual activity minutes for completed sessions (same as the dashboard main card) so the
+  // generated artifact and the readiness card always report the same effective planned total.
+  const plannedMinutes = sessionSummaries.reduce(
+    (sum, session) => sum + (session.status === "completed" ? session.completedMinutes : session.durationMinutes),
+    0
+  );
   const completedPlannedMinutes = sessionSummaries.reduce((sum, session) => sum + session.completedMinutes, 0);
   const completedMinutes = completedPlannedMinutes + extraActivities.reduce((sum, activity) => sum + activity.durationMinutes, 0);
   const skippedMinutes = sessionSummaries.filter((session) => session.status === "skipped").reduce((sum, session) => sum + session.durationMinutes, 0);
