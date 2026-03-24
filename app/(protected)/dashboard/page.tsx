@@ -671,6 +671,10 @@ export default async function DashboardPage({
     .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 
   const behindByMinutes = Math.max(Math.round((expectedByTodayPct / 100) * totals.planned) - totals.completed, 0);
+  // Only surface "behind" when there is genuinely remaining or overdue work.  A back-loaded week can
+  // look "behind pace" even when every session through today is done — suppress the alert in that case.
+  const todayHasRemainingWork = dailyStates.find((d) => d.iso === todayIso)?.tone === "today-remaining";
+  const behindAlertActive = behindByMinutes >= 30 && (missedSessionsCount > 0 || todayHasRemainingWork);
 
   const sports = ["swim", "bike", "run", "strength"] as const;
   const biggestGap = sports
@@ -698,7 +702,7 @@ export default async function DashboardPage({
         href: `/calendar?focus=${overdueKeySession.id}`,
         ctaStyle: "primary"
       }
-    : behindByMinutes >= 30
+    : behindAlertActive
       ? {
           kicker: "Needs attention",
           title: "You are behind this week",

@@ -184,6 +184,97 @@ describe("DashboardPage", () => {
     expect(screen.getByText("30 min • Done")).toBeInTheDocument();
   });
 
+  describe("behindAlertActive — pace-based attention item suppression", () => {
+    // Back-loaded week: small daily sessions Mon–Fri, big blocks on the weekend.
+    // By Friday (elapsedDays = 5, expectedByTodayPct = 71%) the linear pace metric fires
+    // "behind" even when every session through today is done, because the bulk of volume
+    // sits on Sat (120m) and Sun (90m). The fix should suppress the alert in that case.
+    function makeSession(id: string, date: string, sport: string, durationMinutes: number, status: "planned" | "completed") {
+      return {
+        id,
+        plan_id: "plan-1",
+        date,
+        sport,
+        type: "Endurance",
+        duration_minutes: durationMinutes,
+        notes: null,
+        created_at: "2026-03-01T08:00:00.000Z",
+        status
+      };
+    }
+
+    const completedWeekdaySessions = [
+      makeSession("s-mon", "2026-03-09", "run", 30, "completed"),
+      makeSession("s-tue", "2026-03-10", "run", 30, "completed"),
+      makeSession("s-wed", "2026-03-11", "run", 30, "completed"),
+      makeSession("s-thu", "2026-03-12", "run", 30, "completed"),
+    ];
+
+    const bigWeekendSessions = [
+      makeSession("s-sat", "2026-03-14", "bike", 120, "planned"),
+      makeSession("s-sun", "2026-03-15", "run", 90, "planned"),
+    ];
+
+    it("suppresses the behind alert when today is done and no sessions are missed", async () => {
+      // Mon–Fri all done; big Sat/Sun blocks still ahead.
+      // Linear pace says "behind" but there's nothing actually overdue.
+      mockedCreateServerClient.mockReturnValue(
+        createSupabaseMock({
+          sessions: [
+            ...completedWeekdaySessions,
+            makeSession("s-fri", "2026-03-13", "run", 30, "completed"), // today — done
+            ...bigWeekendSessions
+          ],
+          links: []
+        })
+      );
+
+      render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
+
+      expect(screen.queryByText("You are behind this week")).not.toBeInTheDocument();
+      expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    });
+
+    it("shows the behind alert when today still has a remaining planned session", async () => {
+      // Fri session is still planned — today has remaining work, so the alert should fire.
+      mockedCreateServerClient.mockReturnValue(
+        createSupabaseMock({
+          sessions: [
+            ...completedWeekdaySessions,
+            makeSession("s-fri", "2026-03-13", "run", 30, "planned"), // today — remaining
+            ...bigWeekendSessions
+          ],
+          links: []
+        })
+      );
+
+      render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
+
+      expect(screen.getByText("You are behind this week")).toBeInTheDocument();
+    });
+
+    it("shows an attention alert when a past session is missed even if today is done", async () => {
+      // Thu session was not done (missed) — missedSessionsCount > 0 so alert must appear.
+      mockedCreateServerClient.mockReturnValue(
+        createSupabaseMock({
+          sessions: [
+            makeSession("s-mon", "2026-03-09", "run", 30, "completed"),
+            makeSession("s-tue", "2026-03-10", "run", 30, "completed"),
+            makeSession("s-wed", "2026-03-11", "run", 30, "completed"),
+            makeSession("s-thu", "2026-03-12", "run", 30, "planned"), // missed
+            makeSession("s-fri", "2026-03-13", "run", 30, "completed"), // today — done
+            ...bigWeekendSessions
+          ],
+          links: []
+        })
+      );
+
+      render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
+
+      expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    });
+  });
+
   it("shifts the completed Today card toward the next important session", async () => {
     mockedCreateServerClient.mockReturnValue(
       createSupabaseMock({

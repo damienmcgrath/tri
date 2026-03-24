@@ -35,7 +35,8 @@ export async function GET() {
   if (!withStatusError) return NextResponse.json({ uploads: withStatus ?? [] });
 
   if (!isMissingScheduleStatus(withStatusError.message)) {
-    return NextResponse.json({ error: withStatusError.message }, { status: 400 });
+    console.error("[UPLOADS_GET]", withStatusError.message);
+    return NextResponse.json({ error: "Could not load uploads." }, { status: 400 });
   }
 
   const { data: legacyData, error: legacyError } = await supabase
@@ -45,7 +46,10 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(15);
 
-  if (legacyError) return NextResponse.json({ error: legacyError.message }, { status: 400 });
+  if (legacyError) {
+    console.error("[UPLOADS_GET]", legacyError.message);
+    return NextResponse.json({ error: "Could not load uploads." }, { status: 400 });
+  }
 
   const uploads = (legacyData ?? []).map((upload: any) => ({
     ...upload,
@@ -100,6 +104,21 @@ export async function POST(request: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
+
+  // Validate file signature before parsing
+  if (extension === ".fit") {
+    // FIT files have ".FIT" signature at bytes 8-11 in the header
+    if (bytes.length < 12 || bytes.toString("ascii", 8, 12) !== ".FIT") {
+      return NextResponse.json({ error: "Invalid FIT file. File signature does not match." }, { status: 400 });
+    }
+  } else if (extension === ".tcx") {
+    // TCX files are XML — must start with XML declaration or root element
+    const head = bytes.toString("utf8", 0, Math.min(200, bytes.length)).trimStart();
+    if (!head.startsWith("<?xml") && !head.startsWith("<TrainingCenterDatabase")) {
+      return NextResponse.json({ error: "Invalid TCX file. File does not appear to be valid XML." }, { status: 400 });
+    }
+  }
+
   const hash = sha256Hex(bytes);
 
   const { data: duplicate } = await supabase
@@ -123,7 +142,10 @@ export async function POST(request: Request) {
     .select("id")
     .single();
 
-  if (uploadError || !upload) return NextResponse.json({ error: uploadError?.message ?? "Could not store upload" }, { status: 400 });
+  if (uploadError || !upload) {
+    console.error("[UPLOAD_INSERT]", uploadError?.message);
+    return NextResponse.json({ error: "Could not store upload." }, { status: 400 });
+  }
 
   try {
     const parsed = extension === ".fit" ? await parseFitFile(bytes) : parseTcxFile(bytes.toString("utf8"));
@@ -222,8 +244,9 @@ export async function POST(request: Request) {
       headers: rateLimitHeaders(userRateLimit)
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to parse file";
-    await supabase.from("activity_uploads").update({ status: "error", error_message: message }).eq("id", upload.id).eq("user_id", user.id);
-    return NextResponse.json({ error: message, uploadId: upload.id }, { status: 400 });
+    const internalMessage = error instanceof Error ? error.message : "Failed to parse file";
+    console.error("[UPLOAD_PARSE]", internalMessage);
+    await supabase.from("activity_uploads").update({ status: "error", error_message: internalMessage }).eq("id", upload.id).eq("user_id", user.id);
+    return NextResponse.json({ error: "Failed to parse activity file.", uploadId: upload.id }, { status: 400 });
   }
 }

@@ -3,7 +3,7 @@
 import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/actions-utils";
 import { parseTcxToSessions } from "@/lib/workouts/tcx";
 import { appendSkipTag } from "@/lib/plans/skip-notes";
 
@@ -25,19 +25,6 @@ const swapSessionSchema = z.object({
 const markSkippedSchema = z.object({
   sessionId: z.string().uuid()
 });
-
-async function getAuthedClient() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in.");
-  }
-
-  return { supabase, user };
-}
 
 export async function moveSessionAction(formData: FormData) {
   const parsed = moveSessionSchema.parse({

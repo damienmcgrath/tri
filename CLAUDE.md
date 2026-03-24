@@ -107,6 +107,7 @@ Completed session linked to planned session → `lib/execution-review.ts` analys
 - **`lib/` is uni-directional.** Business logic in `lib/` must never import from `app/`. Data flows one way: `app/` → `lib/`.
 - **Agent Preview seeded data resets on server restart** unless `globalThis` persistence is in place (see recent HMR fix). Don't rely on preview state surviving a full restart.
 - **Routes most likely to need visual verification:** `/dashboard` (upload panel), `/sessions/[id]` (review + mark-as-extra), `/calendar` (week view), `/coach` (chat interface).
+- **Agent Preview has no unlinked uploads by default.** The seeded upload is already "Scheduled", so the attach modal in `/settings/integrations` can't be visually tested without uploading a real file or modifying the seed data.
 
 ## Branch Naming
 

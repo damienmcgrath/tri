@@ -171,7 +171,11 @@ async function runCoachResponseFlow(params: {
       input: [
         {
           role: "user",
-          content: [{ type: "input_text", text: `Conversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n\nAthlete message: ${params.userMessage}` }]
+          content: [{ type: "input_text", text: `<context>\nConversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n</context>` }]
+        },
+        {
+          role: "user",
+          content: [{ type: "input_text", text: params.userMessage }]
         }
       ],
       tools: coachTools,

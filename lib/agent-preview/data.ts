@@ -9,9 +9,13 @@ const PREVIEW_ACTIVITY_TWO_ID = "55555555-5555-4555-8555-555555555552";
 const PREVIEW_ACTIVITY_THREE_ID = "55555555-5555-4555-8555-555555555553";
 const PREVIEW_ACTIVITY_EXTRA_RUN_ID = "55555555-5555-4555-8555-555555555554";
 const PREVIEW_ACTIVITY_UNREVIEWED_ID = "55555555-5555-4555-8555-555555555555";
+const PREVIEW_ACTIVITY_SWIM_ID = "55555555-5555-4555-8555-555555555556";
+const PREVIEW_ACTIVITY_LONG_RUN_ID = "55555555-5555-4555-8555-555555555557";
 const PREVIEW_LINK_ONE_ID = "66666666-6666-4666-8666-666666666661";
 const PREVIEW_LINK_TWO_ID = "66666666-6666-4666-8666-666666666662";
 const PREVIEW_LINK_EXTRA_RUN_ID = "66666666-6666-4666-8666-666666666663";
+const PREVIEW_LINK_SWIM_ID = "66666666-6666-4666-8666-666666666664";
+const PREVIEW_LINK_LONG_RUN_ID = "66666666-6666-4666-8666-666666666665";
 
 type PreviewTableName =
   | "profiles"
@@ -231,7 +235,7 @@ export function createPreviewDatabase(): PreviewDatabase {
         duration_minutes: 35,
         intent_category: "threshold",
         session_role: "key",
-        status: "planned",
+        status: "skipped",
         day_order: 1,
         notes: null,
         created_at: "2026-03-08T18:04:00.000Z",
@@ -253,7 +257,7 @@ export function createPreviewDatabase(): PreviewDatabase {
         duration_minutes: 140,
         intent_category: "long",
         session_role: "key",
-        status: "planned",
+        status: "skipped",
         day_order: 1,
         notes: "Fuel every 20 min and stay capped on climbs.",
         created_at: "2026-03-08T18:05:00.000Z",
@@ -275,12 +279,19 @@ export function createPreviewDatabase(): PreviewDatabase {
         duration_minutes: 95,
         intent_category: "long",
         session_role: "key",
-        status: "planned",
+        status: "completed",
         day_order: 1,
-        notes: null,
+        notes: "Solid long run. Kept easy for the first 18km, last 3km drifted to steady.",
         created_at: "2026-03-08T18:06:00.000Z",
         is_key: true,
-        execution_result: null
+        execution_result: {
+          status: "matched_intent",
+          executionScore: 86,
+          executionScoreBand: "On target",
+          executionScoreSummary: "Aerobic control held well. Final 3km steady as planned.",
+          whyItMatters: "Long run quality supports race-day run durability at the 70.3 distance.",
+          recommendedNextAction: "Keep the easy pace honest on the next long run — the slight drift at the end was fine here."
+        }
       },
       {
         id: "77777777-7777-4777-8777-777777777778",
@@ -312,6 +323,58 @@ export function createPreviewDatabase(): PreviewDatabase {
       { id: "88888888-8888-4888-8888-888888888883", user_id: PREVIEW_USER_ID, date: "2026-03-11", sport: "run" }
     ],
     completed_activities: [
+      {
+        id: PREVIEW_ACTIVITY_SWIM_ID,
+        user_id: PREVIEW_USER_ID,
+        upload_id: PREVIEW_UPLOAD_ID,
+        sport_type: "swim",
+        start_time_utc: "2026-03-09T06:30:00.000Z",
+        end_time_utc: "2026-03-09T07:18:00.000Z",
+        duration_sec: 2880,
+        moving_duration_sec: 2880,
+        elapsed_duration_sec: 2880,
+        distance_m: 1800,
+        avg_hr: 132,
+        avg_power: null,
+        avg_cadence: null,
+        max_hr: 148,
+        max_power: null,
+        elevation_gain_m: null,
+        elevation_loss_m: null,
+        calories: 480,
+        avg_pace_per_100m_sec: 92,
+        avg_stroke_rate_spm: 26,
+        avg_swolf: 38,
+        pool_length_m: 25,
+        laps_count: 12,
+        activity_vendor: "garmin",
+        activity_type_raw: "swimming",
+        activity_subtype_raw: "pool_swimming",
+        source: "upload",
+        parse_summary: null,
+        notes: "CSS intervals — 12 x 100m. Pacing held cleanly through the last set.",
+        schedule_status: "scheduled",
+        is_unplanned: false,
+        is_race: false,
+        created_at: "2026-03-09T07:20:00.000Z",
+        updated_at: "2026-03-09T07:20:00.000Z",
+        metrics_v2: {
+          paceZones: [
+            { zone: 1, durationSec: 300, pctOfSession: 0.10 },
+            { zone: 2, durationSec: 900, pctOfSession: 0.31 },
+            { zone: 3, durationSec: 1350, pctOfSession: 0.47 },
+            { zone: 4, durationSec: 330, pctOfSession: 0.11 }
+          ],
+          laps: [
+            { index: 1, durationSec: 95, distanceM: 100, avgPacePer100mSec: 95 },
+            { index: 2, durationSec: 94, distanceM: 100, avgPacePer100mSec: 94 },
+            { index: 3, durationSec: 92, distanceM: 100, avgPacePer100mSec: 92 },
+            { index: 4, durationSec: 91, distanceM: 100, avgPacePer100mSec: 91 },
+            { index: 5, durationSec: 91, distanceM: 100, avgPacePer100mSec: 91 },
+            { index: 6, durationSec: 90, distanceM: 100, avgPacePer100mSec: 90 }
+          ]
+        }
+      },
       {
         id: PREVIEW_ACTIVITY_ONE_ID,
         user_id: PREVIEW_USER_ID,
@@ -555,6 +618,60 @@ export function createPreviewDatabase(): PreviewDatabase {
         created_at: "2026-03-18T12:45:00.000Z",
         updated_at: "2026-03-18T12:45:00.000Z",
         metrics_v2: null
+      },
+      {
+        id: PREVIEW_ACTIVITY_LONG_RUN_ID,
+        user_id: PREVIEW_USER_ID,
+        upload_id: PREVIEW_UPLOAD_ID,
+        sport_type: "run",
+        start_time_utc: "2026-03-15T07:00:00.000Z",
+        end_time_utc: "2026-03-15T08:38:00.000Z",
+        duration_sec: 5880,
+        moving_duration_sec: 5840,
+        elapsed_duration_sec: 5880,
+        distance_m: 21000,
+        avg_hr: 144,
+        avg_power: null,
+        avg_cadence: 170,
+        max_hr: 162,
+        max_power: null,
+        elevation_gain_m: 186,
+        elevation_loss_m: 184,
+        calories: 1260,
+        avg_pace_per_100m_sec: null,
+        avg_stroke_rate_spm: null,
+        avg_swolf: null,
+        pool_length_m: null,
+        laps_count: 7,
+        activity_vendor: "garmin",
+        activity_type_raw: "running",
+        activity_subtype_raw: "long_run",
+        source: "upload",
+        parse_summary: null,
+        notes: "Solid. Kept it honest for 18km then let the last 3km drift to steady.",
+        schedule_status: "scheduled",
+        is_unplanned: false,
+        is_race: false,
+        created_at: "2026-03-15T08:45:00.000Z",
+        updated_at: "2026-03-15T09:00:00.000Z",
+        metrics_v2: {
+          cadence: { avgCadence: 170, maxCadence: 184 },
+          elevation: { gainM: 186 },
+          heartRateZones: [
+            { zone: 1, heartRateMin: null, heartRateMax: 130, durationSec: 480, pctOfSession: 0.08 },
+            { zone: 2, heartRateMin: 131, heartRateMax: 149, durationSec: 3720, pctOfSession: 0.64 },
+            { zone: 3, heartRateMin: 150, heartRateMax: 165, durationSec: 1560, pctOfSession: 0.27 }
+          ],
+          laps: [
+            { index: 1, durationSec: 840, distanceM: 3000, avgHr: 138, avgPaceSecPerKm: 280 },
+            { index: 2, durationSec: 840, distanceM: 3000, avgHr: 141, avgPaceSecPerKm: 280 },
+            { index: 3, durationSec: 845, distanceM: 3000, avgHr: 144, avgPaceSecPerKm: 282 },
+            { index: 4, durationSec: 848, distanceM: 3000, avgHr: 146, avgPaceSecPerKm: 283 },
+            { index: 5, durationSec: 852, distanceM: 3000, avgHr: 148, avgPaceSecPerKm: 284 },
+            { index: 6, durationSec: 848, distanceM: 3000, avgHr: 148, avgPaceSecPerKm: 283 },
+            { index: 7, durationSec: 767, distanceM: 3000, avgHr: 155, avgPaceSecPerKm: 256 }
+          ]
+        }
       }
     ],
     session_activity_links: [
@@ -587,6 +704,26 @@ export function createPreviewDatabase(): PreviewDatabase {
         confirmation_status: "rejected",
         matched_at: "2026-03-17T07:12:00.000Z",
         match_method: "unmatched"
+      },
+      {
+        id: PREVIEW_LINK_SWIM_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: "77777777-7777-4777-8777-777777777771",
+        completed_activity_id: PREVIEW_ACTIVITY_SWIM_ID,
+        confidence: 0.97,
+        confirmation_status: "confirmed",
+        matched_at: "2026-03-09T07:22:00.000Z",
+        match_method: "preview"
+      },
+      {
+        id: PREVIEW_LINK_LONG_RUN_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: "77777777-7777-4777-8777-777777777777",
+        completed_activity_id: PREVIEW_ACTIVITY_LONG_RUN_ID,
+        confidence: 0.94,
+        confirmation_status: "confirmed",
+        matched_at: "2026-03-15T09:02:00.000Z",
+        match_method: "preview"
       }
     ],
     activity_uploads: [
@@ -649,7 +786,132 @@ export function createPreviewDatabase(): PreviewDatabase {
         support_count: 3
       }
     ],
-    weekly_debriefs: [],
+    weekly_debriefs: [
+      {
+        athlete_id: PREVIEW_USER_ID,
+        week_start: "2026-03-09",
+        week_end: "2026-03-15",
+        status: "ready",
+        source_updated_at: "2026-03-15T09:00:00.000Z",
+        generated_at: "2026-03-15T10:00:00.000Z",
+        generation_version: 6,
+        helpful: null,
+        accurate: null,
+        feedback_note: null,
+        feedback_updated_at: null,
+        narrative: {
+          executiveSummary: "A disrupted build week where the bookends held. The CSS swim and long run both delivered what was needed — mid-week brick work fell through but did not undo the quality work either side of it. Bike power showed the familiar late-rep fade pattern again, worth watching as load increases.",
+          highlights: [
+            "CSS intervals executed cleanly — pace control held through all 12 reps with no fade in the final set.",
+            "Long run on Sunday landed well: 21km aerobic with the last 3km drifting to steady as planned.",
+            "FTP Build bike: first two reps matched target power — the quality stimulus arrived even without the third."
+          ],
+          observations: [
+            "Brick run and race prep brick lost to mid-week schedule compression — cumulative bike-run transition work is now behind for the block.",
+            "Bike power fades in the final rep of threshold work; this is the second consecutive week with this pattern."
+          ],
+          carryForward: [
+            "Protect the brick slot next week — even a shortened 20-minute transition run off the bike will rebuild the missing stimulus without requiring a full make-up session.",
+            "In the next FTP Build, start 5 watts lower to hold form through all three reps rather than letting the last one fade."
+          ]
+        },
+        coach_share: {
+          headline: "Bookend quality held despite mid-week disruption",
+          summary: "CSS swim and long run both delivered. Brick stack lost mid-week but core quality arrived either side of the gap.",
+          wins: [
+            "CSS swim held pace through all 12 reps",
+            "Long run 21km steady and on target",
+            "FTP bike quality in first two reps"
+          ],
+          concerns: [
+            "Brick stack missed — bike-run transitions behind for the block",
+            "Bike threshold fade becoming a recurring pattern"
+          ],
+          carryForward: [
+            "Protect the brick slot next week — even a shortened 20-minute transition run off the bike will rebuild the missing stimulus.",
+            "Start FTP Build 5 watts lower to hold form through all three reps rather than fading the last one."
+          ]
+        },
+        facts: {
+          weekLabel: "Week of Mar 9",
+          weekRange: "Mar 9 – Mar 15",
+          title: "Key sessions held, mid-week brick stack lost",
+          statusLine: "CSS swim and long run delivered — brick work fell through. Net effect: run and swim quality intact, transition work behind.",
+          primaryTakeawayTitle: "Quality at the bookends, gap in the middle",
+          primaryTakeawayDetail: "The two highest-value sessions landed cleanly. The lost brick stack is the main thing to carry forward — one week behind on bike-run transitions is recoverable if protected next week.",
+          plannedSessions: 7,
+          completedPlannedSessions: 4,
+          completedSessions: 5,
+          addedSessions: 1,
+          skippedSessions: 3,
+          remainingSessions: 0,
+          keySessionsCompleted: 3,
+          keySessionsMissed: 2,
+          keySessionsTotal: 5,
+          plannedMinutes: 500,
+          completedPlannedMinutes: 265,
+          completedMinutes: 297,
+          skippedMinutes: 235,
+          extraMinutes: 32,
+          completionPct: 59,
+          dominantSport: "run",
+          keySessionStatus: "3 of 5 key sessions completed",
+          weekShape: "disrupted",
+          reflectionsSparse: false,
+          narrativeSource: "ai",
+          artifactStateLabel: "final",
+          artifactStateNote: null,
+          provisionalReviewCount: 0,
+          confidenceNote: null,
+          metrics: [
+            { label: "Sessions completed", value: "5 / 7", detail: "3 key sessions on target", tone: "neutral" },
+            { label: "Key sessions", value: "3 / 5", detail: "Brick stack lost mid-week", tone: "caution" },
+            { label: "Training time", value: "4h 57m", detail: "vs 8h 20m planned", tone: "muted" }
+          ],
+          factualBullets: [
+            "CSS swim: 12 x 100m executed with strong pace control — no fade through the final set.",
+            "FTP Build bike: first two reps on target, third rep faded in the final minutes.",
+            "Long run: 21km with last 3km drifting to steady — matched intent cleanly.",
+            "Race Prep Brick and Brick Run skipped due to mid-week schedule compression."
+          ],
+          evidenceGroups: [
+            {
+              claim: "CSS swim and long run delivered the week's quality",
+              detail: "Both bookend sessions matched intent — swim pace held through the final reps, long run stayed aerobic with a controlled finish.",
+              supports: [
+                {
+                  id: "77777777-7777-4777-8777-777777777771",
+                  label: "CSS Intervals — Sun Mar 9",
+                  href: "/sessions/77777777-7777-4777-8777-777777777771",
+                  kind: "session",
+                  reason: "Execution score 91 — pace control held cleanly through all 12 reps."
+                },
+                {
+                  id: "77777777-7777-4777-8777-777777777777",
+                  label: "Long Run — Sun Mar 15",
+                  href: "/sessions/77777777-7777-4777-8777-777777777777",
+                  kind: "session",
+                  reason: "21km aerobic with last 3km steady as planned — execution score 86."
+                }
+              ]
+            },
+            {
+              claim: "Bike threshold quality shows a recurring late-rep fade",
+              detail: "FTP Build had the same fade pattern as last week — first two reps on target, third fades.",
+              supports: [
+                {
+                  id: "77777777-7777-4777-8777-777777777772",
+                  label: "FTP Build — Mon Mar 10",
+                  href: "/sessions/77777777-7777-4777-8777-777777777772",
+                  kind: "session",
+                  reason: "Execution score 74 — power held for 2 of 3 reps, third faded in the final minutes."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
     ingestion_events: []
   };
 }
