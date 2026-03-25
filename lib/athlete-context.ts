@@ -171,6 +171,7 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
       .select("value,source,recorded_at")
       .eq("athlete_id", athleteId)
       .order("recorded_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
   ]);

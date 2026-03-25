@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { sortAthleteFtpHistory } from "@/lib/athlete-ftp";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/security/request";
 
@@ -30,13 +31,14 @@ export async function GET(request: Request) {
     .select("id,value,source,notes,recorded_at,created_at")
     .eq("athlete_id", user.id)
     .order("recorded_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ history: data ?? [] });
+  return NextResponse.json({ history: sortAthleteFtpHistory(data ?? []) });
 }
 
 export async function POST(request: Request) {

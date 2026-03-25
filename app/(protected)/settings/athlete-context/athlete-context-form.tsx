@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
+import { sortAthleteFtpHistory, type AthleteFtpHistoryEntry } from "@/lib/athlete-ftp";
 
 type Props = {
   snapshot: AthleteContextSnapshot;
@@ -146,14 +147,6 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
   );
 }
 
-type FtpEntry = {
-  id: string;
-  value: number;
-  source: string;
-  notes: string | null;
-  recorded_at: string;
-};
-
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
   ramp_test: "Ramp test",
@@ -162,7 +155,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 function FtpSection({ initialFtp }: { initialFtp: AthleteContextSnapshot["ftp"] }) {
   const todayIso = new Date().toISOString().slice(0, 10);
-  const [history, setHistory] = useState<FtpEntry[]>([]);
+  const [history, setHistory] = useState<AthleteFtpHistoryEntry[]>([]);
   const [ftpValue, setFtpValue] = useState("");
   const [ftpSource, setFtpSource] = useState("manual");
   const [ftpNotes, setFtpNotes] = useState("");
@@ -174,13 +167,14 @@ function FtpSection({ initialFtp }: { initialFtp: AthleteContextSnapshot["ftp"] 
   useEffect(() => {
     fetch("/api/athlete-ftp")
       .then((res) => res.json())
-      .then((data: { history?: FtpEntry[] }) => {
-        if (data.history) setHistory(data.history);
+      .then((data: { history?: AthleteFtpHistoryEntry[] }) => {
+        if (data.history) setHistory(sortAthleteFtpHistory(data.history));
       })
       .catch(() => {});
   }, []);
 
-  const currentFtp = history[0] ?? (initialFtp ? { value: initialFtp.value, source: initialFtp.source, recorded_at: initialFtp.recordedAt, id: "", notes: null } : null);
+  const orderedHistory = sortAthleteFtpHistory(history);
+  const currentFtp = orderedHistory[0] ?? (initialFtp ? { value: initialFtp.value, source: initialFtp.source, recorded_at: initialFtp.recordedAt, created_at: null, id: "", notes: null } : null);
 
   async function handleFtpSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,9 +191,9 @@ function FtpSection({ initialFtp }: { initialFtp: AthleteContextSnapshot["ftp"] 
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ value: watts, source: ftpSource, notes: ftpNotes || null, recorded_at: ftpDate })
       });
-      const data = (await response.json()) as { error?: string; entry?: FtpEntry };
+      const data = (await response.json()) as { error?: string; entry?: AthleteFtpHistoryEntry };
       if (!response.ok) throw new Error(data.error ?? "Could not save FTP.");
-      if (data.entry) setHistory((prev) => [data.entry!, ...prev]);
+      if (data.entry) setHistory((prev) => sortAthleteFtpHistory([...prev, data.entry!]));
       setFtpValue("");
       setFtpNotes("");
       setFtpDate(todayIso);
@@ -234,7 +228,7 @@ function FtpSection({ initialFtp }: { initialFtp: AthleteContextSnapshot["ftp"] 
 
       {showHistory && history.length > 1 ? (
         <ul className="space-y-1">
-          {history.slice(1).map((entry) => (
+          {orderedHistory.slice(1).map((entry) => (
             <li key={entry.id} className="flex items-center gap-3 text-sm text-muted font-mono">
               <span>{entry.recorded_at}</span>
               <span>{entry.value}W</span>
