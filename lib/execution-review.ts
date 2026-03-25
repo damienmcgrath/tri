@@ -991,12 +991,12 @@ export async function generateCoachVerdict(args: {
     const client = getOpenAIClient();
     const timeoutMs = getCoachRequestTimeoutMs();
     const startedAt = Date.now();
-    const response = await client.responses.parse(
+    const response = await client.responses.create(
       {
         model: getCoachModel(),
         instructions: buildCoachVerdictInstructions(),
         reasoning: { effort: "low" },
-        max_output_tokens: 900,
+        max_output_tokens: 1600,
         text: {
           format: zodTextFormat(coachVerdictSchema, "session_coach_verdict", {
             description: "Structured session review verdict."
@@ -1020,24 +1020,40 @@ export async function generateCoachVerdict(args: {
       },
       { timeout: timeoutMs }
     );
-    const parsedVerdict = response.output_parsed;
-    if (!parsedVerdict) {
-      console.warn("[session-review-ai] Falling back to deterministic review: empty parsed model output", {
+    const text = response.output_text?.trim();
+    if (!text) {
+      console.warn("[session-review-ai] Falling back to deterministic review: empty model output", {
         sessionId: args.evidence.sessionId,
+        incompleteReason: response.incomplete_details?.reason ?? null,
         elapsedMs: Date.now() - startedAt
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    const { normalizedPayload, parsed } = coerceCoachVerdictPayload(parsedVerdict, {
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(text);
+    } catch (error) {
+      console.warn("[session-review-ai] Falling back to deterministic review: could not parse model output as JSON", {
+        sessionId: args.evidence.sessionId,
+        incompleteReason: response.incomplete_details?.reason ?? null,
+        outputLength: text.length,
+        elapsedMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return { verdict: deterministicFallback, source: "fallback" as const };
+    }
+
+    const { normalizedPayload, parsed } = coerceCoachVerdictPayload(parsedJson, {
       intentMatch: args.evidence.rulesSummary.intentMatch,
       executionCost: args.evidence.rulesSummary.executionCost,
       nextCall: nextCallFromEvidence(args.evidence.rulesSummary.intentMatch, args.evidence.rulesSummary.executionCost)
     });
     if (!parsed.success) {
-      const payloadKeys = Object.keys(asObject(parsedVerdict) ?? {});
+      const payloadKeys = Object.keys(asObject(parsedJson) ?? {});
       const normalizedKeys = Object.keys(asObject(normalizedPayload) ?? {});
       console.warn("[session-review-ai] Falling back to deterministic review: model JSON failed schema validation", {
         sessionId: args.evidence.sessionId,
+        incompleteReason: response.incomplete_details?.reason ?? null,
         elapsedMs: Date.now() - startedAt,
         payloadKeys,
         normalizedKeys,
