@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 
 type Props = {
@@ -68,7 +68,8 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
       <div className={`grid gap-3 ${compact ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"}`}>
         <label className="space-y-1 text-sm">
           <span className="text-muted">Experience level</span>
@@ -133,11 +134,163 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={isSaving} className="rounded-full bg-[hsl(var(--accent))] px-4 py-2 text-sm font-medium text-[hsl(var(--accent-foreground))] disabled:opacity-60">
+        <button type="submit" disabled={isSaving} className="btn-primary disabled:opacity-60">
           {isSaving ? "Saving..." : compact ? "Save context" : "Save athlete context"}
         </button>
         {message ? <p className="text-sm text-muted">{message}</p> : null}
       </div>
     </form>
+
+    <FtpSection initialFtp={snapshot.ftp} />
+    </>
+  );
+}
+
+type FtpEntry = {
+  id: string;
+  value: number;
+  source: string;
+  notes: string | null;
+  recorded_at: string;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual: "Manual",
+  ramp_test: "Ramp test",
+  estimated: "Estimated"
+};
+
+function FtpSection({ initialFtp }: { initialFtp: AthleteContextSnapshot["ftp"] }) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [history, setHistory] = useState<FtpEntry[]>([]);
+  const [ftpValue, setFtpValue] = useState("");
+  const [ftpSource, setFtpSource] = useState("manual");
+  const [ftpNotes, setFtpNotes] = useState("");
+  const [ftpDate, setFtpDate] = useState(todayIso);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/athlete-ftp")
+      .then((res) => res.json())
+      .then((data: { history?: FtpEntry[] }) => {
+        if (data.history) setHistory(data.history);
+      })
+      .catch(() => {});
+  }, []);
+
+  const currentFtp = history[0] ?? (initialFtp ? { value: initialFtp.value, source: initialFtp.source, recorded_at: initialFtp.recordedAt, id: "", notes: null } : null);
+
+  async function handleFtpSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const watts = parseInt(ftpValue, 10);
+    if (isNaN(watts) || watts < 50 || watts > 1999) {
+      setMessage("Enter a value between 50 and 1999 watts.");
+      return;
+    }
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/athlete-ftp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value: watts, source: ftpSource, notes: ftpNotes || null, recorded_at: ftpDate })
+      });
+      const data = (await response.json()) as { error?: string; entry?: FtpEntry };
+      if (!response.ok) throw new Error(data.error ?? "Could not save FTP.");
+      if (data.entry) setHistory((prev) => [data.entry!, ...prev]);
+      setFtpValue("");
+      setFtpNotes("");
+      setFtpDate(todayIso);
+      setMessage("FTP saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save FTP.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-[hsl(var(--border))] pt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-medium">Bike FTP</h3>
+          {currentFtp ? (
+            <p className="text-sm text-muted">
+              Current: <span className="font-mono text-[hsl(var(--foreground))]">{currentFtp.value}W</span>
+              {" "}· {SOURCE_LABELS[currentFtp.source] ?? currentFtp.source} · {currentFtp.recorded_at}
+            </p>
+          ) : (
+            <p className="text-sm text-muted">Not set — add your FTP for power-zone guidance.</p>
+          )}
+        </div>
+        {history.length > 1 ? (
+          <button type="button" onClick={() => setShowHistory((v) => !v)} className="text-xs text-muted underline-offset-2 hover:underline">
+            {showHistory ? "Hide history" : `History (${history.length})`}
+          </button>
+        ) : null}
+      </div>
+
+      {showHistory && history.length > 1 ? (
+        <ul className="space-y-1">
+          {history.slice(1).map((entry) => (
+            <li key={entry.id} className="flex items-center gap-3 text-sm text-muted font-mono">
+              <span>{entry.recorded_at}</span>
+              <span>{entry.value}W</span>
+              <span className="font-sans">{SOURCE_LABELS[entry.source] ?? entry.source}</span>
+              {entry.notes ? <span className="font-sans truncate max-w-xs">{entry.notes}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <form onSubmit={handleFtpSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="space-y-1 text-sm">
+          <span className="text-muted">New FTP (watts)</span>
+          <input
+            type="number"
+            min={50}
+            max={1999}
+            value={ftpValue}
+            onChange={(e) => setFtpValue(e.target.value)}
+            placeholder="e.g. 265"
+            className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2"
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="text-muted">Source</span>
+          <select value={ftpSource} onChange={(e) => setFtpSource(e.target.value)} className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
+            <option value="manual">Manual</option>
+            <option value="ramp_test">Ramp test</option>
+            <option value="estimated">Estimated</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="text-muted">Date</span>
+          <input
+            type="date"
+            value={ftpDate}
+            onChange={(e) => setFtpDate(e.target.value)}
+            className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2"
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="text-muted">Notes (optional)</span>
+          <input
+            value={ftpNotes}
+            onChange={(e) => setFtpNotes(e.target.value)}
+            placeholder="e.g. post base block"
+            className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2"
+          />
+        </label>
+        <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={isSaving || !ftpValue} className="btn-primary disabled:opacity-60">
+            {isSaving ? "Saving..." : "Save FTP"}
+          </button>
+          {message ? <p className="text-sm text-muted">{message}</p> : null}
+        </div>
+      </form>
+    </div>
   );
 }
