@@ -1,6 +1,8 @@
+import "openai/shims/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { getCoachModel, getOpenAIClient } from "@/lib/openai";
+import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient } from "@/lib/openai";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import { diagnoseCompletedSession, type SessionDiagnosisInput, type Sport } from "@/lib/coach/session-diagnosis";
 
@@ -519,15 +521,10 @@ function normalizeSessionVerdictFields(
     nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
   }
 ): Record<string, unknown> {
-  const validIntentMatch = (v: unknown): v is CoachVerdict["sessionVerdict"]["intentMatch"] =>
-    v === "on_target" || v === "partial" || v === "missed";
-  const validExecutionCost = (v: unknown): v is CoachVerdict["sessionVerdict"]["executionCost"] =>
-    v === "low" || v === "moderate" || v === "high" || v === "unknown";
-
   return {
     ...sessionVerdict,
-    intentMatch: validIntentMatch(sessionVerdict.intentMatch) ? sessionVerdict.intentMatch : (defaults?.intentMatch ?? sessionVerdict.intentMatch),
-    executionCost: validExecutionCost(sessionVerdict.executionCost) ? sessionVerdict.executionCost : (defaults?.executionCost ?? sessionVerdict.executionCost),
+    intentMatch: sessionVerdict.intentMatch ?? defaults?.intentMatch,
+    executionCost: sessionVerdict.executionCost ?? defaults?.executionCost,
     nextCall: normalizeNextCall(sessionVerdict.nextCall) ?? sessionVerdict.nextCall ?? defaults?.nextCall
   };
 }
@@ -992,10 +989,19 @@ export async function generateCoachVerdict(args: {
 
   try {
     const client = getOpenAIClient();
-    const response = await Promise.race([
-      client.responses.create({
+    const timeoutMs = getCoachRequestTimeoutMs();
+    const startedAt = Date.now();
+    const response = await client.responses.parse(
+      {
         model: getCoachModel(),
         instructions: buildCoachVerdictInstructions(),
+        reasoning: { effort: "low" },
+        max_output_tokens: 900,
+        text: {
+          format: zodTextFormat(coachVerdictSchema, "session_coach_verdict", {
+            description: "Structured session review verdict."
+          })
+        },
         input: [
           {
             role: "user",
@@ -1011,39 +1017,28 @@ export async function generateCoachVerdict(args: {
             ]
           }
         ]
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("OpenAI request timed out after 30s")), 30_000)
-      )
-    ]);
-    const text = response.output_text?.trim();
-    if (!text) {
-      console.warn("[session-review-ai] Falling back to deterministic review: empty model output", {
-        sessionId: args.evidence.sessionId
-      });
-      return { verdict: deterministicFallback, source: "fallback" as const };
-    }
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(text);
-    } catch (error) {
-      console.warn("[session-review-ai] Falling back to deterministic review: could not parse model output as JSON", {
+      },
+      { timeout: timeoutMs }
+    );
+    const parsedVerdict = response.output_parsed;
+    if (!parsedVerdict) {
+      console.warn("[session-review-ai] Falling back to deterministic review: empty parsed model output", {
         sessionId: args.evidence.sessionId,
-        error: error instanceof Error ? error.message : String(error)
+        elapsedMs: Date.now() - startedAt
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-
-    const { normalizedPayload, parsed } = coerceCoachVerdictPayload(parsedJson, {
+    const { normalizedPayload, parsed } = coerceCoachVerdictPayload(parsedVerdict, {
       intentMatch: args.evidence.rulesSummary.intentMatch,
       executionCost: args.evidence.rulesSummary.executionCost,
       nextCall: nextCallFromEvidence(args.evidence.rulesSummary.intentMatch, args.evidence.rulesSummary.executionCost)
     });
     if (!parsed.success) {
-      const payloadKeys = Object.keys(asObject(parsedJson) ?? {});
+      const payloadKeys = Object.keys(asObject(parsedVerdict) ?? {});
       const normalizedKeys = Object.keys(asObject(normalizedPayload) ?? {});
       console.warn("[session-review-ai] Falling back to deterministic review: model JSON failed schema validation", {
         sessionId: args.evidence.sessionId,
+        elapsedMs: Date.now() - startedAt,
         payloadKeys,
         normalizedKeys,
         formErrors: parsed.error.flatten().formErrors,
@@ -1055,6 +1050,7 @@ export async function generateCoachVerdict(args: {
     if (deterministicConfidence !== "low" && parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
       console.warn("[session-review-ai] Falling back to deterministic review: model intent match disagreed with deterministic diagnosis", {
         sessionId: args.evidence.sessionId,
+        elapsedMs: Date.now() - startedAt,
         modelIntentMatch: parsed.data.sessionVerdict.intentMatch,
         deterministicIntentMatch: args.evidence.rulesSummary.intentMatch
       });
@@ -1062,9 +1058,17 @@ export async function generateCoachVerdict(args: {
     }
     return { verdict: normalizeVerdictUnits(parsed.data), source: "ai" as const };
   } catch (error) {
+    const timeoutMs = getCoachRequestTimeoutMs();
+    const message =
+      error instanceof Error && error.message === "Request timed out."
+        ? `OpenAI request timed out after ${Math.round(timeoutMs / 1000)}s`
+        : error instanceof Error
+          ? error.message
+          : String(error);
     console.warn("[session-review-ai] Falling back to deterministic review: model request failed", {
       sessionId: args.evidence.sessionId,
-      error: error instanceof Error ? error.message : String(error)
+      timeoutMs,
+      error: message
     });
     return { verdict: deterministicFallback, source: "fallback" as const };
   }
