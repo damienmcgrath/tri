@@ -18,6 +18,7 @@ export type ExecutionEvidence = {
       pace?: { min?: number; max?: number };
     } | null;
     plannedIntervals: number | null;
+    plannedStructure: string | null;
     sessionRole: "key" | "supporting" | "recovery" | "unknown";
   };
   actual: {
@@ -646,6 +647,65 @@ function coerceCoachVerdictPayload(
   };
 }
 
+function formatSecondsToDuration(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)} s`;
+  const totalMin = Math.round(sec / 60);
+  if (totalMin < 60) return `${totalMin} min`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return mins === 0 ? `${hours} h` : `${hours} h ${mins} min`;
+}
+
+function formatSecondsToPacePerKm(sec: number): string {
+  const totalSec = Math.round(sec);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}/km`;
+}
+
+function normalizeUnitString(text: string): string {
+  // Replace bare seconds (e.g. "2,239 s", "2239s", "37.5 s") — not s/km
+  let result = text.replace(/(\d[\d,]*(?:\.\d+)?)\s*s\b(?!\/km)/g, (_match, numStr: string) => {
+    const sec = parseFloat(numStr.replace(/,/g, ""));
+    return formatSecondsToDuration(sec);
+  });
+  // Replace pace in s/km (e.g. "341.63 s/km", "341 s/km")
+  result = result.replace(/(\d+(?:\.\d+)?)\s*s\/km/g, (_match, numStr: string) => {
+    return formatSecondsToPacePerKm(parseFloat(numStr));
+  });
+  return result;
+}
+
+export function normalizeVerdictUnitsForTest(text: string): string {
+  return normalizeUnitString(text);
+}
+
+function normalizeVerdictUnits(verdict: CoachVerdict): CoachVerdict {
+  const n = normalizeUnitString;
+  return {
+    ...verdict,
+    sessionVerdict: {
+      ...verdict.sessionVerdict,
+      headline: n(verdict.sessionVerdict.headline),
+      summary: n(verdict.sessionVerdict.summary)
+    },
+    explanation: {
+      whatHappened: n(verdict.explanation.whatHappened),
+      whyItMatters: n(verdict.explanation.whyItMatters),
+      whatToDoNextTime: n(verdict.explanation.whatToDoNextTime),
+      whatToDoThisWeek: n(verdict.explanation.whatToDoThisWeek)
+    },
+    uncertainty: {
+      ...verdict.uncertainty,
+      detail: n(verdict.uncertainty.detail)
+    },
+    citedEvidence: verdict.citedEvidence.map((e) => ({
+      claim: n(e.claim),
+      support: e.support.map(n)
+    }))
+  };
+}
+
 export function coerceCoachVerdictPayloadForTest(
   payload: unknown,
   defaults: {
@@ -670,6 +730,8 @@ function buildCoachVerdictInstructions() {
     "Keep each `support` entry as a plain string, not an object.",
     "If evidence is limited, reflect that in `uncertainty` and keep recommendations conservative.",
     "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
+    "Express durations in minutes (e.g. '37 min', '1 h 15 min'). Never write raw seconds.",
+    "Express run pace as min:sec/km (e.g. '5:41/km'). Never write raw seconds per km.",
     "Field requirements:",
     "- `sessionVerdict.headline`: short label, max 160 chars.",
     "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
@@ -829,6 +891,7 @@ export function buildExecutionEvidence(args: {
   sessionId: string;
   sessionTitle: string;
   sessionRole?: string | null;
+  plannedStructure?: string | null;
   diagnosisInput: SessionDiagnosisInput;
   weeklyState?: { fatigue: number | null } | null;
 }) {
@@ -856,6 +919,7 @@ export function buildExecutionEvidence(args: {
         durationSec: args.diagnosisInput.planned.plannedDurationSec ?? null,
         targetBands: args.diagnosisInput.planned.targetBands ?? null,
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
+        plannedStructure: args.plannedStructure ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
       actual: buildActualEvidence(args.diagnosisInput),
@@ -894,6 +958,7 @@ export function buildExecutionEvidence(args: {
         durationSec: args.diagnosisInput.planned.plannedDurationSec ?? null,
         targetBands: args.diagnosisInput.planned.targetBands ?? null,
         plannedIntervals: args.diagnosisInput.planned.plannedIntervals ?? null,
+        plannedStructure: args.plannedStructure ?? null,
         sessionRole: args.sessionRole === "key" || args.sessionRole === "supporting" || args.sessionRole === "recovery" ? args.sessionRole : "unknown"
       },
       actual: buildActualEvidence(args.diagnosisInput),
@@ -995,7 +1060,7 @@ export async function generateCoachVerdict(args: {
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    return { verdict: parsed.data, source: "ai" as const };
+    return { verdict: normalizeVerdictUnits(parsed.data), source: "ai" as const };
   } catch (error) {
     console.warn("[session-review-ai] Falling back to deterministic review: model request failed", {
       sessionId: args.evidence.sessionId,

@@ -82,6 +82,11 @@ export type AthleteContextSnapshot = {
     note: string | null;
     updatedAt: string | null;
   };
+  ftp: {
+    value: number;
+    source: string;
+    recordedAt: string;
+  } | null;
   recentBests?: Array<{
     sport: string;
     label: string;
@@ -131,7 +136,7 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
   const todayIso = getTodayUtc();
 
-  const [{ data: profile }, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }] = await Promise.all([
+  const [{ data: profile }, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }, { data: latestFtp }] = await Promise.all([
     supabase.from("profiles").select("id,display_name,race_name,race_date,active_plan_id").eq("id", athleteId).maybeSingle(),
     supabase.from("athlete_context").select("*").eq("athlete_id", athleteId).maybeSingle(),
     supabase
@@ -160,7 +165,14 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
       .gte("date", todayIso)
       .in("session_role", ["key", "supporting"])
       .order("date", { ascending: true })
-      .limit(4)
+      .limit(4),
+    supabase
+      .from("athlete_ftp_history")
+      .select("value,source,recorded_at")
+      .eq("athlete_id", athleteId)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
 
   const priorityEventName = context?.priority_event_name ?? profile?.race_name ?? null;
@@ -218,6 +230,9 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
       note: checkin?.note ?? null,
       updatedAt: checkin?.updated_at ?? null
     },
+    ftp: latestFtp
+      ? { value: latestFtp.value, source: latestFtp.source, recordedAt: latestFtp.recorded_at }
+      : null,
     recentBests: await import("@/lib/training/benchmarks")
       .then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, athleteId, weekStart, weekEnd))
       .then((bests) => bests.slice(0, 3).map((b) => ({ sport: b.sport, label: b.label, formattedValue: b.formattedValue, date: b.activityDate })))

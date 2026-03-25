@@ -1,4 +1,4 @@
-import { coerceCoachVerdictPayloadForTest } from "./execution-review";
+import { coerceCoachVerdictPayloadForTest, normalizeVerdictUnitsForTest } from "./execution-review";
 
 const defaults = {
   intentMatch: "partial" as const,
@@ -153,5 +153,27 @@ describe("coerceCoachVerdictPayloadForTest", () => {
     if (result.parsed.success) {
       expect(result.parsed.data.sessionVerdict.nextCall).toBe("proceed_with_caution");
     }
+  });
+});
+
+describe("normalizeVerdictUnitsForTest", () => {
+  test("converts bare seconds to minutes", () => {
+    expect(normalizeVerdictUnitsForTest("You completed 2,239 s of work.")).toBe("You completed 37 min of work.");
+  });
+
+  test("converts seconds over one hour to h + min", () => {
+    expect(normalizeVerdictUnitsForTest("Duration: 4500 s")).toBe("Duration: 1 h 15 min");
+  });
+
+  test("converts s/km pace to min:sec/km", () => {
+    expect(normalizeVerdictUnitsForTest("Avg pace was 341.63 s/km.")).toBe("Avg pace was 5:42/km.");
+  });
+
+  test("leaves already-formatted values untouched", () => {
+    expect(normalizeVerdictUnitsForTest("Duration 37 min at 5:41/km")).toBe("Duration 37 min at 5:41/km");
+  });
+
+  test("does not corrupt s/km when converting bare seconds in the same string", () => {
+    expect(normalizeVerdictUnitsForTest("2,239 s at 341 s/km")).toBe("37 min at 5:41/km");
   });
 });

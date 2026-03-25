@@ -475,20 +475,19 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-            <div>
-              <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
-                {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
-              </h2>
-              <p className="mt-3 max-w-3xl text-base text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.actualExecutionSummary}</p>
-              <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
-            </div>
-
-            <div className="border-t border-[hsl(var(--border))] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-              <p className={quietLabelClass}>What to do next</p>
-              <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
-              <p className={`mt-4 ${quietLabelClass}`}>This week</p>
-              <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
+          <div className="mt-5">
+            <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
+              {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
+            </h2>
+            <div className="mt-4 grid gap-5 sm:grid-cols-2 border-t border-[hsl(var(--border))] pt-4">
+              <div>
+                <p className={quietLabelClass}>What to do next</p>
+                <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
+              </div>
+              <div className="sm:border-l sm:border-[hsl(var(--border))] sm:pl-5">
+                <p className={quietLabelClass}>This week</p>
+                <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
+              </div>
             </div>
           </div>
 
@@ -519,10 +518,11 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         {reviewVm.isReviewable ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-5">
-              {hasSpecificPlannedIntent ? (
+              {hasSpecificPlannedIntent || session.notes ? (
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{plannedColumnLabel}</p>
-                  <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
+                  {hasSpecificPlannedIntent ? <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p> : null}
+                  {session.notes ? <p className="mt-1.5 text-sm text-muted italic">{session.notes}</p> : null}
                 </div>
               ) : null}
               <div className={hasSpecificPlannedIntent ? "border-t border-[hsl(var(--border))] pt-5" : ""}>
@@ -532,6 +532,10 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
               <div className="border-t border-[hsl(var(--border))] pt-5">
                 <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
                 <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
+              </div>
+              <div className="border-t border-[hsl(var(--border))] pt-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
+                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
               </div>
             </div>
 
@@ -556,10 +560,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                   <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
                 </div>
               )}
-              <div className="border-t border-[hsl(var(--border))] pt-5">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
-                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
-              </div>
             </div>
           </div>
         ) : (
