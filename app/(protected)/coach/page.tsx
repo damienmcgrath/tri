@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CoachChat } from "./coach-chat";
+import { CoachBriefingCard } from "./CoachBriefingCard";
 import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
@@ -282,94 +283,11 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
   return (
     <section className="space-y-4">
       {weeklyBrief ? (
-        <article className="surface p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="label">Coach Briefing</p>
-              <h2 className="mt-1 text-xl font-semibold sm:text-2xl">{weeklyBrief.weekHeadline}</h2>
-              <p className="mt-2 max-w-3xl text-sm text-muted">{weeklyBrief.weekSummary}</p>
-            </div>
-            <Link href="/settings/athlete-context" className="inline-flex min-h-[44px] items-center rounded-full border border-[hsl(var(--border))] px-3 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground lg:min-h-0 lg:py-1.5">
-              Edit athlete context
-            </Link>
-          </div>
-
-          {weeklyBrief.trend.reviewedCount === 0 ? (
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What unlocks a stronger brief</p>
-                <p className="mt-2 text-sm">Once this week has reviewed sessions, Coach will summarize what landed, what drifted, and what to protect next.</p>
-                <p className="mt-2 text-xs text-tertiary">{briefingContext.uploadedSessionCount} uploaded · {briefingContext.linkedSessionCount} linked · {briefingContext.pendingReviewCount} pending review</p>
-              </div>
-              <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Best next move</p>
-                <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
-                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? <p className="mt-2 text-xs text-tertiary">{athleteContext.observed.recurringPatterns[0]?.detail}</p> : null}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="card-kicker">Key positive</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.keyPositive ?? "No strong positive yet. More reviewed sessions will sharpen the read."}</p>
-                </div>
-                <div className="rounded-2xl border border-[hsl(var(--border))] p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Key risk</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.keyRisk ?? "No single session is creating outsized risk right now."}</p>
-                </div>
-                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:col-span-2">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Next-week decision</p>
-                  <p className="mt-2 text-sm">{weeklyBrief.nextWeekDecision}</p>
-                  {weeklyBrief.confidenceNote ? <p className="mt-2 text-xs text-tertiary">{weeklyBrief.confidenceNote}</p> : null}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="card-kicker">Trend line</p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="font-mono text-[22px] font-medium text-white">{weeklyBrief.trend.reviewedCount}</p>
-                    <p className="text-xs text-muted">Reviewed</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[22px] font-medium text-success">{weeklyBrief.trend.onTargetCount}</p>
-                    <p className="text-xs text-muted">On target</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[22px] font-medium text-[hsl(var(--warning))]">{weeklyBrief.trend.partialCount}</p>
-                    <p className="text-xs text-muted">Partial</p>
-                  </div>
-                  <div>
-                    <p className={`font-mono text-[22px] font-medium ${weeklyBrief.trend.missedCount > 0 ? "text-danger" : "text-[rgba(255,255,255,0.35)]"}`}>{weeklyBrief.trend.missedCount}</p>
-                    <p className="text-xs text-muted">Missed</p>
-                  </div>
-                </div>
-                {athleteContext && athleteContext.observed.recurringPatterns.length > 0 ? (
-                  <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Athlete context cue</p>
-                    <p className="mt-2 text-sm">{athleteContext.observed.recurringPatterns[0]?.detail}</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {weeklyBrief.sessionsNeedingAttention.length > 0 ? (
-            <div className="mt-4">
-              <p className="card-kicker">Sessions needing attention</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {weeklyBrief.sessionsNeedingAttention.map((session) => (
-                  <Link key={session.sessionId} href={`/sessions/${session.sessionId}`} className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#18181C] p-4 transition hover:border-[rgba(255,255,255,0.12)]" style={{ borderLeftWidth: "2px", borderLeftColor: "#FFB43C" }}>
-                    <p className="text-sm font-semibold">{session.sessionName}</p>
-                    <p className="mt-2 text-xs text-tertiary">Intent only partially landed</p>
-                    <p className="mt-2 text-sm text-muted">{session.reason}</p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </article>
+        <CoachBriefingCard
+          brief={weeklyBrief}
+          athleteContext={athleteContext}
+          briefingContext={briefingContext}
+        />
       ) : null}
 
       <section className="space-y-2.5">

@@ -1291,7 +1291,7 @@ export async function buildWeeklyExecutionBrief(args: {
     weekSummary:
       reviewedCount === 0
         ? `Early uploads are in.${extraNote} Hold the current structure for now, then let the next reviewed sessions sharpen the call.`
-        : `${onTargetCount} reviewed session${onTargetCount === 1 ? "" : "s"} are on target, ${partialCount} partial, and ${missedCount} missed.${extraNote}${contextCue ? ` Current context cue: ${contextCue}.` : ""}`,
+        : `${extraCount > 0 ? `${extraCount} extra ${extraCount === 1 ? "session" : "sessions"} also logged this week.` : "Execution reviewed against this week's training intent."}${contextCue ? ` ${contextCue} noted.` : ""}`,
     keyPositive,
     keyRisk,
     nextWeekDecision,
