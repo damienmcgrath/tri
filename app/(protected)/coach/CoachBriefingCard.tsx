@@ -31,16 +31,19 @@ export function CoachBriefingCard({ brief, athleteContext, briefingContext }: Pr
 
       {/* Trend strip — compact metadata row, only when there's data */}
       {brief.trend.reviewedCount > 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <span className="font-mono text-sm font-medium text-white">{brief.trend.reviewedCount} reviewed</span>
-          <span className="text-[rgba(255,255,255,0.15)]">·</span>
-          <span className="font-mono text-sm font-medium text-success">{brief.trend.onTargetCount} on target</span>
-          <span className="text-[rgba(255,255,255,0.15)]">·</span>
-          <span className="font-mono text-sm font-medium text-[hsl(var(--warning))]">{brief.trend.partialCount} partial</span>
-          <span className="text-[rgba(255,255,255,0.15)]">·</span>
-          <span className={`font-mono text-sm font-medium ${brief.trend.missedCount > 0 ? "text-danger" : "text-[rgba(255,255,255,0.3)]"}`}>
-            {brief.trend.missedCount} missed
-          </span>
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <span className="font-mono text-sm font-medium text-white">{brief.trend.reviewedCount} reviewed</span>
+            <span className="text-[rgba(255,255,255,0.15)]">·</span>
+            <span className="font-mono text-sm font-medium text-success">{brief.trend.onTargetCount} on target</span>
+            <span className="text-[rgba(255,255,255,0.15)]">·</span>
+            <span className="font-mono text-sm font-medium text-[hsl(var(--warning))]">{brief.trend.partialCount} partial</span>
+            <span className="text-[rgba(255,255,255,0.15)]">·</span>
+            <span className={`font-mono text-sm font-medium ${brief.trend.missedCount > 0 ? "text-danger" : "text-[rgba(255,255,255,0.3)]"}`}>
+              {brief.trend.missedCount} missed
+            </span>
+          </div>
+          {brief.weekSummary ? <p className="mt-2 text-sm text-muted">{brief.weekSummary}</p> : null}
         </div>
       ) : null}
 
