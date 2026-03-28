@@ -39,6 +39,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
   const [attachError, setAttachError] = useState<string>("");
   const [occupiedSessionIds, setOccupiedSessionIds] = useState(() => new Set(initialOccupiedSessionIds));
   const [isPending, startTransition] = useTransition();
+  const [isAttaching, setIsAttaching] = useState(false);
 
   const detail = uploads.find((item) => item.id === detailId) ?? null;
 
@@ -53,7 +54,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
       const bSport = activity?.sport_type === b.sport ? 0 : 1;
       return aSame - bSame || aSport - bSport;
     });
-  }, [attachFor, plannedSessions]);
+  }, [attachFor, plannedSessions, occupiedSessionIds]);
 
   async function upload(file: File) {
     const data = new FormData();
@@ -194,26 +195,21 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                   <span>{candidate.date} · {candidate.sport} · {candidate.type}</span>
                   <button
                     className="btn-secondary"
-                    disabled={isPending}
-                    onClick={() => {
-                      startTransition(async () => {
-                        try {
-                          const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ plannedSessionId: candidate.id, mode: "override", actor: "athlete" })
-                          });
-
-                          if (!response.ok) {
-                            const payload = await response.json().catch(() => ({}));
-                            setAttachError(payload.error ?? "Could not attach activity to session");
-                            return;
-                          }
-                        } catch {
-                          setAttachError("Network error — could not reach the server");
+                    disabled={isAttaching || isPending}
+                    onClick={async () => {
+                      setIsAttaching(true);
+                      setAttachError("");
+                      try {
+                        const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ plannedSessionId: candidate.id, mode: "override", actor: "athlete" })
+                        });
+                        if (!response.ok) {
+                          const payload = await response.json().catch(() => ({}));
+                          setAttachError(payload.error ?? "Could not attach activity to session");
                           return;
                         }
-
                         setOccupiedSessionIds((prev) => new Set([...prev, candidate.id]));
                         setUploads((current) =>
                           current.map((item) =>
@@ -238,10 +234,14 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                         setMessage(`Attached to ${candidate.date} · ${candidate.type}.`);
                         setAttachFor(null);
                         router.refresh();
-                      });
+                      } catch {
+                        setAttachError("Network error — could not reach the server");
+                      } finally {
+                        setIsAttaching(false);
+                      }
                     }}
                   >
-                    Attach
+                    {isAttaching ? "Attaching…" : "Attach"}
                   </button>
                 </li>
               ))}
