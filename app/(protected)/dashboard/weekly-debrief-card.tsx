@@ -6,6 +6,13 @@ function formatWeekDate(iso: string) {
   return weekDateFormatter.format(new Date(`${iso}T00:00:00.000Z`));
 }
 
+function formatDuration(minutes: number) {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}hr` : `${h}hr ${m}min`;
+}
+
 type Props = {
   snapshot: WeeklyDebriefSnapshot;
 };
@@ -32,7 +39,7 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
           </div>
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-tertiary">Resolved time</p>
-            <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedMinutes}m / {snapshot.readiness.plannedMinutes}m</p>
+            <p className="mt-2 text-sm font-medium">{formatDuration(snapshot.readiness.resolvedMinutes)} / {formatDuration(snapshot.readiness.plannedMinutes)}</p>
           </div>
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-tertiary">Unlocks when</p>

@@ -515,7 +515,7 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   const maxSpeed = firstPositiveNumber([session.enhanced_max_speed, session.max_speed]);
   const avgGradeAdjustedSpeed = firstPositiveNumber([session.avg_grade_adjusted_speed, session.enhanced_avg_grade_adjusted_speed]);
   const bestPaceSecPerKm = normalizedSport === "run" ? paceFromSpeed(maxSpeed, 1000) : undefined;
-  const bestPacePer100mSec = normalizedSport === "swim" ? paceFromSpeed(maxSpeed, 100) : undefined;
+  const bestPacePer100mSec = normalizedSport === "swim" ? positiveInt(paceFromSpeed(maxSpeed, 100)) : undefined;
   const normalizedGradedPaceSecPerKm = normalizedSport === "run" ? paceFromSpeed(avgGradeAdjustedSpeed, 1000) : undefined;
   const lapSummaries = buildLapSummaries(Array.isArray(fit?.laps) ? fit.laps : [], normalizedSport);
   const splitSummaries = buildHalfSummaries(lapSummaries, durationSec, normalizedSport);
