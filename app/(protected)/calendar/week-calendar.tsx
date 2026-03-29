@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -173,10 +173,22 @@ function SessionActionMenu({
   onAssign: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const activityId = getActivityId(session.id);
 
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
   return (
-    <div className="relative" onClick={(event) => event.stopPropagation()}>
+    <div ref={menuRef} className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
         className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] text-muted hover:text-foreground"
@@ -763,7 +775,7 @@ export function WeekCalendar({
                   const state = getSessionState(session, trackedMoves, extraActivityIds);
                   const discipline = getDisciplineMeta(session.sport);
                   const disciplineTone = calendarDisciplineChipTone(session.sport);
-                  const isNeedsAttentionCard = state === "skipped" || state === "unmatched_upload";
+                  const isNeedsAttentionCard = state === "unmatched_upload";
                   const cardBackground = isNeedsAttentionCard ? "rgba(255,90,40,0.04)" : "#18181C";
                   const leftBorderColor = isNeedsAttentionCard ? "#FF5A28" : calendarDisciplineBorderColor(session.sport);
 
@@ -844,7 +856,7 @@ export function WeekCalendar({
                       {isNeedsAttentionCard && !showCompletedFooter ? (
                         <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[var(--color-warning)]">
                           <span aria-hidden="true" className="h-[6px] w-[6px] rounded-full bg-[var(--color-warning)]" />
-                          <span>{state === "skipped" ? "Needs attention" : "Needs review"}</span>
+                          <span>Needs review</span>
                         </div>
                       ) : null}
                       {showCompletedFooter ? (
@@ -918,8 +930,13 @@ export function WeekCalendar({
         />
       ) : null}
       {detailSession ? <DetailsModal session={detailSession} onClose={() => setDetailSession(null)} /> : null}
-      {toast ? <p className="text-xs text-accent">{toast}</p> : null}
-      {isPending ? <p className="text-xs text-muted">Saving…</p> : null}
+      {toast ? (
+        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2">
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] px-4 py-2.5 text-sm font-medium text-[hsl(var(--text-primary))] shadow-xl">
+            {toast}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1064,7 +1081,7 @@ function AssignUploadModal({
             }}
             className="btn-secondary mt-2 px-2 py-1 text-xs"
           >
-            Mark as extra
+            {isSaving ? "Saving\u2026" : "Mark as extra"}
           </button>
         </div>
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
@@ -1100,7 +1117,7 @@ function AssignUploadModal({
             }}
             className="btn-primary px-2 py-1 text-xs"
           >
-            Assign to session
+            {isSaving ? "Assigning\u2026" : "Assign to session"}
           </button>
         </div>
       </div>
