@@ -11,10 +11,12 @@ import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 6;
 
+const truncateStr = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + "\u2026" : s);
+
 const weeklyDebriefEvidenceItemSchema = z.object({
   id: z.string().min(1),
-  label: z.string().min(1).max(160),
-  detail: z.string().min(1).max(280),
+  label: z.string().min(1).transform((s) => truncateStr(s, 160)),
+  detail: z.string().min(1).transform((s) => truncateStr(s, 280)),
   kind: z.enum(["session", "activity"]),
   href: z.string().min(1),
   supportType: z.enum(["fact", "observation", "carry_forward"])
@@ -23,14 +25,14 @@ const weeklyDebriefEvidenceItemSchema = z.object({
 export type WeeklyDebriefEvidenceItem = z.infer<typeof weeklyDebriefEvidenceItemSchema>;
 
 const weeklyDebriefEvidenceGroupSchema = z.object({
-  claim: z.string().min(1).max(160),
-  detail: z.string().min(1).max(280),
+  claim: z.string().min(1).transform((s) => truncateStr(s, 160)),
+  detail: z.string().min(1).transform((s) => truncateStr(s, 280)),
   supports: z.array(z.object({
     id: z.string().min(1),
-    label: z.string().min(1).max(160),
+    label: z.string().min(1).transform((s) => truncateStr(s, 160)),
     href: z.string().min(1),
     kind: z.enum(["session", "activity"]),
-    reason: z.string().min(1).max(200)
+    reason: z.string().min(1).transform((s) => truncateStr(s, 200))
   })).min(1).max(5)
 });
 
@@ -1248,9 +1250,10 @@ function buildFallbackEvidenceSummaries(sessionSummaries: WeeklyDebriefSessionSu
     evidence.push({
       id: session.id,
       label: session.label,
-      detail:
+      detail: truncateStr(
         review?.executionSummary ??
         (session.status === "skipped" ? "This planned session was explicitly skipped." : `${formatMinutes(session.completedMinutes)} completed.`),
+        280),
       kind: "session",
       href: `/sessions/${session.id}`,
       supportType: review ? "observation" : "fact"
@@ -1262,7 +1265,7 @@ function buildFallbackEvidenceSummaries(sessionSummaries: WeeklyDebriefSessionSu
     evidence.push({
       id: activity.id,
       label: `${capitalize(activity.sport)} extra workout`,
-      detail: `${formatMinutes(activity.durationMinutes)} of unscheduled work was added to the week.${loadDetail ? ` ${loadDetail}.` : ""}`,
+      detail: truncateStr(`${formatMinutes(activity.durationMinutes)} of unscheduled work was added to the week.${loadDetail ? ` ${loadDetail}.` : ""}`, 280),
       kind: "activity",
       href: `/sessions/activity/${activity.id}`,
       supportType: "fact"
