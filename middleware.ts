@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { AGENT_PREVIEW_COOKIE, isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 
-const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings", "/sessions", "/activities"];
+const protectedRoutes = ["/dashboard", "/plan", "/calendar", "/coach", "/settings", "/sessions", "/activities", "/debrief"];
 
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
@@ -115,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/activities/:path*", "/auth/sign-in", "/dev/agent-:path*"]
+  matcher: ["/dashboard/:path*", "/plan/:path*", "/calendar/:path*", "/coach/:path*", "/settings/:path*", "/sessions/:path*", "/activities/:path*", "/debrief/:path*", "/auth/sign-in", "/dev/agent-:path*"]
 };
