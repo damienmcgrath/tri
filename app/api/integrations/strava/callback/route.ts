@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens } from "@/lib/integrations/providers/strava/client";
 import { upsertConnection } from "@/lib/integrations/token-service";
-import { backfillRecentActivities, type IngestResult } from "@/lib/integrations/ingestion-service";
-import { getConnection } from "@/lib/integrations/token-service";
 
 /**
  * GET /api/integrations/strava/callback
@@ -110,16 +108,4 @@ export async function GET(request: Request): Promise<Response> {
   });
 
   return response;
-}
-
-/**
- * Internal helper used by the sync route — exported for reuse.
- * Runs a full backfill and returns stats. Separated for testability.
- */
-export async function runBackfill(userId: string): Promise<IngestResult> {
-  const connection = await getConnection(userId, "strava");
-  if (!connection) {
-    throw new Error("No Strava connection found");
-  }
-  return backfillRecentActivities(userId, connection);
 }
