@@ -23,7 +23,7 @@ const DIRECTION_ARROW: Record<string, string> = {
 };
 
 const DIRECTION_CLASS: Record<string, string> = {
-  improving: "text-[hsl(var(--success))]",
+  improving: "text-success",
   declining: "text-[hsl(var(--signal-risk))]",
   stable: "text-muted"
 };
