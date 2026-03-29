@@ -604,7 +604,7 @@ export default async function DashboardPage({
   );
   const totals = { planned: minuteMetrics.plannedMinutes, completed: minuteMetrics.completedMinutes };
   const completedSessionsCount = plannedCompletedSessionsCount + extraCompletedCount;
-  const missedSessions = sessions.filter((session) => session.status === "planned" && session.date < todayIso);
+  const missedSessions = sessions.filter((session) => (session.status === "planned" || session.status === "skipped") && session.date < todayIso);
   const missedSessionsCount = missedSessions.length;
   const missedMinutes = missedSessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
 
@@ -618,7 +618,7 @@ export default async function DashboardPage({
   const dailyStates = Array.from({ length: 7 }).map((_, index) => {
     const iso = addDays(weekStart, index);
     const daySessions = sessions.filter((session) => session.date === iso);
-    const plannedCount = daySessions.filter((session) => session.status === "planned").length;
+    const unresolvedCount = daySessions.filter((session) => session.status === "planned" || session.status === "skipped").length;
     const plannedMinutes = daySessions.reduce((sum, session) => sum + (session.duration_minutes ?? 0), 0);
     const extraMinutesOnDay = extraMinutesByDay.get(iso) ?? 0;
     const plannedCompletedMinutesOnDay =
@@ -634,7 +634,7 @@ export default async function DashboardPage({
     let microLabel = "";
 
     if (iso === todayIso) {
-      if (plannedCount > 0 && remainingMinutesOnDay > 0) {
+      if (unresolvedCount > 0 && remainingMinutesOnDay > 0) {
         tone = "today-remaining";
         stateLabel = "Today";
         microLabel = trainingMeaning
@@ -648,7 +648,7 @@ export default async function DashboardPage({
         microLabel = `${completedMinutesOnDay}m done`;
       }
     } else if (iso < todayIso) {
-      if (plannedCount > 0 && remainingMinutesOnDay > 0) {
+      if (unresolvedCount > 0 && remainingMinutesOnDay > 0) {
         tone = "missed";
         stateLabel = completedMinutesOnDay > 0 ? "Mixed" : "Missed";
         microLabel = completedMinutesOnDay > 0 ? `${completedMinutesOnDay}m done · ${remainingMinutesOnDay || plannedMinutes}m missed` : `${remainingMinutesOnDay || plannedMinutes}m missed`;
@@ -657,7 +657,7 @@ export default async function DashboardPage({
         stateLabel = "Done";
         microLabel = `${completedMinutesOnDay}m done`;
       }
-    } else if (plannedCount > 0) {
+    } else if (unresolvedCount > 0) {
       tone = "upcoming";
       stateLabel = trainingMeaning ?? "Upcoming";
       microLabel = `${plannedMinutes}m planned`;
