@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { ActivityUploadsPanel } from "./activity-uploads-panel";
 import { ActivityMetricsBackfillButton } from "./activity-metrics-backfill-button";
 import { ReviewBackfillButton } from "./review-backfill-button";
+import { ConnectedServices } from "./connected-services";
 
 type UploadRow = {
   id: string;
@@ -127,9 +129,13 @@ export default async function IntegrationsPage() {
     <section className="space-y-4">
       <header className="surface p-6">
         <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Settings → Integrations / Uploads</p>
-        <h1 className="mt-2 text-2xl font-semibold">Garmin file uploads</h1>
-        <p className="mt-1 text-sm text-muted">Upload .fit or .tcx activities, then review and attach them to planned sessions.</p>
+        <h1 className="mt-2 text-2xl font-semibold">Integrations &amp; uploads</h1>
+        <p className="mt-1 text-sm text-muted">Connect third-party accounts or upload .fit / .tcx files to import your completed activities.</p>
       </header>
+
+      <Suspense fallback={null}>
+        <ConnectedServices />
+      </Suspense>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ActivityMetricsBackfillButton />
