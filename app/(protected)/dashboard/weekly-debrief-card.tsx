@@ -79,7 +79,7 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
           <h2 className="mt-1 text-lg font-semibold">{artifact.facts.title}</h2>
           <p className="mt-1 text-sm text-muted">{artifact.facts.statusLine}</p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs ${snapshot.stale ? "border-[hsl(var(--warning)/0.38)] bg-[hsl(var(--warning)/0.12)] text-bright" : "border-[hsl(var(--border))] text-tertiary"}`}>
+        <span className={`rounded-full border px-3 py-1 text-xs ${snapshot.stale ? "border-[hsl(var(--warning)/0.38)] bg-[hsl(var(--warning)/0.12)] text-white" : "border-[hsl(var(--border))] text-tertiary"}`}>
           {snapshot.stale ? "Needs refresh" : artifact.facts.weekRange}
         </span>
       </div>
@@ -87,7 +87,7 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {artifact.facts.factualBullets.slice(0, 3).map((fact) => (
           <div key={fact} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-            <p className="text-sm text-bright">{fact}</p>
+            <p className="text-sm text-white">{fact}</p>
           </div>
         ))}
       </div>

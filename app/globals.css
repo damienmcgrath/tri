@@ -277,10 +277,6 @@
     color: var(--color-text-secondary);
   }
 
-  .text-bright {
-    color: var(--color-text-primary);
-  }
-
   .text-tertiary {
     color: var(--color-text-tertiary);
   }

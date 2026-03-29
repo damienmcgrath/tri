@@ -10,7 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        base: "var(--color-base)",
         surface: "var(--color-surface)",
         raised: "var(--color-surface-raised)",
         overlay: "var(--color-surface-overlay)",

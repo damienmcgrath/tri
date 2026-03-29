@@ -32,7 +32,7 @@ export function SessionComparisonCard({ comparison, trends = [] }: Props) {
         {comparison.metrics.map((m) => (
           <div key={m.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
             <p className="text-xs text-muted">{m.metric}</p>
-            <p className="mt-1 text-base font-semibold text-bright">{m.current}</p>
+            <p className="mt-1 text-base font-semibold text-white">{m.current}</p>
             <div className="mt-2 flex items-center gap-2">
               <span
                 className={`text-sm font-medium ${

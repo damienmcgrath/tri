@@ -831,7 +831,7 @@ export function CoachChat({
         <section className="surface p-5">
           <div className="border-b border-[hsl(var(--border))] pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
-            <h2 className="mt-2 text-2xl font-semibold text-bright">{topInsight.headline}</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">{topInsight.headline}</h2>
             <p className="mt-1.5 max-w-3xl text-sm text-muted">{condensedRationale}</p>
           </div>
           <div className="mt-3 grid gap-3.5 lg:grid-cols-[1.25fr_0.75fr]">
@@ -851,7 +851,7 @@ export function CoachChat({
                 </Link>
                 <a
                   href={topInsight.secondaryAction.href}
-                  className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-bright"
+                  className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-white"
                 >
                   {topInsight.secondaryAction.label}
                 </a>
@@ -874,7 +874,7 @@ export function CoachChat({
                   {flaggedSessions.slice(0, 2).map((session) => (
                     <li key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2 py-1.5 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <Link href={`/sessions/${session.id}`} className="truncate text-[hsl(var(--text-secondary))] underline-offset-2 hover:text-bright hover:underline">
+                        <Link href={`/sessions/${session.id}`} className="truncate text-[hsl(var(--text-secondary))] underline-offset-2 hover:text-white hover:underline">
                           {session.sessionName}
                         </Link>
                         <span className={`signal-chip ${statusChip(session.status).className}`}>{statusChip(session.status).label}</span>
@@ -893,7 +893,7 @@ export function CoachChat({
               {latestScoredSession ? (
                 <p className="mt-1.5 text-xs text-tertiary">
                   Latest reviewed session:{" "}
-                  <Link href={`/sessions/${latestScoredSession.id}`} className="underline-offset-2 hover:text-bright hover:underline">
+                  <Link href={`/sessions/${latestScoredSession.id}`} className="underline-offset-2 hover:text-white hover:underline">
                     {latestScoredSession.sessionName}
                   </Link>
                   {" · "}
@@ -924,13 +924,13 @@ export function CoachChat({
                     <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
                       <div className="flex items-start justify-between gap-1">
                         <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-                          <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-bright" : "text-[rgba(255,255,255,0.55)]"}`}>
+                          <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
                             {conversationTitle(conversation, idx)}
                           </p>
                           <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
                         </button>
                         <details className="relative">
-                          <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-bright">⋯</summary>
+                          <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-white">⋯</summary>
                           <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
                             <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
                             <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
@@ -1070,7 +1070,7 @@ export function CoachChat({
                   Send
                 </button>
                 {isLoading ? (
-                  <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-bright">
+                  <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-white">
                     Stop
                   </button>
                 ) : null}

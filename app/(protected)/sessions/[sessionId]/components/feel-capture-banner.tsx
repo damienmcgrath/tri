@@ -70,7 +70,7 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
             className={`min-h-[44px] w-full rounded-lg border text-sm font-medium transition-colors ${
               selectedRpe === rpe
                 ? "border-[rgba(190,255,0,0.6)] bg-[rgba(190,255,0,0.15)] text-[var(--color-accent)]"
-                : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-bright"
+                : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
             }`}
           >
             {rpe}
@@ -88,7 +88,7 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
           onChange={(e) => setNote(e.target.value.slice(0, 200))}
           placeholder="Optional note (e.g. felt strong on the run, legs heavy...)"
           rows={2}
-          className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-3 py-2 text-sm text-bright placeholder:text-tertiary focus:border-[rgba(190,255,0,0.4)] focus:outline-none"
+          className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-3 py-2 text-sm text-white placeholder:text-tertiary focus:border-[rgba(190,255,0,0.4)] focus:outline-none"
         />
         <p className="mt-1 text-right text-[11px] text-tertiary">{note.length}/200</p>
       </div>
@@ -111,7 +111,7 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
         <button
           type="button"
           onClick={() => void handleSkip()}
-          className="text-sm text-tertiary hover:text-bright"
+          className="text-sm text-tertiary hover:text-white"
         >
           Skip
         </button>

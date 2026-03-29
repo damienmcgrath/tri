@@ -51,7 +51,7 @@ export function TrendCards({ trends }: { trends: WeeklyTrend[] }) {
                 <Sparkline values={values} color={color} width={80} height={24} />
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-base font-semibold text-bright">
+                <span className="text-base font-semibold text-white">
                   {currentLabel}
                 </span>
                 <span className={`text-xs font-medium ${DIRECTION_CLASS[trend.direction]}`}>
