@@ -93,7 +93,7 @@ function ModalMetricRow({
     <div className="rounded-[22px] border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface-subtle)),hsl(var(--surface)))] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-primary">{metric.label}</p>
+          <p className="text-sm font-medium text-bright">{metric.label}</p>
           <p className="mt-1 text-xs text-muted">{metric.hint}</p>
         </div>
         <span
@@ -114,7 +114,7 @@ function ModalMetricRow({
             className={`cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium transition ${
               value === choice.value
                 ? "border-[hsl(var(--accent))] bg-[linear-gradient(180deg,hsl(var(--accent)),hsl(var(--accent)/0.88))] text-[hsl(var(--accent-foreground))] shadow-[0_12px_30px_hsl(var(--accent)/0.22)]"
-                : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] text-muted hover:border-[hsl(var(--accent)/0.35)] hover:bg-[hsl(var(--surface-subtle))] hover:text-primary"
+                : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] text-muted hover:border-[hsl(var(--accent)/0.35)] hover:bg-[hsl(var(--surface-subtle))] hover:text-bright"
             }`}
           >
             <input
@@ -293,7 +293,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-lg text-muted transition hover:text-primary"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-lg text-muted transition hover:text-bright"
                     aria-label="Close weekly check-in"
                   >
                     ×
@@ -316,7 +316,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
 
               <div className="rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                 <label className="block space-y-2 text-sm">
-                  <span className="text-sm font-medium text-primary">Quick note</span>
+                  <span className="text-sm font-medium text-bright">Quick note</span>
                   <span className="block text-xs text-muted">Optional context for sleep, work stress, soreness, or confidence.</span>
                   <textarea
                     value={note}
@@ -344,7 +344,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm text-muted transition hover:text-primary"
+                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm text-muted transition hover:text-bright"
                 >
                   Cancel
                 </button>

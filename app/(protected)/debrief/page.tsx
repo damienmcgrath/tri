@@ -47,7 +47,7 @@ function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
 
 function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") {
   if (source === "ai") return "debrief-pill border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]";
-  if (source === "fallback") return "debrief-pill border-[hsl(var(--warning)/0.32)] bg-[hsl(var(--warning)/0.08)] text-primary";
+  if (source === "fallback") return "debrief-pill border-[hsl(var(--warning)/0.32)] bg-[hsl(var(--warning)/0.08)] text-bright";
   return "debrief-pill";
 }
 
@@ -267,7 +267,7 @@ export default async function DebriefPage({
               <span className={narrativeSourcePillClass(artifact.facts.narrativeSource)}>{narrativeSourceLabel(artifact.facts.narrativeSource)}</span>
             </div>
             <h1 className="mt-4 max-w-4xl text-2xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">{artifact.facts.title}</h1>
-            <p className="mt-3 max-w-3xl text-[15px] leading-7 text-primary">{artifact.facts.statusLine}</p>
+            <p className="mt-3 max-w-3xl text-[15px] leading-7 text-bright">{artifact.facts.statusLine}</p>
             {snapshot.stale ? (
               <p className="mt-3 max-w-2xl text-sm text-muted">The week changed after this version was saved.</p>
             ) : artifact.facts.artifactStateNote ? (
@@ -300,7 +300,7 @@ export default async function DebriefPage({
           {artifact.facts.metrics.map((metric) => (
             <div key={metric.label} className={`${metricToneClass(metric.tone)} sm:min-h-[110px]`}>
               <p className="debrief-kicker">{metric.label}</p>
-              <p className="mt-4 text-xl font-semibold leading-tight text-primary">{metric.value}</p>
+              <p className="mt-4 text-xl font-semibold leading-tight text-bright">{metric.value}</p>
               {metric.detail ? <p className="mt-2 text-xs text-muted">{metric.detail}</p> : null}
             </div>
           ))}
@@ -349,11 +349,11 @@ export default async function DebriefPage({
 
         <article className="debrief-section-card p-4">
           <p className="debrief-kicker">Top signal</p>
-          <h2 className="mt-2.5 text-[0.95rem] font-semibold tracking-[-0.02em] text-primary">{artifact.facts.primaryTakeawayTitle}</h2>
+          <h2 className="mt-2.5 text-[0.95rem] font-semibold tracking-[-0.02em] text-bright">{artifact.facts.primaryTakeawayTitle}</h2>
           {artifact.evidenceGroups[0]?.supports?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {artifact.evidenceGroups[0].supports.slice(0, 3).map((support) => (
-                <a key={`${support.kind}-${support.id}`} href={support.href} className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-primary">
+                <a key={`${support.kind}-${support.id}`} href={support.href} className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-bright">
                   {support.label}
                 </a>
               ))}
@@ -368,7 +368,7 @@ export default async function DebriefPage({
           <div className="mt-3 space-y-3">
             {artifact.narrative.highlights.map((item) => (
               <div key={item} className="debrief-list-card debrief-list-card--positive">
-                <p className="text-sm text-primary">{item}</p>
+                <p className="text-sm text-bright">{item}</p>
               </div>
             ))}
           </div>
@@ -379,7 +379,7 @@ export default async function DebriefPage({
           <div className="mt-3 space-y-3">
             {artifact.narrative.observations.map((item) => (
               <div key={item} className="debrief-list-card debrief-list-card--notice">
-                <p className="text-sm text-primary">{item}</p>
+                <p className="text-sm text-bright">{item}</p>
               </div>
             ))}
           </div>
@@ -397,7 +397,7 @@ export default async function DebriefPage({
           {artifact.narrative.carryForward.map((item) => (
             <div key={item} className="debrief-carry-card">
               <p className="debrief-kicker text-accent">Carry forward</p>
-              <p className="mt-3 text-[15px] font-medium leading-7 text-primary">{item}</p>
+              <p className="mt-3 text-[15px] font-medium leading-7 text-bright">{item}</p>
             </div>
           ))}
         </div>
@@ -416,7 +416,7 @@ export default async function DebriefPage({
                     {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-primary">{trend.detail}</p>
+                <p className="mt-2 text-sm text-bright">{trend.detail}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {trend.dataPoints.slice(-4).map((pt) => (
                     <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
@@ -440,7 +440,7 @@ export default async function DebriefPage({
                   <span>{benchmark.sport === "run" ? "🏃" : benchmark.sport === "bike" ? "🚴" : "🏊"}</span>
                   <p className="text-xs font-medium text-muted">{benchmark.label}</p>
                 </div>
-                <p className="mt-2 text-xl font-semibold leading-tight text-primary">{benchmark.formattedValue}</p>
+                <p className="mt-2 text-xl font-semibold leading-tight text-bright">{benchmark.formattedValue}</p>
                 {benchmark.isThisWeek ? (
                   <span className="mt-1 inline-block text-[11px] font-medium uppercase tracking-[0.08em] text-success">New this week</span>
                 ) : null}
@@ -481,7 +481,7 @@ export default async function DebriefPage({
                 <div key={group.claim} className="debrief-list-card">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="max-w-3xl">
-                      <p className="text-sm font-semibold text-primary">{group.claim}</p>
+                      <p className="text-sm font-semibold text-bright">{group.claim}</p>
                       <p className="mt-1.5 text-sm leading-6 text-muted">{group.detail}</p>
                     </div>
                     <span className="debrief-pill">{group.supports.length} support{group.supports.length === 1 ? "" : "s"}</span>
@@ -490,7 +490,7 @@ export default async function DebriefPage({
                   <div className="mt-3 space-y-2.5">
                     {group.supports.map((support) => (
                       <a key={`${support.kind}-${support.id}`} href={support.href} className="block rounded-2xl border border-[hsl(var(--border))] bg-[rgba(255,255,255,0.02)] px-4 py-3 transition hover:border-[hsl(var(--accent)/0.42)]">
-                        <p className="text-sm font-medium text-primary">{support.label}</p>
+                        <p className="text-sm font-medium text-bright">{support.label}</p>
                         <p className="mt-1.5 text-sm leading-6 text-muted">{support.reason}</p>
                       </a>
                     ))}
@@ -504,7 +504,7 @@ export default async function DebriefPage({
                     {artifact.evidence.map((item) => (
                       <a key={`${item.kind}-${item.id}`} href={item.href} className="debrief-list-card block transition hover:border-[hsl(var(--accent)/0.42)]">
                         <div>
-                          <p className="text-sm font-semibold text-primary">{item.label}</p>
+                          <p className="text-sm font-semibold text-bright">{item.label}</p>
                           <p className="mt-2 text-sm text-muted">{item.detail}</p>
                         </div>
                       </a>
@@ -538,7 +538,7 @@ export default async function DebriefPage({
               </a>
             ) : null}
           </div>
-          <a href="/dashboard" className="inline-flex min-h-[44px] items-center text-xs text-muted underline-offset-2 hover:text-primary hover:underline lg:min-h-0">
+          <a href="/dashboard" className="inline-flex min-h-[44px] items-center text-xs text-muted underline-offset-2 hover:text-bright hover:underline lg:min-h-0">
             Back to dashboard
           </a>
         </div>

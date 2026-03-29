@@ -98,7 +98,7 @@ export default async function CoachDebriefPage({
             <p className="label">Coach-share view</p>
             <h1 className="mt-1 text-3xl font-semibold">{artifact.coachShare.headline}</h1>
             <p className="mt-2 text-sm text-muted">{artifact.facts.weekRange}</p>
-            <p className="mt-3 max-w-3xl text-sm text-primary">{artifact.coachShare.summary}</p>
+            <p className="mt-3 max-w-3xl text-sm text-bright">{artifact.coachShare.summary}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <a href={`/debrief?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 py-1.5 text-xs">
@@ -116,7 +116,7 @@ export default async function CoachDebriefPage({
             {artifact.facts.metrics.slice(0, 4).map((metric) => (
               <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-tertiary">{metric.label}</p>
-                <p className="mt-2 text-base font-semibold text-primary">{metric.value}</p>
+                <p className="mt-2 text-base font-semibold text-bright">{metric.value}</p>
               </div>
             ))}
           </div>
@@ -127,7 +127,7 @@ export default async function CoachDebriefPage({
           <div className="mt-4 space-y-3">
             {artifact.coachShare.carryForward.map((item) => (
               <div key={item} className="rounded-2xl border border-[hsl(var(--accent)/0.32)] bg-[hsl(var(--accent)/0.08)] p-4">
-                <p className="text-sm font-medium text-primary">{item}</p>
+                <p className="text-sm font-medium text-bright">{item}</p>
               </div>
             ))}
           </div>
@@ -140,7 +140,7 @@ export default async function CoachDebriefPage({
           <div className="mt-4 space-y-3">
             {artifact.coachShare.wins.map((item) => (
               <div key={item} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-sm text-primary">{item}</p>
+                <p className="text-sm text-bright">{item}</p>
               </div>
             ))}
           </div>
@@ -151,7 +151,7 @@ export default async function CoachDebriefPage({
           <div className="mt-4 space-y-3">
             {artifact.coachShare.concerns.map((item) => (
               <div key={item} className="rounded-2xl border border-[hsl(var(--warning)/0.28)] bg-[hsl(var(--warning)/0.08)] p-4">
-                <p className="text-sm text-primary">{item}</p>
+                <p className="text-sm text-bright">{item}</p>
               </div>
             ))}
           </div>
@@ -170,7 +170,7 @@ export default async function CoachDebriefPage({
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {artifact.evidence.slice(0, 8).map((item) => (
             <a key={`${item.kind}-${item.id}`} href={item.href} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 transition hover:border-[hsl(var(--accent)/0.42)]">
-              <p className="text-sm font-semibold text-primary">{item.label}</p>
+              <p className="text-sm font-semibold text-bright">{item.label}</p>
               <p className="mt-2 text-sm text-muted">{item.detail}</p>
             </a>
           ))}

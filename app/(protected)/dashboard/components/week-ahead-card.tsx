@@ -43,7 +43,7 @@ export function WeekAheadCard({ preview }: Props) {
       </p>
 
       {preview.aiNarrative ? (
-        <p className="mt-3 text-sm text-primary">{preview.aiNarrative}</p>
+        <p className="mt-3 text-sm text-bright">{preview.aiNarrative}</p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-4">
@@ -124,7 +124,7 @@ export function WeekAheadCard({ preview }: Props) {
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: SPORT_COLORS[session.sport] ?? "rgba(255,255,255,0.35)" }}
                 />
-                <span className="flex-1 text-primary">
+                <span className="flex-1 text-bright">
                   {session.type}
                   {session.isKey ? <span className="ml-1.5 text-[10px] text-[hsl(var(--warning))]">Key</span> : null}
                 </span>

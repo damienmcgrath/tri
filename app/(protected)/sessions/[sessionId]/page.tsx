@@ -482,12 +482,12 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             {reviewVm.oneThingToChange ? (
               <div className="mt-4 rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)] p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--accent))]">One thing to change</p>
-                <p className="mt-2 text-sm font-medium text-primary">{reviewVm.oneThingToChange}</p>
+                <p className="mt-2 text-sm font-medium text-bright">{reviewVm.oneThingToChange}</p>
               </div>
             ) : (
               <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
                 <p className={quietLabelClass}>What to do next</p>
-                <p className="mt-2 text-sm text-primary">{reviewVm.nextAction}</p>
+                <p className="mt-2 text-sm text-bright">{reviewVm.nextAction}</p>
               </div>
             )}
             <div className="mt-4 grid gap-5 sm:grid-cols-2 border-t border-[hsl(var(--border))] pt-4">
@@ -564,8 +564,8 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3 sm:p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p
-                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-primary"}`}
-                        style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-primary))" }}
+                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-bright"}`}
+                        style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-bright))" }}
                       >
                         {metric.value}
                       </p>
@@ -631,10 +631,10 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                     <div key={component.label}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-primary">{component.label}</span>
+                          <span className="text-xs font-medium text-bright">{component.label}</span>
                           <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{component.weightLabel}</span>
                         </div>
-                        <span className="text-xs font-mono font-medium text-primary">{component.score}</span>
+                        <span className="text-xs font-mono font-medium text-bright">{component.score}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
                         <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${component.score}%` }} />
@@ -656,7 +656,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                 {reviewVm.usefulMetrics.map((metric) => (
                   <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
                     <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">{metric.label}</p>
-                    <p className="mt-0.5 text-sm font-semibold text-primary">{metric.value}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-bright">{metric.value}</p>
                   </div>
                 ))}
               </div>
