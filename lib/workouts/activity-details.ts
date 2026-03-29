@@ -29,6 +29,9 @@ export type ActivityDetails = {
   activity_type_raw: string | null;
   activity_subtype_raw: string | null;
   source: string;
+  external_provider: string | null;
+  external_activity_id: string | null;
+  external_title: string | null;
   parse_summary: { laps?: Array<Record<string, unknown>> } | null;
   metrics_v2: Record<string, unknown> | null;
   notes: string | null;
@@ -76,10 +79,10 @@ export async function loadActivityDetails(activityId: string): Promise<ActivityD
   if (!user) return null;
 
   const selectVariants = [
-    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,notes,is_unplanned,is_race",
-    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,is_unplanned,is_race",
-    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2,is_race",
-    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,parse_summary,metrics_v2"
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,external_provider,external_activity_id,external_title,parse_summary,metrics_v2,notes,is_unplanned,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,external_provider,external_activity_id,external_title,parse_summary,metrics_v2,is_unplanned,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,external_provider,external_activity_id,external_title,parse_summary,metrics_v2,is_race",
+    "id,user_id,upload_id,sport_type,start_time_utc,end_time_utc,duration_sec,distance_m,avg_hr,avg_power,calories,moving_duration_sec,elapsed_duration_sec,pool_length_m,laps_count,avg_pace_per_100m_sec,avg_stroke_rate_spm,avg_swolf,avg_cadence,max_hr,max_power,elevation_gain_m,elevation_loss_m,activity_vendor,activity_type_raw,activity_subtype_raw,source,external_provider,external_activity_id,external_title,parse_summary,metrics_v2"
   ] as const;
 
   let activity: ActivityDetails | null = null;
@@ -98,6 +101,9 @@ export async function loadActivityDetails(activityId: string): Promise<ActivityD
       const record = query.data as unknown as Record<string, unknown>;
       activity = {
         ...(record as unknown as ActivityDetails),
+        external_provider: typeof record.external_provider === "string" ? record.external_provider : null,
+        external_activity_id: typeof record.external_activity_id === "string" ? record.external_activity_id : null,
+        external_title: typeof record.external_title === "string" ? record.external_title : null,
         notes: typeof record.notes === "string" ? record.notes : null,
         is_unplanned: typeof record.is_unplanned === "boolean" ? record.is_unplanned : false,
         is_race: typeof record.is_race === "boolean" ? record.is_race : false
