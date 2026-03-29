@@ -51,7 +51,8 @@ const baseConnection: ExternalConnection = {
   providerProfile: {},
   lastSyncedAt: null,
   lastSyncStatus: null,
-  lastSyncError: null
+  lastSyncError: null,
+  syncWindowDays: 7
 };
 
 beforeEach(() => {

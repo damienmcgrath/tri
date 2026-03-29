@@ -6,6 +6,7 @@
  */
 
 import type { StravaActivitySummary } from "./normalizer";
+import { parseRateLimitHeaders, StravaRateLimitError, type RateLimitInfo } from "./rate-limiter";
 
 const STRAVA_API_BASE = "https://www.strava.com/api/v3";
 const STRAVA_OAUTH_TOKEN_URL = "https://www.strava.com/oauth/token";
@@ -32,15 +33,46 @@ export type StravaTokenResponse = {
   scope?: string;
 };
 
+export type FetchWithRateLimit<T> = {
+  data: T;
+  rateLimit: RateLimitInfo | null;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function stravaFetch<T>(url: string, options: RequestInit): Promise<T> {
+/**
+ * Extended fetch that returns both the parsed body and rate limit headers.
+ * Throws StravaRateLimitError on 429 responses.
+ */
+async function stravaFetchWithHeaders<T>(
+  url: string,
+  options: RequestInit
+): Promise<FetchWithRateLimit<T>> {
   const res = await fetch(url, options);
+  const rateLimit = parseRateLimitHeaders(res.headers);
+
+  if (res.status === 429) {
+    // Default retry after 15 minutes if no header
+    const retryAfterMs = 15 * 60 * 1000;
+    throw new StravaRateLimitError(
+      `Strava rate limit exceeded (429)`,
+      retryAfterMs
+    );
+  }
+
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Strava API ${res.status}: ${body}`);
   }
-  return res.json() as Promise<T>;
+
+  const data = (await res.json()) as T;
+  return { data, rateLimit };
+}
+
+/** Simple fetch wrapper (backward compat). */
+async function stravaFetch<T>(url: string, options: RequestInit): Promise<T> {
+  const { data } = await stravaFetchWithHeaders<T>(url, options);
+  return data;
 }
 
 // ─── Activity endpoints ───────────────────────────────────────────────────────
@@ -76,6 +108,25 @@ export async function fetchRecentActivities(
     per_page: String(options.perPage ?? 50)
   });
   return stravaFetch<StravaActivitySummary[]>(
+    `${STRAVA_API_BASE}/athlete/activities?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+}
+
+/**
+ * Same as fetchRecentActivities but also returns rate limit info.
+ * Used by backfill to check throttle status between pages.
+ */
+export async function fetchRecentActivitiesWithRateLimit(
+  accessToken: string,
+  options: { after: number; page?: number; perPage?: number }
+): Promise<FetchWithRateLimit<StravaActivitySummary[]>> {
+  const params = new URLSearchParams({
+    after: String(options.after),
+    page: String(options.page ?? 1),
+    per_page: String(options.perPage ?? 50)
+  });
+  return stravaFetchWithHeaders<StravaActivitySummary[]>(
     `${STRAVA_API_BASE}/athlete/activities?${params.toString()}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );

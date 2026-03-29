@@ -6,6 +6,8 @@ export type StravaConnectionRow = {
   last_synced_at: string | null;
   last_sync_status: "ok" | "error" | "running" | null;
   last_sync_error: string | null;
+  sync_window_days: number | null;
+  last_sync_metadata: { importedCount?: number; skippedCount?: number; errorCount?: number } | null;
 } | null;
 
 /**
@@ -20,13 +22,34 @@ export async function ConnectedServices() {
 
   if (!user) return null;
 
-  const { data: connection } = await supabase
+  // Try with new columns first, fall back to base columns if migration hasn't been applied yet
+  let connection: StravaConnectionRow = null;
+  const baseSelect = "provider_display_name,last_synced_at,last_sync_status,last_sync_error";
+  const extendedSelect = `${baseSelect},sync_window_days,last_sync_metadata`;
+
+  const extended = await supabase
     .from("external_account_connections")
-    .select("provider_display_name,last_synced_at,last_sync_status,last_sync_error")
+    .select(extendedSelect)
     .eq("user_id", user.id)
     .eq("provider", "strava")
     .is("disconnected_at", null)
     .maybeSingle();
+
+  if (!extended.error) {
+    connection = extended.data as StravaConnectionRow;
+  } else {
+    // Fallback: columns may not exist yet
+    const base = await supabase
+      .from("external_account_connections")
+      .select(baseSelect)
+      .eq("user_id", user.id)
+      .eq("provider", "strava")
+      .is("disconnected_at", null)
+      .maybeSingle();
+    if (base.data) {
+      connection = { ...base.data, sync_window_days: null, last_sync_metadata: null } as StravaConnectionRow;
+    }
+  }
 
   return (
     <section className="surface p-6 space-y-4">

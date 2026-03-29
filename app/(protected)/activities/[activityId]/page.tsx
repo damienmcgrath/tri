@@ -5,6 +5,38 @@ import { loadActivityDetails } from "@/lib/workouts/activity-details";
 import { getMetricsV2HrZones, getMetricsV2Laps, getMetricsV2PowerZones, getNestedNumber, getNestedString } from "@/lib/workouts/metrics-v2";
 import { ActivityLinkingCard } from "./activity-linking-card";
 
+function SourceBadge({ source, externalProvider, externalActivityId, externalTitle }: {
+  source: string;
+  externalProvider?: string | null;
+  externalActivityId?: string | null;
+  externalTitle?: string | null;
+}) {
+  if (externalProvider === "strava" && externalActivityId) {
+    const stravaUrl = `https://www.strava.com/activities/${externalActivityId}`;
+    return (
+      <a
+        href={stravaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 rounded-full border border-[#FC4C02]/30 bg-[#FC4C02]/10 px-2 py-1 text-[#FC4C02] hover:bg-[#FC4C02]/20 transition-colors"
+        title={externalTitle ?? "View on Strava"}
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3" aria-hidden="true">
+          <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+        </svg>
+        Strava
+      </a>
+    );
+  }
+
+  if (source === "upload" || source === "fit_upload" || source === "tcx_import") {
+    const label = source === "tcx_import" ? "TCX Import" : "FIT Upload";
+    return <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{label}</span>;
+  }
+
+  return <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{source}</span>;
+}
+
 function sportIcon(sport: string) {
   if (sport === "run") return "🏃";
   if (sport === "bike") return "🚴";
@@ -115,8 +147,8 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
               <div>
                 <h1 className="text-2xl font-semibold">{sportIcon(activity.sport_type)} Activity</h1>
                 <p className="mt-1 text-sm text-muted">{dateLabel}</p>
-                <div className="mt-2 flex gap-2 text-xs">
-                  <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{activity.source === "upload" ? "Garmin upload" : "Synced"}</span>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <SourceBadge source={activity.source} externalProvider={activity.external_provider} externalActivityId={activity.external_activity_id} externalTitle={activity.external_title} />
                   <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{linkedSession ? "Linked" : "Unassigned"}</span>
                   {!linkedSession ? <span className="rounded-full border border-[hsl(var(--signal-risk)/0.5)] bg-[hsl(var(--signal-risk)/0.12)] px-2 py-1 text-[hsl(var(--signal-risk))]">Unscheduled</span> : null}
                 </div>
