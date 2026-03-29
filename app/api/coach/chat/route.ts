@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveCoachAuthContext } from "@/lib/coach/auth";
-import { COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
+import { buildContextualPrompts, COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
 import { executeCoachTool } from "@/lib/coach/tool-handlers";
 import { coachToolSchemas, coachTools, type CoachToolName } from "@/lib/coach/tools";
+import { getLatestFitness, getTsbTrend, getReadinessState } from "@/lib/training/fitness-model";
+import { detectCrossDisciplineFatigue } from "@/lib/training/fatigue-detection";
 import { coachChatRequestSchema, coachStructuredResponseSchema, type CoachStructuredResponse } from "@/lib/coach/types";
 import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
@@ -152,6 +154,67 @@ async function collectResponseStream(params: {
   } satisfies StreamedResponseResult;
 }
 
+async function buildContextualState(deps: Parameters<typeof executeCoachTool>[2]) {
+  try {
+    const [fitness, tsbTrend, crossFatigue] = await Promise.all([
+      getLatestFitness(deps.supabase, deps.ctx.userId).catch(() => null),
+      getTsbTrend(deps.supabase, deps.ctx.userId).catch(() => null),
+      detectCrossDisciplineFatigue(deps.supabase, deps.ctx.userId).catch(() => null)
+    ]);
+
+    const totalFitness = fitness?.total ?? null;
+    const readiness = totalFitness ? getReadinessState(totalFitness.tsb, tsbTrend) : null;
+
+    // Check for recent partial/missed sessions
+    const { data: recentSessions } = await deps.supabase
+      .from("sessions")
+      .select("id,date,sport,type,session_name,execution_result")
+      .eq("user_id", deps.ctx.userId)
+      .eq("status", "completed")
+      .order("date", { ascending: false })
+      .limit(5);
+
+    const recentPartial = (recentSessions ?? [])
+      .filter((s) => {
+        const exec = s.execution_result as { status?: string } | null;
+        return exec?.status === "partial_intent" || exec?.status === "missed_intent";
+      })
+      .slice(0, 2)
+      .map((s) => ({
+        name: (s.session_name as string) ?? (s.type as string) ?? s.sport,
+        date: s.date as string,
+        status: ((s.execution_result as { status?: string })?.status ?? "partial").replace("_", " ")
+      }));
+
+    // Check for pending follow-ups from recent assistant messages
+    const { data: recentAssistantMsgs } = await deps.supabase
+      .from("ai_messages")
+      .select("content,metadata")
+      .eq("user_id", deps.ctx.userId)
+      .eq("role", "assistant")
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    const pendingFollowups: string[] = [];
+    for (const msg of recentAssistantMsgs ?? []) {
+      const meta = msg.metadata as { pending_followups?: string[] } | null;
+      if (meta?.pending_followups) {
+        pendingFollowups.push(...meta.pending_followups);
+      }
+    }
+
+    return {
+      readiness,
+      fatigueSignals: crossFatigue ? [crossFatigue] : [],
+      imbalances: [] as Array<{ sport: string; direction: string; deltaPp: number }>,
+      recentPartialSessions: recentPartial,
+      pendingFollowups: pendingFollowups.slice(0, 3)
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function runCoachResponseFlow(params: {
   userMessage: string;
   priorMessages: ConversationMessageRow[];
@@ -163,6 +226,13 @@ async function runCoachResponseFlow(params: {
 }) {
   const history = params.priorMessages.slice(-10).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join("\n");
 
+  // Build contextual prompts from current training state
+  const trainingState = await buildContextualState(params.toolDeps);
+  const contextualPrompts = trainingState ? buildContextualPrompts(trainingState) : [];
+  const contextBlock = contextualPrompts.length > 0
+    ? `\n\nCoaching directives for this conversation:\n${contextualPrompts.map((p) => `- ${p}`).join("\n")}`
+    : "";
+
   let response = await collectResponseStream({
     request: {
       model: getCoachModel(),
@@ -171,7 +241,7 @@ async function runCoachResponseFlow(params: {
       input: [
         {
           role: "user",
-          content: [{ type: "input_text", text: `<context>\nConversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}\n</context>` }]
+          content: [{ type: "input_text", text: `<context>\nConversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}${contextBlock}\n</context>` }]
         },
         {
           role: "user",

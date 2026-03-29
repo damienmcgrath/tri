@@ -138,7 +138,7 @@ export type ExecutionEvidence = {
   rulesSummary: {
     intentMatch: "on_target" | "partial" | "missed";
     executionScore: number | null;
-    executionScoreBand: "On target" | "Partial match" | "Missed intent" | null;
+    executionScoreBand: "On target" | "Solid" | "Partial match" | "Missed intent" | null;
     confidence: "high" | "medium" | "low";
     provisional: boolean;
     evidenceCount: number;
@@ -156,8 +156,10 @@ export type CoachVerdict = {
     nextCall: "move_on" | "proceed_with_caution" | "repeat_session" | "protect_recovery" | "adjust_next_key_session";
   };
   explanation: {
+    sessionIntent?: string;
     whatHappened: string;
     whyItMatters: string;
+    oneThingToChange?: string;
     whatToDoNextTime: string;
     whatToDoThisWeek: string;
   };
@@ -209,7 +211,7 @@ export type PersistedExecutionReview = {
   status: "matched_intent" | "partial_intent" | "missed_intent";
   intentMatchStatus: "matched_intent" | "partial_intent" | "missed_intent";
   executionScore: number | null;
-  executionScoreBand: "On target" | "Partial match" | "Missed intent" | null;
+  executionScoreBand: "On target" | "Solid" | "Partial match" | "Missed intent" | null;
   executionScoreSummary: string;
   executionSummary: string;
   summary: string;
@@ -266,8 +268,10 @@ const coachVerdictSchema = z.object({
     nextCall: z.enum(["move_on", "proceed_with_caution", "repeat_session", "protect_recovery", "adjust_next_key_session"])
   }),
   explanation: z.object({
+    sessionIntent: z.string().min(1).max(300).optional(),
     whatHappened: z.string().min(1).max(500),
     whyItMatters: z.string().min(1).max(500),
+    oneThingToChange: z.string().min(1).max(500).optional(),
     whatToDoNextTime: z.string().min(1).max(500),
     whatToDoThisWeek: z.string().min(1).max(500)
   }),
@@ -292,8 +296,10 @@ const COACH_VERDICT_EXAMPLE: CoachVerdict = {
     nextCall: "proceed_with_caution"
   },
   explanation: {
-    whatHappened: "Early control was acceptable, but the final segment faded and the last planned work was not completed cleanly.",
+    sessionIntent: "Threshold intervals to push lactate clearance at race-relevant intensity.",
+    whatHappened: "Intensity stayed 5% below target through the first 4 reps, then faded. The last 2 reps were incomplete.",
     whyItMatters: "That means the session delivered some useful stimulus, but not the precise version the week was counting on.",
+    oneThingToChange: "NEXT threshold intervals: hold 165-175 bpm for all 6 reps. Success: complete the full set without fade. Start 2% easier on rep 1.",
     whatToDoNextTime: "Start the first work block a touch easier so you can hold form and finish the full set.",
     whatToDoThisWeek: "Keep the next key session on the calendar, but avoid forcing progression if fatigue is still lingering."
   },
@@ -687,8 +693,10 @@ function normalizeVerdictUnits(verdict: CoachVerdict): CoachVerdict {
       summary: n(verdict.sessionVerdict.summary)
     },
     explanation: {
+      ...(verdict.explanation.sessionIntent ? { sessionIntent: n(verdict.explanation.sessionIntent) } : {}),
       whatHappened: n(verdict.explanation.whatHappened),
       whyItMatters: n(verdict.explanation.whyItMatters),
+      ...(verdict.explanation.oneThingToChange ? { oneThingToChange: n(verdict.explanation.oneThingToChange) } : {}),
       whatToDoNextTime: n(verdict.explanation.whatToDoNextTime),
       whatToDoThisWeek: n(verdict.explanation.whatToDoThisWeek)
     },
@@ -729,14 +737,26 @@ function buildCoachVerdictInstructions() {
     "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
     "Express durations in minutes (e.g. '37 min', '1 h 15 min'). Never write raw seconds.",
     "Express run pace as min:sec/km (e.g. '5:41/km'). Never write raw seconds per km.",
+    "",
+    "Prescriptive review rules:",
+    "- Speak with direct authority. State findings. Do not hedge.",
+    "- Never lead with duration comparison. Evaluate intensity compliance first, pacing second, duration third.",
+    "- For interval sessions: evaluate interval quality before mentioning whether all were completed.",
+    "- For endurance sessions: evaluate intensity compliance before mentioning duration.",
+    "- For 90+ scores: say 'Maintain this approach. Same targets next time.' in oneThingToChange.",
+    "- For scores below 90: use the NEXT format: 'NEXT [session type]: [specific target]. [success criterion]. [progression cue].'",
+    "- Do not use words like 'appears', 'seems', 'might', 'possibly', 'likely'. State what the data shows.",
+    "",
     "Field requirements:",
     "- `sessionVerdict.headline`: short label, max 160 chars.",
     "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
     "- `sessionVerdict.intentMatch`: must match the provided deterministic intent result.",
     "- `sessionVerdict.executionCost`: must stay consistent with the provided deterministic execution cost.",
     "- `sessionVerdict.nextCall`: choose one allowed enum only.",
-    "- `explanation.whatHappened`: factual session read, max 500 chars.",
+    "- `explanation.sessionIntent` (optional): one sentence on the physiological purpose of this session, max 300 chars.",
+    "- `explanation.whatHappened`: factual session read evaluating intensity first, pacing second, duration third. Max 500 chars.",
     "- `explanation.whyItMatters`: what it means for adaptation or the week, max 500 chars.",
+    "- `explanation.oneThingToChange` (optional): single concrete instruction using NEXT format, max 500 chars.",
     "- `explanation.whatToDoNextTime`: one practical cue for the next similar session, max 500 chars.",
     "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
     "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
@@ -837,6 +857,9 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
       nextCall
     },
     explanation: {
+      sessionIntent: evidence.planned.intentCategory
+        ? `${evidence.planned.intentCategory} — targeting the planned training stimulus for this session.`
+        : undefined,
       whatHappened: evidence.detectedIssues.length > 0
         ? `Key execution issues: ${evidence.detectedIssues.slice(0, 2).map((issue) => issue.code.replaceAll("_", " ")).join(", ")}.`
         : "Execution stayed close to the planned session targets.",
@@ -844,6 +867,12 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
         intentMatch === "on_target"
           ? "Matching the planned intent protects the adaptation you wanted from the day and supports the rest of the week."
           : "When execution drifts, the session can stop delivering the precise stimulus the week depends on.",
+      oneThingToChange:
+        intentMatch === "on_target"
+          ? "Maintain this approach. Same targets next time."
+          : intentMatch === "missed"
+            ? `NEXT ${evidence.planned.intentCategory ?? "session"}: start more conservatively and protect the key work before adding intensity.`
+            : `NEXT ${evidence.planned.intentCategory ?? "session"}: tighten control earlier in the session.`,
       whatToDoNextTime:
         intentMatch === "on_target"
           ? "Repeat the same pacing and control on the next similar session."

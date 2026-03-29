@@ -479,15 +479,33 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
               {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
             </h2>
-            <div className="mt-4 grid gap-5 sm:grid-cols-2 border-t border-[hsl(var(--border))] pt-4">
-              <div>
+            {reviewVm.oneThingToChange ? (
+              <div className="mt-4 rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)] p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--accent))]">One thing to change</p>
+                <p className="mt-2 text-sm font-medium text-[hsl(var(--text-primary))]">{reviewVm.oneThingToChange}</p>
+              </div>
+            ) : (
+              <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
                 <p className={quietLabelClass}>What to do next</p>
                 <p className="mt-2 text-sm text-[hsl(var(--text-primary))]">{reviewVm.nextAction}</p>
               </div>
-              <div className="sm:border-l sm:border-[hsl(var(--border))] sm:pl-5">
+            )}
+            <div className="mt-4 grid gap-5 sm:grid-cols-2 border-t border-[hsl(var(--border))] pt-4">
+              <div>
                 <p className={quietLabelClass}>This week</p>
                 <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
               </div>
+              {reviewVm.loadContribution?.sessionTss != null ? (
+                <div className="sm:border-l sm:border-[hsl(var(--border))] sm:pl-5">
+                  <p className={quietLabelClass}>Load contribution</p>
+                  <p className="mt-2 text-sm text-muted">
+                    {Math.round(reviewVm.loadContribution.sessionTss)} TSS
+                    {reviewVm.loadContribution.weekTssPct != null
+                      ? ` · ${Math.round(reviewVm.loadContribution.weekTssPct * 100)}% of weekly target`
+                      : ""}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -497,7 +515,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
             </span>
             {reviewVm.isReviewable && reviewVm.scoreConfidenceNote ? (
               <span className={ghostPillClass}>
-                Provisional
+                Limited data
               </span>
             ) : null}
             {reviewVm.isReviewable ? (
@@ -526,7 +544,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
                 </div>
               ) : null}
               <div className={hasSpecificPlannedIntent ? "border-t border-[hsl(var(--border))] pt-5" : ""}>
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What happened</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
                 <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
               </div>
               <div className="border-t border-[hsl(var(--border))] pt-5">
@@ -577,15 +595,14 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       </section>
 
       {reviewVm.uncertaintyDetail ? (
-        <section className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[var(--color-surface)] px-5 py-4" style={{ borderLeftWidth: "2px", borderLeftColor: "#FFB43C" }}>
-          <div>
-            <p className="label-base text-[10px] text-[hsl(var(--warning))]">Early read</p>
-            <p className="mt-2 text-sm">{reviewVm.uncertaintyDetail}</p>
-            {reviewVm.missingEvidence.length > 0 ? (
-              <p className="mt-2 text-sm text-muted">Missing evidence: {reviewVm.missingEvidence.join(", ")}.</p>
-            ) : null}
-          </div>
-        </section>
+        <DetailsAccordion title="Data confidence" summaryDetail={
+          <span className="text-[11px] text-muted">{reviewVm.uncertaintyTitle ?? "Limited data"}</span>
+        }>
+          <p className="text-sm text-muted">{reviewVm.uncertaintyDetail}</p>
+          {reviewVm.missingEvidence.length > 0 ? (
+            <p className="mt-2 text-sm text-muted">Missing: {reviewVm.missingEvidence.join(", ")}.</p>
+          ) : null}
+        </DetailsAccordion>
       ) : null}
 
       {reviewVm.isReviewable && reviewVm.score !== null ? (
@@ -598,11 +615,42 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           }
         >
           <div className="space-y-3">
-            <p className="text-xs text-muted">
-              Execution scores compare what actually happened against what was planned —
-              across duration, intensity, intent alignment, and consistency. A higher score means the
-              session delivered the intended training stimulus.
-            </p>
+            {reviewVm.componentScores ? (
+              <div className="space-y-3">
+                {[
+                  { label: "Intent match", weightLabel: "40%", score: reviewVm.componentScores.intentMatch.score, detail: reviewVm.componentScores.intentMatch.detail },
+                  { label: "Pacing & execution", weightLabel: "25%", score: reviewVm.componentScores.pacingExecution.score, detail: reviewVm.componentScores.pacingExecution.detail },
+                  { label: "Completion", weightLabel: "20%", score: reviewVm.componentScores.completion.score, detail: reviewVm.componentScores.completion.detail },
+                  { label: "Recovery compliance", weightLabel: "15%", score: reviewVm.componentScores.recoveryCompliance.score, detail: reviewVm.componentScores.recoveryCompliance.detail }
+                ].map((component) => {
+                  const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
+                    : component.score >= 60 ? "bg-[hsl(var(--warning))]"
+                    : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
+                    : "bg-[hsl(var(--signal-risk))]";
+                  return (
+                    <div key={component.label}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-[hsl(var(--text-primary))]">{component.label}</span>
+                          <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{component.weightLabel}</span>
+                        </div>
+                        <span className="text-xs font-mono font-medium text-[hsl(var(--text-primary))]">{component.score}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${component.score}%` }} />
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted">{component.detail}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted">
+                Execution scores compare what actually happened against what was planned —
+                across duration, intensity, intent alignment, and consistency. A higher score means the
+                session delivered the intended training stimulus.
+              </p>
+            )}
             {reviewVm.usefulMetrics.length > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2">
                 {reviewVm.usefulMetrics.map((metric) => (

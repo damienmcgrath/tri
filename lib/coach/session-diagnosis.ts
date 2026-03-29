@@ -2,7 +2,7 @@ export type Sport = "swim" | "bike" | "run" | "strength" | "other";
 
 export type IntentMatchStatus = "matched_intent" | "partial_intent" | "missed_intent";
 export type DiagnosisConfidence = "high" | "medium" | "low";
-export type ExecutionScoreBand = "On target" | "Partial match" | "Missed intent";
+export type ExecutionScoreBand = "On target" | "Solid" | "Partial match" | "Missed intent";
 
 export type PlannedTargetBand = {
   hr?: { min?: number; max?: number };
@@ -43,6 +43,21 @@ export type CompletedSessionDiagnosisInput = {
 export type SessionDiagnosisInput = {
   planned: PlannedSessionDiagnosisInput;
   actual: CompletedSessionDiagnosisInput;
+  sessionTss?: number | null;
+};
+
+export type ComponentScore = {
+  score: number;
+  weight: number;
+  detail: string;
+};
+
+export type ComponentScores = {
+  intentMatch: ComponentScore;
+  pacingExecution: ComponentScore;
+  completion: ComponentScore;
+  recoveryCompliance: ComponentScore;
+  composite: number;
 };
 
 export type SessionDiagnosis = {
@@ -57,6 +72,7 @@ export type SessionDiagnosis = {
   executionScoreProvisional: boolean;
   detectedIssues: IssueKey[];
   evidenceCount: number;
+  componentScores: ComponentScores | null;
 };
 
 type IntentBucket = "easy_endurance" | "recovery" | "threshold_quality" | "long_endurance" | "swim_strength" | "unknown";
@@ -289,8 +305,9 @@ function getConfidence(evidenceCount: number): DiagnosisConfidence {
 }
 
 function getExecutionScoreBand(score: number): ExecutionScoreBand {
-  if (score >= 85) return "On target";
-  if (score >= 65) return "Partial match";
+  if (score >= 90) return "On target";
+  if (score >= 75) return "Solid";
+  if (score >= 55) return "Partial match";
   return "Missed intent";
 }
 
@@ -423,6 +440,165 @@ function getNextAction(status: IntentMatchStatus, issues: IssueKey[], bucket: In
   return "Use this result as feedback and aim for tighter control against the planned intent next time.";
 }
 
+function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket): ComponentScore {
+  const weight = 0.40;
+  let score: number;
+  let detail: string;
+
+  if (draft.status === "matched_intent") {
+    score = draft.evidenceCount >= 3 ? 98 : 95;
+    detail = "Execution stayed aligned with the planned intent.";
+  } else if (draft.status === "partial_intent") {
+    const issueSeverity = draft.issues.length;
+    score = Math.max(55, 85 - issueSeverity * 10);
+    detail = `Intent partially met — ${draft.issues.length} issue${draft.issues.length > 1 ? "s" : ""} detected.`;
+  } else {
+    const issueSeverity = draft.issues.length;
+    score = Math.max(0, 55 - issueSeverity * 12);
+    detail = `Intent missed — execution drifted significantly from plan.`;
+  }
+
+  if (bucket === "recovery" && draft.issues.includes("too_hard")) {
+    score = Math.min(score, 40);
+    detail = "Recovery intent was compromised by excessive intensity.";
+  }
+
+  return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
+}
+
+function computePacingExecutionScore(input: SessionDiagnosisInput, draft: DiagnosisDraft): ComponentScore {
+  const weight = 0.25;
+  let score = 90;
+  const penalties: string[] = [];
+
+  const splits = input.actual.splitMetrics;
+  const variability = input.actual.variabilityIndex;
+
+  if (splits?.firstHalfAvgHr && splits?.lastHalfAvgHr) {
+    const drift = splits.lastHalfAvgHr / splits.firstHalfAvgHr;
+    if (drift > 1.08) { score -= 25; penalties.push("significant HR drift"); }
+    else if (drift > 1.05) { score -= 12; penalties.push("moderate HR drift"); }
+  }
+
+  if (splits?.firstHalfPaceSPerKm && splits?.lastHalfPaceSPerKm) {
+    const fade = splits.lastHalfPaceSPerKm / splits.firstHalfPaceSPerKm;
+    if (fade > 1.15) { score -= 25; penalties.push("significant pace fade"); }
+    else if (fade > 1.08) { score -= 12; penalties.push("moderate pace fade"); }
+  }
+
+  if (typeof variability === "number") {
+    if (variability > 1.20) { score -= 20; penalties.push("high variability"); }
+    else if (variability > 1.12) { score -= 10; penalties.push("moderate variability"); }
+  }
+
+  if (draft.issues.includes("started_too_hard")) { score -= 15; penalties.push("started too hard"); }
+  if (draft.issues.includes("faded_late") && !penalties.some(p => p.includes("fade"))) { score -= 15; penalties.push("faded late"); }
+
+  const detail = penalties.length > 0
+    ? `Pacing issues: ${penalties.join(", ")}.`
+    : "Pacing stayed controlled throughout.";
+
+  return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
+}
+
+function computeCompletionScore(input: SessionDiagnosisInput, draft: DiagnosisDraft): ComponentScore {
+  const weight = 0.20;
+  let score = 95;
+  const notes: string[] = [];
+
+  const intervalCompletion = input.actual.intervalCompletionPct
+    ?? ratio(input.actual.completedIntervals, input.planned.plannedIntervals);
+  const durationCompletion = ratio(input.actual.durationSec, input.planned.plannedDurationSec ?? null);
+
+  if (typeof intervalCompletion === "number") {
+    score = Math.round(intervalCompletion * 100);
+    if (intervalCompletion < 1) notes.push(`${Math.round(intervalCompletion * 100)}% intervals completed`);
+  }
+
+  if (typeof durationCompletion === "number") {
+    const durationScore = Math.round(Math.min(1, durationCompletion) * 100);
+    if (typeof intervalCompletion === "number") {
+      score = Math.round(score * 0.6 + durationScore * 0.4);
+    } else {
+      score = durationScore;
+    }
+    if (durationCompletion < 0.95) notes.push(`${Math.round(durationCompletion * 100)}% duration completed`);
+  }
+
+  if (typeof intervalCompletion !== "number" && typeof durationCompletion !== "number") {
+    score = draft.issues.includes("shortened") ? 65 : 80;
+  }
+
+  const detail = notes.length > 0
+    ? notes.join("; ") + "."
+    : "Session completed as planned.";
+
+  return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
+}
+
+function computeRecoveryComplianceScore(input: SessionDiagnosisInput, bucket: IntentBucket): ComponentScore {
+  const weight = 0.15;
+  const isEasyOrRecovery = bucket === "easy_endurance" || bucket === "recovery";
+
+  if (!isEasyOrRecovery) {
+    return { score: 80, weight, detail: "Recovery compliance is neutral for non-easy sessions." };
+  }
+
+  let score = 100;
+  const penalties: string[] = [];
+
+  const timeAbove = input.actual.timeAboveTargetPct;
+  if (typeof timeAbove === "number") {
+    if (timeAbove >= 0.25) { score -= 35; penalties.push("significant time above target zone"); }
+    else if (timeAbove >= 0.12) { score -= 18; penalties.push("moderate time above target zone"); }
+  }
+
+  const avgHr = input.actual.avgHr ?? getMetric(input.actual, "avg_hr");
+  const targetHrMax = input.planned.targetBands?.hr?.max;
+  if (targetHrMax && avgHr) {
+    const hrExcess = avgHr / targetHrMax;
+    if (hrExcess > 1.10) { score -= 30; penalties.push("HR well above ceiling"); }
+    else if (hrExcess > 1.04) { score -= 15; penalties.push("HR above ceiling"); }
+  }
+
+  const avgPower = input.actual.avgPower ?? getMetric(input.actual, "avg_power");
+  const targetPowerMax = input.planned.targetBands?.power?.max;
+  if (targetPowerMax && avgPower) {
+    const powerExcess = avgPower / targetPowerMax;
+    if (powerExcess > 1.15) { score -= 30; penalties.push("power well above ceiling"); }
+    else if (powerExcess > 1.05) { score -= 22; penalties.push("power above ceiling"); }
+  }
+
+  if (input.sessionTss && input.sessionTss > 80 && bucket === "recovery") {
+    score -= 20;
+    penalties.push("TSS too high for recovery");
+  }
+
+  const detail = penalties.length > 0
+    ? `Recovery compromised: ${penalties.join(", ")}.`
+    : "Easy-day intensity stayed well controlled.";
+
+  return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
+}
+
+function computeComponentScores(input: SessionDiagnosisInput, draft: DiagnosisDraft, bucket: IntentBucket): ComponentScores | null {
+  if (draft.evidenceCount === 0) return null;
+
+  const intentMatch = computeIntentMatchScore(draft, bucket);
+  const pacingExecution = computePacingExecutionScore(input, draft);
+  const completion = computeCompletionScore(input, draft);
+  const recoveryCompliance = computeRecoveryComplianceScore(input, bucket);
+
+  const composite = Math.round(
+    intentMatch.score * intentMatch.weight +
+    pacingExecution.score * pacingExecution.weight +
+    completion.score * completion.weight +
+    recoveryCompliance.score * recoveryCompliance.weight
+  );
+
+  return { intentMatch, pacingExecution, completion, recoveryCompliance, composite };
+}
+
 export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionDiagnosis {
   const bucket = toIntentBucket(input.planned);
 
@@ -439,7 +615,10 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
               ? evaluateSwimStrength(input)
               : evaluateUnknown(input);
 
-  const score = deriveExecutionScore(bucket, draft);
+  const components = computeComponentScores(input, draft, bucket);
+  const score = components
+    ? { score: components.composite, band: getExecutionScoreBand(components.composite), provisional: draft.evidenceCount < 2 }
+    : deriveExecutionScore(bucket, draft);
   const summary = getSummary(draft.status, draft.issues, bucket);
 
   return {
@@ -453,6 +632,7 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
     diagnosisConfidence: getConfidence(draft.evidenceCount),
     executionScoreProvisional: score.provisional,
     detectedIssues: [...new Set(draft.issues)],
-    evidenceCount: draft.evidenceCount
+    evidenceCount: draft.evidenceCount,
+    componentScores: components
   };
 }

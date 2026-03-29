@@ -14,6 +14,8 @@ import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 import { WeeklyDebriefCard } from "./weekly-debrief-card";
 import { WeekAheadCard } from "./components/week-ahead-card";
+import { TrendCards } from "./trend-cards";
+import { detectTrends } from "@/lib/training/trends";
 
 type Session = {
   id: string;
@@ -763,6 +765,13 @@ export default async function DashboardPage({
       })
     : null;
 
+  let trends: Awaited<ReturnType<typeof detectTrends>> = [];
+  try {
+    trends = await detectTrends(supabase, user.id);
+  } catch {
+    // Trends are non-critical
+  }
+
   let weekAheadPreview = null;
   if (showWeekAheadCard) {
     try {
@@ -978,6 +987,8 @@ export default async function DashboardPage({
       {weekAheadPreview ? <WeekAheadCard preview={weekAheadPreview} /> : null}
 
       {weeklyDebriefSnapshot ? <WeeklyDebriefCard snapshot={weeklyDebriefSnapshot} /> : null}
+
+      {trends.length > 0 ? <TrendCards trends={trends} /> : null}
     </section>
   );
 }
