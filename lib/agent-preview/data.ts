@@ -911,6 +911,121 @@ export function createPreviewDatabase(): PreviewDatabase {
           ]
         }
       }
+      ,{
+        athlete_id: PREVIEW_USER_ID,
+        week_start: "2026-03-16",
+        week_end: "2026-03-22",
+        status: "ready",
+        source_updated_at: "2026-03-22T09:00:00.000Z",
+        generated_at: "2026-03-22T10:00:00.000Z",
+        generation_version: 6,
+        helpful: null,
+        accurate: null,
+        feedback_note: null,
+        feedback_updated_at: null,
+        narrative: {
+          executiveSummary: "A shortened week with one solid swim session and a useful extra run. The strength upload still needs assigning — once placed, the week reads as a light but intentional recovery-style block. Not enough volume to call it a proper build week, but the sessions that landed were clean.",
+          highlights: [
+            "Pull Endurance swim: 55 minutes of steady work with good stroke consistency throughout.",
+            "Extra run added useful aerobic volume without disrupting recovery.",
+            "Strength session logged — once assigned it will round out the week's cross-training picture."
+          ],
+          observations: [
+            "Only 2 of 3 planned sessions completed — the unassigned strength upload may close that gap once reviewed.",
+            "Low overall volume for a build phase — worth watching if this becomes a pattern."
+          ],
+          carryForward: [
+            "Assign the strength upload so the week's picture is complete before moving on.",
+            "Next week should aim for full session count to keep the build block on track."
+          ]
+        },
+        coach_share: {
+          headline: "Light week — swim held, strength pending review",
+          summary: "Pull Endurance swim was solid. Strength upload needs assigning. Extra run added useful volume.",
+          wins: [
+            "Pull Endurance swim: 55 min steady",
+            "Extra run added aerobic volume"
+          ],
+          concerns: [
+            "Only 2 of 3 planned sessions done",
+            "Low volume for a build week"
+          ],
+          carryForward: [
+            "Assign the pending strength upload.",
+            "Aim for full session count next week."
+          ]
+        },
+        facts: {
+          weekLabel: "Week of Mar 16",
+          weekRange: "Mar 16 – Mar 22",
+          title: "Light week with clean swim, strength pending",
+          statusLine: "Pull Endurance swim landed well. Extra run added volume. Strength upload still needs review.",
+          primaryTakeawayTitle: "Swim quality held in a light week",
+          primaryTakeawayDetail: "The swim session was the anchor — clean and on target. The missing volume is the main thing to address next week.",
+          plannedSessions: 3,
+          completedPlannedSessions: 1,
+          completedSessions: 2,
+          addedSessions: 1,
+          skippedSessions: 0,
+          remainingSessions: 2,
+          keySessionsCompleted: 1,
+          keySessionsMissed: 0,
+          keySessionsTotal: 1,
+          plannedMinutes: 170,
+          completedPlannedMinutes: 55,
+          completedMinutes: 90,
+          skippedMinutes: 0,
+          extraMinutes: 35,
+          completionPct: 53,
+          dominantSport: "swim",
+          keySessionStatus: "1 of 1 key sessions completed",
+          weekShape: "partial_reflection",
+          reflectionsSparse: false,
+          narrativeSource: "ai",
+          artifactStateLabel: "final",
+          artifactStateNote: null,
+          provisionalReviewCount: 0,
+          confidenceNote: null,
+          metrics: [
+            { label: "Sessions completed", value: "2 / 3", detail: "1 extra run added", tone: "neutral" },
+            { label: "Key sessions", value: "1 / 1", detail: "Pull Endurance swim on target", tone: "positive" },
+            { label: "Training time", value: "1h 30m", detail: "vs 2h 50m planned", tone: "muted" }
+          ],
+          factualBullets: [
+            "Pull Endurance swim: 55 minutes of steady-state work with consistent stroke rate.",
+            "Extra run: 35 minutes easy aerobic — added useful volume without disrupting recovery.",
+            "Strength upload (40 min) logged but not yet assigned to a planned session."
+          ],
+          evidenceGroups: [
+            {
+              claim: "Swim session anchored the week",
+              detail: "Pull Endurance was the only planned session completed — it landed cleanly and gave the week its quality signal.",
+              supports: [
+                {
+                  id: "77777777-7777-4777-8777-777777777781",
+                  label: "Pull Endurance — Mon Mar 16",
+                  href: "/sessions/77777777-7777-4777-8777-777777777781",
+                  kind: "session",
+                  reason: "55 minutes steady with good stroke consistency."
+                }
+              ]
+            },
+            {
+              claim: "Extra run kept volume from being too light",
+              detail: "The unplanned run added 35 minutes of aerobic work that rounded out an otherwise sparse week.",
+              supports: [
+                {
+                  id: PREVIEW_ACTIVITY_EXTRA_RUN_ID,
+                  label: "Extra Run — Tue Mar 17",
+                  href: `/sessions/activity/${PREVIEW_ACTIVITY_EXTRA_RUN_ID}`,
+                  kind: "activity",
+                  reason: "35 minutes easy — added volume without replacing planned work."
+                }
+              ]
+            }
+          ]
+        }
+      }
     ],
     ingestion_events: []
   };

@@ -608,10 +608,23 @@ export function computeWeeklyDebriefReadiness(args: {
   resolvedKeySessions: number;
 }) {
   const isEndOfWeek = args.todayIso >= args.weekEnd;
+  const hasAnyContent = args.plannedMinutes > 0 || args.resolvedMinutes > 0;
   const effectiveCompletionReady =
     args.plannedMinutes > 0 &&
     args.resolvedMinutes >= Math.round(args.plannedMinutes * 0.7) &&
     args.totalKeySessions === args.resolvedKeySessions;
+
+  if (!hasAnyContent) {
+    return weeklyDebriefReadinessSchema.parse({
+      isReady: false,
+      reason: "No planned or completed sessions this week — nothing to debrief yet.",
+      unlockedBy: "insufficient_signal",
+      resolvedKeySessions: args.resolvedKeySessions,
+      totalKeySessions: args.totalKeySessions,
+      resolvedMinutes: args.resolvedMinutes,
+      plannedMinutes: args.plannedMinutes
+    });
+  }
 
   if (isEndOfWeek) {
     return weeklyDebriefReadinessSchema.parse({
