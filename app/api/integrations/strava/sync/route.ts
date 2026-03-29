@@ -33,7 +33,7 @@ export async function POST(): Promise<Response> {
 
   try {
     const freshConnection = await refreshIfExpired(connection);
-    const result = await backfillRecentActivities(user.id, freshConnection);
+    const result = await backfillRecentActivities(user.id, freshConnection, connection.syncWindowDays);
 
     console.log(`[STRAVA_SYNC] Done for user ${user.id}:`, result);
     return NextResponse.json(result);

@@ -4,6 +4,7 @@ import { ActivityUploadsPanel } from "./activity-uploads-panel";
 import { ActivityMetricsBackfillButton } from "./activity-metrics-backfill-button";
 import { ReviewBackfillButton } from "./review-backfill-button";
 import { ConnectedServices } from "./connected-services";
+import { SyncHistory } from "./sync-history";
 
 type UploadRow = {
   id: string;
@@ -135,6 +136,10 @@ export default async function IntegrationsPage() {
 
       <Suspense fallback={null}>
         <ConnectedServices />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <SyncHistory />
       </Suspense>
 
       <div className="grid gap-4 xl:grid-cols-2">

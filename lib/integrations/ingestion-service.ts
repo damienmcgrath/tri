@@ -9,11 +9,13 @@
  * All queries scope explicitly to userId.
  */
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { fetchActivity, fetchRecentActivities } from "./providers/strava/client";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/strava/client";
+import { shouldThrottle } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
 import { refreshIfExpired, updateSyncStatus, type ExternalConnection } from "./token-service";
 import { suggestSessionMatches, pickBestSuggestion } from "@/lib/workouts/matching-service";
+import { findCrossSourceDuplicate, mergeStravaIntoExisting } from "./cross-source-dedup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,9 +27,39 @@ export type IngestResult = {
 
 export type IngestOneResult =
   | { status: "imported"; activityId: string; matched: boolean }
-  | { status: "skipped" };
+  | { status: "skipped" }
+  | { status: "merged" };
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42703" || /(is_unplanned|schedule_status|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+}
+
+/** Strip columns that may not exist yet (migration not applied) and retry insert. */
+async function insertActivity(
+  supabase: SupabaseClient,
+  normalized: Record<string, unknown>
+): Promise<{ data: any; error: any }> {
+  const result = await supabase
+    .from("completed_activities")
+    .insert(normalized)
+    .select("id,start_time_utc,sport_type,duration_sec,distance_m")
+    .single();
+
+  if (!result.error || !isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  // Retry without optional columns
+  const { is_unplanned, schedule_status, ...safe } = normalized as any;
+  return supabase
+    .from("completed_activities")
+    .insert(safe)
+    .select("id,start_time_utc,sport_type,duration_sec,distance_m")
+    .single();
+}
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,6 +89,71 @@ async function logSyncEvent(
     raw_payload: rawPayload,
     error_message: errorMessage ?? null
   });
+}
+
+type CreatedActivity = {
+  id: string;
+  start_time_utc: string;
+  sport_type: string;
+  duration_sec: number;
+  distance_m: string | number | null;
+};
+
+/**
+ * Try to auto-match a newly imported activity to a planned session.
+ * Returns true if a match was created.
+ */
+async function matchActivity(
+  supabase: SupabaseClient,
+  userId: string,
+  created: CreatedActivity
+): Promise<boolean> {
+  const start = new Date(created.start_time_utc);
+  const windowStart = new Date(start.getTime() - 6 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString();
+
+  const { data: candidates } = await supabase
+    .from("sessions")
+    .select("id,sport,date,duration_minutes")
+    .eq("user_id", userId)
+    .gte("date", windowStart.slice(0, 10))
+    .lte("date", windowEnd.slice(0, 10));
+
+  const suggestions = suggestSessionMatches(
+    {
+      id: created.id,
+      userId,
+      sportType: created.sport_type,
+      startTimeUtc: created.start_time_utc,
+      durationSec: created.duration_sec,
+      distanceM: Number(created.distance_m ?? 0)
+    },
+    (candidates ?? []).map((c: { id: string; sport: string; date: string; duration_minutes: number | null }) => ({
+      id: c.id,
+      userId,
+      date: c.date,
+      sport: c.sport,
+      type: c.sport,
+      durationMinutes: c.duration_minutes,
+      distanceM: null
+    }))
+  );
+
+  const best = pickBestSuggestion(suggestions);
+  if (!best) return false;
+
+  const { error: linkError } = await supabase.from("session_activity_links").insert({
+    user_id: userId,
+    planned_session_id: best.plannedSessionId,
+    completed_activity_id: created.id,
+    link_type: "auto",
+    confidence: best.confidence,
+    match_reason: best.reason,
+    confirmation_status: "suggested",
+    match_method: best.matchMethod
+  });
+
+  return !linkError;
 }
 
 // ─── Core ingest ──────────────────────────────────────────────────────────────
@@ -109,12 +206,22 @@ export async function ingestStravaActivity(
   // 4. Normalize
   const normalized = normalizeStravaActivity(raw, userId);
 
+  // 4b. Cross-source dedup — check if a FIT/TCX upload already has this workout
+  const crossMatch = await findCrossSourceDuplicate(
+    userId,
+    normalized.sport_type,
+    normalized.start_time_utc,
+    normalized.duration_sec
+  );
+  if (crossMatch) {
+    console.log(`[INGEST] MERGED activityId=${externalId} into existing ${crossMatch.existingId} (source: ${crossMatch.existingSource})`);
+    await mergeStravaIntoExisting(crossMatch.existingId, externalId, normalized.external_title);
+    await logSyncEvent(userId, "strava", "activity_merged", externalId, "ok", { mergedInto: crossMatch.existingId });
+    return { status: "merged" };
+  }
+
   // 5. Insert (ON CONFLICT DO NOTHING for safety — partial index handles dedup)
-  const { data: created, error: insertError } = await supabase
-    .from("completed_activities")
-    .insert(normalized)
-    .select("id,start_time_utc,sport_type,duration_sec,distance_m")
-    .single();
+  const { data: created, error: insertError } = await insertActivity(supabase, normalized);
 
   if (insertError) {
     // If it's a uniqueness violation the row already exists — treat as skipped
@@ -134,59 +241,10 @@ export async function ingestStravaActivity(
 
   console.log(`[INGEST] IMPORTED activityId=${externalId} completedActivityId=${created.id}`);
 
-  // 6. Session matching — same window query as the file upload route
-  const start = new Date(created.start_time_utc);
-  const windowStart = new Date(start.getTime() - 6 * 60 * 60 * 1000).toISOString();
-  const windowEnd = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString();
-
-  const { data: candidates } = await supabase
-    .from("sessions")
-    .select("id,sport,date,duration_minutes")
-    .eq("user_id", userId)
-    .gte("date", windowStart.slice(0, 10))
-    .lte("date", windowEnd.slice(0, 10));
-
-  const suggestions = suggestSessionMatches(
-    {
-      id: created.id,
-      userId,
-      sportType: created.sport_type,
-      startTimeUtc: created.start_time_utc,
-      durationSec: created.duration_sec,
-      distanceM: Number(created.distance_m ?? 0)
-    },
-    (candidates ?? []).map((candidate: { id: string; sport: string; date: string; duration_minutes: number | null }) => ({
-      id: candidate.id,
-      userId,
-      date: candidate.date,
-      sport: candidate.sport,
-      type: candidate.sport,
-      durationMinutes: candidate.duration_minutes,
-      distanceM: null
-    }))
-  );
-
-  const best = pickBestSuggestion(suggestions);
-  let matched = false;
-
-  if (best) {
-    const { error: linkError } = await supabase.from("session_activity_links").insert({
-      user_id: userId,
-      planned_session_id: best.plannedSessionId,
-      completed_activity_id: created.id,
-      link_type: "auto",
-      confidence: best.confidence,
-      match_reason: best.reason,
-      confirmation_status: "suggested",
-      match_method: best.matchMethod
-    });
-
-    if (!linkError) {
-      matched = true;
-      console.log(`[INGEST] MATCHED activityId=${externalId} → session ${best.plannedSessionId} (confidence ${best.confidence})`);
-    } else {
-      console.error(`[INGEST] LINK_ERROR activityId=${externalId}:`, linkError.message);
-    }
+  // 6. Session matching
+  const matched = await matchActivity(supabase, userId, created);
+  if (matched) {
+    console.log(`[INGEST] MATCHED activityId=${externalId}`);
   } else {
     console.log(`[INGEST] NO_MATCH activityId=${externalId}`);
   }
@@ -199,22 +257,23 @@ export async function ingestStravaActivity(
 // ─── Backfill ─────────────────────────────────────────────────────────────────
 
 /**
- * Import the last 7 days of Strava activities for a user.
+ * Import recent Strava activities for a user.
  *
  * Uses the list endpoint (GET /athlete/activities) which returns summaries —
  * this avoids hitting per-activity endpoints and respects Strava's rate limits.
- * Processes activities sequentially to stay well within the 100 req/15min limit.
+ * Stops early with partial results if approaching the 15-minute rate limit.
  */
 export async function backfillRecentActivities(
   userId: string,
-  connection: ExternalConnection
+  connection: ExternalConnection,
+  syncWindowDays: number = 7
 ): Promise<IngestResult> {
-  console.log(`[INGEST] BACKFILL START userId=${userId}`);
+  console.log(`[INGEST] BACKFILL START userId=${userId} window=${syncWindowDays}d`);
 
   // Refresh token if needed before starting
   const freshConnection = await refreshIfExpired(connection);
 
-  const ninetyDaysAgoSec = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+  const afterSec = Math.floor((Date.now() - syncWindowDays * 24 * 60 * 60 * 1000) / 1000);
   const result: IngestResult = { imported: 0, skipped: 0, matched: 0 };
 
   let page = 1;
@@ -222,12 +281,20 @@ export async function backfillRecentActivities(
 
   while (true) {
     let activities;
+    let throttled = false;
+
     try {
-      activities = await fetchRecentActivities(freshConnection.accessToken, {
-        after: ninetyDaysAgoSec,
+      const { data, rateLimit } = await fetchRecentActivitiesWithRateLimit(freshConnection.accessToken, {
+        after: afterSec,
         page,
         perPage
       });
+      activities = data;
+
+      if (rateLimit && shouldThrottle(rateLimit)) {
+        console.log(`[INGEST] BACKFILL THROTTLED — 15min usage ${rateLimit.usage15min}/${rateLimit.limit15min}`);
+        throttled = true;
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Fetch error";
       console.error(`[INGEST] BACKFILL_FETCH_ERROR page=${page}:`, msg);
@@ -239,8 +306,6 @@ export async function backfillRecentActivities(
 
     for (const activity of activities) {
       try {
-        // For the list endpoint we already have summary data — use it directly
-        // instead of fetching each activity individually (saves API rate limit)
         const externalId = String(activity.id);
 
         // Dedup check first (fast path)
@@ -261,11 +326,21 @@ export async function backfillRecentActivities(
         // Normalize and insert from list summary (has all fields needed)
         const normalized = normalizeStravaActivity(activity, userId);
 
-        const { data: created, error: insertError } = await supabase
-          .from("completed_activities")
-          .insert(normalized)
-          .select("id,start_time_utc,sport_type,duration_sec,distance_m")
-          .single();
+        // Cross-source dedup — check if a FIT/TCX upload already has this workout
+        const crossMatch = await findCrossSourceDuplicate(
+          userId,
+          normalized.sport_type,
+          normalized.start_time_utc,
+          normalized.duration_sec
+        );
+        if (crossMatch) {
+          console.log(`[INGEST] BACKFILL MERGED activityId=${externalId} into existing ${crossMatch.existingId}`);
+          await mergeStravaIntoExisting(crossMatch.existingId, externalId, normalized.external_title);
+          result.skipped++;
+          continue;
+        }
+
+        const { data: created, error: insertError } = await insertActivity(supabase, normalized);
 
         if (insertError) {
           if (insertError.code === "23505") {
@@ -284,64 +359,23 @@ export async function backfillRecentActivities(
 
         result.imported++;
 
-        // Session matching
-        const start = new Date(created.start_time_utc);
-        const windowStart = new Date(start.getTime() - 6 * 60 * 60 * 1000).toISOString();
-        const windowEnd = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString();
-
-        const { data: candidates } = await supabase
-          .from("sessions")
-          .select("id,sport,date,duration_minutes")
-          .eq("user_id", userId)
-          .gte("date", windowStart.slice(0, 10))
-          .lte("date", windowEnd.slice(0, 10));
-
-        const suggestions = suggestSessionMatches(
-          {
-            id: created.id,
-            userId,
-            sportType: created.sport_type,
-            startTimeUtc: created.start_time_utc,
-            durationSec: created.duration_sec,
-            distanceM: Number(created.distance_m ?? 0)
-          },
-          (candidates ?? []).map((c: { id: string; sport: string; date: string; duration_minutes: number | null }) => ({
-            id: c.id,
-            userId,
-            date: c.date,
-            sport: c.sport,
-            type: c.sport,
-            durationMinutes: c.duration_minutes,
-            distanceM: null
-          }))
-        );
-
-        const best = pickBestSuggestion(suggestions);
-        if (best) {
-          const { error: linkError } = await supabase.from("session_activity_links").insert({
-            user_id: userId,
-            planned_session_id: best.plannedSessionId,
-            completed_activity_id: created.id,
-            link_type: "auto",
-            confidence: best.confidence,
-            match_reason: best.reason,
-            confirmation_status: "suggested",
-            match_method: best.matchMethod
-          });
-          if (!linkError) result.matched++;
-        }
+        const matched = await matchActivity(supabase, userId, created);
+        if (matched) result.matched++;
       } catch (err) {
         console.error(`[INGEST] BACKFILL_ACTIVITY_ERROR activityId=${activity.id}:`, err);
         result.skipped++;
       }
     }
 
-    // If fewer results than requested, we're done
-    if (activities.length < perPage) break;
+    // Stop pagination if throttled or fewer results than requested
+    if (throttled || activities.length < perPage) break;
     page++;
   }
 
   console.log(`[INGEST] BACKFILL DONE userId=${userId}`, result);
-  await updateSyncStatus(userId, "strava", "ok");
+  await updateSyncStatus(userId, "strava", "ok", undefined, {
+    importedCount: result.imported,
+    skippedCount: result.skipped
+  });
   return result;
 }

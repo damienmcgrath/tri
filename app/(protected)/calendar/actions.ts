@@ -159,27 +159,67 @@ export async function moveSessionAction(input: { sessionId: string; newDate: str
   const parsed = moveSessionSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
 
+  // Try "sessions" table first, fall back to "planned_sessions"
   const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("date,notes")
+    .eq("id", parsed.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!sessionError) {
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    if (session.date === parsed.newDate) {
+      return;
+    }
+
+    const withoutExistingMoveTag = (session.notes ?? "").replace(/\n?\[moved\sfrom\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+    const nextNotes = `${withoutExistingMoveTag}\n[Moved from ${session.date}]`.trim();
+
+    const { error } = await supabase
+      .from("sessions")
+      .update({ date: parsed.newDate, notes: nextNotes })
+      .eq("id", parsed.sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      throw new Error(error.message ?? "Could not move session.");
+    }
+
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    return;
+  }
+
+  if (sessionError.code !== "PGRST205") {
+    throw new Error(sessionError.message ?? "Could not load session before moving.");
+  }
+
+  // Fallback to legacy table
+  const { data: legacySession, error: legacyError } = await supabase
     .from("planned_sessions")
     .select("date,notes")
     .eq("id", parsed.sessionId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (sessionError) {
-    throw new Error(sessionError.message ?? "Could not load session before moving.");
+  if (legacyError) {
+    throw new Error(legacyError.message ?? "Could not load session before moving.");
   }
 
-  if (!session) {
+  if (!legacySession) {
     throw new Error("Session not found.");
   }
 
-  if (session.date === parsed.newDate) {
+  if (legacySession.date === parsed.newDate) {
     return;
   }
 
-  const withoutExistingMoveTag = (session.notes ?? "").replace(/\n?\[moved\sfrom\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
-  const nextNotes = `${withoutExistingMoveTag}\n[Moved from ${session.date}]`.trim();
+  const withoutExistingMoveTag = (legacySession.notes ?? "").replace(/\n?\[moved\sfrom\s\d{4}-\d{2}-\d{2}\]/gi, "").trim();
+  const nextNotes = `${withoutExistingMoveTag}\n[Moved from ${legacySession.date}]`.trim();
 
   const { error } = await supabase
     .from("planned_sessions")
@@ -203,22 +243,72 @@ export async function swapSessionDayAction(input: { sourceSessionId: string; tar
   }
 
   const { supabase, user } = await getAuthedClient();
+
+  // Try "sessions" table first, fall back to "planned_sessions"
   const { data: pair, error: pairError } = await supabase
+    .from("sessions")
+    .select("id,date")
+    .in("id", [parsed.sourceSessionId, parsed.targetSessionId])
+    .eq("user_id", user.id);
+
+  if (!pairError) {
+    if (!pair || pair.length !== 2) {
+      throw new Error("Could not find both sessions for swap.");
+    }
+
+    const source = pair.find((s: any) => s.id === parsed.sourceSessionId);
+    const target = pair.find((s: any) => s.id === parsed.targetSessionId);
+
+    if (!source || !target) {
+      throw new Error("Could not identify selected sessions.");
+    }
+
+    const { error: sourceError } = await supabase
+      .from("sessions")
+      .update({ date: target.date })
+      .eq("id", source.id)
+      .eq("user_id", user.id);
+
+    if (sourceError) {
+      throw new Error(sourceError.message ?? "Could not swap sessions.");
+    }
+
+    const { error: targetError } = await supabase
+      .from("sessions")
+      .update({ date: source.date })
+      .eq("id", target.id)
+      .eq("user_id", user.id);
+
+    if (targetError) {
+      throw new Error(targetError.message ?? "Could not swap sessions.");
+    }
+
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    return;
+  }
+
+  if (pairError.code !== "PGRST205") {
+    throw new Error(pairError.message ?? "Could not load sessions for swap.");
+  }
+
+  // Fallback to legacy table
+  const { data: legacyPair, error: legacyPairError } = await supabase
     .from("planned_sessions")
     .select("id,date")
     .in("id", [parsed.sourceSessionId, parsed.targetSessionId])
     .eq("user_id", user.id);
 
-  if (pairError) {
-    throw new Error(pairError.message ?? "Could not load sessions for swap.");
+  if (legacyPairError) {
+    throw new Error(legacyPairError.message ?? "Could not load sessions for swap.");
   }
 
-  if (!pair || pair.length !== 2) {
+  if (!legacyPair || legacyPair.length !== 2) {
     throw new Error("Could not find both sessions for swap.");
   }
 
-  const source = pair.find((session: any) => session.id === parsed.sourceSessionId);
-  const target = pair.find((session: any) => session.id === parsed.targetSessionId);
+  const source = legacyPair.find((s: any) => s.id === parsed.sourceSessionId);
+  const target = legacyPair.find((s: any) => s.id === parsed.targetSessionId);
 
   if (!source || !target) {
     throw new Error("Could not identify selected sessions.");
@@ -591,18 +681,37 @@ export async function quickAddSessionAction(input: {
     planId = createdPlan.id;
   }
 
-  const { error } = await supabase.from("planned_sessions").insert({
+  // Try "sessions" table first, fall back to "planned_sessions"
+  const { error: sessionsError } = await supabase.from("sessions").insert({
     user_id: user.id,
     plan_id: planId,
     date: parsed.date,
     sport: parsed.sport,
     type: parsed.type?.trim() || "Session",
-    duration: parsed.duration,
-    notes: parsed.notes?.trim() || null
+    duration_minutes: parsed.duration,
+    notes: parsed.notes?.trim() || null,
+    status: "planned"
   });
 
-  if (error) {
-    throw new Error(error.message ?? "Could not create session.");
+  if (!sessionsError) {
+    // success
+  } else if (sessionsError.code === "PGRST205") {
+    // Fallback to legacy table
+    const { error } = await supabase.from("planned_sessions").insert({
+      user_id: user.id,
+      plan_id: planId,
+      date: parsed.date,
+      sport: parsed.sport,
+      type: parsed.type?.trim() || "Session",
+      duration: parsed.duration,
+      notes: parsed.notes?.trim() || null
+    });
+
+    if (error) {
+      throw new Error(error.message ?? "Could not create session.");
+    }
+  } else {
+    throw new Error(sessionsError.message ?? "Could not create session.");
   }
 
   revalidatePath("/calendar");

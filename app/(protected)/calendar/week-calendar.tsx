@@ -8,6 +8,7 @@ import { SessionStatusChip } from "@/lib/ui/status-chip";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDayStateLabel, type SessionLifecycleState } from "@/lib/training/semantics";
 import { acceptAdaptationAction, clearSkippedAction, confirmSkippedAction, dismissAdaptationAction, markActivityExtraAction, markSkippedAction, moveSessionAction, quickAddSessionAction } from "@/app/(protected)/calendar/actions";
+import { linkActivityAction } from "@/app/(protected)/activities/[activityId]/actions";
 import { hasConfirmedSkipTag } from "@/lib/plans/skip-notes";
 
 type SessionStatus = SessionLifecycleState;
@@ -487,9 +488,7 @@ export function WeekCalendar({
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] md:justify-end">
-                  {upload.source?.uploadId ? (
-                    <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to session</button>
-                  ) : null}
+                  <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to session</button>
                   <button
                     onClick={() => {
                       const activityId = getActivityId(upload.id);
@@ -857,15 +856,13 @@ export function WeekCalendar({
                         </div>
                       ) : state === "unmatched_upload" ? (
                         <div className="mt-2 border-t border-[hsl(var(--accent-performance)/0.18)] pt-1.5">
-                          {session.source?.uploadId ? (
-                            <button
-                              type="button"
-                              onClick={() => setAssignSource(session)}
-                              className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
-                            >
-                              Review upload
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setAssignSource(session)}
+                            className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
+                          >
+                            Review upload
+                          </button>
                         </div>
                       ) : !isNeedsAttentionCard ? (
                         <div className="mt-1 flex items-center justify-end">{stateBadge}</div>
@@ -1074,18 +1071,26 @@ function AssignUploadModal({
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
             type="button"
-            disabled={isSaving || !selectedSessionId || !upload.source?.uploadId || candidateSessions.length === 0}
+            disabled={isSaving || !selectedSessionId || candidateSessions.length === 0}
             onClick={async () => {
-              if (!upload.source?.uploadId || !selectedSessionId) return;
+              if (!selectedSessionId) return;
               setIsSaving(true);
               try {
-                const response = await fetch(`/api/uploads/activities/${upload.source.uploadId}/attach`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ plannedSessionId: selectedSessionId, actor: "athlete", mode: "override" })
-                });
-
-                if (!response.ok) throw new Error("failed");
+                if (upload.source?.uploadId) {
+                  // FIT/TCX upload — use the upload attach API
+                  const response = await fetch(`/api/uploads/activities/${upload.source.uploadId}/attach`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ plannedSessionId: selectedSessionId, actor: "athlete", mode: "override" })
+                  });
+                  if (!response.ok) throw new Error("failed");
+                } else {
+                  // Strava import or other source — use the direct link action
+                  const activityId = getActivityId(upload.id);
+                  if (!activityId) throw new Error("no activity id");
+                  const result = await linkActivityAction(activityId, selectedSessionId);
+                  if (result.error) throw new Error(result.error);
+                }
                 onAssigned(selectedSessionId);
               } catch {
                 onError();

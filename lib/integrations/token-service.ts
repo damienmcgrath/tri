@@ -26,6 +26,7 @@ export type ExternalConnection = {
   lastSyncedAt: Date | null;
   lastSyncStatus: "ok" | "error" | "running" | null;
   lastSyncError: string | null;
+  syncWindowDays: number;
 };
 
 export type ConnectionInput = {
@@ -66,7 +67,8 @@ function toExternalConnection(row: Record<string, unknown>): ExternalConnection 
     providerProfile: (row.provider_profile as Record<string, unknown>) ?? {},
     lastSyncedAt: row.last_synced_at ? new Date(row.last_synced_at as string) : null,
     lastSyncStatus: (row.last_sync_status as SyncStatus) ?? null,
-    lastSyncError: (row.last_sync_error as string) ?? null
+    lastSyncError: (row.last_sync_error as string) ?? null,
+    syncWindowDays: (row.sync_window_days as number) ?? 7
   };
 }
 
@@ -203,12 +205,19 @@ export async function refreshIfExpired(
   };
 }
 
+export type SyncMetadata = {
+  importedCount?: number;
+  skippedCount?: number;
+  errorCount?: number;
+};
+
 /** Update the sync status and last_synced_at timestamp. */
 export async function updateSyncStatus(
   userId: string,
   provider: string,
   status: SyncStatus,
-  error?: string
+  error?: string,
+  metadata?: SyncMetadata
 ): Promise<void> {
   const supabase = getAdminClient();
   const update: Record<string, unknown> = {
@@ -218,6 +227,9 @@ export async function updateSyncStatus(
   if (status === "ok") {
     update.last_synced_at = new Date().toISOString();
     update.last_sync_error = null;
+  }
+  if (metadata) {
+    update.last_sync_metadata = metadata;
   }
 
   const { error: dbError } = await supabase
@@ -246,5 +258,29 @@ export async function deleteConnection(
   if (error) {
     console.error("[TOKEN_SERVICE] deleteConnection error:", error.message);
     throw new Error(`Failed to delete connection: ${error.message}`);
+  }
+}
+
+/**
+ * Soft-disconnect a connection by provider athlete ID.
+ * Used by Strava's deauthorization webhook where we only know the athlete ID.
+ * Sets disconnected_at without deleting the row so history is preserved.
+ */
+export async function softDisconnect(
+  provider: string,
+  providerAthleteId: string
+): Promise<void> {
+  const supabase = getAdminClient();
+  const { error } = await supabase
+    .from("external_account_connections")
+    .update({ disconnected_at: new Date().toISOString() })
+    .eq("provider", provider)
+    .eq("provider_athlete_id", providerAthleteId)
+    .is("disconnected_at", null);
+
+  if (error) {
+    console.error("[TOKEN_SERVICE] softDisconnect error:", error.message);
+  } else {
+    console.log(`[TOKEN_SERVICE] Soft-disconnected ${provider} athlete ${providerAthleteId}`);
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import type { StravaConnectionRow } from "./connected-services";
 
 function formatRelativeTime(isoString: string | null): string {
@@ -14,6 +14,14 @@ function formatRelativeTime(isoString: string | null): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function formatSyncSummary(meta: { importedCount?: number; skippedCount?: number; errorCount?: number }): string {
+  const parts: string[] = [];
+  if (meta.importedCount) parts.push(`${meta.importedCount} imported`);
+  if (meta.skippedCount) parts.push(`${meta.skippedCount} skipped`);
+  if (meta.errorCount) parts.push(`${meta.errorCount} error${meta.errorCount === 1 ? "" : "s"}`);
+  return parts.length > 0 ? `Last sync: ${parts.join(", ")}` : "";
 }
 
 // Simple Strava logo SVG
@@ -37,7 +45,21 @@ export function StravaConnectionCard({ connection }: Props) {
   const [isSyncing, startSync] = useTransition();
   const [isDisconnecting, startDisconnect] = useTransition();
 
+  const [syncWindow, setSyncWindow] = useState(connection?.sync_window_days ?? 7);
   const isConnected = connection !== null;
+
+  async function handleSyncWindowChange(days: number) {
+    setSyncWindow(days);
+    try {
+      await fetch("/api/integrations/strava/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ syncWindowDays: days })
+      });
+    } catch (err) {
+      console.error("[STRAVA_CARD] Settings update error:", err);
+    }
+  }
 
   async function handleSync() {
     startSync(async () => {
@@ -131,11 +153,32 @@ export function StravaConnectionCard({ connection }: Props) {
         </p>
       )}
 
+      {!isRunning && connection.last_sync_metadata && (
+        <p className="text-xs text-muted">
+          {formatSyncSummary(connection.last_sync_metadata)}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2">
+        <label htmlFor="sync-window" className="text-xs text-muted whitespace-nowrap">Sync window</label>
+        <select
+          id="sync-window"
+          value={syncWindow}
+          onChange={(e) => handleSyncWindowChange(Number(e.target.value))}
+          className="flex-1 text-xs rounded border border-border bg-base px-2 py-1 text-foreground"
+        >
+          <option value={7}>7 days</option>
+          <option value={14}>14 days</option>
+          <option value={30}>30 days</option>
+          <option value={90}>90 days</option>
+        </select>
+      </div>
+
       <div className="flex gap-2">
         <button
           onClick={handleSync}
           disabled={isRunning || isDisconnecting}
-          className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded bg-accent text-white hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 btn-primary px-3 py-1.5 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isRunning ? "Syncing…" : "Sync now"}
         </button>

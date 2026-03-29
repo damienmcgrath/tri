@@ -4,10 +4,14 @@ import type { StravaActivitySummary } from "./providers/strava/normalizer";
 // ─── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mockFetchActivity = jest.fn();
-const mockFetchRecentActivities = jest.fn();
+const mockFetchRecentActivitiesWithRateLimit = jest.fn();
 jest.mock("./providers/strava/client", () => ({
   fetchActivity: (...args: unknown[]) => mockFetchActivity(...args),
-  fetchRecentActivities: (...args: unknown[]) => mockFetchRecentActivities(...args)
+  fetchRecentActivitiesWithRateLimit: (...args: unknown[]) => mockFetchRecentActivitiesWithRateLimit(...args)
+}));
+
+jest.mock("./providers/strava/rate-limiter", () => ({
+  shouldThrottle: () => false
 }));
 
 const mockRefreshIfExpired = jest.fn();
@@ -53,7 +57,8 @@ const connection: ExternalConnection = {
   providerProfile: {},
   lastSyncedAt: null,
   lastSyncStatus: null,
-  lastSyncError: null
+  lastSyncError: null,
+  syncWindowDays: 7
 };
 
 const rawActivity: StravaActivitySummary = {
@@ -158,7 +163,7 @@ describe("ingestStravaActivity", () => {
 
 describe("backfillRecentActivities", () => {
   it("returns empty result when no activities returned", async () => {
-    mockFetchRecentActivities.mockResolvedValue([]);
+    mockFetchRecentActivitiesWithRateLimit.mockResolvedValue({ data: [], rateLimit: null });
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }));
 
     const result = await backfillRecentActivities("user-1", connection);
@@ -168,7 +173,9 @@ describe("backfillRecentActivities", () => {
   });
 
   it("skips activities that already exist", async () => {
-    mockFetchRecentActivities.mockResolvedValueOnce([rawActivity]).mockResolvedValueOnce([]);
+    mockFetchRecentActivitiesWithRateLimit
+      .mockResolvedValueOnce({ data: [rawActivity], rateLimit: null })
+      .mockResolvedValueOnce({ data: [], rateLimit: null });
 
     mockFrom.mockImplementation((table: string) => {
       const chain = makeChain({ data: null, error: null });
@@ -187,9 +194,9 @@ describe("backfillRecentActivities", () => {
 
   it("paginates until empty page is returned", async () => {
     // Page 1: full page, page 2: empty
-    mockFetchRecentActivities
-      .mockResolvedValueOnce(Array(50).fill(rawActivity).map((a, i) => ({ ...a, id: i + 1 })))
-      .mockResolvedValueOnce([]);
+    mockFetchRecentActivitiesWithRateLimit
+      .mockResolvedValueOnce({ data: Array(50).fill(rawActivity).map((a, i) => ({ ...a, id: i + 1 })), rateLimit: null })
+      .mockResolvedValueOnce({ data: [], rateLimit: null });
 
     // All activities already imported (dedup)
     mockFrom.mockImplementation(() => {
@@ -200,7 +207,7 @@ describe("backfillRecentActivities", () => {
 
     const result = await backfillRecentActivities("user-1", connection);
 
-    expect(mockFetchRecentActivities).toHaveBeenCalledTimes(2);
+    expect(mockFetchRecentActivitiesWithRateLimit).toHaveBeenCalledTimes(2);
     expect(result.skipped).toBe(50);
   });
 });
