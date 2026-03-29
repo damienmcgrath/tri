@@ -277,6 +277,10 @@
     color: var(--color-text-secondary);
   }
 
+  .text-primary {
+    color: var(--color-text-primary);
+  }
+
   .text-tertiary {
     color: var(--color-text-tertiary);
   }

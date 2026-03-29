@@ -496,7 +496,7 @@ export function WeekCalendar({
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                  <p className="font-semibold text-[hsl(var(--text-primary))]">Upload needs review</p>
+                  <p className="font-semibold text-primary">Upload needs review</p>
                   <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] md:justify-end">
@@ -635,7 +635,7 @@ export function WeekCalendar({
                 <div key={adaptation.id} className="rounded-lg border border-[rgba(190,255,0,0.15)] bg-[rgba(190,255,0,0.03)] px-3 py-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-[hsl(var(--text-primary))]">{adaptation.trigger_type.replace(/_/g, " ")}</p>
+                      <p className="text-xs font-medium text-primary">{adaptation.trigger_type.replace(/_/g, " ")}</p>
                       {options.length > 0 && !isExpanded ? (
                         <p className="mt-0.5 text-[11px] text-tertiary">{options.length} option{options.length > 1 ? "s" : ""} available</p>
                       ) : null}
@@ -657,7 +657,7 @@ export function WeekCalendar({
                             });
                           });
                         }}
-                        className="text-tertiary hover:text-[hsl(var(--text-primary))]"
+                        className="text-tertiary hover:text-primary"
                       >
                         Dismiss
                       </button>
@@ -932,7 +932,7 @@ export function WeekCalendar({
       {detailSession ? <DetailsModal session={detailSession} onClose={() => setDetailSession(null)} /> : null}
       {toast ? (
         <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2">
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] px-4 py-2.5 text-sm font-medium text-[hsl(var(--text-primary))] shadow-xl">
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] px-4 py-2.5 text-sm font-medium text-primary shadow-xl">
             {toast}
           </div>
         </div>
@@ -1044,7 +1044,7 @@ function AssignUploadModal({
       <div className="space-y-3">
         <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.3)] bg-[hsl(var(--accent-performance)/0.08)] p-3">
           <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Uploaded workout</p>
-          <p className="mt-1 text-sm font-semibold text-[hsl(var(--text-primary))]">
+          <p className="mt-1 text-sm font-semibold text-primary">
             {getDisciplineMeta(upload.sport).label} · {upload.duration} min
           </p>
           <p className="mt-1 text-xs text-muted">Logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
@@ -1061,7 +1061,7 @@ function AssignUploadModal({
           </select>
         )}
         <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-          <p className="text-xs font-medium text-[hsl(var(--text-primary))]">Mark as extra / unplanned</p>
+          <p className="text-xs font-medium text-primary">Mark as extra / unplanned</p>
           <p className="mt-1 text-xs text-muted">This workout wasn&apos;t part of your training plan.</p>
           <button
             type="button"
@@ -1161,11 +1161,11 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
                 {executionScoreBand}
               </span>
             </div>
-            <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
+            <p className="mt-1 text-base font-semibold text-primary">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
             {(executionSummary || nextAction) ? (
               <div className="mt-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2">
                 {executionSummary ? <p className="text-xs text-muted">{executionSummary}</p> : null}
-                {nextAction ? <p className="mt-1 text-xs font-medium text-[hsl(var(--text-primary))]">Next step: {nextAction}</p> : null}
+                {nextAction ? <p className="mt-1 text-xs font-medium text-primary">Next step: {nextAction}</p> : null}
               </div>
             ) : null}
           </div>

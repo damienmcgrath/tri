@@ -69,14 +69,14 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
             <button
               type="button"
               onClick={() => void save({ helpful: true })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-[hsl(var(--text-primary))]" : "border-[hsl(var(--border))] text-muted hover:text-[hsl(var(--text-primary))]"}`}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-primary" : "border-[hsl(var(--border))] text-muted hover:text-primary"}`}
             >
               Yes
             </button>
             <button
               type="button"
               onClick={() => void save({ helpful: false })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-[hsl(var(--text-primary))]" : "border-[hsl(var(--border))] text-muted hover:text-[hsl(var(--text-primary))]"}`}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-primary" : "border-[hsl(var(--border))] text-muted hover:text-primary"}`}
             >
               No
             </button>
@@ -89,14 +89,14 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
             <button
               type="button"
               onClick={() => void save({ accurate: true })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-[hsl(var(--text-primary))]" : "border-[hsl(var(--border))] text-muted hover:text-[hsl(var(--text-primary))]"}`}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-primary" : "border-[hsl(var(--border))] text-muted hover:text-primary"}`}
             >
               Yes
             </button>
             <button
               type="button"
               onClick={() => void save({ accurate: false })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-[hsl(var(--text-primary))]" : "border-[hsl(var(--border))] text-muted hover:text-[hsl(var(--text-primary))]"}`}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-primary" : "border-[hsl(var(--border))] text-muted hover:text-primary"}`}
             >
               No
             </button>
@@ -107,7 +107,7 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
           <button
             type="button"
             onClick={() => setShowNoteEditor((current) => !current)}
-            className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-[hsl(var(--text-primary))]"
+            className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-primary"
           >
             {showNoteEditor ? "Hide note" : note.trim() ? "Edit note" : "Add note"}
           </button>
@@ -140,7 +140,7 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
             <button
               type="button"
               onClick={() => setShowNoteEditor(false)}
-              className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-[hsl(var(--text-primary))]"
+              className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-primary"
             >
               Done
             </button>
