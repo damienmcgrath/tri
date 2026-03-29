@@ -19,7 +19,9 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalNonEmptyString(),
   OPENAI_API_KEY: optionalNonEmptyString(),
   OPENAI_COACH_MODEL: optionalNonEmptyString(),
-  OPENAI_COACH_DEEP_MODEL: optionalNonEmptyString()
+  OPENAI_COACH_DEEP_MODEL: optionalNonEmptyString(),
+  STRAVA_CLIENT_ID: optionalNonEmptyString(),
+  STRAVA_CLIENT_SECRET: optionalNonEmptyString()
 }).superRefine((data, ctx) => {
   if (!data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY && !data.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     ctx.addIssue({
@@ -40,5 +42,7 @@ export const env = serverSchema.parse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_COACH_MODEL: process.env.OPENAI_COACH_MODEL,
-  OPENAI_COACH_DEEP_MODEL: process.env.OPENAI_COACH_DEEP_MODEL
+  OPENAI_COACH_DEEP_MODEL: process.env.OPENAI_COACH_DEEP_MODEL,
+  STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID,
+  STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET
 });

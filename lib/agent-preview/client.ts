@@ -7,6 +7,7 @@ type Filter =
   | { type: "lte"; column: string; value: unknown }
   | { type: "lt"; column: string; value: unknown }
   | { type: "gt"; column: string; value: unknown }
+  | { type: "is"; column: string; value: unknown }
   | { type: "not"; column: string; operator: string; value: unknown }
   | { type: "or"; expression: string };
 
@@ -93,6 +94,10 @@ function rowMatchesFilter(row: Record<string, unknown>, filter: Filter) {
   if (filter.type === "lte") return compareValues(current, filter.value) <= 0;
   if (filter.type === "lt") return compareValues(current, filter.value) < 0;
   if (filter.type === "gt") return compareValues(current, filter.value) > 0;
+  if (filter.type === "is") {
+    if (filter.value === null) return current === null || typeof current === "undefined";
+    return current === filter.value;
+  }
   if (filter.type === "not") {
     if (filter.operator === "is" && filter.value === null) {
       return current !== null && typeof current !== "undefined";
@@ -170,6 +175,11 @@ class PreviewQueryBuilder {
 
   gt(column: string, value: unknown) {
     this.filters.push({ type: "gt", column, value });
+    return this;
+  }
+
+  is(column: string, value: unknown) {
+    this.filters.push({ type: "is", column, value });
     return this;
   }
 
