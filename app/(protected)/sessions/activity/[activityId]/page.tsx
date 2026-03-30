@@ -198,14 +198,14 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
                 </span>
               ) : null}
             </div>
-            <p className="mt-3 text-base font-semibold text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{reviewVm.reviewModeDetail}</p>
+            <p className="mt-3 text-base font-semibold text-white">{reviewVm.reviewModeDetail}</p>
             <p className="mt-2 text-sm text-muted">{reviewVm.sessionStatusDetail}</p>
           </div>
 
           <div className={`grid gap-3 ${reviewVm.isReviewable ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
               <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Discipline</p>
-              <p className="mt-2 text-base font-semibold text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{disciplineLabel}</p>
+              <p className="mt-2 text-base font-semibold text-white">{disciplineLabel}</p>
               <p className="mt-1 text-sm text-muted">{sessionDateLabel}</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
@@ -254,7 +254,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
                   {reviewVm.usefulMetrics.map((metric) => (
                     <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
                       <p className="text-xs text-muted">{metric.label}</p>
-                      <p className="mt-1 text-base font-semibold text-[hsl(var(--text-primary))]" style={{ color: "hsl(var(--text-primary))" }}>{metric.value}</p>
+                      <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
                     </div>
                   ))}
                 </div>

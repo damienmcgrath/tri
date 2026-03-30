@@ -165,7 +165,7 @@ export function StravaConnectionCard({ connection }: Props) {
           id="sync-window"
           value={syncWindow}
           onChange={(e) => handleSyncWindowChange(Number(e.target.value))}
-          className="flex-1 text-xs rounded border border-border bg-base px-2 py-1 text-foreground"
+          className="flex-1 text-xs rounded border border-border bg-[var(--color-base)] px-2 py-1 text-foreground"
         >
           <option value={7}>7 days</option>
           <option value={14}>14 days</option>

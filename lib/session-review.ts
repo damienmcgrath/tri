@@ -1,5 +1,6 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
+import type { ComponentScores } from "@/lib/coach/session-diagnosis";
 
 export type SessionReviewRow = {
   id: string;
@@ -23,7 +24,7 @@ export type SessionReviewRow = {
 
 type SessionStatus = "planned" | "completed" | "skipped";
 type DiagnosisStatus = "matched_intent" | "partial_intent" | "missed_intent";
-type ScoreBand = "On target" | "Partial match" | "Missed intent";
+type ScoreBand = "On target" | "Solid" | "Partial match" | "Missed intent";
 type Tone = "success" | "warning" | "risk" | "muted";
 type IntentBucket = "easy" | "recovery" | "threshold" | "long" | "swim_strength" | "unknown";
 
@@ -58,6 +59,15 @@ export type ReviewViewModel = {
   followUpIntro: string;
   followUpPrompts: string[];
   narrativeSource: "ai" | "fallback" | "legacy_unknown";
+  componentScores: ComponentScores | null;
+  trendContext: string | null;
+  oneThingToChange: string | null;
+  loadContribution: {
+    sessionTss: number | null;
+    weekTssSoFar: number | null;
+    weekTssTarget: number | null;
+    weekTssPct: number | null;
+  } | null;
 };
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
@@ -67,8 +77,9 @@ const STATUS_LABELS: Record<SessionStatus, string> = {
 };
 
 const SCORE_BAND_BY_VALUE = [
-  { min: 85, label: "On target" },
-  { min: 70, label: "Partial match" },
+  { min: 90, label: "On target" },
+  { min: 75, label: "Solid" },
+  { min: 55, label: "Partial match" },
   { min: 0, label: "Missed intent" }
 ] as const;
 
@@ -176,6 +187,29 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
   };
 }
 
+function deriveOneThingToChange(
+  componentScores: ComponentScores | null,
+  scoreBand: ScoreBand | null,
+  aiNextAction: string | null
+): string | null {
+  if (componentScores) {
+    const components = [
+      { key: "intentMatch" as const, label: "intensity target", score: componentScores.intentMatch.score, detail: componentScores.intentMatch.detail },
+      { key: "pacingExecution" as const, label: "pacing", score: componentScores.pacingExecution.score, detail: componentScores.pacingExecution.detail },
+      { key: "completion" as const, label: "session completion", score: componentScores.completion.score, detail: componentScores.completion.detail },
+      { key: "recoveryCompliance" as const, label: "recovery discipline", score: componentScores.recoveryCompliance.score, detail: componentScores.recoveryCompliance.detail }
+    ];
+    const worst = components.reduce((a, b) => (a.score <= b.score ? a : b));
+    if (worst.score < 80) {
+      return `NEXT ${worst.label}: ${worst.detail}`;
+    }
+  }
+  if (scoreBand === "On target" || scoreBand === "Solid") {
+    return "Maintain this approach. Same targets next time.";
+  }
+  return aiNextAction || null;
+}
+
 function toExtraReviewState(hasDiagnosticSignals: boolean) {
   if (hasDiagnosticSignals) {
     return {
@@ -277,7 +311,7 @@ function toExtraIntent(status: unknown, isReviewable: boolean) {
 }
 
 function toScoreBand(score: number | null, explicitBand: string | null) {
-  if (explicitBand === "On target" || explicitBand === "Partial match" || explicitBand === "Missed intent") return explicitBand;
+  if (explicitBand === "On target" || explicitBand === "Solid" || explicitBand === "Partial match" || explicitBand === "Missed intent") return explicitBand;
   if (score === null) return null;
   return SCORE_BAND_BY_VALUE.find((band) => score >= band.min)?.label ?? "Partial match";
 }
@@ -366,7 +400,7 @@ export function toneToBadgeClass(tone: Tone) {
   return "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-muted";
 }
 
-export function createReviewViewModel(session: SessionReviewRow): ReviewViewModel {
+export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null }): ReviewViewModel {
   const diagnosis = session.execution_result;
   const v2Review = parsePersistedExecutionReview(diagnosis);
   const hasLinkedActivity = session.has_linked_activity === true;
@@ -535,11 +569,16 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
   const scoreTone: Tone =
     score === null
       ? "muted"
-      : scoreBand === "On target"
+      : scoreBand === "On target" || scoreBand === "Solid"
         ? "success"
         : scoreBand === "Partial match"
           ? "warning"
           : "risk";
+
+  const rawComponentScores = diagnosis?.componentScores as ComponentScores | null | undefined;
+  const componentScores: ComponentScores | null = rawComponentScores && typeof rawComponentScores.composite === "number"
+    ? rawComponentScores
+    : null;
 
   const runMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
@@ -675,6 +714,25 @@ export function createReviewViewModel(session: SessionReviewRow): ReviewViewMode
     unlockTitle,
     unlockDetail,
     narrativeSource,
+    componentScores,
+    trendContext: options?.trendContext ?? null,
+    oneThingToChange: reviewState.isReviewable
+      ? deriveOneThingToChange(
+          componentScores,
+          scoreBand,
+          v2Review?.verdict?.explanation.oneThingToChange
+            ?? v2Review?.verdict?.explanation.whatToDoNextTime
+            ?? null
+        )
+      : null,
+    loadContribution: trainingStressScore !== null
+      ? {
+          sessionTss: trainingStressScore,
+          weekTssSoFar: null,
+          weekTssTarget: null,
+          weekTssPct: null
+        }
+      : null,
     followUpIntro: isExtra
       ? "Use coach follow-up to decide whether this extra session should change the rest of the week."
       : reviewState.isReviewable

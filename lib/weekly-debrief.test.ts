@@ -286,7 +286,8 @@ describe("weekly debrief helpers", () => {
           note: null,
           updatedAt: "2026-03-13T09:00:00.000Z"
         },
-        ftp: null
+        ftp: null,
+        fitness: null
       },
       timeZone: "UTC",
       weekStart: "2026-03-09",

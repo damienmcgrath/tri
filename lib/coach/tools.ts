@@ -6,6 +6,8 @@ export const getUpcomingSessionsArgsSchema = z.object({ daysAhead: z.number().in
 export const getWeekProgressArgsSchema = z.object({}).strict();
 export const getWeeklyBriefArgsSchema = z.object({}).strict();
 export const getActivityDetailsArgsSchema = z.object({ activityId: z.string().uuid() }).strict();
+export const getTrainingLoadArgsSchema = z.object({}).strict();
+
 export const createPlanChangeProposalArgsSchema = z.object({
   title: z.string().trim().min(3).max(160),
   rationale: z.string().trim().min(5).max(1000),
@@ -22,6 +24,7 @@ export const coachToolSchemas = {
   get_week_progress: getWeekProgressArgsSchema,
   get_weekly_brief: getWeeklyBriefArgsSchema,
   get_activity_details: getActivityDetailsArgsSchema,
+  get_training_load: getTrainingLoadArgsSchema,
   create_plan_change_proposal: createPlanChangeProposalArgsSchema
 } as const;
 
@@ -97,6 +100,17 @@ export const coachTools = [
       properties: {
         activityId: { type: "string", format: "uuid" }
       }
+    }
+  },
+  {
+    type: "function" as const,
+    name: "get_training_load",
+    description: "Return the athlete's current fitness state: CTL/ATL/TSB (total + per-discipline), readiness state, discipline balance, ramp rate, and fatigue signals.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {}
     }
   },
   {

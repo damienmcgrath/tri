@@ -4,6 +4,9 @@ import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
 import { detectAmbientSignals } from "@/lib/training/ambient-signals";
+import { getLatestFitness, getTsbTrend, getReadinessState } from "@/lib/training/fitness-model";
+import { computeWeeklyDisciplineBalance, detectDisciplineImbalance } from "@/lib/training/discipline-balance";
+import { detectCrossDisciplineFatigue, detectDisciplineSpecificDecline } from "@/lib/training/fatigue-detection";
 import {
   coachToolSchemas,
   type CoachToolName
@@ -378,6 +381,67 @@ async function createPlanChangeProposal(args: unknown, deps: ToolDeps) {
   };
 }
 
+async function getTrainingLoad({ supabase, ctx }: ToolDeps) {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const weekStart = isoDate(addDays(now, mondayOffset));
+
+  const [fitness, tsbTrend, balance, crossFatigue, specificDecline] = await Promise.all([
+    getLatestFitness(supabase, ctx.userId),
+    getTsbTrend(supabase, ctx.userId),
+    computeWeeklyDisciplineBalance(supabase, ctx.userId, weekStart),
+    detectCrossDisciplineFatigue(supabase, ctx.userId).catch(() => null),
+    detectDisciplineSpecificDecline(supabase, ctx.userId).catch(() => [])
+  ]);
+
+  const totalFitness = fitness?.total ?? null;
+  const readiness = totalFitness
+    ? getReadinessState(totalFitness.tsb, tsbTrend)
+    : null;
+
+  const imbalances = detectDisciplineImbalance(balance);
+  const fatigueSignals = [
+    ...(crossFatigue ? [crossFatigue] : []),
+    ...specificDecline
+  ];
+
+  // Per-discipline summary
+  const perDiscipline: Record<string, { ctl: number; atl: number; tsb: number; rampRate: number | null }> = {};
+  if (fitness) {
+    for (const sport of ["swim", "bike", "run", "strength"] as const) {
+      const snap = fitness[sport];
+      if (snap && (snap.ctl > 0 || snap.atl > 0)) {
+        perDiscipline[sport] = {
+          ctl: snap.ctl,
+          atl: snap.atl,
+          tsb: snap.tsb,
+          rampRate: snap.rampRate
+        };
+      }
+    }
+  }
+
+  return {
+    fitness: totalFitness ? {
+      ctl: totalFitness.ctl,
+      atl: totalFitness.atl,
+      tsb: totalFitness.tsb,
+      rampRate: totalFitness.rampRate,
+      readiness,
+      tsbTrend
+    } : null,
+    perDiscipline,
+    weekBalance: {
+      weekStart: balance.weekStart,
+      totalActualTss: balance.totalActualTss,
+      actual: balance.actual,
+      imbalances
+    },
+    fatigueSignals
+  };
+}
+
 export async function executeCoachTool(name: CoachToolName, args: unknown, deps: ToolDeps) {
   logCoachAudit("info", "coach.tool.execute", {
     ctx: deps.ctx,
@@ -409,6 +473,10 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
         break;
       case "get_activity_details":
         result = await getActivityDetails(args, deps);
+        break;
+      case "get_training_load":
+        coachToolSchemas.get_training_load.parse(args);
+        result = await getTrainingLoad(deps);
         break;
       case "create_plan_change_proposal":
         result = await createPlanChangeProposal(args, deps);

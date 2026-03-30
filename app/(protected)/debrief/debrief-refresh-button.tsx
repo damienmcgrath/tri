@@ -37,7 +37,7 @@ export function DebriefRefreshButton({ weekStart, label = "Refresh" }: Props) {
         type="button"
         onClick={onRefresh}
         disabled={isRefreshing}
-        className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-[hsl(var(--text-primary))] disabled:cursor-not-allowed disabled:opacity-60"
+        className="debrief-pill transition hover:border-[hsl(var(--accent)/0.5)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isRefreshing ? "Refreshing..." : label}
       </button>

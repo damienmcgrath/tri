@@ -176,6 +176,55 @@ export async function detectAmbientSignals(
     });
   }
 
+  // --- Signal: score-RPE alignment (confidence calibration) ---
+  // When execution scores and RPE consistently agree, scoring confidence is high
+  if (feelsWithRpe.length >= 5) {
+    const feelsById = new Map(feelsWithRpe.map((f) => [f.session_id as string, f.rpe as number]));
+    let aligned = 0;
+    let compared = 0;
+
+    for (const s of sessionList) {
+      if (s.status !== "completed") continue;
+      const rpe = feelsById.get(s.id);
+      if (rpe == null) continue;
+
+      const exec = s.execution_result as { status?: string } | null;
+      if (!exec?.status) continue;
+
+      compared++;
+      // High score + low RPE = aligned for easy sessions
+      // Matched intent + moderate RPE = aligned
+      // Missed intent + high RPE = aligned (athlete felt it was hard and it was)
+      const matched = exec.status === "matched_intent";
+      const missed = exec.status === "missed_intent";
+
+      if ((matched && rpe <= 7) || (missed && rpe >= 7) || (!matched && !missed && rpe >= 4 && rpe <= 8)) {
+        aligned++;
+      }
+    }
+
+    if (compared >= 5) {
+      const alignmentPct = Math.round((aligned / compared) * 100);
+      if (alignmentPct >= 80) {
+        signals.push({
+          type: "score_rpe_aligned",
+          severity: "info",
+          label: "High scoring confidence",
+          detail: `Execution scores aligned with your RPE in ${alignmentPct}% of recent sessions (${aligned}/${compared}).`,
+          evidence: [`${alignmentPct}% alignment across ${compared} sessions with RPE data`]
+        });
+      } else if (alignmentPct < 50 && compared >= 6) {
+        signals.push({
+          type: "score_rpe_misaligned",
+          severity: "caution",
+          label: "Score-effort mismatch",
+          detail: `Execution scores diverge from your RPE in ${100 - alignmentPct}% of recent sessions — review data sources or calibration.`,
+          evidence: [`${alignmentPct}% alignment across ${compared} sessions`]
+        });
+      }
+    }
+  }
+
   // Deduplicate: if consecutive_skips and session_gap overlap, keep the more specific one
   const hasConsecutiveSkips = signals.some((s) => s.type === "consecutive_skips");
   const finalSignals = signals.filter(
