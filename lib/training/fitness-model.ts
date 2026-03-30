@@ -91,6 +91,25 @@ export function computeRampRate(ctlToday: number, ctl7DaysAgo: number): number {
   return round1(ctlToday - ctl7DaysAgo);
 }
 
+export function projectFitnessSnapshot(snapshot: FitnessSnapshot, days: number): FitnessSnapshot {
+  if (days <= 0) return snapshot;
+
+  let ctl = snapshot.ctl;
+  let atl = snapshot.atl;
+  for (let i = 0; i < days; i++) {
+    const projected = computeDailyFitness(ctl, atl, 0);
+    ctl = projected.ctl;
+    atl = projected.atl;
+  }
+
+  return {
+    ctl,
+    atl,
+    tsb: round1(ctl - atl),
+    rampRate: null
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Database operations
 // ---------------------------------------------------------------------------
@@ -146,9 +165,9 @@ export async function rebuildFitnessHistory(
     byDate.get(row.date)!.set(row.sport, Number(row.tss) || 0);
   }
 
-  // Fill gaps: iterate from first date to last date, even days with no load
+  // Fill gaps and carry the series through today so rest-day recovery is represented.
   const dates = Array.from(byDate.keys()).sort();
-  const allDates = generateDateRange(dates[0], dates[dates.length - 1]);
+  const allDates = generateDateRange(dates[0], maxIsoDate(dates[dates.length - 1], todayIso()));
 
   const upsertBatch: Array<{
     user_id: string;
@@ -251,7 +270,16 @@ export async function getLatestFitness(
     if (!result[sport]) result[sport] = defaultSnapshot;
   }
 
-  return result as DisciplineFitness;
+  const projected = result as DisciplineFitness;
+  const projectedDays = dateDiffInDays(latestRow.date, todayIso());
+  if (projectedDays <= 0) return projected;
+
+  const next: Partial<DisciplineFitness> = {};
+  for (const sport of SPORTS) {
+    next[sport] = projectFitnessSnapshot(projected[sport], projectedDays);
+  }
+
+  return next as DisciplineFitness;
 }
 
 /**
@@ -309,4 +337,18 @@ function generateDateRange(startStr: string, endStr: string): string[] {
     current.setUTCDate(current.getUTCDate() + 1);
   }
   return dates;
+}
+
+function dateDiffInDays(startStr: string, endStr: string): number {
+  const start = new Date(`${startStr}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endStr}T00:00:00.000Z`).getTime();
+  return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+function maxIsoDate(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }

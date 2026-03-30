@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncSessionLoad } from "@/lib/training/load-sync";
 import { syncSessionExecutionAfterUnlink, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 
 async function updateUploadStatusForActivity(params: {
@@ -34,7 +35,7 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const { data: session } = await supabase.from("sessions").select("id").eq("id", plannedSessionId).eq("user_id", user.id).maybeSingle();
+  const { data: session } = await supabase.from("sessions").select("id,intent_category").eq("id", plannedSessionId).eq("user_id", user.id).maybeSingle();
   if (!session) return { error: "Session not found" };
 
   await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
@@ -62,6 +63,11 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
     sessionId: plannedSessionId,
     activityId
   });
+  try {
+    await syncSessionLoad(supabase, user.id, activityId, plannedSessionId, session.intent_category ?? null);
+  } catch (syncError) {
+    console.error("[training-load] Failed to sync linked activity load:", syncError);
+  }
 
   revalidatePath(`/activities/${activityId}`);
   revalidatePath(`/sessions/${plannedSessionId}`);
@@ -98,6 +104,11 @@ export async function unlinkActivityAction(activityId: string) {
     });
     revalidatePath(`/sessions/${sessionId}`);
   }
+  try {
+    await syncSessionLoad(supabase, user.id, activityId, null, null);
+  } catch (syncError) {
+    console.error("[training-load] Failed to resync unlinked activity load:", syncError);
+  }
 
   revalidatePath(`/activities/${activityId}`);
   revalidatePath("/dashboard");
@@ -132,6 +143,11 @@ export async function markUnplannedAction(activityId: string) {
       sessionId
     });
     revalidatePath(`/sessions/${sessionId}`);
+  }
+  try {
+    await syncSessionLoad(supabase, user.id, activityId, null, null);
+  } catch (syncError) {
+    console.error("[training-load] Failed to resync unplanned activity load:", syncError);
   }
 
   revalidatePath(`/activities/${activityId}`);

@@ -41,14 +41,20 @@ export async function POST() {
 
   // Fetch session links for these activities
   const activityIds = activities.map((a: { id: string }) => a.id);
-  const { data: links } = await supabase
-    .from("completed_activities_session_links")
-    .select("activity_id, session_id")
-    .in("activity_id", activityIds);
+  const { data: links, error: linksError } = await supabase
+    .from("session_activity_links")
+    .select("completed_activity_id, planned_session_id")
+    .in("completed_activity_id", activityIds);
+
+  if (linksError) {
+    return NextResponse.json({ error: linksError.message }, { status: 500 });
+  }
 
   const linkMap = new Map<string, string>();
   for (const link of links ?? []) {
-    linkMap.set(link.activity_id, link.session_id);
+    if (link.completed_activity_id && link.planned_session_id) {
+      linkMap.set(link.completed_activity_id, link.planned_session_id);
+    }
   }
 
   // Fetch intent_category for linked sessions
@@ -63,6 +69,18 @@ export async function POST() {
 
     for (const s of sessions ?? []) {
       sessionIntents[s.id] = s.intent_category;
+    }
+
+    const missingSessionIds = sessionIds.filter((id) => !(id in sessionIntents));
+    if (missingSessionIds.length > 0) {
+      const { data: legacySessions } = await supabase
+        .from("planned_sessions")
+        .select("id, intent_category")
+        .in("id", missingSessionIds);
+
+      for (const s of legacySessions ?? []) {
+        sessionIntents[s.id] = s.intent_category;
+      }
     }
   }
 

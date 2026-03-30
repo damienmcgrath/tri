@@ -5,6 +5,7 @@ import { parseFitFile, parseTcxFile, sha256Hex } from "@/lib/workouts/activity-p
 import { pickBestSuggestion, suggestSessionMatches } from "@/lib/workouts/matching-service";
 import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
+import { syncSessionLoad } from "@/lib/training/load-sync";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const acceptedExtensions = [".fit", ".tcx"];
@@ -196,10 +197,14 @@ export async function POST(request: Request) {
 
     const { data: candidates } = await supabase
       .from("sessions")
-      .select("id,sport,date,duration_minutes")
+      .select("id,sport,date,duration_minutes,intent_category")
       .eq("user_id", user.id)
       .gte("date", windowStart.slice(0, 10))
       .lte("date", windowEnd.slice(0, 10));
+
+    const candidateIntentById = new Map<string, string | null>(
+      (candidates ?? []).map((candidate: any) => [candidate.id as string, candidate.intent_category ?? null])
+    );
 
     const suggestions = suggestSessionMatches(
       {
@@ -237,6 +242,17 @@ export async function POST(request: Request) {
 
       if (!linkError) {
         suggested = true;
+        try {
+          await syncSessionLoad(
+            supabase,
+            user.id,
+            createdActivity.id,
+            best.plannedSessionId,
+            candidateIntentById.get(best.plannedSessionId) ?? null
+          );
+        } catch (syncError) {
+          console.error("[training-load] Failed to sync suggested activity load:", syncError);
+        }
       }
     }
 

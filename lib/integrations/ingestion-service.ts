@@ -14,6 +14,7 @@ import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/s
 import { shouldThrottle } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
 import { refreshIfExpired, updateSyncStatus, type ExternalConnection } from "./token-service";
+import { syncSessionLoad } from "@/lib/training/load-sync";
 import { suggestSessionMatches, pickBestSuggestion } from "@/lib/workouts/matching-service";
 import { findCrossSourceDuplicate, mergeStravaIntoExisting } from "./cross-source-dedup";
 
@@ -114,10 +115,14 @@ async function matchActivity(
 
   const { data: candidates } = await supabase
     .from("sessions")
-    .select("id,sport,date,duration_minutes")
+    .select("id,sport,date,duration_minutes,intent_category")
     .eq("user_id", userId)
     .gte("date", windowStart.slice(0, 10))
     .lte("date", windowEnd.slice(0, 10));
+
+  const candidateIntentById = new Map<string, string | null>(
+    (candidates ?? []).map((candidate: any) => [candidate.id as string, candidate.intent_category ?? null])
+  );
 
   const suggestions = suggestSessionMatches(
     {
@@ -153,7 +158,21 @@ async function matchActivity(
     match_method: best.matchMethod
   });
 
-  return !linkError;
+  if (linkError) return false;
+
+  try {
+    await syncSessionLoad(
+      supabase,
+      userId,
+      created.id,
+      best.plannedSessionId,
+      candidateIntentById.get(best.plannedSessionId) ?? null
+    );
+  } catch (syncError) {
+    console.error("[training-load] Failed to sync auto-matched activity load:", syncError);
+  }
+
+  return true;
 }
 
 // ─── Core ingest ──────────────────────────────────────────────────────────────
