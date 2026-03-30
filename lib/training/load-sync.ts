@@ -216,8 +216,8 @@ async function updateFitnessFromDate(
   }
 
   const dates = Array.from(byDate.keys()).sort();
-  // Fill gaps between dates
-  const allDates = generateDateRange(dates[0], dates[dates.length - 1]);
+  // Carry fitness forward through today so readiness can improve on rest days.
+  const allDates = generateDateRange(dates[0], maxIsoDate(dates[dates.length - 1], todayIso()));
 
   // Track CTL for ramp rate
   const ctlHistory: Record<string, number[]> = {};
@@ -359,4 +359,12 @@ function generateDateRange(startStr: string, endStr: string): string[] {
     current.setUTCDate(current.getUTCDate() + 1);
   }
   return dates;
+}
+
+function maxIsoDate(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }

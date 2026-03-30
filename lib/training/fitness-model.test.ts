@@ -3,6 +3,7 @@ import {
   computeDailyFitness,
   getReadinessState,
   computeRampRate,
+  projectFitnessSnapshot,
   CTL_TIME_CONSTANT,
   ATL_TIME_CONSTANT
 } from "./fitness-model";
@@ -134,6 +135,21 @@ describe("computeRampRate", () => {
 
   it("returns zero when CTL is stable", () => {
     expect(computeRampRate(50, 50)).toBe(0);
+  });
+});
+
+describe("projectFitnessSnapshot", () => {
+  it("projects readiness forward through rest days", () => {
+    const projected = projectFitnessSnapshot({ ctl: 50, atl: 70, tsb: -20, rampRate: 4 }, 3);
+    expect(projected.ctl).toBeLessThan(50);
+    expect(projected.atl).toBeLessThan(70);
+    expect(projected.tsb).toBeGreaterThan(-20);
+    expect(projected.rampRate).toBeNull();
+  });
+
+  it("returns the original snapshot when no projection is needed", () => {
+    const snapshot = { ctl: 42, atl: 38, tsb: 4, rampRate: 1.5 };
+    expect(projectFitnessSnapshot(snapshot, 0)).toEqual(snapshot);
   });
 });
 

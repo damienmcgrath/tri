@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSameOrigin } from "@/lib/security/request";
+import { syncSessionLoad } from "@/lib/training/load-sync";
 import { syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 
 const schema = z.object({
@@ -29,11 +30,11 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
 
   if (!activity) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
 
-  let session: { id: string } | null = null;
+  let session: { id: string; intent_category: string | null } | null = null;
 
   const { data: sessionData } = await supabase
     .from("sessions")
-    .select("id")
+    .select("id,intent_category")
     .eq("id", body.data.plannedSessionId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
   } else {
     const { data: legacySession } = await supabase
       .from("planned_sessions")
-      .select("id")
+      .select("id,intent_category")
       .eq("id", body.data.plannedSessionId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -86,6 +87,11 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
     sessionId: body.data.plannedSessionId,
     activityId: activity.id
   });
+  try {
+    await syncSessionLoad(supabase, user.id, activity.id, body.data.plannedSessionId, session.intent_category);
+  } catch (syncError) {
+    console.error("[training-load] Failed to sync linked activity load:", syncError);
+  }
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
