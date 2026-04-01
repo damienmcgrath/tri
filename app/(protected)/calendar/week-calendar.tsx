@@ -1212,6 +1212,12 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 }
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-40 overflow-hidden bg-black/55 backdrop-blur-[2px]">
       <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
@@ -1223,7 +1229,7 @@ function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose
 function TaskSheet({ children, title, description, onClose }: { children: React.ReactNode; title: string; description?: string; onClose: () => void }) {
   return (
     <TaskOverlay onClose={onClose}>
-      <aside className="relative ml-auto flex min-h-screen w-full flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl sm:max-w-xl">
+      <aside className="relative ml-auto flex h-screen w-full flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] shadow-2xl sm:max-w-xl">
         <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
