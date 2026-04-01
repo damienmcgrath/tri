@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { asStringArray } from "@/lib/openai";
 
 const experienceLevelSchema = z.enum(["beginner", "intermediate", "advanced"]);
 const goalTypeSchema = z.enum(["finish", "perform", "qualify", "build"]);
@@ -103,9 +104,7 @@ export type AthleteContextSnapshot = {
   }>;
 };
 
-function asStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}
+// asStringArray is now imported from @/lib/openai
 
 function getTodayUtc() {
   return new Date().toISOString().slice(0, 10);

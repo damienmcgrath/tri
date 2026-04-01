@@ -5,7 +5,7 @@ import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
 import { evaluateAdaptationTriggers, buildAdaptationOptions, type SessionSummary, type CheckInData } from "@/lib/training/adaptation-rules";
-import { getOpenAIClient, getCoachModel } from "@/lib/openai";
+import { getOpenAIClient, getCoachModel, getCoachRequestTimeoutMs } from "@/lib/openai";
 
 const adaptationRequestSchema = z.object({
   weekStart: z.string().date()
@@ -116,11 +116,14 @@ ${JSON.stringify(deterministicAdaptations, null, 2)}
 
 Respond with a JSON array matching the input structure, but with each option.description replaced by a concise, coach-voice rationale. Keep it practical and empathetic. No preamble.`;
 
-      const response = await client.responses.create({
-        model: getCoachModel({ deep: true }),
-        input: [{ role: "user", content: prompt }],
-        text: { format: { type: "json_object" } }
-      });
+      const response = await client.responses.create(
+        {
+          model: getCoachModel({ deep: true }),
+          input: [{ role: "user", content: prompt }],
+          text: { format: { type: "json_object" } }
+        },
+        { timeout: getCoachRequestTimeoutMs() }
+      );
 
       const aiText = typeof response.output_text === "string" ? response.output_text : null;
       if (aiText) {

@@ -4,7 +4,7 @@ import { isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
 import { generateWeekPreview } from "@/lib/training/week-preview";
-import { getOpenAIClient, getCoachModel } from "@/lib/openai";
+import { getOpenAIClient, getCoachModel, getCoachRequestTimeoutMs } from "@/lib/openai";
 
 const weekAheadSchema = z.object({
   weekStart: z.string().date()
@@ -46,10 +46,13 @@ Planned volume: ${preview.totalPlannedMinutes} min total (${sportLines})
 Key sessions: ${preview.keySessionCount}
 ${preview.carryForwardNote ? `Carry-forward: ${preview.carryForwardNote}` : ""}`;
 
-      const response = await client.responses.create({
-        model: getCoachModel(),
-        input: [{ role: "user", content: prompt }]
-      });
+      const response = await client.responses.create(
+        {
+          model: getCoachModel(),
+          input: [{ role: "user", content: prompt }]
+        },
+        { timeout: getCoachRequestTimeoutMs() }
+      );
 
       aiNarrative = typeof response.output_text === "string" ? response.output_text.trim() : null;
     } catch {

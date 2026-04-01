@@ -3,7 +3,7 @@ import { z } from "zod";
 import { buildExtraCompletedActivities, hasConfirmedPlannedSessionLink, loadCompletedActivities, localIsoDate } from "@/lib/activities/completed-activities";
 import { getAthleteContextSnapshot, type AthleteContextSnapshot } from "@/lib/athlete-context";
 import { parsePersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
-import { getCoachModel, getOpenAIClient } from "@/lib/openai";
+import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonObject, clip } from "@/lib/openai";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 import { asMetricsRecord, getMetricsV2Laps, getMetricsV2PaceZones, getMetricsV2HrZones, getNestedNumber as getMetricsNestedNumber, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
@@ -11,7 +11,8 @@ import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 6;
 
-const truncateStr = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + "\u2026" : s);
+/** @deprecated Use clip() from lib/openai.ts — this alias exists only for schema transform compatibility. */
+const truncateStr = clip;
 
 const weeklyDebriefEvidenceItemSchema = z.object({
   id: z.string().min(1),
@@ -726,37 +727,7 @@ function buildCoachShare(args: { facts: WeeklyDebriefFacts; narrative: WeeklyDeb
   });
 }
 
-function extractJsonObject(text: string) {
-  const trimmed = text.trim();
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // Fall through to fence/object extraction.
-  }
-
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) {
-    try {
-      return JSON.parse(fenced[1].trim());
-    } catch {
-      // Fall through to brace extraction.
-    }
-  }
-
-  const firstBrace = trimmed.indexOf("{");
-  const lastBrace = trimmed.lastIndexOf("}");
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    const candidate = trimmed.slice(firstBrace, lastBrace + 1);
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-}
+// extractJsonObject is now imported from @/lib/openai
 
 function coerceNarrativeString(value: unknown, maxLength: number) {
   if (typeof value === "string") {
@@ -853,8 +824,9 @@ async function generateNarrative(args: {
       }
     }
 
-    const response = await Promise.race([
-      client.responses.create({
+    const timeoutMs = getCoachRequestTimeoutMs();
+    const response = await client.responses.create(
+      {
         model: getCoachModel(),
         instructions:
           "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
@@ -887,11 +859,9 @@ async function generateNarrative(args: {
             ]
           }
         ]
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("OpenAI request timed out after 30s")), 30_000)
-      )
-    ]);
+      },
+      { timeout: timeoutMs }
+    );
     const text = response.output_text?.trim();
     if (!text) {
       console.warn("[weekly-debrief] Falling back to deterministic narrative: empty model output");

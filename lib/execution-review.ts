@@ -2,7 +2,7 @@ import "openai/shims/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient } from "@/lib/openai";
+import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonObject, asObject, asString, asStringArray, clip } from "@/lib/openai";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import { diagnoseCompletedSession, type SessionDiagnosisInput, type Sport } from "@/lib/coach/session-diagnosis";
 
@@ -471,23 +471,7 @@ function buildActualEvidence(input: SessionDiagnosisInput): ExecutionEvidence["a
   };
 }
 
-function asObject(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value: unknown) {
-  return Array.isArray(value)
-    ? value.map((item) => asString(item)).filter((item): item is string => item !== null)
-    : [];
-}
-
-function clip(text: string, max: number) {
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
-}
+// asObject, asString, asStringArray, clip are now imported from @/lib/openai
 
 function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["nextCall"] | null {
   if (typeof value !== "string") return null;
@@ -1058,16 +1042,13 @@ export async function generateCoachVerdict(args: {
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(text);
-    } catch (error) {
+    const parsedJson = extractJsonObject(text);
+    if (parsedJson == null) {
       console.warn("[session-review-ai] Falling back to deterministic review: could not parse model output as JSON", {
         sessionId: args.evidence.sessionId,
         incompleteReason: response.incomplete_details?.reason ?? null,
         outputLength: text.length,
         elapsedMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error)
       });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
