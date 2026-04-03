@@ -112,6 +112,48 @@ export function buildExtraCompletedActivities(params: {
     .filter((activity) => extraActivityIds.has(activity.id));
 }
 
+const selectVariants = [
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at"
+] as const;
+
+let cachedSelectVariantIndex = 0;
+
+function mapActivityRow(activity: Record<string, unknown>): CompletedActivityRecord {
+  return {
+    id: String(activity.id),
+    upload_id: typeof activity.upload_id === "string" ? activity.upload_id : null,
+    sport_type: String(activity.sport_type),
+    start_time_utc: String(activity.start_time_utc),
+    duration_sec: typeof activity.duration_sec === "number" ? activity.duration_sec : null,
+    distance_m: typeof activity.distance_m === "number" ? activity.distance_m : null,
+    avg_hr: typeof activity.avg_hr === "number" ? activity.avg_hr : null,
+    avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
+    schedule_status: activity.schedule_status === "scheduled" ? "scheduled" : "unscheduled",
+    is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false,
+    metrics_v2:
+      activity.metrics_v2 && typeof activity.metrics_v2 === "object" && !Array.isArray(activity.metrics_v2)
+        ? activity.metrics_v2 as Record<string, unknown>
+        : null,
+    created_at: typeof activity.created_at === "string" ? activity.created_at : undefined,
+    updated_at: typeof activity.updated_at === "string" ? activity.updated_at : undefined
+  };
+}
+
 export async function loadCompletedActivities(params: {
   supabase: SupabaseClient;
   userId: string;
@@ -119,54 +161,39 @@ export async function loadCompletedActivities(params: {
   rangeEnd: string;
 }): Promise<CompletedActivityRecord[]> {
   const { supabase, userId, rangeStart, rangeEnd } = params;
-  const selectVariants = [
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at,updated_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,metrics_v2,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,metrics_v2,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,created_at",
-    "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at"
-  ] as const;
 
-  let lastError: { code?: string; message?: string } | null = null;
+  // Try the cached successful variant first to avoid retrying all 16 on every call
+  const cachedQuery = await supabase
+    .from("completed_activities")
+    .select(selectVariants[cachedSelectVariantIndex])
+    .eq("user_id", userId)
+    .gte("start_time_utc", rangeStart)
+    .lt("start_time_utc", rangeEnd);
 
-  for (const selectClause of selectVariants) {
+  if (!cachedQuery.error) {
+    return ((cachedQuery.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapActivityRow);
+  }
+
+  if (!isMissingCompletedActivityColumnError(cachedQuery.error)) {
+    throw new Error(cachedQuery.error.message ?? "Failed to load completed activities.");
+  }
+
+  // Cached variant failed due to schema change — find new working variant
+  let lastError: { code?: string; message?: string } | null = cachedQuery.error;
+
+  for (let i = 0; i < selectVariants.length; i++) {
+    if (i === cachedSelectVariantIndex) continue;
+
     const query = await supabase
       .from("completed_activities")
-      .select(selectClause)
+      .select(selectVariants[i])
       .eq("user_id", userId)
       .gte("start_time_utc", rangeStart)
       .lt("start_time_utc", rangeEnd);
 
     if (!query.error) {
-      return ((query.data ?? []) as unknown as Array<Record<string, unknown>>).map((activity) => ({
-        id: String(activity.id),
-        upload_id: typeof activity.upload_id === "string" ? activity.upload_id : null,
-        sport_type: String(activity.sport_type),
-        start_time_utc: String(activity.start_time_utc),
-        duration_sec: typeof activity.duration_sec === "number" ? activity.duration_sec : null,
-        distance_m: typeof activity.distance_m === "number" ? activity.distance_m : null,
-        avg_hr: typeof activity.avg_hr === "number" ? activity.avg_hr : null,
-        avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
-        schedule_status: activity.schedule_status === "scheduled" ? "scheduled" : "unscheduled",
-        is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false,
-        metrics_v2:
-          activity.metrics_v2 && typeof activity.metrics_v2 === "object" && !Array.isArray(activity.metrics_v2)
-            ? activity.metrics_v2 as Record<string, unknown>
-            : null,
-        created_at: typeof activity.created_at === "string" ? activity.created_at : undefined,
-        updated_at: typeof activity.updated_at === "string" ? activity.updated_at : undefined
-      }));
+      cachedSelectVariantIndex = i;
+      return ((query.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapActivityRow);
     }
 
     lastError = query.error;

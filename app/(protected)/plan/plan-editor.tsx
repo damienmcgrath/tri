@@ -13,6 +13,7 @@ import {
   updateSessionAction,
   updateWeekAction
 } from "./actions";
+import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 type TrainingWeek = {
@@ -74,19 +75,6 @@ const templates = [
 
 const sports = ["swim", "bike", "run", "strength", "other"] as const;
 const sessionRoles: SessionRole[] = ["Key", "Supporting", "Recovery", "Optional"];
-
-function addDays(isoDate: string, days: number) {
-  const date = new Date(`${isoDate}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function weekRangeLabel(weekStartDate: string) {
-  const start = new Date(`${weekStartDate}T00:00:00.000Z`);
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
-  return `${shortDateFormatter.format(start)} – ${shortDateFormatter.format(end)}`;
-}
 
 function getLocalTodayIso() {
   const now = new Date();

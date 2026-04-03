@@ -1447,12 +1447,14 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
   }, {});
 
   const confirmedLinks = input.links.filter(hasConfirmedPlannedSessionLink);
+  const activitiesIndex = new Map(input.activities.map((a) => [a.id, a]));
+  const sessionsIndex = new Map(input.sessions.map((s) => [s.id, s]));
   const linkedActivityBySessionId = new Map<string, WeeklyDebriefActivity>();
   const linkedSessionByActivityId = new Map<string, WeeklyDebriefSession>();
   for (const link of confirmedLinks) {
     if (!link.planned_session_id || linkedActivityBySessionId.has(link.planned_session_id)) continue;
-    const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
-    const session = input.sessions.find((candidate) => candidate.id === link.planned_session_id);
+    const activity = activitiesIndex.get(link.completed_activity_id);
+    const session = sessionsIndex.get(link.planned_session_id);
     if (activity) {
       linkedActivityBySessionId.set(link.planned_session_id, activity);
       if (session) linkedSessionByActivityId.set(activity.id, session);
@@ -2003,12 +2005,13 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
 
   // For completed sessions use actual activity minutes (same as the main card) so both cards show the
   // same effective total.  For skipped/planned sessions keep the planned duration.
+  const activitiesById = new Map(input.activities.map((a) => [a.id, a]));
   const getEffectiveMinutes = (session: (typeof sessionSummaries)[number]) => {
     if (session.resolvedStatus !== "completed") return session.durationMinutes;
     const linkedMinutes = confirmedLinks
       .filter((link) => link.planned_session_id === session.id)
       .reduce((minutes, link) => {
-        const activity = input.activities.find((candidate) => candidate.id === link.completed_activity_id);
+        const activity = activitiesById.get(link.completed_activity_id);
         return minutes + Math.round((activity?.duration_sec ?? 0) / 60);
       }, 0);
     return linkedMinutes > 0 ? linkedMinutes : session.durationMinutes;
