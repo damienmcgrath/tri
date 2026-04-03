@@ -308,4 +308,183 @@ describe("executeCoachTool hardening", () => {
 
     expect(sessionsBuilder.eq).toHaveBeenCalledWith("athlete_id", ctx.athleteId);
   });
+
+  it("returns upcoming sessions with correct shape", async () => {
+    const sessionsBuilder = createQueryBuilder({});
+    sessionsBuilder.limit.mockResolvedValue({
+      data: [
+        {
+          id: "s1",
+          date: "2026-04-04",
+          sport: "run",
+          type: "Easy run",
+          duration_minutes: 45,
+          status: "planned",
+          notes: "Keep HR low"
+        },
+        {
+          id: "s2",
+          date: "2026-04-05",
+          sport: "swim",
+          type: "Aerobic swim",
+          duration_minutes: 60,
+          status: "planned",
+          notes: null
+        }
+      ],
+      error: null
+    });
+
+    const supabase = {
+      from: jest.fn((table: string) => {
+        if (table === "sessions") return sessionsBuilder;
+        throw new Error(`Unexpected table: ${table}`);
+      })
+    } as unknown as { from: jest.Mock };
+
+    const result = await executeCoachTool("get_upcoming_sessions", { daysAhead: 7 }, { supabase: supabase as never, ctx });
+
+    expect(result).toMatchObject({
+      range: { from: expect.any(String), to: expect.any(String) },
+      sessions: [
+        { id: "s1", sport: "run", type: "Easy run", notes: "Keep HR low" },
+        { id: "s2", sport: "swim", type: "Aerobic swim", notes: null }
+      ]
+    });
+    expect(sessionsBuilder.eq).toHaveBeenCalledWith("athlete_id", ctx.athleteId);
+  });
+
+  it("throws on Supabase error in get_upcoming_sessions", async () => {
+    const sessionsBuilder = createQueryBuilder({});
+    sessionsBuilder.limit.mockResolvedValue({
+      data: null,
+      error: { message: "connection error" }
+    });
+
+    const supabase = {
+      from: jest.fn(() => sessionsBuilder)
+    } as unknown as { from: jest.Mock };
+
+    await expect(
+      executeCoachTool("get_upcoming_sessions", { daysAhead: 7 }, { supabase: supabase as never, ctx })
+    ).rejects.toThrow("connection error");
+  });
+
+  it("returns week progress with correct structure", async () => {
+    const plannedBuilder = createQueryBuilder({});
+    plannedBuilder.lte = jest.fn().mockResolvedValue({
+      data: [
+        { id: "s1", status: "completed", duration_minutes: 60 },
+        { id: "s2", status: "planned", duration_minutes: 45 },
+        { id: "s3", status: "planned", duration_minutes: 30 }
+      ],
+      error: null
+    });
+
+    const completedBuilder = createQueryBuilder({});
+    completedBuilder.lte = jest.fn().mockResolvedValue({
+      data: [{ id: "c1" }],
+      error: null
+    });
+
+    const supabase = {
+      from: jest.fn((table: string) => {
+        if (table === "sessions") return plannedBuilder;
+        if (table === "completed_sessions") return completedBuilder;
+        throw new Error(`Unexpected table: ${table}`);
+      })
+    } as unknown as { from: jest.Mock };
+
+    const result = await executeCoachTool("get_week_progress", {}, { supabase: supabase as never, ctx });
+
+    expect(result).toMatchObject({
+      weekStart: expect.any(String),
+      weekEnd: expect.any(String),
+      plannedSessionCount: 3,
+      completedSessionCount: 1,
+      plannedMinutes: 135,
+      completionRatio: expect.any(Number)
+    });
+  });
+
+  it("throws on unsupported tool name", async () => {
+    const supabase = { from: jest.fn() } as unknown as { from: jest.Mock };
+
+    await expect(
+      executeCoachTool("nonexistent_tool" as never, {}, { supabase: supabase as never, ctx })
+    ).rejects.toThrow("Unsupported tool");
+  });
+
+  it("returns activity details as not found when activity does not exist", async () => {
+    const activityBuilder = createQueryBuilder({
+      maybeSingle: { data: null, error: null }
+    });
+
+    const supabase = {
+      from: jest.fn(() => activityBuilder)
+    } as unknown as { from: jest.Mock };
+
+    await expect(
+      executeCoachTool("get_activity_details", { activityId: "11111111-1111-4111-8111-111111111111" }, { supabase: supabase as never, ctx })
+    ).rejects.toThrow("not found");
+  });
+
+  it("returns activity details with error from Supabase", async () => {
+    const activityBuilder = createQueryBuilder({
+      maybeSingle: { data: null, error: { message: "db error" } }
+    });
+
+    const supabase = {
+      from: jest.fn(() => activityBuilder)
+    } as unknown as { from: jest.Mock };
+
+    await expect(
+      executeCoachTool("get_activity_details", { activityId: "22222222-2222-4222-8222-222222222222" }, { supabase: supabase as never, ctx })
+    ).rejects.toThrow("db error");
+  });
+
+  it("successful proposal creation returns expected fields", async () => {
+    const sessionsBuilder = createQueryBuilder({
+      maybeSingle: { data: { id: "11111111-1111-4111-8111-111111111111" }, error: null }
+    });
+
+    const proposalBuilder = createQueryBuilder({
+      single: {
+        data: {
+          id: "proposal-1",
+          title: "Reduce load",
+          rationale: "Fatigue is elevated",
+          status: "pending",
+          proposed_date: null,
+          proposed_duration_minutes: null
+        },
+        error: null
+      }
+    });
+
+    const supabase = {
+      from: jest.fn((table: string) => {
+        if (table === "sessions") return sessionsBuilder;
+        if (table === "coach_plan_change_proposals") return proposalBuilder;
+        throw new Error(`Unexpected table: ${table}`);
+      })
+    } as unknown as { from: jest.Mock };
+
+    const result = await executeCoachTool(
+      "create_plan_change_proposal",
+      {
+        title: "Reduce load",
+        rationale: "Fatigue is elevated",
+        changeSummary: "Swap hard run for easy run",
+        targetSessionId: "11111111-1111-4111-8111-111111111111"
+      },
+      { supabase: supabase as never, ctx }
+    );
+
+    expect(result).toMatchObject({
+      id: "proposal-1",
+      title: "Reduce load",
+      status: "pending"
+    });
+  });
 });
