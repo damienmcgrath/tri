@@ -187,19 +187,28 @@ export default async function DebriefPage({
               <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Week</p>
               <p className="mt-2 text-sm font-medium">{formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}</p>
             </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Key sessions</p>
-              <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedKeySessions}/{snapshot.readiness.totalKeySessions} resolved</p>
-            </div>
-            <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Resolved time</p>
-              <p className="mt-2 text-sm font-medium">{formatDuration(snapshot.readiness.resolvedMinutes)} / {formatDuration(snapshot.readiness.plannedMinutes)}</p>
-            </div>
+            {snapshot.readiness.totalKeySessions > 0 ? (
+              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Key sessions</p>
+                <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedKeySessions}/{snapshot.readiness.totalKeySessions} resolved</p>
+              </div>
+            ) : null}
+            {snapshot.readiness.plannedMinutes > 0 ? (
+              <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Resolved time</p>
+                <p className="mt-2 text-sm font-medium">{formatDuration(snapshot.readiness.resolvedMinutes)} / {formatDuration(snapshot.readiness.plannedMinutes)}</p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <p className="mt-4 text-xs text-tertiary">Complete 2+ key sessions to unlock your weekly analysis with trends, benchmarks, and coaching notes.</p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
             <a href="/dashboard" className="btn-secondary px-3 text-xs">
               Back to dashboard
+            </a>
+            <a href="/calendar" className="btn-secondary px-3 text-xs">
+              View calendar
             </a>
           </div>
         </article>

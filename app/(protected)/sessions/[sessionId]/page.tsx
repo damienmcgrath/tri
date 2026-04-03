@@ -443,8 +443,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     <section className="space-y-4">
       <Link href="/calendar" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-cyan-300 underline-offset-2 hover:underline lg:min-h-0">← Back to Calendar</Link>
 
-      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} /> : null}
-
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -689,6 +687,8 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       ) : null}
 
       {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} /> : null}
+
+      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} /> : null}
 
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -14,7 +14,10 @@ export default async function AthleteContextSettingsPage() {
     redirect("/auth/sign-in");
   }
 
-  const snapshot = await getAthleteContextSnapshot(supabase, user.id);
+  const [snapshot, { data: profileData }] = await Promise.all([
+    getAthleteContextSnapshot(supabase, user.id),
+    supabase.from("profiles").select("race_name,race_date").eq("id", user.id).maybeSingle()
+  ]);
 
   return (
     <section className="space-y-4">
@@ -29,7 +32,7 @@ export default async function AthleteContextSettingsPage() {
         </p>
       </header>
       <article className="surface p-6">
-        <AthleteContextForm snapshot={snapshot} />
+        <AthleteContextForm snapshot={snapshot} raceName={profileData?.race_name ?? null} raceDate={profileData?.race_date ?? null} />
       </article>
       <article className="surface p-6">
         <FtpSection initialFtp={snapshot.ftp} />

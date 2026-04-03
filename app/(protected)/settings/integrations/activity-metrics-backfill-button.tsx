@@ -46,7 +46,7 @@ export function ActivityMetricsBackfillButton() {
     <article className="surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">Temporary maintenance</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-accent">Data tools</p>
           <h2 className="mt-1 text-lg font-semibold">Backfill richer activity metrics</h2>
           <p className="mt-1 text-sm text-muted">Reparse retained uploaded FIT/TCX files so older activities gain the richer metrics now used by reviews and debriefs.</p>
         </div>

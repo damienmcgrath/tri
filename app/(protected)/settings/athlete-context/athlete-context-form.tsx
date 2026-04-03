@@ -255,16 +255,12 @@ function CompletenessBar({
   experienceLevel,
   goalType,
   coachingPreference,
-  priorityEventName,
-  priorityEventDate,
   limiters,
   weeklyConstraints,
 }: {
   experienceLevel: string;
   goalType: string;
   coachingPreference: string;
-  priorityEventName: string;
-  priorityEventDate: string;
   limiters: string;
   weeklyConstraints: string;
 }) {
@@ -272,8 +268,6 @@ function CompletenessBar({
     experienceLevel,
     goalType,
     coachingPreference,
-    priorityEventName,
-    priorityEventDate,
     limiters.trim(),
     weeklyConstraints.trim(),
   ];
@@ -301,9 +295,11 @@ function CompletenessBar({
 type Props = {
   snapshot: AthleteContextSnapshot;
   compact?: boolean;
+  raceName?: string | null;
+  raceDate?: string | null;
 };
 
-export function AthleteContextForm({ snapshot, compact = false }: Props) {
+export function AthleteContextForm({ snapshot, compact = false, raceName, raceDate }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -311,12 +307,6 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
     snapshot.declared.experienceLevel.value ?? ""
   );
   const [goalType, setGoalType] = useState(snapshot.goals.goalType ?? "");
-  const [priorityEventName, setPriorityEventName] = useState(
-    snapshot.goals.priorityEventName ?? ""
-  );
-  const [priorityEventDate, setPriorityEventDate] = useState(
-    snapshot.goals.priorityEventDate ?? ""
-  );
   const [limiters, setLimiters] = useState(
     joinLines(snapshot.declared.limiters.map((item) => item.value))
   );
@@ -347,8 +337,6 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
         body: JSON.stringify({
           experienceLevel: experienceLevel || null,
           goalType: goalType || null,
-          priorityEventName: priorityEventName || null,
-          priorityEventDate: priorityEventDate || null,
           limiters: splitLines(limiters),
           strongestDisciplines,
           weakestDisciplines,
@@ -406,25 +394,21 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
           </select>
         </label>
 
-        <label className="space-y-1 text-sm">
-          <span className="text-muted">Priority event</span>
-          <input
-            value={priorityEventName}
-            onChange={(e) => setPriorityEventName(e.target.value)}
-            placeholder="e.g. Warsaw 70.3"
-            className={inputCls}
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-muted">Priority event date</span>
-          <input
-            type="date"
-            value={priorityEventDate}
-            onChange={(e) => setPriorityEventDate(e.target.value)}
-            className={dateCls}
-          />
-        </label>
+        <div className="space-y-1 text-sm sm:col-span-2">
+          <span className="text-muted">Race target</span>
+          <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
+            <span className="flex-1 truncate text-sm">
+              {raceName && raceDate
+                ? `${raceName} — ${new Date(`${raceDate}T00:00:00.000Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                : raceName
+                  ? raceName
+                  : "No race set yet"}
+            </span>
+            <a href="/settings/race" className="shrink-0 text-xs text-accent underline-offset-2 hover:underline">
+              {raceName ? "Change" : "Set race"}
+            </a>
+          </div>
+        </div>
       </div>
 
       {compact ? (
@@ -492,8 +476,6 @@ export function AthleteContextForm({ snapshot, compact = false }: Props) {
           experienceLevel={experienceLevel}
           goalType={goalType}
           coachingPreference={coachingPreference}
-          priorityEventName={priorityEventName}
-          priorityEventDate={priorityEventDate}
           limiters={limiters}
           weeklyConstraints={weeklyConstraints}
         />

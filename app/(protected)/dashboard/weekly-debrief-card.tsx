@@ -43,7 +43,7 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
           </div>
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-tertiary">Unlocks when</p>
-            <p className="mt-2 text-sm font-medium">Week is effectively complete</p>
+            <p className="mt-2 text-sm font-medium">2+ key sessions resolved</p>
           </div>
         </div>
       </article>
