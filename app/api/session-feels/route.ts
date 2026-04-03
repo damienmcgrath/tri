@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request);
-  const ipLimit = checkRateLimit("feels-ip", ip, { maxRequests: 30, windowMs: 60_000 });
+  const ipLimit = await checkRateLimit("feels-ip", ip, { maxRequests: 30, windowMs: 60_000 });
   if (!ipLimit.allowed) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(ipLimit) });
   }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userLimit = checkRateLimit("feels-user", user.id, { maxRequests: 15, windowMs: 60_000 });
+  const userLimit = await checkRateLimit("feels-user", user.id, { maxRequests: 15, windowMs: 60_000 });
   if (!userLimit.allowed) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(userLimit) });
   }

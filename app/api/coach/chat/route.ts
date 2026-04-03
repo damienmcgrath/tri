@@ -160,7 +160,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request);
-  const ipRateLimit = checkRateLimit("chat-ip", ip, { maxRequests: 40, windowMs: 60_000 });
+  const ipRateLimit = await checkRateLimit("chat-ip", ip, { maxRequests: 40, windowMs: 60_000 });
 
   if (!ipRateLimit.allowed) {
     return NextResponse.json({ error: "Too many chat requests. Please try again shortly." }, {
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRateLimit = checkRateLimit("chat-user", ctx.userId, { maxRequests: 20, windowMs: 60_000 });
+  const userRateLimit = await checkRateLimit("chat-user", ctx.userId, { maxRequests: 20, windowMs: 60_000 });
 
   if (!userRateLimit.allowed) {
     return NextResponse.json({ error: "Chat limit reached. Please wait a minute and retry." }, {

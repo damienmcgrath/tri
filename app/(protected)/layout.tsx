@@ -4,7 +4,7 @@ import { signOutAction } from "./actions";
 import { GlobalHeader } from "./global-header";
 import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Profile = {
   display_name: string | null;

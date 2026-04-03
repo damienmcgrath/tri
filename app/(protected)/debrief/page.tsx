@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { addDays } from "../week-context";
 import { DebriefFeedbackCard } from "./debrief-feedback-card";
@@ -201,11 +202,9 @@ export default async function DebriefPage({
 
   const artifact = snapshot.artifact;
   const weekEnd = addDays(weekStart, 6);
-  const [adjacent, macroCtx, trends, benchmarks, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
+  const [adjacent, macroCtx, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
     getAdjacentWeeklyDebriefs({ supabase, athleteId: user.id, weekStart }),
     getMacroContext(supabase, user.id),
-    import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6)).catch(() => []),
-    import("@/lib/training/benchmarks").then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, user.id, weekStart, weekEnd)).catch(() => []),
     supabase
       .from("sessions")
       .select("sport,duration_minutes,status")
@@ -395,56 +394,13 @@ export default async function DebriefPage({
         </div>
       </article>
 
-      {trends.length > 0 ? (
-        <article className="debrief-section-card p-5">
-          <p className="debrief-kicker">Trends</p>
-          <p className="mt-2 text-sm text-muted">Patterns observed over the last 6 weeks.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {trends.map((trend) => (
-              <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-muted">{trend.metric}</p>
-                  <span className={`text-[11px] font-medium uppercase tracking-[0.08em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
-                    {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-white">{trend.detail}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {trend.dataPoints.slice(-4).map((pt) => (
-                    <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] text-tertiary">Confidence: {trend.confidence}</p>
-              </div>
-            ))}
-          </div>
-        </article>
-      ) : null}
+      <Suspense fallback={null}>
+        <DebriefTrends supabase={supabase} userId={user.id} />
+      </Suspense>
 
-      {benchmarks.length > 0 ? (
-        <article className="debrief-section-card p-5">
-          <p className="debrief-kicker">Best efforts</p>
-          <p className="mt-2 text-sm text-muted">Training-block bests from the last 12 weeks.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {benchmarks.map((benchmark) => (
-              <a key={benchmark.activityId} href={`/activities/${benchmark.activityId}`} className="block rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 transition hover:border-[hsl(var(--accent)/0.42)]">
-                <div className="flex items-center gap-2">
-                  <span>{benchmark.sport === "run" ? "🏃" : benchmark.sport === "bike" ? "🚴" : "🏊"}</span>
-                  <p className="text-xs font-medium text-muted">{benchmark.label}</p>
-                </div>
-                <p className="mt-2 text-xl font-semibold leading-tight text-white">{benchmark.formattedValue}</p>
-                {benchmark.isThisWeek ? (
-                  <span className="mt-1 inline-block text-[11px] font-medium uppercase tracking-[0.08em] text-success">New this week</span>
-                ) : null}
-                <p className="mt-1 text-sm text-muted">{benchmark.detail}</p>
-                {benchmark.deltaLabel ? (
-                  <p className={`mt-1 text-[11px] ${(benchmark.deltaVsPriorBlock ?? 0) > 0 ? "text-success" : "text-muted"}`}>{benchmark.deltaLabel}</p>
-                ) : null}
-              </a>
-            ))}
-          </div>
-        </article>
-      ) : null}
+      <Suspense fallback={null}>
+        <DebriefBenchmarks supabase={supabase} userId={user.id} weekStart={weekStart} weekEnd={weekEnd} />
+      </Suspense>
 
       <article className="debrief-section-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -536,5 +492,92 @@ export default async function DebriefPage({
         </div>
       </article>
     </section>
+  );
+}
+
+// ── Suspense-streamed async components ───────────────────────────────────
+
+async function DebriefTrends(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId } = props;
+  let trends: Awaited<ReturnType<typeof import("@/lib/training/trends").detectTrends>>;
+  try {
+    const { detectTrends } = await import("@/lib/training/trends");
+    trends = await detectTrends(supabase, userId, 6);
+  } catch {
+    return null;
+  }
+  if (trends.length === 0) return null;
+
+  return (
+    <article className="debrief-section-card p-5">
+      <p className="debrief-kicker">Trends</p>
+      <p className="mt-2 text-sm text-muted">Patterns observed over the last 6 weeks.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {trends.map((trend) => (
+          <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted">{trend.metric}</p>
+              <span className={`text-[11px] font-medium uppercase tracking-[0.08em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
+                {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-white">{trend.detail}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {trend.dataPoints.slice(-4).map((pt) => (
+                <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-tertiary">Confidence: {trend.confidence}</p>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+async function DebriefBenchmarks(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+  weekEnd: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart, weekEnd } = props;
+  let benchmarks: Awaited<ReturnType<typeof import("@/lib/training/benchmarks").deriveBenchmarks>>;
+  try {
+    const { deriveBenchmarks } = await import("@/lib/training/benchmarks");
+    benchmarks = await deriveBenchmarks(supabase, userId, weekStart, weekEnd);
+  } catch {
+    return null;
+  }
+  if (benchmarks.length === 0) return null;
+
+  return (
+    <article className="debrief-section-card p-5">
+      <p className="debrief-kicker">Best efforts</p>
+      <p className="mt-2 text-sm text-muted">Training-block bests from the last 12 weeks.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {benchmarks.map((benchmark) => (
+          <a key={benchmark.activityId} href={`/activities/${benchmark.activityId}`} className="block rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 transition hover:border-[hsl(var(--accent)/0.42)]">
+            <div className="flex items-center gap-2">
+              <span>{benchmark.sport === "run" ? "🏃" : benchmark.sport === "bike" ? "🚴" : "🏊"}</span>
+              <p className="text-xs font-medium text-muted">{benchmark.label}</p>
+            </div>
+            <p className="mt-2 text-xl font-semibold leading-tight text-white">{benchmark.formattedValue}</p>
+            {benchmark.isThisWeek ? (
+              <span className="mt-1 inline-block text-[11px] font-medium uppercase tracking-[0.08em] text-success">New this week</span>
+            ) : null}
+            <p className="mt-1 text-sm text-muted">{benchmark.detail}</p>
+            {benchmark.deltaLabel ? (
+              <p className={`mt-1 text-[11px] ${(benchmark.deltaVsPriorBlock ?? 0) > 0 ? "text-success" : "text-muted"}`}>{benchmark.deltaLabel}</p>
+            ) : null}
+          </a>
+        ))}
+      </div>
+    </article>
   );
 }

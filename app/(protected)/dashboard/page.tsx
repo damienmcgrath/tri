@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -755,35 +756,6 @@ export default async function DashboardPage({
   const resolvedFocusItem = diagnosisAwareSignal.focusOverride ?? focusItem;
   const todayCue = diagnosisAwareSignal.todayCue;
   const nextImportantSession = getNextImportantSession(sessions, todayIso);
-  const weeklyDebriefSnapshot = showWeeklyDebriefCard
-    ? await getWeeklyDebriefSnapshot({
-        supabase,
-        athleteId: user.id,
-        weekStart,
-        timeZone,
-        todayIso
-      })
-    : null;
-
-  let trends: Awaited<ReturnType<typeof detectTrends>> = [];
-  try {
-    trends = await detectTrends(supabase, user.id);
-  } catch {
-    // Trends are non-critical
-  }
-
-  let weekAheadPreview = null;
-  if (showWeekAheadCard) {
-    try {
-      const { getMacroContext } = await import("@/lib/training/macro-context");
-      const { generateWeekPreview } = await import("@/lib/training/week-preview");
-      const nextWeekStart = addDays(weekStart, 7);
-      const macroCtx = await getMacroContext(supabase, user.id);
-      weekAheadPreview = await generateWeekPreview(supabase, user.id, nextWeekStart, macroCtx);
-    } catch {
-      // Week ahead preview is non-critical
-    }
-  }
 
   // Show at most one signal. Attention takes priority; focus only shows when there is no attention item,
   // or when attention is about a missed key session (structural) while focus is about a different sport gap.
@@ -984,11 +956,73 @@ export default async function DashboardPage({
         </article>
       </div>
 
-      {weekAheadPreview ? <WeekAheadCard preview={weekAheadPreview} /> : null}
+      {showWeekAheadCard ? (
+        <Suspense fallback={null}>
+          <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
+        </Suspense>
+      ) : null}
 
-      {weeklyDebriefSnapshot ? <WeeklyDebriefCard snapshot={weeklyDebriefSnapshot} /> : null}
+      {showWeeklyDebriefCard ? (
+        <Suspense fallback={null}>
+          <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
+        </Suspense>
+      ) : null}
 
-      {trends.length > 0 ? <TrendCards trends={trends} /> : null}
+      <Suspense fallback={null}>
+        <DashboardTrends supabase={supabase} userId={user.id} />
+      </Suspense>
     </section>
   );
+}
+
+// ── Suspense-streamed async components ───────────────────────────────────
+
+async function DashboardDebrief(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+  timeZone: string;
+  todayIso: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart, timeZone, todayIso } = props;
+  const snapshot = await getWeeklyDebriefSnapshot({ supabase, athleteId: userId, weekStart, timeZone, todayIso });
+  if (!snapshot) return null;
+  return <WeeklyDebriefCard snapshot={snapshot} />;
+}
+
+async function DashboardTrends(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId } = props;
+  let trends: Awaited<ReturnType<typeof detectTrends>> = [];
+  try {
+    trends = await detectTrends(supabase, userId);
+  } catch {
+    return null;
+  }
+  if (trends.length === 0) return null;
+  return <TrendCards trends={trends} />;
+}
+
+async function DashboardWeekAhead(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart } = props;
+  try {
+    const { getMacroContext } = await import("@/lib/training/macro-context");
+    const { generateWeekPreview } = await import("@/lib/training/week-preview");
+    const nextWeekStart = addDays(weekStart, 7);
+    const macroCtx = await getMacroContext(supabase, userId);
+    const preview = await generateWeekPreview(supabase, userId, nextWeekStart, macroCtx);
+    if (!preview) return null;
+    return <WeekAheadCard preview={preview} />;
+  } catch {
+    return null;
+  }
 }

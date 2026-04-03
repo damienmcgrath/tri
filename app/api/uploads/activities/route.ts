@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request);
-  const ipRateLimit = checkRateLimit("upload-ip", ip, { maxRequests: 20, windowMs: 60 * 60 * 1000 });
+  const ipRateLimit = await checkRateLimit("upload-ip", ip, { maxRequests: 20, windowMs: 60 * 60 * 1000 });
 
   if (!ipRateLimit.allowed) {
     return NextResponse.json({ error: "Too many upload attempts. Try again later." }, {
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userRateLimit = checkRateLimit("upload-user", user.id, { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+  const userRateLimit = await checkRateLimit("upload-user", user.id, { maxRequests: 10, windowMs: 60 * 60 * 1000 });
 
   if (!userRateLimit.allowed) {
     return NextResponse.json({ error: "Upload limit reached for this hour." }, {
