@@ -1,20 +1,9 @@
-// The jsdom test environment does not include the Web Fetch API globally.
-// node-fetch provides a compatible Request / Headers implementation that
-// satisfies the interface consumed by our helpers (headers.get only).
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Request: NodeFetchRequest } = require("node-fetch") as {
-  Request: new (url: string, init?: { headers?: Record<string, string> }) => {
-    headers: { get(name: string): string | null };
-  };
-};
-
 import { getClientIp, isSameOrigin } from "./request";
 
 function makeRequest(
   headers: Record<string, string> = {},
-  url = "https://example.com/",
 ): Request {
-  return new NodeFetchRequest(url, { headers }) as unknown as Request;
+  return { headers: new Headers(headers) } as unknown as Request;
 }
 
 // ---------------------------------------------------------------------------

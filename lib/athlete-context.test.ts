@@ -151,8 +151,7 @@ const FTP_ROW = {
 // Build a mock supabase that maps each table to a dedicated builder
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildSupabase(overrides: Record<string, any> = {}) {
+function buildSupabase(overrides: Record<string, unknown> = {}) {
   const defaults = {
     // maybeSingle-only terminals (no .limit before .maybeSingle)
     profiles: createMaybeSingleBuilder({ data: PROFILE_ROW, error: null }),
