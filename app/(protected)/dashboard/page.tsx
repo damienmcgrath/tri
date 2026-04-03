@@ -14,6 +14,7 @@ import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 import { WeeklyDebriefCard } from "./weekly-debrief-card";
 import { WeekAheadCard } from "./components/week-ahead-card";
+import { RaceCountdown } from "./components/race-countdown";
 import { TrendCards } from "./trend-cards";
 import { detectTrends } from "@/lib/training/trends";
 
@@ -983,6 +984,10 @@ export default async function DashboardPage({
           )}
         </article>
       </div>
+
+      {profile?.race_date && profile?.race_name ? (
+        <RaceCountdown raceName={profile.race_name} raceDate={profile.race_date} todayIso={todayIso} />
+      ) : null}
 
       {weekAheadPreview ? <WeekAheadCard preview={weekAheadPreview} /> : null}
 

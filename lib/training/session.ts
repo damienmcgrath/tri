@@ -7,7 +7,7 @@ export type SessionSourceMetadata = {
   assignedBy?: "planner" | "upload" | "coach" | null;
 };
 
-export type SessionExecutionResultPlaceholder = {
+export type SessionExecutionResult = {
   status?: ExecutionResultState | null;
   summary?: string | null;
 };
@@ -28,8 +28,8 @@ export type SessionModelInput = {
   is_key?: boolean | null;
   source?: SessionSourceMetadata | null;
   sourceMetadata?: SessionSourceMetadata | null;
-  executionResult?: SessionExecutionResultPlaceholder | null;
-  execution_result?: SessionExecutionResultPlaceholder | null;
+  executionResult?: SessionExecutionResult | null;
+  execution_result?: SessionExecutionResult | null;
 };
 
 export type EnrichedSessionModel = {
@@ -41,7 +41,7 @@ export type EnrichedSessionModel = {
   intentCategory: string | null;
   role: SessionRoleState | null;
   source: SessionSourceMetadata | null;
-  executionResult: SessionExecutionResultPlaceholder | null;
+  executionResult: SessionExecutionResult | null;
 };
 
 const GENERIC_SESSION_NAMES = new Set(["session", "workout", "training", "training session"]);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CoachChat } from "./coach-chat";
 import { CoachBriefingCard } from "./CoachBriefingCard";
+import { ProposalCards } from "./proposal-cards";
 import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
@@ -277,6 +278,17 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
       extraActivityCount: briefingContext.extraActivityCount
     })
     : null;
+
+  const { data: proposalsData } = user
+    ? await supabase
+      .from("coach_plan_change_proposals")
+      .select("id,title,rationale,change_summary,proposed_date,proposed_duration_minutes,status,created_at")
+      .eq("user_id", user.id)
+      .in("status", ["pending"])
+      .order("created_at", { ascending: false })
+      .limit(5)
+    : { data: null };
+
   const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;
   const missingContextLabels = athleteContext ? getMissingContextLabels(athleteContext) : [];
 
@@ -289,6 +301,8 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
           briefingContext={briefingContext}
         />
       ) : null}
+
+      <ProposalCards proposals={proposalsData ?? []} />
 
       <section className="space-y-2.5">
         <div>
