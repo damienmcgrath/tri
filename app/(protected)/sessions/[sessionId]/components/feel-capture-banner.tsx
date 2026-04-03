@@ -53,29 +53,44 @@ export function FeelCaptureBanner({ sessionId }: FeelCaptureBannerProps) {
     10: "Max effort"
   };
 
+  function rpeTone(rpe: number) {
+    if (rpe <= 3) return { border: "rgba(52,211,153,0.5)", bg: "rgba(52,211,153,0.14)", text: "rgb(110,231,183)" };
+    if (rpe <= 6) return { border: "rgba(250,204,21,0.5)", bg: "rgba(250,204,21,0.12)", text: "rgb(253,224,71)" };
+    if (rpe <= 9) return { border: "rgba(251,146,60,0.5)", bg: "rgba(251,146,60,0.14)", text: "rgb(253,186,116)" };
+    return { border: "rgba(248,113,113,0.5)", bg: "rgba(248,113,113,0.14)", text: "rgb(252,165,165)" };
+  }
+
   return (
-    <article className="surface border border-[rgba(190,255,0,0.18)] bg-[rgba(190,255,0,0.04)] p-5">
+    <article className="surface border border-[hsl(var(--border))] p-5">
       <p className="label">How did that feel?</p>
       <p className="mt-1 text-sm text-muted">Rate the effort for this session.</p>
 
       <div className="mt-4 grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Rate perceived exertion (1-10)">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((rpe) => (
-          <button
-            key={rpe}
-            type="button"
-            role="radio"
-            aria-checked={selectedRpe === rpe}
-            aria-label={`RPE ${rpe}: ${rpeLabels[rpe]}`}
-            onClick={() => setSelectedRpe(rpe)}
-            className={`min-h-[44px] w-full rounded-lg border text-sm font-medium transition-colors ${
-              selectedRpe === rpe
-                ? "border-[rgba(190,255,0,0.6)] bg-[rgba(190,255,0,0.15)] text-[var(--color-accent)]"
-                : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
-            }`}
-          >
-            {rpe}
-          </button>
-        ))}
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((rpe) => {
+          const tone = rpeTone(rpe);
+          const isSelected = selectedRpe === rpe;
+          return (
+            <button
+              key={rpe}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`RPE ${rpe}: ${rpeLabels[rpe]}`}
+              onClick={() => setSelectedRpe(rpe)}
+              className={`min-h-[44px] w-full rounded-lg border text-sm font-medium transition-colors ${
+                isSelected
+                  ? ""
+                  : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+              }`}
+              style={isSelected
+                ? { borderColor: tone.border, backgroundColor: tone.bg, color: tone.text }
+                : undefined
+              }
+            >
+              {rpe}
+            </button>
+          );
+        })}
       </div>
 
       {selectedRpe !== null ? (

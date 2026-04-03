@@ -18,8 +18,8 @@ export default function SettingsPage() {
 
         <Link href="/settings/integrations" className="surface p-5 transition hover:border-[var(--border-default)]">
           <p className="label">Integrations</p>
-          <h2 className="mt-3 text-lg">Garmin import</h2>
-          <p className="mt-1 text-sm text-muted">Upload TCX files and review recent ingestion events.</p>
+          <h2 className="mt-3 text-lg">Integrations &amp; uploads</h2>
+          <p className="mt-1 text-sm text-muted">Connect Strava, upload FIT/TCX files, and manage activity data.</p>
         </Link>
 
         <Link href="/settings/athlete-context" className="surface p-5 transition hover:border-[var(--border-default)]">
