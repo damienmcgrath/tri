@@ -34,52 +34,42 @@ type ActivityRow = {
 /** Return a Monday ISO date string offset by `weeksAgo` weeks from `anchor`. */
 function mondayOf(anchor: Date, weeksAgo: number): string {
   const d = new Date(anchor);
-  // Snap to Monday of the current week first
   const day = d.getUTCDay();
   const offset = day === 0 ? -6 : 1 - day;
   d.setUTCDate(d.getUTCDate() + offset - weeksAgo * 7);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Return an ISO timestamp string for a day offset from `weekStart` (a
- * YYYY-MM-DD Monday string).  offset=0 → Monday, offset=2 → Wednesday, etc.
- */
-function dayOfWeekTs(weekStart: string, offset = 2): string {
+/** Return a full ISO timestamp for `daysFromMonday` days after the Monday `weekStart`. */
+function dayOfWeek(weekStart: string, daysFromMonday: number): string {
   const d = new Date(weekStart + "T10:00:00.000Z");
-  d.setUTCDate(d.getUTCDate() + offset);
+  d.setUTCDate(d.getUTCDate() + daysFromMonday);
   return d.toISOString();
 }
 
-/**
- * Return an ISO timestamp string for Wednesday of the week that starts on
- * `weekStart` (a YYYY-MM-DD Monday string).
- */
-function wednesdayOf(weekStart: string): string {
-  return dayOfWeekTs(weekStart, 2);
-}
+const wednesdayOf = (w: string) => dayOfWeek(w, 2);
+const thursdayOf  = (w: string) => dayOfWeek(w, 3);
+const fridayOf    = (w: string) => dayOfWeek(w, 4);
+const saturdayOf  = (w: string) => dayOfWeek(w, 5);
+const sundayOf    = (w: string) => dayOfWeek(w, 6);
 
 /**
- * Build a series of activity rows, one per week, starting `weeksAgo` weeks
- * back. `valuesPerWeek` maps week-index (0 = oldest) → partial row fields.
+ * Build a series of run activity rows with avg_hr, one per week.
  */
 function makeRunHrRows(
   anchor: Date,
   weekValues: { weeksAgo: number; hr: number }[]
 ): ActivityRow[] {
-  return weekValues.map(({ weeksAgo, hr }) => {
-    const weekStart = mondayOf(anchor, weeksAgo);
-    return {
-      start_time_utc: wednesdayOf(weekStart),
-      sport_type: "run",
-      avg_hr: hr,
-      avg_power: null,
-      avg_pace_per_100m_sec: null,
-      duration_sec: 3600,
-      distance_m: 10000,
-      metrics_v2: null
-    };
-  });
+  return weekValues.map(({ weeksAgo, hr }) => ({
+    start_time_utc: wednesdayOf(mondayOf(anchor, weeksAgo)),
+    sport_type: "run",
+    avg_hr: hr,
+    avg_power: null,
+    avg_pace_per_100m_sec: null,
+    duration_sec: 3600,
+    distance_m: 10000,
+    metrics_v2: null
+  }));
 }
 
 /** NOW anchor used across all tests so dates are deterministic. */
@@ -99,8 +89,7 @@ describe("detectTrends — Supabase query wiring", () => {
 
   it("returns [] when Supabase returns null", async () => {
     const supabase = makeSupabase(null);
-    const result = await detectTrends(supabase as never, "athlete-1");
-    expect(result).toEqual([]);
+    expect(await detectTrends(supabase as never, "athlete-1")).toEqual([]);
   });
 
   it("returns [] when fewer than 3 activities are returned", async () => {
@@ -108,9 +97,7 @@ describe("detectTrends — Supabase query wiring", () => {
       { start_time_utc: "2026-03-01T10:00:00.000Z", sport_type: "run", avg_hr: 145 },
       { start_time_utc: "2026-03-08T10:00:00.000Z", sport_type: "run", avg_hr: 143 }
     ];
-    const supabase = makeSupabase(rows);
-    const result = await detectTrends(supabase as never, "athlete-1");
-    expect(result).toEqual([]);
+    expect(await detectTrends(makeSupabase(rows) as never, "athlete-1")).toEqual([]);
   });
 
   it("returns [] when activities span fewer than 3 distinct weeks", async () => {
@@ -120,9 +107,7 @@ describe("detectTrends — Supabase query wiring", () => {
       { start_time_utc: "2026-03-03T10:00:00.000Z", sport_type: "run", avg_hr: 143 },
       { start_time_utc: "2026-03-04T10:00:00.000Z", sport_type: "run", avg_hr: 141 }
     ];
-    const supabase = makeSupabase(rows);
-    const result = await detectTrends(supabase as never, "athlete-1");
-    expect(result).toEqual([]);
+    expect(await detectTrends(makeSupabase(rows) as never, "athlete-1")).toEqual([]);
   });
 
   it("uses the weekCount parameter to calculate the start date range", async () => {
@@ -130,11 +115,9 @@ describe("detectTrends — Supabase query wiring", () => {
     await detectTrends(supabase as never, "athlete-1", 4);
     const gteCall = supabase._chain.gte.mock.calls[0];
     expect(gteCall[0]).toBe("start_time_utc");
-    // The start date should be roughly 4 weeks in the past (28 days)
+    // Start date should be roughly 4 weeks (28 days) in the past
     const startDateStr: string = gteCall[1].slice(0, 10);
-    const today = new Date();
-    const startDate = new Date(startDateStr);
-    const daysDiff = (today.getTime() - startDate.getTime()) / 86400000;
+    const daysDiff = (Date.now() - new Date(startDateStr).getTime()) / 86400000;
     expect(daysDiff).toBeGreaterThanOrEqual(27);
     expect(daysDiff).toBeLessThanOrEqual(29);
   });
@@ -146,7 +129,6 @@ describe("detectTrends — Supabase query wiring", () => {
 
 describe("detectTrends — run HR trend", () => {
   it("detects an improving (decreasing) run HR trend", async () => {
-    // HR dropping consistently across 5 weeks → high confidence improving
     const rows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 160 },
       { weeksAgo: 3, hr: 155 },
@@ -154,9 +136,7 @@ describe("detectTrends — run HR trend", () => {
       { weeksAgo: 1, hr: 145 },
       { weeksAgo: 0, hr: 140 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     expect(hrTrend!.direction).toBe("improving");
@@ -171,9 +151,7 @@ describe("detectTrends — run HR trend", () => {
       { weeksAgo: 1, hr: 155 },
       { weeksAgo: 0, hr: 160 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     expect(hrTrend!.direction).toBe("declining");
@@ -181,7 +159,7 @@ describe("detectTrends — run HR trend", () => {
   });
 
   it("marks run HR trend as stable when values barely change", async () => {
-    // All values within 1 bpm — relative change will be < 10%
+    // All values within 1 bpm — relative change will be < 10% of range
     const rows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 150 },
       { weeksAgo: 3, hr: 151 },
@@ -189,15 +167,12 @@ describe("detectTrends — run HR trend", () => {
       { weeksAgo: 1, hr: 151 },
       { weeksAgo: 0, hr: 150 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
-    // Stable + low confidence → buildTrend returns null → not in results
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
+    // Stable + low confidence → buildTrend returns null, so absence is fine too
     if (hrTrend) {
       expect(hrTrend.direction).toBe("stable");
     }
-    // Absence is also acceptable for stable/low-confidence
   });
 
   it("includes correct bpm labels on run HR data points", async () => {
@@ -208,9 +183,7 @@ describe("detectTrends — run HR trend", () => {
       { weeksAgo: 1, hr: 144 },
       { weeksAgo: 0, hr: 140 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     for (const dp of hrTrend!.dataPoints) {
@@ -219,24 +192,17 @@ describe("detectTrends — run HR trend", () => {
   });
 
   it("skips weeks where no runs have avg_hr data", async () => {
-    // Mix of weeks with and without HR data; only 3 valid weeks → still a trend
     const rows: ActivityRow[] = [
-      // Week 5 — no HR
+      // Week 5 — null HR (should not produce a data point)
       { start_time_utc: "2026-02-23T10:00:00.000Z", sport_type: "run", avg_hr: null, duration_sec: 3600, distance_m: 10000 },
-      // Week 4 — HR present
+      // Weeks 4–1 with valid HR
       { start_time_utc: "2026-03-02T10:00:00.000Z", sport_type: "run", avg_hr: 158, duration_sec: 3600, distance_m: 10000 },
-      // Week 3 — HR present
       { start_time_utc: "2026-03-09T10:00:00.000Z", sport_type: "run", avg_hr: 153, duration_sec: 3600, distance_m: 10000 },
-      // Week 2 — HR present
       { start_time_utc: "2026-03-16T10:00:00.000Z", sport_type: "run", avg_hr: 148, duration_sec: 3600, distance_m: 10000 },
-      // Week 1 — HR present
       { start_time_utc: "2026-03-23T10:00:00.000Z", sport_type: "run", avg_hr: 143, duration_sec: 3600, distance_m: 10000 }
     ];
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
-    // The null-HR week should not appear as a data point
     if (hrTrend) {
       expect(hrTrend.dataPoints.every((dp) => dp.value > 0)).toBe(true);
     }
@@ -249,23 +215,19 @@ describe("detectTrends — run HR trend", () => {
 
 describe("detectTrends — run pace trend", () => {
   function makeRunPaceRows(weekData: { weeksAgo: number; distM: number; durSec: number }[]): ActivityRow[] {
-    return weekData.map(({ weeksAgo, distM, durSec }) => {
-      const weekStart = mondayOf(NOW, weeksAgo);
-      return {
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: "run",
-        avg_hr: null,
-        avg_power: null,
-        avg_pace_per_100m_sec: null,
-        duration_sec: durSec,
-        distance_m: distM,
-        metrics_v2: null
-      };
-    });
+    return weekData.map(({ weeksAgo, distM, durSec }) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, weeksAgo)),
+      sport_type: "run",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: null,
+      duration_sec: durSec,
+      distance_m: distM,
+      metrics_v2: null
+    }));
   }
 
   it("detects improving run pace (getting faster = lower sec/km)", async () => {
-    // Pace improving: 6:00/km → 5:30/km → 5:00/km → 4:45/km → 4:30/km
     const rows = makeRunPaceRows([
       { weeksAgo: 4, distM: 10000, durSec: 3600 },  // 6:00/km
       { weeksAgo: 3, distM: 10000, durSec: 3300 },  // 5:30/km
@@ -273,9 +235,7 @@ describe("detectTrends — run pace trend", () => {
       { weeksAgo: 1, distM: 10000, durSec: 2850 },  // 4:45/km
       { weeksAgo: 0, distM: 10000, durSec: 2700 }   // 4:30/km
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const paceTrend = trends.find((t) => t.metric === "Run pace");
     expect(paceTrend).toBeDefined();
     expect(paceTrend!.direction).toBe("improving");
@@ -290,9 +250,7 @@ describe("detectTrends — run pace trend", () => {
       { weeksAgo: 1, distM: 10000, durSec: 3300 },  // 5:30/km
       { weeksAgo: 0, distM: 10000, durSec: 3600 }   // 6:00/km
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const paceTrend = trends.find((t) => t.metric === "Run pace");
     expect(paceTrend).toBeDefined();
     expect(paceTrend!.direction).toBe("declining");
@@ -302,14 +260,12 @@ describe("detectTrends — run pace trend", () => {
   it("formats pace labels as min:sec/km", async () => {
     const rows = makeRunPaceRows([
       { weeksAgo: 4, distM: 10000, durSec: 3000 },  // exactly 5:00/km
-      { weeksAgo: 3, distM: 10000, durSec: 2910 },  // 4:51/km
+      { weeksAgo: 3, distM: 10000, durSec: 2910 },
       { weeksAgo: 2, distM: 10000, durSec: 2820 },
       { weeksAgo: 1, distM: 10000, durSec: 2730 },
       { weeksAgo: 0, distM: 10000, durSec: 2640 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const paceTrend = trends.find((t) => t.metric === "Run pace");
     if (paceTrend) {
       for (const dp of paceTrend.dataPoints) {
@@ -320,7 +276,7 @@ describe("detectTrends — run pace trend", () => {
 
   it("skips weeks where total distance is less than 100m", async () => {
     const badWeek: ActivityRow = {
-      start_time_utc: mondayOf(NOW, 5) + "T10:00:00.000Z",
+      start_time_utc: wednesdayOf(mondayOf(NOW, 5)),
       sport_type: "run",
       avg_hr: null,
       avg_power: null,
@@ -336,12 +292,10 @@ describe("detectTrends — run pace trend", () => {
       { weeksAgo: 1, distM: 10000, durSec: 2850 },
       { weeksAgo: 0, distM: 10000, durSec: 2700 }
     ]);
-    const supabase = makeSupabase([badWeek, ...validRows]);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase([badWeek, ...validRows]) as never, "athlete-1");
     const paceTrend = trends.find((t) => t.metric === "Run pace");
     if (paceTrend) {
-      // None of the data point values should reflect an absurdly high pace
+      // No data point should reflect an absurdly high pace
       expect(paceTrend.dataPoints.every((dp) => dp.value < 36000)).toBe(true);
     }
   });
@@ -353,19 +307,16 @@ describe("detectTrends — run pace trend", () => {
 
 describe("detectTrends — bike power trend", () => {
   function makeBikePowerRows(weekData: { weeksAgo: number; power: number; sportType?: string }[]): ActivityRow[] {
-    return weekData.map(({ weeksAgo, power, sportType = "bike" }) => {
-      const weekStart = mondayOf(NOW, weeksAgo);
-      return {
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: sportType,
-        avg_hr: null,
-        avg_power: power,
-        avg_pace_per_100m_sec: null,
-        duration_sec: 3600,
-        distance_m: null,
-        metrics_v2: null
-      };
-    });
+    return weekData.map(({ weeksAgo, power, sportType = "bike" }) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, weeksAgo)),
+      sport_type: sportType,
+      avg_hr: null,
+      avg_power: power,
+      avg_pace_per_100m_sec: null,
+      duration_sec: 3600,
+      distance_m: null,
+      metrics_v2: null
+    }));
   }
 
   it("detects improving bike power (increasing watts)", async () => {
@@ -376,9 +327,7 @@ describe("detectTrends — bike power trend", () => {
       { weeksAgo: 1, power: 230 },
       { weeksAgo: 0, power: 240 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const powerTrend = trends.find((t) => t.metric === "Bike avg power");
     expect(powerTrend).toBeDefined();
     expect(powerTrend!.direction).toBe("improving");
@@ -393,9 +342,7 @@ describe("detectTrends — bike power trend", () => {
       { weeksAgo: 1, power: 210 },
       { weeksAgo: 0, power: 200 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const powerTrend = trends.find((t) => t.metric === "Bike avg power");
     expect(powerTrend).toBeDefined();
     expect(powerTrend!.direction).toBe("declining");
@@ -410,9 +357,7 @@ describe("detectTrends — bike power trend", () => {
       { weeksAgo: 1, power: 230, sportType: "cycling" },
       { weeksAgo: 0, power: 240, sportType: "cycling" }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const powerTrend = trends.find((t) => t.metric === "Bike avg power");
     expect(powerTrend).toBeDefined();
     expect(powerTrend!.direction).toBe("improving");
@@ -426,9 +371,7 @@ describe("detectTrends — bike power trend", () => {
       { weeksAgo: 1, power: 238 },
       { weeksAgo: 0, power: 250 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const powerTrend = trends.find((t) => t.metric === "Bike avg power");
     if (powerTrend) {
       for (const dp of powerTrend.dataPoints) {
@@ -444,19 +387,16 @@ describe("detectTrends — bike power trend", () => {
 
 describe("detectTrends — swim pace trend", () => {
   function makeSwimPaceRows(weekData: { weeksAgo: number; pace100m: number }[]): ActivityRow[] {
-    return weekData.map(({ weeksAgo, pace100m }) => {
-      const weekStart = mondayOf(NOW, weeksAgo);
-      return {
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: "swim",
-        avg_hr: null,
-        avg_power: null,
-        avg_pace_per_100m_sec: pace100m,
-        duration_sec: 3600,
-        distance_m: null,
-        metrics_v2: null
-      };
-    });
+    return weekData.map(({ weeksAgo, pace100m }) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, weeksAgo)),
+      sport_type: "swim",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: pace100m,
+      duration_sec: 3600,
+      distance_m: null,
+      metrics_v2: null
+    }));
   }
 
   it("detects improving swim pace (lower sec/100m is better)", async () => {
@@ -467,9 +407,7 @@ describe("detectTrends — swim pace trend", () => {
       { weeksAgo: 1, pace100m: 112 },
       { weeksAgo: 0, pace100m: 108 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const swimTrend = trends.find((t) => t.metric === "Swim pace");
     expect(swimTrend).toBeDefined();
     expect(swimTrend!.direction).toBe("improving");
@@ -484,9 +422,7 @@ describe("detectTrends — swim pace trend", () => {
       { weeksAgo: 1, pace100m: 119 },
       { weeksAgo: 0, pace100m: 123 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const swimTrend = trends.find((t) => t.metric === "Swim pace");
     expect(swimTrend).toBeDefined();
     expect(swimTrend!.direction).toBe("declining");
@@ -501,15 +437,12 @@ describe("detectTrends — swim pace trend", () => {
       { weeksAgo: 1, pace100m: 108 },
       { weeksAgo: 0, pace100m: 104 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const swimTrend = trends.find((t) => t.metric === "Swim pace");
     if (swimTrend) {
       for (const dp of swimTrend.dataPoints) {
         expect(dp.label).toMatch(/^\d+:\d{2}\/100m$/);
       }
-      // First data point should be "2:00/100m"
       expect(swimTrend.dataPoints[0].label).toBe("2:00/100m");
     }
   });
@@ -521,19 +454,16 @@ describe("detectTrends — swim pace trend", () => {
 
 describe("detectTrends — strength duration trend", () => {
   function makeStrengthRows(weekData: { weeksAgo: number; durSec: number }[]): ActivityRow[] {
-    return weekData.map(({ weeksAgo, durSec }) => {
-      const weekStart = mondayOf(NOW, weeksAgo);
-      return {
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: "strength",
-        avg_hr: null,
-        avg_power: null,
-        avg_pace_per_100m_sec: null,
-        duration_sec: durSec,
-        distance_m: null,
-        metrics_v2: null
-      };
-    });
+    return weekData.map(({ weeksAgo, durSec }) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, weeksAgo)),
+      sport_type: "strength",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: null,
+      duration_sec: durSec,
+      distance_m: null,
+      metrics_v2: null
+    }));
   }
 
   it("detects improving strength duration (longer sessions = better)", async () => {
@@ -544,9 +474,7 @@ describe("detectTrends — strength duration trend", () => {
       { weeksAgo: 1, durSec: 2700 },  // 45 min
       { weeksAgo: 0, durSec: 3000 }   // 50 min
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const strengthTrend = trends.find((t) => t.metric === "Strength duration");
     expect(strengthTrend).toBeDefined();
     expect(strengthTrend!.direction).toBe("improving");
@@ -561,9 +489,7 @@ describe("detectTrends — strength duration trend", () => {
       { weeksAgo: 1, durSec: 2100 },
       { weeksAgo: 0, durSec: 1800 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const strengthTrend = trends.find((t) => t.metric === "Strength duration");
     expect(strengthTrend).toBeDefined();
     expect(strengthTrend!.direction).toBe("declining");
@@ -578,9 +504,7 @@ describe("detectTrends — strength duration trend", () => {
       { weeksAgo: 1, durSec: 2700 },
       { weeksAgo: 0, durSec: 3000 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const strengthTrend = trends.find((t) => t.metric === "Strength duration");
     if (strengthTrend) {
       for (const dp of strengthTrend.dataPoints) {
@@ -596,7 +520,6 @@ describe("detectTrends — strength duration trend", () => {
 
 describe("detectTrends — confidence classification", () => {
   it("assigns high confidence when ≥5 data points and ≥4 consistent deltas", async () => {
-    // 5 weeks of consistently declining run HR → high confidence
     const rows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 165 },
       { weeksAgo: 3, hr: 160 },
@@ -604,25 +527,20 @@ describe("detectTrends — confidence classification", () => {
       { weeksAgo: 1, hr: 150 },
       { weeksAgo: 0, hr: 145 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     expect(hrTrend!.confidence).toBe("high");
   });
 
-  it("assigns medium confidence for 4 data points with 3 consistent deltas", async () => {
-    // 4 weeks with 3 consistent steps
+  it("assigns medium or low confidence for 4 data points", async () => {
     const rows = makeRunHrRows(NOW, [
       { weeksAgo: 3, hr: 162 },
       { weeksAgo: 2, hr: 157 },
       { weeksAgo: 1, hr: 151 },
       { weeksAgo: 0, hr: 145 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     if (hrTrend) {
       expect(["medium", "low"]).toContain(hrTrend.confidence);
@@ -631,7 +549,7 @@ describe("detectTrends — confidence classification", () => {
 
   it("returns at most 3 trends", async () => {
     // Provide data for all five trend types — result must be capped at 3
-    const runRows = makeRunHrRows(NOW, [
+    const runHrRows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 165 },
       { weeksAgo: 3, hr: 160 },
       { weeksAgo: 2, hr: 155 },
@@ -640,11 +558,11 @@ describe("detectTrends — confidence classification", () => {
     ]);
 
     const extraRows: ActivityRow[] = [];
-    // Run pace (same weeks)
+
+    // Run pace — Thursday (different time-slot from HR runs above)
     for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
       extraRows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 3),
+        start_time_utc: thursdayOf(mondayOf(NOW, w)),
         sport_type: "run",
         avg_hr: null,
         avg_power: null,
@@ -654,11 +572,10 @@ describe("detectTrends — confidence classification", () => {
         metrics_v2: null
       });
     }
-    // Bike power
+    // Bike power — Friday
     for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
       extraRows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 4),
+        start_time_utc: fridayOf(mondayOf(NOW, w)),
         sport_type: "bike",
         avg_hr: null,
         avg_power: 200 + (4 - w) * 10,
@@ -668,11 +585,10 @@ describe("detectTrends — confidence classification", () => {
         metrics_v2: null
       });
     }
-    // Swim
+    // Swim — Saturday
     for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
       extraRows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 5),
+        start_time_utc: saturdayOf(mondayOf(NOW, w)),
         sport_type: "swim",
         avg_hr: null,
         avg_power: null,
@@ -682,11 +598,10 @@ describe("detectTrends — confidence classification", () => {
         metrics_v2: null
       });
     }
-    // Strength
+    // Strength — Sunday
     for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
       extraRows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 6),
+        start_time_utc: sundayOf(mondayOf(NOW, w)),
         sport_type: "strength",
         avg_hr: null,
         avg_power: null,
@@ -697,15 +612,11 @@ describe("detectTrends — confidence classification", () => {
       });
     }
 
-    const supabase = makeSupabase([...runRows, ...extraRows]);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase([...runHrRows, ...extraRows]) as never, "athlete-1");
     expect(trends.length).toBeLessThanOrEqual(3);
   });
 
   it("sorts trends so high-confidence appears before lower-confidence", async () => {
-    // Build rows where run HR produces high confidence (5 consistent weeks)
-    // and run pace produces medium confidence (4 weeks, 3 consistent)
     const runHrRows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 165 },
       { weeksAgo: 3, hr: 160 },
@@ -714,23 +625,19 @@ describe("detectTrends — confidence classification", () => {
       { weeksAgo: 0, hr: 145 }
     ]);
 
-    // Run pace — 4 data points (medium confidence at best)
-    const runPaceRows: ActivityRow[] = [3, 2, 1, 0].map((w) => {
-      const weekStart = mondayOf(NOW, w);
-      return {
-        start_time_utc: dayOfWeekTs(weekStart, 3),
-        sport_type: "run",
-        avg_hr: null,
-        avg_power: null,
-        avg_pace_per_100m_sec: null,
-        duration_sec: 3600 - w * 200,
-        distance_m: 10000,
-        metrics_v2: null
-      };
-    });
+    // Run pace — 4 data points (medium confidence at best), placed Thursday
+    const runPaceRows: ActivityRow[] = [3, 2, 1, 0].map((w) => ({
+      start_time_utc: thursdayOf(mondayOf(NOW, w)),
+      sport_type: "run",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: null,
+      duration_sec: 3600 - w * 200,
+      distance_m: 10000,
+      metrics_v2: null
+    }));
 
-    const supabase = makeSupabase([...runHrRows, ...runPaceRows]);
-    const trends = await detectTrends(supabase as never, "athlete-1");
+    const trends = await detectTrends(makeSupabase([...runHrRows, ...runPaceRows]) as never, "athlete-1");
 
     if (trends.length >= 2) {
       const confidenceOrder = { high: 3, medium: 2, low: 1 };
@@ -749,22 +656,18 @@ describe("detectTrends — confidence classification", () => {
 
 describe("detectTrends — multi-sport data does not cross-contaminate", () => {
   it("run HR trend only uses run activities", async () => {
-    const rows: ActivityRow[] = [];
-    // 5 weeks of bike activities with high HR — should not appear in run HR
-    for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
-      rows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: "bike",
-        avg_hr: 180,
-        avg_power: 250,
-        avg_pace_per_100m_sec: null,
-        duration_sec: 3600,
-        distance_m: null,
-        metrics_v2: null
-      });
-    }
-    // 5 weeks of runs with improving (decreasing) HR
+    // 5 weeks of bike activities with high HR — should not bleed into run HR
+    const bikeRows: ActivityRow[] = Array.from({ length: 5 }, (_, i) => ({
+      start_time_utc: thursdayOf(mondayOf(NOW, 4 - i)),
+      sport_type: "bike",
+      avg_hr: 180,
+      avg_power: 250,
+      avg_pace_per_100m_sec: null,
+      duration_sec: 3600,
+      distance_m: null,
+      metrics_v2: null
+    }));
+
     const runRows = makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 160 },
       { weeksAgo: 3, hr: 155 },
@@ -773,40 +676,29 @@ describe("detectTrends — multi-sport data does not cross-contaminate", () => {
       { weeksAgo: 0, hr: 140 }
     ]);
 
-    const supabase = makeSupabase([...rows, ...runRows]);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase([...bikeRows, ...runRows]) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
-    // The run HR values should all be in the 140–160 range, not 180
     for (const dp of hrTrend!.dataPoints) {
       expect(dp.value).toBeLessThanOrEqual(160);
     }
   });
 
   it("swim activities do not contribute to run pace trend", async () => {
-    const rows: ActivityRow[] = [];
-    // 5 weeks of swims
-    for (let w = 4; w >= 0; w--) {
-      const weekStart = mondayOf(NOW, w);
-      rows.push({
-        start_time_utc: dayOfWeekTs(weekStart, 2),
-        sport_type: "swim",
-        avg_hr: null,
-        avg_power: null,
-        avg_pace_per_100m_sec: 120,
-        duration_sec: 3600,
-        distance_m: 5000,
-        metrics_v2: null
-      });
-    }
+    // 5 weeks of swims only — no run data
+    const rows: ActivityRow[] = Array.from({ length: 5 }, (_, i) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, 4 - i)),
+      sport_type: "swim",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: 120,
+      duration_sec: 3600,
+      distance_m: 5000,
+      metrics_v2: null
+    }));
 
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
-    // There should be no run pace trend since there are no run activities
-    const runPaceTrend = trends.find((t) => t.metric === "Run pace");
-    expect(runPaceTrend).toBeUndefined();
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
+    expect(trends.find((t) => t.metric === "Run pace")).toBeUndefined();
   });
 });
 
@@ -815,17 +707,17 @@ describe("detectTrends — multi-sport data does not cross-contaminate", () => {
 // ---------------------------------------------------------------------------
 
 describe("detectTrends — data point structure", () => {
-  it("each data point has weekStart, value, and label fields", async () => {
-    const rows = makeRunHrRows(NOW, [
+  const fiveWeekHrRows = () =>
+    makeRunHrRows(NOW, [
       { weeksAgo: 4, hr: 160 },
       { weeksAgo: 3, hr: 155 },
       { weeksAgo: 2, hr: 150 },
       { weeksAgo: 1, hr: 145 },
       { weeksAgo: 0, hr: 140 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
 
+  it("each data point has weekStart, value, and label fields", async () => {
+    const trends = await detectTrends(makeSupabase(fiveWeekHrRows()) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     for (const dp of hrTrend!.dataPoints) {
@@ -836,17 +728,8 @@ describe("detectTrends — data point structure", () => {
     }
   });
 
-  it("weekStart dates are Mondays (day index 1)", async () => {
-    const rows = makeRunHrRows(NOW, [
-      { weeksAgo: 4, hr: 160 },
-      { weeksAgo: 3, hr: 155 },
-      { weeksAgo: 2, hr: 150 },
-      { weeksAgo: 1, hr: 145 },
-      { weeksAgo: 0, hr: 140 }
-    ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+  it("weekStart dates are Mondays (UTC day index 1)", async () => {
+    const trends = await detectTrends(makeSupabase(fiveWeekHrRows()) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     for (const dp of hrTrend!.dataPoints) {
@@ -856,21 +739,11 @@ describe("detectTrends — data point structure", () => {
   });
 
   it("data points are ordered chronologically (oldest first)", async () => {
-    const rows = makeRunHrRows(NOW, [
-      { weeksAgo: 4, hr: 160 },
-      { weeksAgo: 3, hr: 155 },
-      { weeksAgo: 2, hr: 150 },
-      { weeksAgo: 1, hr: 145 },
-      { weeksAgo: 0, hr: 140 }
-    ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(fiveWeekHrRows()) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
     const dates = hrTrend!.dataPoints.map((dp) => dp.weekStart);
-    const sorted = [...dates].sort();
-    expect(dates).toEqual(sorted);
+    expect(dates).toEqual([...dates].sort());
   });
 
   it("result trend objects have all required WeeklyTrend fields", async () => {
@@ -881,9 +754,7 @@ describe("detectTrends — data point structure", () => {
       { weeksAgo: 1, hr: 150 },
       { weeksAgo: 0, hr: 145 }
     ]);
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     expect(trends.length).toBeGreaterThan(0);
     for (const trend of trends) {
       expect(typeof trend.metric).toBe("string");
@@ -901,13 +772,12 @@ describe("detectTrends — data point structure", () => {
 
 describe("detectTrends — intra-week averaging", () => {
   it("averages multiple run HR values within the same week", async () => {
-    // Week 4 has two runs; their avg HR should be averaged
-    const weekStart = mondayOf(NOW, 4);
+    const week4Start = mondayOf(NOW, 4);
 
     const rows: ActivityRow[] = [
-      // Two runs in the same week → average should be 155
+      // Two runs in the same week → average of 150 and 160 = 155
       {
-        start_time_utc: dayOfWeekTs(weekStart, 2),
+        start_time_utc: wednesdayOf(week4Start),
         sport_type: "run",
         avg_hr: 150,
         avg_power: null,
@@ -917,7 +787,7 @@ describe("detectTrends — intra-week averaging", () => {
         metrics_v2: null
       },
       {
-        start_time_utc: dayOfWeekTs(weekStart, 3),
+        start_time_utc: thursdayOf(week4Start),
         sport_type: "run",
         avg_hr: 160,
         avg_power: null,
@@ -926,7 +796,7 @@ describe("detectTrends — intra-week averaging", () => {
         distance_m: 10000,
         metrics_v2: null
       },
-      // Three more single-run weeks to reach enough data points
+      // Four more single-run weeks
       ...makeRunHrRows(NOW, [
         { weeksAgo: 3, hr: 152 },
         { weeksAgo: 2, hr: 148 },
@@ -935,12 +805,10 @@ describe("detectTrends — intra-week averaging", () => {
       ])
     ];
 
-    const supabase = makeSupabase(rows);
-    const trends = await detectTrends(supabase as never, "athlete-1");
-
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
     const hrTrend = trends.find((t) => t.metric === "Run avg HR");
     expect(hrTrend).toBeDefined();
-    // The oldest data point (week 4) should be the average of 150 and 160 = 155
+    // Oldest data point (week 4) must be the average: (150 + 160) / 2 = 155
     expect(hrTrend!.dataPoints[0].value).toBe(155);
   });
 });
