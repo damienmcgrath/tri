@@ -17,6 +17,7 @@ import { refreshIfExpired, updateSyncStatus, type ExternalConnection } from "./t
 import { syncSessionLoad } from "@/lib/training/load-sync";
 import { suggestSessionMatches, pickBestSuggestion } from "@/lib/workouts/matching-service";
 import { findCrossSourceDuplicate, mergeStravaIntoExisting } from "./cross-source-dedup";
+import { log, warn, error } from "@/lib/logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ async function matchActivity(
       candidateIntentById.get(best.plannedSessionId) ?? null
     );
   } catch (syncError) {
-    console.error("[training-load] Failed to sync auto-matched activity load:", syncError);
+    error("training-load.auto-match-sync-failed", { message: syncError instanceof Error ? syncError.message : String(syncError) });
   }
 
   return true;
@@ -191,7 +192,7 @@ export async function ingestStravaActivity(
   const supabase = getAdminClient();
   const externalId = String(stravaActivityId);
 
-  console.log(`[INGEST] START userId=${userId} activityId=${externalId}`);
+  log("ingest.start", { userId, activityId: externalId });
 
   // 1. Dedup check
   const { data: existing } = await supabase
@@ -203,7 +204,7 @@ export async function ingestStravaActivity(
     .maybeSingle();
 
   if (existing) {
-    console.log(`[INGEST] SKIPPED (already imported) activityId=${externalId}`);
+    log("ingest.skipped.already-imported", { activityId: externalId });
     await logSyncEvent(userId, "strava", "activity_skipped", externalId, "skipped", {});
     return { status: "skipped" };
   }
@@ -214,7 +215,7 @@ export async function ingestStravaActivity(
     raw = await fetchActivity(connection.accessToken, externalId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown fetch error";
-    console.error(`[INGEST] FETCH_ERROR activityId=${externalId}:`, msg);
+    error("ingest.fetch-error", { activityId: externalId, message: msg });
     await logSyncEvent(userId, "strava", "activity_fetch_error", externalId, "error", {}, msg);
     throw err;
   }
@@ -233,7 +234,7 @@ export async function ingestStravaActivity(
     normalized.duration_sec
   );
   if (crossMatch) {
-    console.log(`[INGEST] MERGED activityId=${externalId} into existing ${crossMatch.existingId} (source: ${crossMatch.existingSource})`);
+    log("ingest.merged", { activityId: externalId, existingId: crossMatch.existingId, existingSource: crossMatch.existingSource });
     await mergeStravaIntoExisting(crossMatch.existingId, externalId, normalized.external_title);
     await logSyncEvent(userId, "strava", "activity_merged", externalId, "ok", { mergedInto: crossMatch.existingId });
     return { status: "merged" };
@@ -245,10 +246,10 @@ export async function ingestStravaActivity(
   if (insertError) {
     // If it's a uniqueness violation the row already exists — treat as skipped
     if (insertError.code === "23505") {
-      console.log(`[INGEST] SKIPPED (conflict) activityId=${externalId}`);
+      log("ingest.skipped.conflict", { activityId: externalId });
       return { status: "skipped" };
     }
-    console.error(`[INGEST] INSERT_ERROR activityId=${externalId}:`, insertError.message);
+    error("ingest.insert-error", { activityId: externalId, message: insertError.message });
     await logSyncEvent(userId, "strava", "activity_insert_error", externalId, "error", {}, insertError.message);
     throw new Error(`Failed to insert activity: ${insertError.message}`);
   }
@@ -258,14 +259,14 @@ export async function ingestStravaActivity(
     return { status: "skipped" };
   }
 
-  console.log(`[INGEST] IMPORTED activityId=${externalId} completedActivityId=${created.id}`);
+  log("ingest.imported", { activityId: externalId, completedActivityId: created.id });
 
   // 6. Session matching
   const matched = await matchActivity(supabase, userId, created);
   if (matched) {
-    console.log(`[INGEST] MATCHED activityId=${externalId}`);
+    log("ingest.matched", { activityId: externalId });
   } else {
-    console.log(`[INGEST] NO_MATCH activityId=${externalId}`);
+    log("ingest.no-match", { activityId: externalId });
   }
 
   await logSyncEvent(userId, "strava", "activity_imported", externalId, "ok", { matched });
@@ -287,7 +288,7 @@ export async function backfillRecentActivities(
   connection: ExternalConnection,
   syncWindowDays: number = 7
 ): Promise<IngestResult> {
-  console.log(`[INGEST] BACKFILL START userId=${userId} window=${syncWindowDays}d`);
+  log("ingest.backfill.start", { userId, windowDays: syncWindowDays });
 
   // Refresh token if needed before starting
   const freshConnection = await refreshIfExpired(connection);
@@ -311,12 +312,12 @@ export async function backfillRecentActivities(
       activities = data;
 
       if (rateLimit && shouldThrottle(rateLimit)) {
-        console.log(`[INGEST] BACKFILL THROTTLED — 15min usage ${rateLimit.usage15min}/${rateLimit.limit15min}`);
+        warn("ingest.backfill.throttled", { usage15min: rateLimit.usage15min, limit15min: rateLimit.limit15min });
         throttled = true;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Fetch error";
-      console.error(`[INGEST] BACKFILL_FETCH_ERROR page=${page}:`, msg);
+      error("ingest.backfill.fetch-error", { page, message: msg });
       await updateSyncStatus(userId, "strava", "error", `Backfill fetch failed: ${msg}`);
       throw err;
     }
@@ -353,7 +354,7 @@ export async function backfillRecentActivities(
           normalized.duration_sec
         );
         if (crossMatch) {
-          console.log(`[INGEST] BACKFILL MERGED activityId=${externalId} into existing ${crossMatch.existingId}`);
+          log("ingest.backfill.merged", { activityId: externalId, existingId: crossMatch.existingId });
           await mergeStravaIntoExisting(crossMatch.existingId, externalId, normalized.external_title);
           result.skipped++;
           continue;
@@ -366,7 +367,7 @@ export async function backfillRecentActivities(
             result.skipped++;
             continue;
           }
-          console.error(`[INGEST] BACKFILL_INSERT_ERROR activityId=${externalId}:`, insertError.message);
+          error("ingest.backfill.insert-error", { activityId: externalId, message: insertError.message });
           result.skipped++;
           continue;
         }
@@ -381,7 +382,7 @@ export async function backfillRecentActivities(
         const matched = await matchActivity(supabase, userId, created);
         if (matched) result.matched++;
       } catch (err) {
-        console.error(`[INGEST] BACKFILL_ACTIVITY_ERROR activityId=${activity.id}:`, err);
+        error("ingest.backfill.activity-error", { activityId: activity.id, message: err instanceof Error ? err.message : String(err) });
         result.skipped++;
       }
     }
@@ -391,7 +392,7 @@ export async function backfillRecentActivities(
     page++;
   }
 
-  console.log(`[INGEST] BACKFILL DONE userId=${userId}`, result);
+  log("ingest.backfill.done", { userId, ...result });
   await updateSyncStatus(userId, "strava", "ok", undefined, {
     importedCount: result.imported,
     skippedCount: result.skipped

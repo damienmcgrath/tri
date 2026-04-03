@@ -88,8 +88,8 @@ export async function unlinkActivityAction(activityId: string) {
     .limit(5);
 
   const affectedSessionIds = (existingLinks ?? [])
-    .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-    .map((link: any) => link.planned_session_id as string);
+    .filter((link: { planned_session_id: string | null; confirmation_status: string | null }) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+    .map((link: { planned_session_id: string | null; confirmation_status: string | null }) => link.planned_session_id as string);
 
   const { error } = await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
   if (error) return { error: error.message };
@@ -128,8 +128,8 @@ export async function markUnplannedAction(activityId: string) {
     .limit(5);
 
   const affectedSessionIds = (existingLinks ?? [])
-    .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-    .map((link: any) => link.planned_session_id as string);
+    .filter((link: { planned_session_id: string | null; confirmation_status: string | null }) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+    .map((link: { planned_session_id: string | null; confirmation_status: string | null }) => link.planned_session_id as string);
 
   await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
   const { error } = await supabase.from("completed_activities").update({ is_unplanned: true, schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);

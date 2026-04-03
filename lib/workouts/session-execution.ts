@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis, type SessionDiagnosisInput, type SplitMetrics } from "@/lib/coach/session-diagnosis";
+import { log, warn } from "@/lib/logger";
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
 import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
@@ -571,11 +572,7 @@ export async function backfillPendingSessionExecutions(args: {
   limit?: number;
   force?: boolean;
 }) {
-  console.info("[execution-review-backfill] Starting backfill", {
-    userId: args.userId,
-    limit: args.limit ?? null,
-    force: args.force === true
-  });
+  log("execution-review-backfill.start", { userId: args.userId, limit: args.limit ?? null, force: args.force === true });
 
   const { data: links, error: linkError } = await args.supabase
     .from("session_activity_links")
@@ -589,13 +586,10 @@ export async function backfillPendingSessionExecutions(args: {
     (link) => link.planned_session_id && link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
   );
 
-  console.info("[execution-review-backfill] Loaded links", {
-    totalLinks: (links ?? []).length,
-    confirmedLinks: confirmedLinks.length
-  });
+  log("execution-review-backfill.links-loaded", { totalLinks: (links ?? []).length, confirmedLinks: confirmedLinks.length });
 
   if (confirmedLinks.length === 0) {
-    console.info("[execution-review-backfill] No confirmed links found; nothing to do");
+    log("execution-review-backfill.no-confirmed-links");
     return { updated: 0, attempted: 0 };
   }
 
@@ -666,30 +660,19 @@ export async function backfillPendingSessionExecutions(args: {
       return shouldRefresh;
     });
 
-    console.info("[execution-review-backfill] Candidate selection complete", {
-      selected: selectionLog.filter((entry) => entry.action === "selected").length,
-      skipped: selectionLog.filter((entry) => entry.action === "skipped").length,
-      sample: selectionLog.slice(0, 20)
-    });
+    log("execution-review-backfill.candidate-selection-complete", { selected: selectionLog.filter((entry) => entry.action === "selected").length, skipped: selectionLog.filter((entry) => entry.action === "skipped").length, sample: selectionLog.slice(0, 20) });
   }
 
   const dedupedLinks = [...new Map(candidateLinks.map((link) => [link.planned_session_id as string, link])).values()];
   const linksToProcess = typeof args.limit === "number" ? dedupedLinks.slice(0, args.limit) : dedupedLinks;
 
-  console.info("[execution-review-backfill] Prepared batch", {
-    candidateLinks: candidateLinks.length,
-    dedupedLinks: dedupedLinks.length,
-    processing: linksToProcess.length
-  });
+  log("execution-review-backfill.batch-prepared", { candidateLinks: candidateLinks.length, dedupedLinks: dedupedLinks.length, processing: linksToProcess.length });
 
   let updated = 0;
   for (const link of linksToProcess) {
     const sessionId = link.planned_session_id as string;
     const activityId = link.completed_activity_id as string;
-    console.info("[execution-review-backfill] Rebuilding execution review", {
-      sessionId,
-      activityId
-    });
+    log("execution-review-backfill.rebuilding", { sessionId, activityId });
 
     try {
       await syncSessionExecutionFromActivityLink({
@@ -699,24 +682,14 @@ export async function backfillPendingSessionExecutions(args: {
         activityId
       });
       updated += 1;
-      console.info("[execution-review-backfill] Rebuild complete", {
-        sessionId,
-        activityId
-      });
+      log("execution-review-backfill.rebuild-complete", { sessionId, activityId });
     } catch (error) {
-      console.warn("[execution-review-backfill] Rebuild failed", {
-        sessionId,
-        activityId,
-        error: error instanceof Error ? error.message : String(error)
-      });
+      warn("execution-review-backfill.rebuild-failed", { sessionId, activityId, message: error instanceof Error ? error.message : String(error) });
       // Skip failed sessions so one bad row does not block the rest of the batch.
     }
   }
 
-  console.info("[execution-review-backfill] Backfill finished", {
-    updated,
-    attempted: linksToProcess.length
-  });
+  log("execution-review-backfill.done", { updated, attempted: linksToProcess.length });
 
   return {
     updated,

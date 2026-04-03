@@ -8,6 +8,7 @@
  */
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { log, error } from "@/lib/logger";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -83,7 +84,7 @@ export async function mergeStravaIntoExisting(
   stravaTitle: string
 ): Promise<void> {
   const supabase = getAdminClient();
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("completed_activities")
     .update({
       external_provider: "strava",
@@ -92,10 +93,10 @@ export async function mergeStravaIntoExisting(
     })
     .eq("id", existingId);
 
-  if (error) {
-    console.error("[CROSS_DEDUP] mergeStravaIntoExisting error:", error.message);
-    throw new Error(`Failed to merge Strava data: ${error.message}`);
+  if (dbError) {
+    error("cross-dedup.merge-strava.error", { message: dbError.message, existingId, stravaExternalId });
+    throw new Error(`Failed to merge Strava data: ${dbError.message}`);
   }
 
-  console.log(`[CROSS_DEDUP] Merged strava:${stravaExternalId} into existing activity ${existingId}`);
+  log("cross-dedup.merge-strava.done", { stravaExternalId, existingId });
 }

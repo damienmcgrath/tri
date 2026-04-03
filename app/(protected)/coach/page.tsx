@@ -8,6 +8,7 @@ import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getSessionDisplayName } from "@/lib/training/session";
+import { addDays } from "../week-context";
 
 type SessionRow = {
   id: string;
@@ -198,16 +199,17 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
   ]);
 
   const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
+  type LinkRow = { planned_session_id: string | null; completed_activity_id: string; confirmation_status: string | null };
   const confirmedLinkedActivityIds = new Set(
     (links ?? [])
-      .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-      .map((link: any) => link.completed_activity_id as string)
+      .filter((link: LinkRow) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link: LinkRow) => link.completed_activity_id as string)
       .filter(Boolean)
   );
   const confirmedLinkedSessionIds = new Set(
     (links ?? [])
-      .filter((link: any) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-      .map((link: any) => link.planned_session_id as string)
+      .filter((link: LinkRow) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link: LinkRow) => link.planned_session_id as string)
   );
 
   const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
@@ -228,12 +230,6 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
     extraActivityCount,
     upcomingKeySessionNames: upcomingKeyNames.length > 0 ? upcomingKeyNames : undefined
   };
-}
-
-function addDays(dateIso: string, days: number) {
-  const date = new Date(`${dateIso}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }
 
 function isContextIncomplete(snapshot: Awaited<ReturnType<typeof getAthleteContextSnapshot>>) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import { sortAthleteFtpHistory, type AthleteFtpHistoryEntry } from "@/lib/athlete-ftp";
+import { FtpChart } from "./components/ftp-chart";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -625,6 +626,9 @@ export function FtpSection({
           </button>
         )}
       </div>
+
+      {/* FTP trend chart */}
+      {history.length > 0 && <FtpChart entries={history} />}
 
       {/* history table with deltas */}
       {showHistory && history.length > 1 && (

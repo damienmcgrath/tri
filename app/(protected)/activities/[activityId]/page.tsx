@@ -72,6 +72,33 @@ function formatOptionalNumber(value?: number | null, suffix = "") {
   return `${value}${suffix}`;
 }
 
+function formatLapDuration(sec: number | null | undefined) {
+  if (!sec || sec <= 0) return "—";
+  const rounded = Math.round(sec);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function formatLapPace(sport: string, durationSec: number | null | undefined, distanceM: number | null | undefined) {
+  if (!durationSec || !distanceM || distanceM <= 0) return "—";
+  if (sport === "run") {
+    const km = distanceM / 1000;
+    const secPerKm = durationSec / km;
+    const mins = Math.floor(secPerKm / 60);
+    const secs = Math.round(secPerKm % 60);
+    return `${mins}:${String(secs).padStart(2, "0")} /km`;
+  }
+  if (sport === "bike") {
+    const speedKmh = (distanceM / durationSec) * 3.6;
+    return `${speedKmh.toFixed(1)} km/h`;
+  }
+  if (sport === "swim") {
+    return `${Math.round((durationSec / distanceM) * 100)}s /100m`;
+  }
+  return "—";
+}
+
 function formatZoneRange(min: number | null | undefined, max: number | null | undefined, unit: string) {
   if (min === null && max === null) return `Open ${unit}`.trim();
   if (min === null || typeof min === "undefined") return `< ${max} ${unit}`.trim();
@@ -222,37 +249,80 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           ) : null}
 
           <article className="surface p-5">
-            <h2 className="text-sm font-semibold">Splits / intervals</h2>
-            {laps.length === 0 ? (
-              <p className="mt-3 text-sm text-muted">Splits coming soon.</p>
-            ) : (
-              <div className="mt-3 overflow-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase text-muted">
-                      <th>Lap</th>
-                      <th>Time</th>
-                      <th>Distance</th>
-                      <th>Avg HR</th>
-                      <th>Avg Power</th>
-                      <th>NP</th>
-                      <th>Cadence</th>
-                    </tr>
-                  </thead>
-                  <tbody>{laps.map((lap) => (
-                    <tr key={lap.index} className="border-t border-white/10">
-                      <td className="py-2">{lap.index}</td>
-                      <td>{lap.durationSec ? formatDuration(Math.round(lap.durationSec)) : "—"}</td>
-                      <td>{lap.distanceM ? `${(lap.distanceM / 1000).toFixed(2)} km` : "—"}</td>
-                      <td>{lap.avgHr ?? "—"}</td>
-                      <td>{lap.avgPower ?? "—"}</td>
-                      <td>{lap.normalizedPower ?? "—"}</td>
-                      <td>{lap.avgCadence ?? "—"}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            )}
+            {(() => {
+              const hasManualTrigger = laps.length > 0 && laps.every((l) => l.trigger === "manual");
+              const sectionLabel = laps.length === 0 ? "Laps" : hasManualTrigger ? "Intervals" : "Laps";
+              const showPace = ["run", "bike", "swim"].includes(activity.sport_type);
+              const totalDuration = laps.reduce((sum, l) => sum + (l.durationSec ?? 0), 0);
+              const totalDistance = laps.reduce((sum, l) => sum + (l.distanceM ?? 0), 0);
+              const lapsWithHr = laps.filter((l) => l.avgHr !== null);
+              const avgHrTotal = lapsWithHr.length > 0
+                ? Math.round(lapsWithHr.reduce((sum, l) => sum + (l.avgHr ?? 0), 0) / lapsWithHr.length)
+                : null;
+              const lapsWithPower = laps.filter((l) => l.avgPower !== null);
+              const avgPowerTotal = lapsWithPower.length > 0
+                ? Math.round(lapsWithPower.reduce((sum, l) => sum + (l.avgPower ?? 0), 0) / lapsWithPower.length)
+                : null;
+              const lapsWithNp = laps.filter((l) => l.normalizedPower !== null);
+              const avgNpTotal = lapsWithNp.length > 0
+                ? Math.round(lapsWithNp.reduce((sum, l) => sum + (l.normalizedPower ?? 0), 0) / lapsWithNp.length)
+                : null;
+              const lapsWithCadence = laps.filter((l) => l.avgCadence !== null);
+              const avgCadenceTotal = lapsWithCadence.length > 0
+                ? Math.round(lapsWithCadence.reduce((sum, l) => sum + (l.avgCadence ?? 0), 0) / lapsWithCadence.length)
+                : null;
+              return (
+                <>
+                  <h2 className="text-sm font-semibold">{sectionLabel}</h2>
+                  {laps.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted">No lap data available for this activity.</p>
+                  ) : (
+                    <div className="mt-3 overflow-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase text-muted">
+                            <th className="pb-2 pr-4">#</th>
+                            <th className="pb-2 pr-4">Time</th>
+                            <th className="pb-2 pr-4">Distance</th>
+                            {showPace ? <th className="pb-2 pr-4">Pace / Speed</th> : null}
+                            <th className="pb-2 pr-4">Avg HR</th>
+                            <th className="pb-2 pr-4">Avg Power</th>
+                            <th className="pb-2 pr-4">NP</th>
+                            <th className="pb-2">Cadence</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {laps.map((lap) => (
+                            <tr key={lap.index} className="border-t border-white/10">
+                              <td className="py-2 pr-4">{lap.index}</td>
+                              <td className="py-2 pr-4 tabular-nums">{formatLapDuration(lap.durationSec)}</td>
+                              <td className="py-2 pr-4 tabular-nums">{lap.distanceM ? `${(lap.distanceM / 1000).toFixed(2)} km` : "—"}</td>
+                              {showPace ? <td className="py-2 pr-4 tabular-nums">{formatLapPace(activity.sport_type, lap.durationSec, lap.distanceM)}</td> : null}
+                              <td className="py-2 pr-4">{lap.avgHr ? `${lap.avgHr} bpm` : "—"}</td>
+                              <td className="py-2 pr-4">{lap.avgPower ? `${lap.avgPower} w` : "—"}</td>
+                              <td className="py-2 pr-4">{lap.normalizedPower ? `${Math.round(lap.normalizedPower)} w` : "—"}</td>
+                              <td className="py-2">{lap.avgCadence ?? "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-white/20 text-muted font-medium">
+                            <td className="pt-2 pr-4 text-xs uppercase tracking-wide">Total</td>
+                            <td className="pt-2 pr-4 tabular-nums">{formatLapDuration(totalDuration)}</td>
+                            <td className="pt-2 pr-4 tabular-nums">{totalDistance > 0 ? `${(totalDistance / 1000).toFixed(2)} km` : "—"}</td>
+                            {showPace ? <td className="pt-2 pr-4 tabular-nums">{formatLapPace(activity.sport_type, totalDuration, totalDistance)}</td> : null}
+                            <td className="pt-2 pr-4">{avgHrTotal ? `${avgHrTotal} bpm` : "—"}</td>
+                            <td className="pt-2 pr-4">{avgPowerTotal ? `${avgPowerTotal} w` : "—"}</td>
+                            <td className="pt-2 pr-4">{avgNpTotal ? `${avgNpTotal} w` : "—"}</td>
+                            <td className="pt-2">{avgCadenceTotal ?? "—"}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </article>
         </div>
 

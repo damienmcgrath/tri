@@ -9,6 +9,7 @@
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { refreshToken as stravaRefreshToken } from "./providers/strava/client";
+import { log, warn, error } from "@/lib/logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export async function getConnection(
   provider: string
 ): Promise<ExternalConnection | null> {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from("external_account_connections")
     .select("*")
     .eq("user_id", userId)
@@ -88,8 +89,8 @@ export async function getConnection(
     .is("disconnected_at", null)
     .maybeSingle();
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] getConnection error:", error.message);
+  if (dbError) {
+    error("token-service.get-connection.error", { message: dbError.message });
     return null;
   }
   if (!data) return null;
@@ -105,7 +106,7 @@ export async function getConnectionByProviderAthleteId(
   providerAthleteId: string
 ): Promise<ExternalConnection | null> {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from("external_account_connections")
     .select("*")
     .eq("provider", provider)
@@ -113,8 +114,8 @@ export async function getConnectionByProviderAthleteId(
     .is("disconnected_at", null)
     .maybeSingle();
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] getConnectionByProviderAthleteId error:", error.message);
+  if (dbError) {
+    error("token-service.get-connection-by-athlete-id.error", { message: dbError.message });
     return null;
   }
   if (!data) return null;
@@ -127,7 +128,7 @@ export async function upsertConnection(
   data: ConnectionInput
 ): Promise<void> {
   const supabase = getAdminClient();
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("external_account_connections")
     .upsert(
       {
@@ -146,9 +147,9 @@ export async function upsertConnection(
       { onConflict: "user_id,provider" }
     );
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] upsertConnection error:", error.message);
-    throw new Error(`Failed to save connection: ${error.message}`);
+  if (dbError) {
+    error("token-service.upsert-connection.error", { message: dbError.message });
+    throw new Error(`Failed to save connection: ${dbError.message}`);
   }
 }
 
@@ -166,7 +167,7 @@ export async function refreshIfExpired(
     return connection;
   }
 
-  console.log(`[TOKEN_SERVICE] Refreshing ${connection.provider} token for user ${connection.userId}`);
+  log("token-service.token-refresh.start", { provider: connection.provider, userId: connection.userId });
 
   let newTokens: { access_token: string; refresh_token: string; expires_at: number };
   try {
@@ -180,7 +181,7 @@ export async function refreshIfExpired(
   const newExpiresAt = new Date(newTokens.expires_at * 1000);
 
   const supabase = getAdminClient();
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("external_account_connections")
     .update({
       access_token: newTokens.access_token,
@@ -190,12 +191,12 @@ export async function refreshIfExpired(
     .eq("user_id", connection.userId)
     .eq("provider", connection.provider);
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] refreshIfExpired update error:", error.message);
-    throw new Error(`Failed to persist refreshed token: ${error.message}`);
+  if (dbError) {
+    error("token-service.token-refresh.persist-error", { message: dbError.message, userId: connection.userId, provider: connection.provider });
+    throw new Error(`Failed to persist refreshed token: ${dbError.message}`);
   }
 
-  console.log(`[TOKEN_SERVICE] Token refreshed for user ${connection.userId}, expires ${newExpiresAt.toISOString()}`);
+  log("token-service.token-refresh.done", { userId: connection.userId, provider: connection.provider, expiresAt: newExpiresAt.toISOString() });
 
   return {
     ...connection,
@@ -216,13 +217,13 @@ export async function updateSyncStatus(
   userId: string,
   provider: string,
   status: SyncStatus,
-  error?: string,
+  syncError?: string,
   metadata?: SyncMetadata
 ): Promise<void> {
   const supabase = getAdminClient();
   const update: Record<string, unknown> = {
     last_sync_status: status,
-    last_sync_error: error ?? null
+    last_sync_error: syncError ?? null
   };
   if (status === "ok") {
     update.last_synced_at = new Date().toISOString();
@@ -239,7 +240,7 @@ export async function updateSyncStatus(
     .eq("provider", provider);
 
   if (dbError) {
-    console.error("[TOKEN_SERVICE] updateSyncStatus error:", dbError.message);
+    error("token-service.update-sync-status.error", { message: dbError.message });
   }
 }
 
@@ -249,15 +250,15 @@ export async function deleteConnection(
   provider: string
 ): Promise<void> {
   const supabase = getAdminClient();
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("external_account_connections")
     .delete()
     .eq("user_id", userId)
     .eq("provider", provider);
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] deleteConnection error:", error.message);
-    throw new Error(`Failed to delete connection: ${error.message}`);
+  if (dbError) {
+    error("token-service.delete-connection.error", { message: dbError.message, userId, provider });
+    throw new Error(`Failed to delete connection: ${dbError.message}`);
   }
 }
 
@@ -271,16 +272,16 @@ export async function softDisconnect(
   providerAthleteId: string
 ): Promise<void> {
   const supabase = getAdminClient();
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("external_account_connections")
     .update({ disconnected_at: new Date().toISOString() })
     .eq("provider", provider)
     .eq("provider_athlete_id", providerAthleteId)
     .is("disconnected_at", null);
 
-  if (error) {
-    console.error("[TOKEN_SERVICE] softDisconnect error:", error.message);
+  if (dbError) {
+    error("token-service.soft-disconnect.error", { message: dbError.message, provider, providerAthleteId });
   } else {
-    console.log(`[TOKEN_SERVICE] Soft-disconnected ${provider} athlete ${providerAthleteId}`);
+    log("token-service.soft-disconnect.done", { provider, providerAthleteId });
   }
 }

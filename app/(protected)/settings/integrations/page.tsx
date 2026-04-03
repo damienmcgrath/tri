@@ -51,7 +51,7 @@ export default async function IntegrationsPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  const uploadIds = (uploadRows ?? []).map((item: any) => item.id);
+  const uploadIds = (uploadRows ?? []).map((item: { id: string }) => item.id);
 
   const [{ data: activities }, { data: links }, sessionsQuery] = await Promise.all([
     uploadIds.length
@@ -60,13 +60,13 @@ export default async function IntegrationsPage() {
           .select("id,upload_id,sport_type,duration_sec,distance_m,schedule_status")
           .eq("user_id", user.id)
           .in("upload_id", uploadIds)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as { id: string; upload_id: string; sport_type: string; duration_sec: number; distance_m: number | null; schedule_status: "scheduled" | "unscheduled" }[] }),
     uploadIds.length
       ? supabase
           .from("session_activity_links")
           .select("planned_session_id,completed_activity_id,confirmation_status")
           .eq("user_id", user.id)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as { planned_session_id: string | null; completed_activity_id: string; confirmation_status: "suggested" | "confirmed" | "rejected" | null }[] }),
     supabase
       .from("sessions")
       .select("id,date,sport,type,duration_minutes")
@@ -77,7 +77,7 @@ export default async function IntegrationsPage() {
 
   let plannedSessions: PlannedCandidate[] = [];
   if (!sessionsQuery.error) {
-    plannedSessions = ((sessionsQuery.data ?? []) as any[]).map((session) => ({
+    plannedSessions = ((sessionsQuery.data ?? []) as Array<{ id: string; date: string; sport: string; type: string; duration_minutes: number }>).map((session) => ({
       id: session.id,
       date: session.date,
       sport: session.sport,
@@ -95,21 +95,25 @@ export default async function IntegrationsPage() {
     plannedSessions = (legacyPlanned ?? []) as PlannedCandidate[];
   }
 
+  type ActivityRow = { id: string; upload_id: string; sport_type: string; duration_sec: number; distance_m: number | null; schedule_status: "scheduled" | "unscheduled" };
+  type LinkRow = { planned_session_id: string | null; completed_activity_id: string; confirmation_status: "suggested" | "confirmed" | "rejected" | null };
+  type UploadBaseRow = { id: string; filename: string; file_type: "fit" | "tcx"; created_at: string; status: "uploaded" | "parsed" | "matched" | "error"; error_message: string | null };
+
   const activityByUpload = new Map<string, UploadRow["completed_activities"]>();
-  (activities ?? []).forEach((activity: any) => {
+  (activities ?? []).forEach((activity: ActivityRow) => {
     const list = activityByUpload.get(activity.upload_id) ?? [];
     list.push(activity);
     activityByUpload.set(activity.upload_id, list);
   });
 
   const linksByActivityId = new Map<string, UploadRow["session_activity_links"]>();
-  (links ?? []).forEach((link: any) => {
+  (links ?? []).forEach((link: LinkRow) => {
     const list = linksByActivityId.get(link.completed_activity_id) ?? [];
     list.push({ planned_session_id: link.planned_session_id, confirmation_status: link.confirmation_status ?? "confirmed" });
     linksByActivityId.set(link.completed_activity_id, list);
   });
 
-  const uploads: UploadRow[] = (uploadRows ?? []).map((upload: any) => {
+  const uploads: UploadRow[] = (uploadRows ?? []).map((upload: UploadBaseRow) => {
     const relatedActivities = activityByUpload.get(upload.id) ?? [];
     const relatedLinks = relatedActivities.flatMap((activity) => linksByActivityId.get(activity.id) ?? []);
 
@@ -122,8 +126,8 @@ export default async function IntegrationsPage() {
 
   const occupiedSessionIds = new Set<string>(
     (links ?? [])
-      .filter((l: any) => l.confirmation_status === "confirmed" && l.planned_session_id !== null)
-      .map((l: any) => l.planned_session_id as string)
+      .filter((l: LinkRow) => l.confirmation_status === "confirmed" && l.planned_session_id !== null)
+      .map((l: LinkRow) => l.planned_session_id as string)
   );
 
   return (

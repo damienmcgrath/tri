@@ -17,6 +17,20 @@ export const createPlanChangeProposalArgsSchema = z.object({
   changeSummary: z.string().trim().min(5).max(1000)
 }).strict();
 
+export const suggestAlternativeWorkoutArgsSchema = z.object({
+  targetSessionId: z.string().uuid().describe("The session to suggest an alternative for"),
+  availableMinutes: z.number().int().min(10).max(480).optional().describe("Minutes available"),
+  reason: z.string().trim().min(3).max(200).optional().describe("Why the alternative is needed"),
+}).strict();
+
+export const saveCoachNoteArgsSchema = z.object({
+  patternKey: z.string().trim().min(3).max(80).describe("A short unique key for this observation, e.g. 'prefers-morning-runs'"),
+  label: z.string().trim().min(3).max(120).describe("Short human-readable label"),
+  detail: z.string().trim().min(5).max(500).describe("Full observation detail"),
+  confidence: z.enum(["low", "medium", "high"]).optional(),
+  sourceSessionId: z.string().uuid().optional().describe("Session that prompted this observation"),
+}).strict();
+
 export const coachToolSchemas = {
   get_athlete_snapshot: getAthleteSnapshotArgsSchema,
   get_recent_sessions: getRecentSessionsArgsSchema,
@@ -25,7 +39,9 @@ export const coachToolSchemas = {
   get_weekly_brief: getWeeklyBriefArgsSchema,
   get_activity_details: getActivityDetailsArgsSchema,
   get_training_load: getTrainingLoadArgsSchema,
-  create_plan_change_proposal: createPlanChangeProposalArgsSchema
+  create_plan_change_proposal: createPlanChangeProposalArgsSchema,
+  suggest_alternative_workout: suggestAlternativeWorkoutArgsSchema,
+  save_coach_note: saveCoachNoteArgsSchema
 } as const;
 
 export const coachTools = [
@@ -129,6 +145,40 @@ export const coachTools = [
         proposedDate: { type: "string", format: "date" },
         proposedDurationMinutes: { type: "number", minimum: 10, maximum: 480 },
         changeSummary: { type: "string", minLength: 5, maxLength: 1000 }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    name: "suggest_alternative_workout",
+    description: "Look up a planned session and generate a context-aware alternative workout suggestion. Use when the athlete cannot do the planned workout as written.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["targetSessionId"],
+      properties: {
+        targetSessionId: { type: "string", format: "uuid" },
+        availableMinutes: { type: "number", minimum: 10, maximum: 480 },
+        reason: { type: "string", minLength: 3, maxLength: 200 }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    name: "save_coach_note",
+    description: "Persist a coaching observation about the athlete's patterns, preferences, or tendencies. Notes are accumulated over time and influence future coaching context. Use when you notice a recurring pattern worth remembering.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["patternKey", "label", "detail"],
+      properties: {
+        patternKey: { type: "string", minLength: 3, maxLength: 80 },
+        label: { type: "string", minLength: 3, maxLength: 120 },
+        detail: { type: "string", minLength: 5, maxLength: 500 },
+        confidence: { type: "string", enum: ["low", "medium", "high"] },
+        sourceSessionId: { type: "string", format: "uuid" }
       }
     }
   }

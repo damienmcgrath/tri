@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { warn } from "@/lib/logger";
 import { buildExtraCompletedActivities, hasConfirmedPlannedSessionLink, loadCompletedActivities, localIsoDate } from "@/lib/activities/completed-activities";
 import { getAthleteContextSnapshot, type AthleteContextSnapshot } from "@/lib/athlete-context";
 import { parsePersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
@@ -864,7 +865,7 @@ async function generateNarrative(args: {
     );
     const text = response.output_text?.trim();
     if (!text) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: empty model output");
+      warn("weekly-debrief.narrative.fallback", { reason: "empty-model-output" });
       return {
         narrative: args.deterministicFallback,
         source: "fallback" as const
@@ -872,7 +873,7 @@ async function generateNarrative(args: {
     }
     const payload = extractJsonObject(text);
     if (!payload) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: could not parse model output as JSON");
+      warn("weekly-debrief.narrative.fallback", { reason: "json-parse-failed" });
       return {
         narrative: args.deterministicFallback,
         source: "fallback" as const
@@ -882,7 +883,7 @@ async function generateNarrative(args: {
       hydrateNarrativePayload(normalizeNarrativePayload(payload), args.deterministicFallback)
     );
     if (!parsed.success) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: model JSON failed schema validation", parsed.error.flatten());
+      warn("weekly-debrief.narrative.fallback", { reason: "schema-validation-failed", formErrors: parsed.error.flatten().formErrors, fieldErrors: parsed.error.flatten().fieldErrors });
       return {
         narrative: args.deterministicFallback,
         source: "fallback" as const
@@ -893,7 +894,7 @@ async function generateNarrative(args: {
       source: "ai" as const
     };
   } catch (error) {
-    console.warn("[weekly-debrief] Falling back to deterministic narrative: model request failed", error);
+    warn("weekly-debrief.narrative.fallback", { reason: "model-request-failed", message: error instanceof Error ? error.message : String(error) });
     return {
       narrative: args.deterministicFallback,
       source: "fallback" as const

@@ -78,8 +78,8 @@ export async function swapSessionDayAction(formData: FormData) {
     throw new Error("Could not find both sessions for swap.");
   }
 
-  const source = pair.find((session: any) => session.id === parsed.data.sourceSessionId);
-  const target = pair.find((session: any) => session.id === parsed.data.targetSessionId);
+  const source = pair.find((session: { id: string; date: string }) => session.id === parsed.data.sourceSessionId);
+  const target = pair.find((session: { id: string; date: string }) => session.id === parsed.data.targetSessionId);
 
   if (!source || !target) {
     throw new Error("Could not identify selected sessions.");

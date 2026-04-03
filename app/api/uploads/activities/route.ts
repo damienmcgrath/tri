@@ -52,9 +52,20 @@ export async function GET() {
     return NextResponse.json({ error: "Could not load uploads." }, { status: 400 });
   }
 
-  const uploads = (legacyData ?? []).map((upload: any) => ({
+  type LegacyUploadRow = {
+    id: string;
+    filename: string;
+    file_type: string;
+    file_size: number;
+    status: string;
+    error_message: string | null;
+    created_at: string;
+    completed_activities: { id: string; sport_type: string; duration_sec: number; distance_m: number | null }[] | null;
+    session_activity_links: { planned_session_id: string | null }[] | null;
+  };
+  const uploads = (legacyData ?? []).map((upload: LegacyUploadRow) => ({
     ...upload,
-    completed_activities: (upload.completed_activities ?? []).map((activity: any) => ({
+    completed_activities: (upload.completed_activities ?? []).map((activity: { id: string; sport_type: string; duration_sec: number; distance_m: number | null }) => ({
       ...activity,
       schedule_status: "unscheduled" as const
     }))
@@ -202,8 +213,9 @@ export async function POST(request: Request) {
       .gte("date", windowStart.slice(0, 10))
       .lte("date", windowEnd.slice(0, 10));
 
+    type CandidateRow = { id: string; sport: string; date: string; duration_minutes: number; intent_category: string | null };
     const candidateIntentById = new Map<string, string | null>(
-      (candidates ?? []).map((candidate: any) => [candidate.id as string, candidate.intent_category ?? null])
+      (candidates ?? []).map((candidate: CandidateRow) => [candidate.id as string, candidate.intent_category ?? null])
     );
 
     const suggestions = suggestSessionMatches(
@@ -215,7 +227,7 @@ export async function POST(request: Request) {
         durationSec: createdActivity.duration_sec,
         distanceM: Number(createdActivity.distance_m ?? 0)
       },
-      (candidates ?? []).map((candidate: any) => ({
+      (candidates ?? []).map((candidate: CandidateRow) => ({
         id: candidate.id,
         userId: user.id,
         date: candidate.date,

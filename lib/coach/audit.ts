@@ -1,4 +1,5 @@
 import type { CoachAuthContext } from "@/lib/coach/types";
+import { log, warn, error } from "@/lib/logger";
 
 export type CoachAuditLevel = "info" | "warn" | "error";
 
@@ -49,14 +50,14 @@ export function logCoachAudit(level: CoachAuditLevel, event: string, details: {
   };
 
   if (level === "error") {
-    console.error("[coach/audit]", payload);
+    error("coach.audit", payload as Record<string, unknown>);
     return;
   }
 
   if (level === "warn") {
-    console.warn("[coach/audit]", payload);
+    warn("coach.audit", payload as Record<string, unknown>);
     return;
   }
 
-  console.info("[coach/audit]", payload);
+  log("coach.audit", payload as Record<string, unknown>);
 }

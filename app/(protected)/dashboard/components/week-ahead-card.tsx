@@ -1,4 +1,5 @@
 import type { WeekPreview } from "@/lib/training/week-preview";
+import { addDays } from "../../week-context";
 
 const dayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const dateFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
@@ -13,12 +14,6 @@ const SPORT_COLORS: Record<string, string> = {
   run: "var(--color-run)",
   strength: "var(--color-strength)"
 };
-
-function addDays(isoDate: string, days: number) {
-  const d = new Date(`${isoDate}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export function WeekAheadCard({ preview }: Props) {
   const totalMinutes = preview.totalPlannedMinutes;

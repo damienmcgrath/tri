@@ -1,12 +1,19 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { isSameOrigin } from "@/lib/security/request";
+import { isSameOrigin, getClientIp } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { syncExtraActivityExecution, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const ip = getClientIp(request);
+  const ipLimit = checkRateLimit("review-regen-ip", ip, { maxRequests: 20, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(ipLimit) });
   }
 
   const { sessionId } = await context.params;
@@ -17,6 +24,11 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userLimit = checkRateLimit("review-regen-user", user.id, { maxRequests: 10, windowMs: 60_000 });
+  if (!userLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(userLimit) });
   }
 
   // Handle extra (unplanned) activities accessed via the synthetic activity-${activityId} session ID
@@ -50,7 +62,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   }
 
   const confirmedLink = (links ?? []).find(
-    (link: any) => link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
+    (link: { completed_activity_id: string | null; confirmation_status: string | null; created_at: string }) => link.completed_activity_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null)
   );
 
   if (!confirmedLink?.completed_activity_id) {

@@ -442,6 +442,91 @@ async function getTrainingLoad({ supabase, ctx }: ToolDeps) {
   };
 }
 
+async function suggestAlternativeWorkout(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.suggest_alternative_workout.parse(args);
+
+  // 1. Fetch the target session
+  const { data: session } = await deps.supabase
+    .from("sessions")
+    .select("id,date,sport,type,session_name,duration_minutes,intent_category,session_role,notes,is_key")
+    .eq("id", parsed.targetSessionId)
+    .eq("user_id", deps.ctx.userId)
+    .maybeSingle();
+
+  if (!session) throw new Error("Session not found or not owned by athlete.");
+
+  // 2. Build a context object for the coach to reason about
+  return {
+    originalSession: {
+      id: session.id,
+      date: session.date,
+      sport: session.sport,
+      name: session.session_name ?? session.type,
+      durationMinutes: session.duration_minutes,
+      intentCategory: session.intent_category,
+      role: session.session_role,
+      isKey: session.is_key,
+    },
+    availableMinutes: parsed.availableMinutes ?? session.duration_minutes,
+    reason: parsed.reason ?? null,
+    guidance: session.is_key
+      ? "This is a KEY session. Preserve the primary training stimulus (intent category) even if duration is reduced. Do not suggest skipping."
+      : "This is a supporting/optional session. An alternative can modify sport, duration, or intensity freely.",
+  };
+}
+
+async function saveCoachNote(args: unknown, deps: ToolDeps) {
+  const parsed = coachToolSchemas.save_coach_note.parse(args);
+
+  // Check if pattern already exists for this athlete
+  const { data: existing } = await deps.supabase
+    .from("athlete_observed_patterns")
+    .select("id, support_count, source_session_ids")
+    .eq("athlete_id", deps.ctx.athleteId)
+    .eq("pattern_key", parsed.patternKey)
+    .maybeSingle();
+
+  if (existing) {
+    // Update: increment support_count, update detail and confidence, append session ID
+    const sessionIds = Array.isArray(existing.source_session_ids) ? existing.source_session_ids : [];
+    if (parsed.sourceSessionId && !sessionIds.includes(parsed.sourceSessionId)) {
+      sessionIds.push(parsed.sourceSessionId);
+    }
+
+    await deps.supabase
+      .from("athlete_observed_patterns")
+      .update({
+        label: parsed.label,
+        detail: parsed.detail,
+        support_count: (existing.support_count ?? 0) + 1,
+        confidence: parsed.confidence ?? (existing.support_count >= 3 ? "high" : existing.support_count >= 1 ? "medium" : "low"),
+        last_observed_at: new Date().toISOString(),
+        source_session_ids: sessionIds,
+      })
+      .eq("id", existing.id);
+
+    return { action: "updated", patternKey: parsed.patternKey, supportCount: (existing.support_count ?? 0) + 1 };
+  } else {
+    // Insert new pattern
+    const sessionIds = parsed.sourceSessionId ? [parsed.sourceSessionId] : [];
+
+    await deps.supabase
+      .from("athlete_observed_patterns")
+      .insert({
+        athlete_id: deps.ctx.athleteId,
+        pattern_key: parsed.patternKey,
+        label: parsed.label,
+        detail: parsed.detail,
+        support_count: 1,
+        confidence: parsed.confidence ?? "low",
+        last_observed_at: new Date().toISOString(),
+        source_session_ids: sessionIds,
+      });
+
+    return { action: "created", patternKey: parsed.patternKey, supportCount: 1 };
+  }
+}
+
 export async function executeCoachTool(name: CoachToolName, args: unknown, deps: ToolDeps) {
   logCoachAudit("info", "coach.tool.execute", {
     ctx: deps.ctx,
@@ -480,6 +565,12 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
         break;
       case "create_plan_change_proposal":
         result = await createPlanChangeProposal(args, deps);
+        break;
+      case "suggest_alternative_workout":
+        result = await suggestAlternativeWorkout(args, deps);
+        break;
+      case "save_coach_note":
+        result = await saveCoachNote(args, deps);
         break;
       default:
         throw new Error(`Unsupported tool: ${String(name)}`);

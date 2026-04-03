@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/security/request";
+import { isSameOrigin, getClientIp } from "@/lib/security/request";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroContext, formatMacroContextSummary } from "@/lib/training/macro-context";
 import { generateWeekPreview } from "@/lib/training/week-preview";
@@ -15,6 +16,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
+  const ip = getClientIp(request);
+  const ipLimit = checkRateLimit("week-ahead-ip", ip, { maxRequests: 10, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(ipLimit) });
+  }
+
   const supabase = await createClient();
   const {
     data: { user }
@@ -22,6 +29,11 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userLimit = checkRateLimit("week-ahead-user", user.id, { maxRequests: 5, windowMs: 60_000 });
+  if (!userLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: rateLimitHeaders(userLimit) });
   }
 
   try {

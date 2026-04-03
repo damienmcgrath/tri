@@ -256,8 +256,8 @@ export async function swapSessionDayAction(input: { sourceSessionId: string; tar
       throw new Error("Could not find both sessions for swap.");
     }
 
-    const source = pair.find((s: any) => s.id === parsed.sourceSessionId);
-    const target = pair.find((s: any) => s.id === parsed.targetSessionId);
+    const source = pair.find((s: { id: string; date: string }) => s.id === parsed.sourceSessionId);
+    const target = pair.find((s: { id: string; date: string }) => s.id === parsed.targetSessionId);
 
     if (!source || !target) {
       throw new Error("Could not identify selected sessions.");
@@ -307,8 +307,8 @@ export async function swapSessionDayAction(input: { sourceSessionId: string; tar
     throw new Error("Could not find both sessions for swap.");
   }
 
-  const source = legacyPair.find((s: any) => s.id === parsed.sourceSessionId);
-  const target = legacyPair.find((s: any) => s.id === parsed.targetSessionId);
+  const source = legacyPair.find((s: { id: string; date: string }) => s.id === parsed.sourceSessionId);
+  const target = legacyPair.find((s: { id: string; date: string }) => s.id === parsed.targetSessionId);
 
   if (!source || !target) {
     throw new Error("Could not identify selected sessions.");

@@ -580,7 +580,7 @@ export async function deleteWeekAction(formData: FormData) {
     throw new Error("A plan must contain at least one week.");
   }
 
-  const weekToDelete = weeks.find((week: any) => week.id === parsed.weekId);
+  const weekToDelete = weeks.find((week: { id: string; week_index: number }) => week.id === parsed.weekId);
 
   if (!weekToDelete) {
     throw new Error("Week not found.");
@@ -592,7 +592,7 @@ export async function deleteWeekAction(formData: FormData) {
     throw new Error(deleteError.message);
   }
 
-  const remainingWeeks = weeks.filter((week: any) => week.id !== parsed.weekId);
+  const remainingWeeks = weeks.filter((week: { id: string; week_index: number }) => week.id !== parsed.weekId);
   for (const [index, week] of remainingWeeks.entries()) {
     const expected = index + 1;
     if (week.week_index !== expected) {

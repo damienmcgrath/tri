@@ -1,5 +1,6 @@
 import "openai/shims/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { warn } from "@/lib/logger";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonObject, asObject, asString, asStringArray, clip } from "@/lib/openai";
@@ -994,9 +995,7 @@ export async function generateCoachVerdict(args: {
 }) {
   const deterministicFallback = buildDeterministicVerdict(args.evidence);
   if (!process.env.OPENAI_API_KEY) {
-    console.warn("[session-review-ai] Falling back to deterministic review: missing OPENAI_API_KEY", {
-      sessionId: args.evidence.sessionId
-    });
+    warn("session-review-ai.fallback", { reason: "missing-openai-api-key", sessionId: args.evidence.sessionId });
     return { verdict: deterministicFallback, source: "fallback" as const };
   }
 
@@ -1035,21 +1034,12 @@ export async function generateCoachVerdict(args: {
     );
     const text = response.output_text?.trim();
     if (!text) {
-      console.warn("[session-review-ai] Falling back to deterministic review: empty model output", {
-        sessionId: args.evidence.sessionId,
-        incompleteReason: response.incomplete_details?.reason ?? null,
-        elapsedMs: Date.now() - startedAt
-      });
+      warn("session-review-ai.fallback", { reason: "empty-model-output", sessionId: args.evidence.sessionId, incompleteReason: response.incomplete_details?.reason ?? null, elapsedMs: Date.now() - startedAt });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
     const parsedJson = extractJsonObject(text);
     if (parsedJson == null) {
-      console.warn("[session-review-ai] Falling back to deterministic review: could not parse model output as JSON", {
-        sessionId: args.evidence.sessionId,
-        incompleteReason: response.incomplete_details?.reason ?? null,
-        outputLength: text.length,
-        elapsedMs: Date.now() - startedAt,
-      });
+      warn("session-review-ai.fallback", { reason: "json-parse-failed", sessionId: args.evidence.sessionId, incompleteReason: response.incomplete_details?.reason ?? null, outputLength: text.length, elapsedMs: Date.now() - startedAt });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
 
@@ -1061,25 +1051,12 @@ export async function generateCoachVerdict(args: {
     if (!parsed.success) {
       const payloadKeys = Object.keys(asObject(parsedJson) ?? {});
       const normalizedKeys = Object.keys(asObject(normalizedPayload) ?? {});
-      console.warn("[session-review-ai] Falling back to deterministic review: model JSON failed schema validation", {
-        sessionId: args.evidence.sessionId,
-        incompleteReason: response.incomplete_details?.reason ?? null,
-        elapsedMs: Date.now() - startedAt,
-        payloadKeys,
-        normalizedKeys,
-        formErrors: parsed.error.flatten().formErrors,
-        fieldErrors: parsed.error.flatten().fieldErrors
-      });
+      warn("session-review-ai.fallback", { reason: "schema-validation-failed", sessionId: args.evidence.sessionId, incompleteReason: response.incomplete_details?.reason ?? null, elapsedMs: Date.now() - startedAt, payloadKeys, normalizedKeys, formErrors: parsed.error.flatten().formErrors, fieldErrors: parsed.error.flatten().fieldErrors });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
     const deterministicConfidence = args.evidence.rulesSummary.confidence;
     if (deterministicConfidence !== "low" && parsed.data.sessionVerdict.intentMatch !== args.evidence.rulesSummary.intentMatch) {
-      console.warn("[session-review-ai] Falling back to deterministic review: model intent match disagreed with deterministic diagnosis", {
-        sessionId: args.evidence.sessionId,
-        elapsedMs: Date.now() - startedAt,
-        modelIntentMatch: parsed.data.sessionVerdict.intentMatch,
-        deterministicIntentMatch: args.evidence.rulesSummary.intentMatch
-      });
+      warn("session-review-ai.fallback", { reason: "intent-match-disagreement", sessionId: args.evidence.sessionId, elapsedMs: Date.now() - startedAt, modelIntentMatch: parsed.data.sessionVerdict.intentMatch, deterministicIntentMatch: args.evidence.rulesSummary.intentMatch });
       return { verdict: deterministicFallback, source: "fallback" as const };
     }
     return { verdict: normalizeVerdictUnits(parsed.data), source: "ai" as const };
@@ -1091,11 +1068,7 @@ export async function generateCoachVerdict(args: {
         : error instanceof Error
           ? error.message
           : String(error);
-    console.warn("[session-review-ai] Falling back to deterministic review: model request failed", {
-      sessionId: args.evidence.sessionId,
-      timeoutMs,
-      error: message
-    });
+    warn("session-review-ai.fallback", { reason: "model-request-failed", sessionId: args.evidence.sessionId, timeoutMs, message });
     return { verdict: deterministicFallback, source: "fallback" as const };
   }
 }

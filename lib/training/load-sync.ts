@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveTss, type AthleteThresholds, type MetricsInput, type Sport } from "@/lib/training/load";
+import { error } from "@/lib/logger";
 import { computeDailyFitness, computeRampRate, SPORTS, type FitnessSport } from "@/lib/training/fitness-model";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +95,7 @@ export async function syncSessionLoad(
   );
 
   if (loadError) {
-    console.error("[load-sync] Failed to upsert session_load:", loadError.message);
+    error("load-sync.session-load.upsert-failed", { message: loadError.message });
     return;
   }
 
@@ -118,14 +119,14 @@ async function rebuildDailyLoad(
   date: string
 ): Promise<void> {
   // Get all session_loads for this user + date
-  const { data: loads, error } = await supabase
+  const { data: loads, error: fetchError } = await supabase
     .from("session_load")
     .select("sport, tss")
     .eq("user_id", userId)
     .eq("date", date);
 
-  if (error) {
-    console.error("[load-sync] Failed to fetch session_loads for daily rebuild:", error.message);
+  if (fetchError) {
+    error("load-sync.daily-load.fetch-failed", { message: fetchError.message });
     return;
   }
 
@@ -167,7 +168,7 @@ async function rebuildDailyLoad(
     .upsert(rows, { onConflict: "user_id,date,sport" });
 
   if (upsertError) {
-    console.error("[load-sync] Failed to upsert daily_load:", upsertError.message);
+    error("load-sync.daily-load.upsert-failed", { message: upsertError.message });
   }
 }
 
@@ -285,11 +286,11 @@ async function updateFitnessFromDate(
   // Upsert in batches
   for (let i = 0; i < upsertBatch.length; i += 500) {
     const batch = upsertBatch.slice(i, i + 500);
-    const { error } = await supabase
+    const { error: upsertError } = await supabase
       .from("athlete_fitness")
       .upsert(batch, { onConflict: "user_id,date,sport" });
-    if (error) {
-      console.error("[load-sync] Failed to upsert athlete_fitness batch:", error.message);
+    if (upsertError) {
+      error("load-sync.athlete-fitness.upsert-failed", { message: upsertError.message });
     }
   }
 }
