@@ -27,7 +27,7 @@ export type IngestResult = {
   matched: number;
 };
 
-export type IngestOneResult =
+type IngestOneResult =
   | { status: "imported"; activityId: string; matched: boolean }
   | { status: "skipped" }
   | { status: "merged" };

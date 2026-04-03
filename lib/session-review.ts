@@ -1,4 +1,5 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { formatDuration } from "@/lib/date-utils";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import type { ComponentScores } from "@/lib/coach/session-diagnosis";
 
@@ -107,11 +108,7 @@ function pct(value: number | null) {
 }
 
 export function durationLabel(minutes: number | null | undefined) {
-  if (!minutes || minutes <= 0) return "—";
-  const wholeMinutes = Math.round(minutes);
-  const h = Math.floor(wholeMinutes / 60);
-  const m = wholeMinutes % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return formatDuration(minutes);
 }
 
 function toStatusLabel(status: string | null | undefined) {

@@ -1,6 +1,6 @@
 export type MetricsRecord = Record<string, unknown>;
 
-export type ActivityLapMetrics = {
+type ActivityLapMetrics = {
   index: number;
   startTime: string | null;
   durationSec: number | null;
@@ -28,7 +28,7 @@ export type ActivityLapMetrics = {
   elevationLossM?: number | null;
 };
 
-export type ZoneMetrics = {
+type ZoneMetrics = {
   zone: number;
   durationSec: number;
   pctOfSession: number | null;

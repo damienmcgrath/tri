@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 import { isMissingColumnError } from "@/lib/supabase/schema-compat";
+import { updateUploadStatusForActivity } from "@/lib/activities/upload-status";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -126,30 +127,6 @@ async function persistExtraActivityMarker(params: {
   }
 }
 
-async function updateUploadStatusForActivity(params: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
-  activityId: string;
-  status: "uploaded" | "parsed" | "matched" | "error";
-}) {
-  const { supabase, userId, activityId, status } = params;
-  const { data: activity, error: loadError } = await supabase
-    .from("completed_activities")
-    .select("upload_id")
-    .eq("id", activityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (loadError || !activity?.upload_id) {
-    return;
-  }
-
-  await supabase
-    .from("activity_uploads")
-    .update({ status, error_message: null })
-    .eq("id", activity.upload_id)
-    .eq("user_id", userId);
-}
 
 export async function moveSessionAction(input: { sessionId: string; newDate: string }) {
   const parsed = moveSessionSchema.parse(input);
@@ -334,209 +311,96 @@ export async function swapSessionDayAction(input: { sourceSessionId: string; tar
   revalidatePath("/dashboard");
 }
 
-export async function markSkippedAction(input: { sessionId: string }) {
-  const parsed = markSkippedSchema.parse(input);
-  const { supabase, user } = await getAuthedClient();
+async function updateSessionNotesWithFallback(params: {
+  supabase: Awaited<ReturnType<typeof getAuthedClient>>["supabase"];
+  userId: string;
+  sessionId: string;
+  transformNotes: (notes: string | null, status: string | null) => string;
+  extraUpdates?: Record<string, unknown>;
+  errorLabel: string;
+}) {
+  const { supabase, userId, sessionId, transformNotes, extraUpdates, errorLabel } = params;
 
   const { data: session, error: sessionError } = await supabase
     .from("sessions")
-    .select("notes")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
+    .select("notes,status")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (!sessionError) {
-    if (!session) {
-      throw new Error("Session not found.");
-    }
+    if (!session) throw new Error("Session not found.");
 
-    const nextNotes = appendSkipTag(session.notes, new Date());
-
+    const nextNotes = transformNotes(session.notes, session.status);
     const { error } = await supabase
       .from("sessions")
-      .update({ notes: nextNotes, status: "skipped" })
-      .eq("id", parsed.sessionId)
-      .eq("user_id", user.id);
+      .update({ notes: nextNotes, ...extraUpdates })
+      .eq("id", sessionId)
+      .eq("user_id", userId);
 
-    if (error) {
-      throw new Error(error.message ?? "Could not mark session as skipped.");
-    }
-
+    if (error) throw new Error(error.message ?? errorLabel);
     revalidatePath("/calendar");
     revalidatePath("/dashboard");
     return;
   }
 
   if (sessionError.code !== "PGRST205") {
-    throw new Error(sessionError.message ?? "Could not update session.");
+    throw new Error(sessionError.message ?? errorLabel);
   }
 
-  const { data: legacySession, error: legacySessionError } = await supabase
+  const { data: legacySession, error: legacyError } = await supabase
     .from("planned_sessions")
     .select("notes")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
+    .eq("id", sessionId)
+    .eq("user_id", userId)
     .maybeSingle();
 
-  if (legacySessionError) {
-    throw new Error(legacySessionError.message ?? "Could not update session.");
-  }
+  if (legacyError) throw new Error(legacyError.message ?? errorLabel);
+  if (!legacySession) throw new Error("Session not found.");
 
-  if (!legacySession) {
-    throw new Error("Session not found.");
-  }
-
-  const nextNotes = appendSkipTag(legacySession.notes, new Date());
-
+  const nextNotes = transformNotes(legacySession.notes, null);
   const { error } = await supabase
     .from("planned_sessions")
     .update({ notes: nextNotes })
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id);
+    .eq("id", sessionId)
+    .eq("user_id", userId);
 
-  if (error) {
-    throw new Error(error.message ?? "Could not mark session as skipped.");
-  }
-
+  if (error) throw new Error(error.message ?? errorLabel);
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
 }
 
+export async function markSkippedAction(input: { sessionId: string }) {
+  const parsed = markSkippedSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+  await updateSessionNotesWithFallback({
+    supabase, userId: user.id, sessionId: parsed.sessionId,
+    transformNotes: (notes) => appendSkipTag(notes, new Date()),
+    extraUpdates: { status: "skipped" },
+    errorLabel: "Could not mark session as skipped.",
+  });
+}
 
 export async function clearSkippedAction(input: { sessionId: string }) {
   const parsed = markSkippedSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
-
-  const { data: session, error: sessionError } = await supabase
-    .from("sessions")
-    .select("notes")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!sessionError) {
-    if (!session) {
-      throw new Error("Session not found.");
-    }
-
-    const nextNotes = clearSkipTag(session.notes);
-
-    const { error } = await supabase
-      .from("sessions")
-      .update({ notes: nextNotes, status: "planned" })
-      .eq("id", parsed.sessionId)
-      .eq("user_id", user.id);
-
-    if (error) {
-      throw new Error(error.message ?? "Could not clear skipped status.");
-    }
-
-    revalidatePath("/calendar");
-    revalidatePath("/dashboard");
-    return;
-  }
-
-  if (sessionError.code !== "PGRST205") {
-    throw new Error(sessionError.message ?? "Could not update session.");
-  }
-
-  const { data: legacySession, error: legacySessionError } = await supabase
-    .from("planned_sessions")
-    .select("notes")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (legacySessionError) {
-    throw new Error(legacySessionError.message ?? "Could not update session.");
-  }
-
-  if (!legacySession) {
-    throw new Error("Session not found.");
-  }
-
-  const nextNotes = clearSkipTag(legacySession.notes);
-
-  const { error } = await supabase
-    .from("planned_sessions")
-    .update({ notes: nextNotes })
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id);
-
-  if (error) {
-    throw new Error(error.message ?? "Could not clear skipped status.");
-  }
-
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
+  await updateSessionNotesWithFallback({
+    supabase, userId: user.id, sessionId: parsed.sessionId,
+    transformNotes: (notes) => clearSkipTag(notes),
+    extraUpdates: { status: "planned" },
+    errorLabel: "Could not clear skipped status.",
+  });
 }
 
 export async function confirmSkippedAction(input: { sessionId: string }) {
   const parsed = confirmSkippedSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
-
-  const { data: session, error: sessionError } = await supabase
-    .from("sessions")
-    .select("notes,status")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!sessionError) {
-    if (!session) {
-      throw new Error("Session not found.");
-    }
-
-    const nextNotes = appendConfirmedSkipTag(session.notes, new Date());
-
-    const { error } = await supabase
-      .from("sessions")
-      .update({ notes: nextNotes, status: session.status ?? "skipped" })
-      .eq("id", parsed.sessionId)
-      .eq("user_id", user.id);
-
-    if (error) {
-      throw new Error(error.message ?? "Could not confirm skipped session.");
-    }
-
-    revalidatePath("/calendar");
-    revalidatePath("/dashboard");
-    return;
-  }
-
-  if (sessionError.code !== "PGRST205") {
-    throw new Error(sessionError.message ?? "Could not confirm skipped session.");
-  }
-
-  const { data: legacySession, error: legacySessionError } = await supabase
-    .from("planned_sessions")
-    .select("notes")
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (legacySessionError) {
-    throw new Error(legacySessionError.message ?? "Could not confirm skipped session.");
-  }
-
-  if (!legacySession) {
-    throw new Error("Session not found.");
-  }
-
-  const nextNotes = appendConfirmedSkipTag(legacySession.notes, new Date());
-
-  const { error } = await supabase
-    .from("planned_sessions")
-    .update({ notes: nextNotes })
-    .eq("id", parsed.sessionId)
-    .eq("user_id", user.id);
-
-  if (error) {
-    throw new Error(error.message ?? "Could not confirm skipped session.");
-  }
-
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
+  await updateSessionNotesWithFallback({
+    supabase, userId: user.id, sessionId: parsed.sessionId,
+    transformNotes: (notes) => appendConfirmedSkipTag(notes, new Date()),
+    extraUpdates: { status: "skipped" },
+    errorLabel: "Could not confirm skipped session.",
+  });
 }
 
 export async function markActivityExtraAction(input: { activityId: string }) {

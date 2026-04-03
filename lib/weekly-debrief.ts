@@ -8,7 +8,7 @@ import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 import { asMetricsRecord, getMetricsV2Laps, getMetricsV2PaceZones, getMetricsV2HrZones, getNestedNumber as getMetricsNestedNumber, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
-import { addDays, weekRangeLabel } from "@/lib/date-utils";
+import { addDays, formatDuration, weekRangeLabel } from "@/lib/date-utils";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 6;
 
@@ -298,12 +298,7 @@ function capitalize(value: string) {
 }
 
 function formatMinutes(minutes: number) {
-  const rounded = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(rounded / 60);
-  const mins = rounded % 60;
-  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-  if (hours > 0) return `${hours}h`;
-  return `${mins}m`;
+  return formatDuration(minutes) === "—" ? "0m" : formatDuration(minutes);
 }
 
 function compactZoneEvidence(zones: ReturnType<typeof getMetricsV2HrZones | typeof getMetricsV2PaceZones>) {
