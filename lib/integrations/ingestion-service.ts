@@ -10,6 +10,7 @@
  */
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { insertActivityWithCompat } from "@/lib/supabase/schema-compat";
 import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/strava/client";
 import { shouldThrottle } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
@@ -33,33 +34,12 @@ export type IngestOneResult =
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  return error.code === "42703" || /(is_unplanned|schedule_status|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
-}
-
 /** Strip columns that may not exist yet (migration not applied) and retry insert. */
 async function insertActivity(
   supabase: SupabaseClient,
   normalized: Record<string, unknown>
 ): Promise<{ data: any; error: any }> {
-  const result = await supabase
-    .from("completed_activities")
-    .insert(normalized)
-    .select("id,start_time_utc,sport_type,duration_sec,distance_m")
-    .single();
-
-  if (!result.error || !isMissingColumnError(result.error)) {
-    return result;
-  }
-
-  // Retry without optional columns
-  const { is_unplanned, schedule_status, ...safe } = normalized as any;
-  return supabase
-    .from("completed_activities")
-    .insert(safe)
-    .select("id,start_time_utc,sport_type,duration_sec,distance_m")
-    .single();
+  return insertActivityWithCompat(supabase, normalized, "id,start_time_utc,sport_type,duration_sec,distance_m");
 }
 
 function getAdminClient() {

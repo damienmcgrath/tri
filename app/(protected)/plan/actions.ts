@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
+import { insertWithCompat, insertBatchWithCompat, updateWithCompat, isMissingColumnError, SESSIONS_OPTIONAL_COLUMNS } from "@/lib/supabase/schema-compat";
 
 const uuidSchema = z.string().uuid();
 
@@ -111,19 +112,6 @@ async function assertPlanOwnership(supabase: Awaited<ReturnType<typeof createCli
   }
 }
 
-function isMissingColumnError(error: { code?: string; message?: string } | null, column: string) {
-  if (!error) {
-    return false;
-  }
-
-  const message = error.message ?? "";
-
-  if (error.code === "42703") {
-    return new RegExp(`\\b${column}\\b`, "i").test(message);
-  }
-
-  return /schema cache/i.test(message) && new RegExp(`['\"]${column}['\"]`, "i").test(message);
-}
 
 function fallbackSessionType(sport: string, sessionType?: string | null) {
   const explicitType = sessionType?.trim();
@@ -139,86 +127,6 @@ function fallbackSessionType(sport: string, sessionType?: string | null) {
 }
 
 
-async function insertSessionWithCompat(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  payload: Record<string, unknown>
-) {
-  const { error: initialError } = await supabase.from("sessions").insert(payload);
-
-  if (!initialError) {
-    return;
-  }
-
-  const withoutOptionalColumns: Record<string, unknown> = { ...payload };
-  delete withoutOptionalColumns.day_order;
-  delete withoutOptionalColumns.target;
-  delete withoutOptionalColumns.is_key;
-  delete withoutOptionalColumns.session_role;
-
-  if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
-    throw new Error(initialError.message);
-  }
-
-  const { error: retryError } = await supabase.from("sessions").insert(withoutOptionalColumns);
-
-  if (retryError) {
-    throw new Error(retryError.message);
-  }
-}
-
-async function updateSessionWithCompat(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  sessionId: string,
-  payload: Record<string, unknown>
-) {
-  const { error: initialError } = await supabase.from("sessions").update(payload).eq("id", sessionId);
-
-  if (!initialError) {
-    return;
-  }
-
-  const withoutOptionalColumns: Record<string, unknown> = { ...payload };
-  delete withoutOptionalColumns.day_order;
-  delete withoutOptionalColumns.target;
-  delete withoutOptionalColumns.is_key;
-  delete withoutOptionalColumns.session_role;
-
-  if (Object.keys(withoutOptionalColumns).length === Object.keys(payload).length) {
-    throw new Error(initialError.message);
-  }
-
-  const { error: retryError } = await supabase.from("sessions").update(withoutOptionalColumns).eq("id", sessionId);
-
-  if (retryError) {
-    throw new Error(retryError.message);
-  }
-}
-
-async function insertSessionsBatchWithCompat(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  payload: Array<Record<string, unknown>>
-) {
-  const { error: initialError } = await supabase.from("sessions").insert(payload);
-
-  if (!initialError) {
-    return;
-  }
-
-  const fallbackPayload = payload.map((row) => {
-    const next = { ...row };
-    delete next.day_order;
-    delete next.target;
-    delete next.is_key;
-    delete next.session_role;
-    return next;
-  });
-
-  const { error: retryError } = await supabase.from("sessions").insert(fallbackPayload);
-
-  if (retryError) {
-    throw new Error(retryError.message);
-  }
-}
 
 async function assertWeekOwnership(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -497,7 +405,7 @@ export async function duplicateWeekForwardAction(formData: FormData) {
       };
     });
 
-    await insertSessionsBatchWithCompat(supabase, payload);
+    await insertBatchWithCompat(supabase, "sessions", payload, SESSIONS_OPTIONAL_COLUMNS);
   }
 
   revalidatePath("/plan");
@@ -656,7 +564,7 @@ export async function createSessionAction(formData: FormData) {
     session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 
-  await insertSessionWithCompat(supabase, canonicalPayload);
+  await insertWithCompat(supabase, "sessions", canonicalPayload, SESSIONS_OPTIONAL_COLUMNS);
 
   revalidatePath("/plan");
 }
@@ -701,7 +609,7 @@ export async function updateSessionAction(formData: FormData) {
     session_role: parsed.sessionRole === "" ? null : parsed.sessionRole
   };
 
-  await updateSessionWithCompat(supabase, parsed.sessionId, canonicalPayload);
+  await updateWithCompat(supabase, "sessions", parsed.sessionId, canonicalPayload, SESSIONS_OPTIONAL_COLUMNS);
 
   revalidatePath("/plan");
 }

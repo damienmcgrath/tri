@@ -3,7 +3,8 @@ import { z } from "zod";
 import { buildExtraCompletedActivities, hasConfirmedPlannedSessionLink, loadCompletedActivities, localIsoDate } from "@/lib/activities/completed-activities";
 import { getAthleteContextSnapshot, type AthleteContextSnapshot } from "@/lib/athlete-context";
 import { parsePersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
-import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonObject, clip } from "@/lib/openai";
+import { clip } from "@/lib/openai";
+import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "@/lib/workouts/session-execution";
 import { asMetricsRecord, getMetricsV2Laps, getMetricsV2PaceZones, getMetricsV2HrZones, getNestedNumber as getMetricsNestedNumber, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
@@ -800,105 +801,62 @@ async function generateNarrative(args: {
   deterministicFallback: WeeklyDebriefNarrative;
   recentFeedback?: Array<{ weekStart: string; helpful: boolean | null; accurate: boolean | null; note: string | null }>;
 }) {
-  if (!process.env.OPENAI_API_KEY) {
-    return {
-      narrative: args.deterministicFallback,
-      source: "fallback" as const
-    };
-  }
-
-  try {
-    const client = getOpenAIClient();
-
-    // Build calibration note from recent feedback
-    let calibrationNote = "";
-    if (args.recentFeedback && args.recentFeedback.length > 0) {
-      const inaccurateCount = args.recentFeedback.filter((f) => f.accurate === false).length;
-      const unhelpfulCount = args.recentFeedback.filter((f) => f.helpful === false).length;
-      const notes = args.recentFeedback.filter((f) => f.note).map((f) => f.note);
-      if (inaccurateCount > 0 || unhelpfulCount > 0) {
-        calibrationNote = ` CALIBRATION: The athlete rated ${inaccurateCount} of the last ${args.recentFeedback.length} debriefs as inaccurate and ${unhelpfulCount} as unhelpful. Be more conservative in claims and stick closer to the data.`;
-        if (notes.length > 0) {
-          calibrationNote += ` Athlete notes: ${notes.slice(0, 2).join("; ")}.`;
-        }
+  // Build calibration note from recent feedback
+  let calibrationNote = "";
+  if (args.recentFeedback && args.recentFeedback.length > 0) {
+    const inaccurateCount = args.recentFeedback.filter((f) => f.accurate === false).length;
+    const unhelpfulCount = args.recentFeedback.filter((f) => f.helpful === false).length;
+    const notes = args.recentFeedback.filter((f) => f.note).map((f) => f.note);
+    if (inaccurateCount > 0 || unhelpfulCount > 0) {
+      calibrationNote = ` CALIBRATION: The athlete rated ${inaccurateCount} of the last ${args.recentFeedback.length} debriefs as inaccurate and ${unhelpfulCount} as unhelpful. Be more conservative in claims and stick closer to the data.`;
+      if (notes.length > 0) {
+        calibrationNote += ` Athlete notes: ${notes.slice(0, 2).join("; ")}.`;
       }
     }
-
-    const timeoutMs = getCoachRequestTimeoutMs();
-    const response = await client.responses.create(
-      {
-        model: getCoachModel(),
-        instructions:
-          "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
-        input: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: JSON.stringify({
-                  facts: args.facts,
-                  evidence: args.evidence,
-                  activityEvidence: args.activityEvidence,
-                  athleteContext: args.athleteContext ? {
-                    weeklyState: args.athleteContext.weeklyState,
-                    declared: {
-                      weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
-                      limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
-                    }
-                  } : null,
-                  checkIn: args.checkIn ? {
-                    fatigue: args.checkIn.fatigueScore,
-                    stress: args.checkIn.stressScore,
-                    motivation: args.checkIn.motivationScore,
-                    notes: args.checkIn.weekNotes
-                  } : null,
-                  recentFeedback: args.recentFeedback ?? null,
-                })
-              }
-            ]
-          }
-        ]
-      },
-      { timeout: timeoutMs }
-    );
-    const text = response.output_text?.trim();
-    if (!text) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: empty model output");
-      return {
-        narrative: args.deterministicFallback,
-        source: "fallback" as const
-      };
-    }
-    const payload = extractJsonObject(text);
-    if (!payload) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: could not parse model output as JSON");
-      return {
-        narrative: args.deterministicFallback,
-        source: "fallback" as const
-      };
-    }
-    const parsed = weeklyDebriefNarrativeSchema.safeParse(
-      hydrateNarrativePayload(normalizeNarrativePayload(payload), args.deterministicFallback)
-    );
-    if (!parsed.success) {
-      console.warn("[weekly-debrief] Falling back to deterministic narrative: model JSON failed schema validation", parsed.error.flatten());
-      return {
-        narrative: args.deterministicFallback,
-        source: "fallback" as const
-      };
-    }
-    return {
-      narrative: parsed.data,
-      source: "ai" as const
-    };
-  } catch (error) {
-    console.warn("[weekly-debrief] Falling back to deterministic narrative: model request failed", error);
-    return {
-      narrative: args.deterministicFallback,
-      source: "fallback" as const
-    };
   }
+
+  const result = await callOpenAIWithFallback<WeeklyDebriefNarrative>({
+    logTag: "weekly-debrief",
+    fallback: args.deterministicFallback,
+    buildRequest: () => ({
+      instructions:
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
+      input: [
+        {
+          role: "user" as const,
+          content: [
+            {
+              type: "input_text" as const,
+              text: JSON.stringify({
+                facts: args.facts,
+                evidence: args.evidence,
+                activityEvidence: args.activityEvidence,
+                athleteContext: args.athleteContext ? {
+                  weeklyState: args.athleteContext.weeklyState,
+                  declared: {
+                    weeklyConstraints: args.athleteContext.declared.weeklyConstraints,
+                    limiters: args.athleteContext.declared.limiters.slice(0, 3).map((limiter) => limiter.value)
+                  }
+                } : null,
+                checkIn: args.checkIn ? {
+                  fatigue: args.checkIn.fatigueScore,
+                  stress: args.checkIn.stressScore,
+                  motivation: args.checkIn.motivationScore,
+                  notes: args.checkIn.weekNotes
+                } : null,
+                recentFeedback: args.recentFeedback ?? null,
+              })
+            }
+          ]
+        }
+      ]
+    }),
+    schema: weeklyDebriefNarrativeSchema,
+    normalizePayload: (raw) =>
+      hydrateNarrativePayload(normalizeNarrativePayload(raw), args.deterministicFallback)
+  });
+
+  return { narrative: result.value, source: result.source };
 }
 
 function getSourceUpdatedAt(values: Array<string | null | undefined>) {
