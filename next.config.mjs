@@ -25,6 +25,9 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ["openai", "zod", "@supabase/supabase-js"]
+  },
   async headers() {
     const headers = [...securityHeaders];
 

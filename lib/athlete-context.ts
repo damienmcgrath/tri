@@ -241,27 +241,32 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
     ftp: latestFtp
       ? { value: latestFtp.value, source: latestFtp.source, recordedAt: latestFtp.recorded_at }
       : null,
-    fitness: await import("@/lib/training/fitness-model")
-      .then(async ({ getLatestFitness, getTsbTrend, getReadinessState }) => {
-        const fitness = await getLatestFitness(supabase, athleteId);
-        if (!fitness) return null;
-        const total = fitness.total;
-        const trend = await getTsbTrend(supabase, athleteId, "total");
-        const readiness = getReadinessState(total.tsb, trend);
-        const perDiscipline: Record<string, { ctl: number; atl: number; tsb: number }> = {};
-        for (const sport of ["swim", "bike", "run"] as const) {
-          const d = fitness[sport];
-          if (d && (d.ctl > 0 || d.atl > 0)) {
-            perDiscipline[sport] = { ctl: d.ctl, atl: d.atl, tsb: d.tsb };
-          }
-        }
-        return { ctl: total.ctl, atl: total.atl, tsb: total.tsb, rampRate: total.rampRate, readiness, perDiscipline };
-      })
-      .catch(() => null),
-    recentBests: await import("@/lib/training/benchmarks")
-      .then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, athleteId, weekStart, weekEnd))
-      .then((bests) => bests.slice(0, 3).map((b) => ({ sport: b.sport, label: b.label, formattedValue: b.formattedValue, date: b.activityDate })))
-      .catch(() => [])
+    ...(await (async () => {
+      const [fitnessResult, benchmarkResult] = await Promise.all([
+        import("@/lib/training/fitness-model")
+          .then(async ({ getLatestFitness, getTsbTrend, getReadinessState }) => {
+            const fitness = await getLatestFitness(supabase, athleteId);
+            if (!fitness) return null;
+            const total = fitness.total;
+            const trend = await getTsbTrend(supabase, athleteId, "total");
+            const readiness = getReadinessState(total.tsb, trend);
+            const perDiscipline: Record<string, { ctl: number; atl: number; tsb: number }> = {};
+            for (const sport of ["swim", "bike", "run"] as const) {
+              const d = fitness[sport];
+              if (d && (d.ctl > 0 || d.atl > 0)) {
+                perDiscipline[sport] = { ctl: d.ctl, atl: d.atl, tsb: d.tsb };
+              }
+            }
+            return { ctl: total.ctl, atl: total.atl, tsb: total.tsb, rampRate: total.rampRate, readiness, perDiscipline };
+          })
+          .catch(() => null),
+        import("@/lib/training/benchmarks")
+          .then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, athleteId, weekStart, weekEnd))
+          .then((bests) => bests.slice(0, 3).map((b) => ({ sport: b.sport, label: b.label, formattedValue: b.formattedValue, date: b.activityDate })))
+          .catch(() => [] as Array<{ sport: string; label: string; formattedValue: string; date: string }>)
+      ]);
+      return { fitness: fitnessResult, recentBests: benchmarkResult };
+    })())
   };
 }
 

@@ -135,28 +135,11 @@ export default async function DebriefPage({
     todayIso
   });
 
-  if (snapshot.readiness.isReady && !snapshot.artifact) {
-    const refreshed = await refreshWeeklyDebrief({
-      supabase,
-      athleteId: user.id,
-      weekStart,
-      timeZone,
-      todayIso
-    });
-    snapshot = {
-      readiness: refreshed.readiness,
-      artifact: refreshed.artifact,
-      stale: false,
-      sourceUpdatedAt: refreshed.artifact?.sourceUpdatedAt ?? snapshot.sourceUpdatedAt,
-      weekStart,
-      weekEnd: addDays(weekStart, 6)
-    };
-  }
+  const needsRefresh =
+    (snapshot.readiness.isReady && !snapshot.artifact) ||
+    (snapshot.artifact && (snapshot.stale || snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION));
 
-  if (
-    snapshot.artifact &&
-    (snapshot.stale || snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION)
-  ) {
+  if (needsRefresh) {
     const refreshed = await refreshWeeklyDebrief({
       supabase,
       athleteId: user.id,
