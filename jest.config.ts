@@ -6,6 +6,7 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   testEnvironment: 'jsdom',
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
+  testPathIgnorePatterns: ['/node_modules/', '/.claude/'],
   collectCoverageFrom: ['lib/**/*.ts', '!lib/supabase/**', '!lib/env/**', '!lib/ui/**'],
   coverageThreshold: {
     global: {
