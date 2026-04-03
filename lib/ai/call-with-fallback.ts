@@ -11,6 +11,7 @@
  */
 
 import type { ZodType } from "zod";
+import type { Response as OpenAIResponse } from "openai/resources/responses/responses";
 import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonObject } from "@/lib/openai";
 
 type OpenAIRequestInput = Parameters<ReturnType<typeof getOpenAIClient>["responses"]["create"]>[0];
@@ -70,9 +71,9 @@ export async function callOpenAIWithFallback<T>(
 
     const requestParams = opts.buildRequest();
     const response = await client.responses.create(
-      { model: getCoachModel(), ...requestParams },
+      { model: getCoachModel(), ...requestParams, stream: false },
       { timeout: timeoutMs }
-    );
+    ) as OpenAIResponse;
 
     const text = response.output_text?.trim();
     if (!text) {
