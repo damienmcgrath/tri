@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
+import { isMissingColumnError } from "@/lib/supabase/schema-compat";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -44,11 +45,6 @@ const quickAddSchema = z.object({
   notes: z.string().trim().max(1000).optional()
 });
 
-function isMissingCompletedActivityColumnError(error: { code?: string; message?: string } | null | undefined) {
-  if (!error) return false;
-  return error.code === "42703" || /(is_unplanned|schedule_status|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
-}
-
 async function updateCompletedActivityExtraState(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -65,7 +61,7 @@ async function updateCompletedActivityExtraState(params: {
     return;
   }
 
-  if (!isMissingCompletedActivityColumnError(fullUpdate.error)) {
+  if (!isMissingColumnError(fullUpdate.error)) {
     throw new Error(fullUpdate.error.message ?? "Could not mark activity as extra.");
   }
 
@@ -83,7 +79,7 @@ async function updateCompletedActivityExtraState(params: {
       continue;
     }
 
-    if (!isMissingCompletedActivityColumnError(fallbackUpdate.error)) {
+    if (!isMissingColumnError(fallbackUpdate.error)) {
       throw new Error(fallbackUpdate.error.message ?? "Could not mark activity as extra.");
     }
   }
