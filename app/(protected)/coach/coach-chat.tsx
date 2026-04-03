@@ -373,6 +373,7 @@ export function CoachChat({
   const shouldAutoScrollRef = useRef(true);
   const activeRequestRef = useRef<AbortController | null>(null);
 
+  const memoizedGroups = useMemo(() => groupConversations(conversations), [conversations]);
   const sessionDiagnoses = useMemo(() => diagnosisSessions, [diagnosisSessions]);
   const flaggedSessions = useMemo(() => rankFlaggedSessions(sessionDiagnoses), [sessionDiagnoses]);
   const matchedSessions = useMemo(() => sessionDiagnoses.filter((session) => session.status === "matched"), [sessionDiagnoses]);
@@ -914,7 +915,7 @@ export function CoachChat({
             </button>
             <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {(() => {
-                const groups = groupConversations(conversations);
+                const groups = memoizedGroups;
                 const allIndex = conversations.slice();
 
                 function renderConversation(conversation: Conversation) {

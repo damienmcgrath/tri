@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { asStringArray } from "@/lib/openai";
@@ -138,7 +139,7 @@ function daysUntil(date: string | null) {
   return Math.ceil((target.getTime() - today.getTime()) / 86400000);
 }
 
-export async function getAthleteContextSnapshot(supabase: SupabaseClient, athleteId: string): Promise<AthleteContextSnapshot> {
+export const getAthleteContextSnapshot = cache(async function getAthleteContextSnapshot(supabase: SupabaseClient, athleteId: string): Promise<AthleteContextSnapshot> {
   const weekStart = getWeekStartUtc();
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
   const todayIso = getTodayUtc();
@@ -268,7 +269,7 @@ export async function getAthleteContextSnapshot(supabase: SupabaseClient, athlet
       return { fitness: fitnessResult, recentBests: benchmarkResult };
     })())
   };
-}
+});
 
 export async function saveAthleteContext(supabase: SupabaseClient, athleteId: string, input: AthleteContextInput) {
   const parsed = athleteContextInputSchema.parse(input);

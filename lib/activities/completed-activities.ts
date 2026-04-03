@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNestedNumber } from "@/lib/workouts/metrics-v2";
 import { classifyActivityStatus } from "@/lib/activities/activity-status";
@@ -154,7 +155,7 @@ function mapActivityRow(activity: Record<string, unknown>): CompletedActivityRec
   };
 }
 
-export async function loadCompletedActivities(params: {
+export const loadCompletedActivities = cache(async function loadCompletedActivities(params: {
   supabase: SupabaseClient;
   userId: string;
   rangeStart: string;
@@ -203,4 +204,4 @@ export async function loadCompletedActivities(params: {
   }
 
   throw new Error(lastError?.message ?? "Failed to load completed activities.");
-}
+});

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import Link from "next/link";
 import { CoachChat } from "./coach-chat";
 import { CoachBriefingCard } from "./CoachBriefingCard";
@@ -148,7 +149,7 @@ async function getDiagnosisSessions(supabase: Awaited<ReturnType<typeof createCl
     .slice(0, 6);
 }
 
-async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, weekStart: string, weekEnd: string): Promise<CoachBriefingContext> {
+const getBriefingContext = cache(async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, weekStart: string, weekEnd: string): Promise<CoachBriefingContext> {
   if (!userId) {
     return {
       uploadedSessionCount: 0,
@@ -227,7 +228,7 @@ async function getBriefingContext(supabase: Awaited<ReturnType<typeof createClie
     extraActivityCount,
     upcomingKeySessionNames: upcomingKeyNames.length > 0 ? upcomingKeyNames : undefined
   };
-}
+});
 
 function addDays(dateIso: string, days: number) {
   const date = new Date(`${dateIso}T00:00:00.000Z`);

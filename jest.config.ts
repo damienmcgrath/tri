@@ -7,6 +7,10 @@ const customJestConfig = {
   testEnvironment: 'jsdom',
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   testPathIgnorePatterns: ['/node_modules/', '/.claude/'],
+  moduleNameMapper: {
+    '^@upstash/ratelimit$': '<rootDir>/test/__mocks__/@upstash/ratelimit.ts',
+    '^@upstash/redis$': '<rootDir>/test/__mocks__/@upstash/redis.ts',
+  },
   collectCoverageFrom: ['lib/**/*.ts', '!lib/supabase/**', '!lib/env/**', '!lib/ui/**'],
   coverageThreshold: {
     global: {
