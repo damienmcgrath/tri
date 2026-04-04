@@ -24,11 +24,11 @@ export type ConversationMessageRow = {
   created_at: string;
 };
 
-export type StreamWriters = {
+type StreamWriters = {
   onAnswerDelta?: (chunk: string) => void;
 };
 
-export type CoachResponseFlowResult = {
+type CoachResponseFlowResult = {
   answer: string;
   structured: CoachStructuredResponse;
   responseId: string | undefined;

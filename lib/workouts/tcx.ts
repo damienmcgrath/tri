@@ -10,7 +10,7 @@ const parser = new XMLParser({
 
 type Sport = "swim" | "bike" | "run" | "strength" | "other";
 
-export type NormalizedCompletedSession = {
+type NormalizedCompletedSession = {
   garminId: string;
   date: string;
   sport: Sport;

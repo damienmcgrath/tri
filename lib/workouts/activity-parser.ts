@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import FitParser from "fit-file-parser";
 import { XMLParser } from "fast-xml-parser";
 
-export type ParsedActivity = {
+type ParsedActivity = {
   sportType: string;
   startTimeUtc: string;
   endTimeUtc: string;

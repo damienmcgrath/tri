@@ -16,7 +16,7 @@ import { getCoachModel, getCoachRequestTimeoutMs, getOpenAIClient, extractJsonOb
 
 type OpenAIRequestInput = Parameters<ReturnType<typeof getOpenAIClient>["responses"]["create"]>[0];
 
-export type CallWithFallbackOptions<T> = {
+type CallWithFallbackOptions<T> = {
   /** Tag used in console.warn messages, e.g. "[session-review-ai]" */
   logTag: string;
   /** The deterministic fallback value returned when AI is unavailable or fails. */
@@ -44,7 +44,7 @@ export type CallWithFallbackOptions<T> = {
   logContext?: Record<string, unknown>;
 };
 
-export type CallWithFallbackResult<T> = {
+type CallWithFallbackResult<T> = {
   value: T;
   source: "ai" | "fallback";
 };

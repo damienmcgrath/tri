@@ -5,27 +5,10 @@ export const coachChatRequestSchema = z.object({
   conversationId: z.preprocess((value) => (value === null ? undefined : value), z.string().uuid().optional())
 });
 
-export type CoachChatRequest = z.infer<typeof coachChatRequestSchema>;
-
 export type CoachAuthContext = {
   userId: string;
   athleteId: string;
   email: string | null;
-};
-
-export type CoachAction = {
-  type: "proposal" | "focus" | "follow_up";
-  label: string;
-  payload?: Record<string, unknown>;
-};
-
-export type CoachProposal = {
-  id: string;
-  title: string;
-  rationale: string;
-  status: "pending";
-  proposedDate?: string;
-  proposedDurationMinutes?: number;
 };
 
 export const coachStructuredResponseSchema = z.object({

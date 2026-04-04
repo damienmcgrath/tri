@@ -51,7 +51,7 @@ export type SessionCandidate = {
   isRecommended: boolean;
 };
 
-export type ActivityDetailsPayload = {
+type ActivityDetailsPayload = {
   activity: ActivityDetails;
   linkedSession: SessionCandidate | null;
   candidates: SessionCandidate[];
