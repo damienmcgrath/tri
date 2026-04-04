@@ -52,7 +52,14 @@ function roundNumber(value: unknown, decimals = 2): number | undefined {
   return Number.isFinite(parsed) ? Number(parsed.toFixed(decimals)) : undefined;
 }
 
-const tcxParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", parseTagValue: true, trimValues: true });
+const tcxParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "",
+  parseTagValue: true,
+  trimValues: true,
+  processEntities: false,
+  htmlEntities: false,
+});
 
 function asArray<T>(value: T | T[] | undefined): T[] {
   if (!value) return [];

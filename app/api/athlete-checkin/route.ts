@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { athleteCheckinInputSchema, getAthleteContextSnapshot, saveWeeklyCheckin } from "@/lib/athlete-context";
-import { isSameOrigin } from "@/lib/security/request";
+import { isSameOrigin, getClientIp } from "@/lib/security/request";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit("checkin-ip", ip, { maxRequests: 20, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
   const supabase = await createClient();

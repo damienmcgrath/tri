@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getClientIp } from "@/lib/security/request";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import {
   getConnectionByProviderAthleteId,
   refreshIfExpired,
   softDisconnect
 } from "@/lib/integrations/token-service";
 import { ingestStravaActivity } from "@/lib/integrations/ingestion-service";
+
+const webhookEventSchema = z.object({
+  object_type: z.string(),
+  object_id: z.number(),
+  aspect_type: z.string(),
+  owner_id: z.number(),
+  subscription_id: z.number(),
+  updates: z.record(z.string()).optional(),
+  event_time: z.number()
+});
 
 /**
  * GET /api/integrations/strava/webhook
@@ -61,9 +74,21 @@ type StravaWebhookEvent = {
  * - athlete deauthorize → soft-disconnect the connection
  */
 export async function POST(request: Request): Promise<Response> {
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit("strava-webhook-ip", ip, { maxRequests: 100, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+  }
+
   let event: StravaWebhookEvent;
   try {
-    event = (await request.json()) as StravaWebhookEvent;
+    const raw = await request.json();
+    const parsed = webhookEventSchema.safeParse(raw);
+    if (!parsed.success) {
+      console.error("[STRAVA_WEBHOOK] Invalid event shape:", parsed.error.message);
+      return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+    }
+    event = parsed.data as StravaWebhookEvent;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

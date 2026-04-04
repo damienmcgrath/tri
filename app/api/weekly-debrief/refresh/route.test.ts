@@ -1,5 +1,10 @@
 jest.mock("../../../../lib/security/request", () => ({
-  isSameOrigin: jest.fn(() => true)
+  isSameOrigin: jest.fn(() => true),
+  getClientIp: jest.fn(() => "127.0.0.1")
+}));
+
+jest.mock("../../../../lib/security/rate-limit", () => ({
+  checkRateLimit: jest.fn(() => ({ allowed: true, remaining: 99, resetAt: Date.now() + 60000 }))
 }));
 
 jest.mock("next/server", () => ({

@@ -10,7 +10,7 @@ export function getClientIp(request: Request) {
 export function isSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) {
-    return true;
+    return false;
   }
 
   const host = request.headers.get("host");

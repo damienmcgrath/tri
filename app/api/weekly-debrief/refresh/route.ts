@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/security/request";
+import { isSameOrigin, getClientIp } from "@/lib/security/request";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWeekStart } from "@/lib/athlete-context";
 import { refreshWeeklyDebrief } from "@/lib/weekly-debrief";
@@ -13,6 +14,12 @@ const refreshInputSchema = z.object({
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit("debrief-refresh-ip", ip, { maxRequests: 10, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
   const supabase = await createClient();

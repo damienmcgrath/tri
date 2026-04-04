@@ -1,3 +1,4 @@
+import { createHmac } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildAuthorizationUrl } from "@/lib/integrations/providers/strava/client";
@@ -23,14 +24,17 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Strava integration not configured." }, { status: 503 });
   }
 
-  // Build redirect URI from request host (works for both localhost and production)
+  // Build redirect URI: prefer explicit env var, fall back to request host
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "localhost:3000";
   const protocol = host.startsWith("localhost") ? "http" : "https";
-  const redirectUri = `${protocol}://${host}/api/integrations/strava/callback`;
+  const redirectUri = process.env.STRAVA_REDIRECT_URI ?? `${protocol}://${host}/api/integrations/strava/callback`;
 
-  // Generate a nonce to prevent CSRF
+  // Generate a nonce to prevent CSRF, with HMAC signature to prevent state tampering
   const nonce = crypto.randomUUID();
-  const state = Buffer.from(JSON.stringify({ userId: user.id, nonce })).toString("base64url");
+  const payload = JSON.stringify({ userId: user.id, nonce });
+  const hmacSecret = process.env.STRAVA_CLIENT_SECRET ?? clientId;
+  const signature = createHmac("sha256", hmacSecret).update(payload).digest("hex");
+  const state = Buffer.from(JSON.stringify({ payload, signature })).toString("base64url");
 
   const stravaUrl = buildAuthorizationUrl(state, redirectUri);
 

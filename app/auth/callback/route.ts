@@ -55,8 +55,9 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
+      console.error("[AUTH_CALLBACK] Code exchange failed:", error.message);
       const signInUrl = new URL("/auth/sign-in", requestUrl.origin);
-      signInUrl.searchParams.set("error", error.message);
+      signInUrl.searchParams.set("error", "Authentication failed. Please try again.");
       return NextResponse.redirect(signInUrl);
     }
 
@@ -70,8 +71,9 @@ export async function GET(request: Request) {
     });
 
     if (error) {
+      console.error("[AUTH_CALLBACK] OTP verification failed:", error.message);
       const signInUrl = new URL("/auth/sign-in", requestUrl.origin);
-      signInUrl.searchParams.set("error", error.message);
+      signInUrl.searchParams.set("error", "Authentication failed. Please try again.");
       return NextResponse.redirect(signInUrl);
     }
 

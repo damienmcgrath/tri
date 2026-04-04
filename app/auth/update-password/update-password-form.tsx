@@ -28,8 +28,8 @@ export function UpdatePasswordForm() {
     setMessage(null);
     setError(null);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
       return;
     }
 
@@ -66,7 +66,7 @@ export function UpdatePasswordForm() {
           id="password"
           type="password"
           required
-          minLength={6}
+          minLength={12}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           className="input-base"
@@ -81,7 +81,7 @@ export function UpdatePasswordForm() {
           id="confirmPassword"
           type="password"
           required
-          minLength={6}
+          minLength={12}
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           className="input-base"

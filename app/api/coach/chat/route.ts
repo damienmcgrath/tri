@@ -7,6 +7,7 @@ import { getCoachModel } from "@/lib/openai";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { logCoachAudit } from "@/lib/coach/audit";
+import { detectPromptInjection } from "@/lib/security/prompt-guard";
 
 type ConversationRow = {
   id: string;
@@ -175,6 +176,13 @@ export async function POST(request: Request) {
     payload = coachChatRequestSchema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid chat payload." }, { status: 400 });
+  }
+
+  const injection = detectPromptInjection(payload.message);
+  if (injection.suspicious) {
+    logCoachAudit("warn", "coach.chat.prompt_injection_detected", {
+      reason: `Matched pattern: ${injection.matchedPattern}`,
+    });
   }
 
   const { supabase, ctx, reason } = await resolveCoachAuthContext();

@@ -9,7 +9,17 @@ import { triggerComparisonAfterVerdict } from "@/lib/training/session-comparison
 import { getCoachModel } from "@/lib/openai";
 
 function tryParseJson(value: string): unknown {
-  try { return JSON.parse(value); } catch { return value; }
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed === "object" && parsed !== null) {
+      if ("__proto__" in parsed || "constructor" in parsed || "prototype" in parsed) {
+        return null;
+      }
+    }
+    return parsed;
+  } catch {
+    return value;
+  }
 }
 
 const requestSchema = z.object({

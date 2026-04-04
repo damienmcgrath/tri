@@ -1,3 +1,4 @@
+import { createHmac } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens } from "@/lib/integrations/providers/strava/client";
@@ -34,16 +35,31 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   // Validate CSRF nonce from cookie
-  const cookies = request.headers.get("cookie") ?? "";
-  const nonceCookie = cookies
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const nonceCookie = cookieHeader
     .split(";")
     .map((c) => c.trim())
     .find((c) => c.startsWith("strava_oauth_nonce="))
     ?.split("=")[1];
 
+  // Parse and verify HMAC-signed state parameter
   let stateData: { userId: string; nonce: string } | null = null;
   try {
-    stateData = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf8"));
+    const stateOuter = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf8"));
+    if (stateOuter.payload && stateOuter.signature) {
+      // New HMAC-signed format
+      const hmacSecret = process.env.STRAVA_CLIENT_SECRET ?? process.env.STRAVA_CLIENT_ID ?? "";
+      const expectedSignature = createHmac("sha256", hmacSecret).update(stateOuter.payload).digest("hex");
+      if (stateOuter.signature !== expectedSignature) {
+        console.error("[STRAVA_CALLBACK] HMAC signature mismatch — possible state tampering");
+        return NextResponse.redirect(`${baseUrl}/settings/integrations?error=strava_invalid`);
+      }
+      stateData = JSON.parse(stateOuter.payload);
+    } else {
+      // Legacy format (userId + nonce directly in state) — accept but log warning
+      stateData = stateOuter;
+      console.warn("[STRAVA_CALLBACK] Legacy unsigned state format detected");
+    }
   } catch {
     console.error("[STRAVA_CALLBACK] Failed to parse state param");
   }
@@ -64,8 +80,8 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.redirect(`${baseUrl}/settings/integrations?error=strava_invalid`);
   }
 
-  // Exchange code for tokens
-  const redirectUri = `${baseUrl}/api/integrations/strava/callback`;
+  // Exchange code for tokens — redirect_uri must match the one used in the connect step
+  const redirectUri = process.env.STRAVA_REDIRECT_URI ?? `${baseUrl}/api/integrations/strava/callback`;
   let tokens;
   try {
     tokens = await exchangeCodeForTokens(code, redirectUri);

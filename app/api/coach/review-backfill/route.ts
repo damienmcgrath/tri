@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isSameOrigin } from "@/lib/security/request";
+import { isSameOrigin, getClientIp } from "@/lib/security/request";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { backfillPendingSessionExecutions } from "@/lib/workouts/session-execution";
 
 function isMissingSessionReviewSchema(message: string) {
@@ -12,6 +13,12 @@ function isMissingSessionReviewSchema(message: string) {
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit("review-backfill-ip", ip, { maxRequests: 10, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
   let runAll = false;

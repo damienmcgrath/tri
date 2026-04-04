@@ -16,6 +16,13 @@ jest.mock("../../../../../lib/integrations/ingestion-service", () => ({
   ingestStravaActivity: (...args: unknown[]) => mockIngestStravaActivity(...args)
 }));
 
+jest.mock("../../../../../lib/security/request", () => ({
+  getClientIp: () => "127.0.0.1"
+}));
+jest.mock("../../../../../lib/security/rate-limit", () => ({
+  checkRateLimit: () => ({ allowed: true, remaining: 99, resetAt: Date.now() + 60000 })
+}));
+
 import { GET, POST } from "./route";
 
 const VERIFY_TOKEN = "test-verify-token";
