@@ -800,6 +800,8 @@ async function generateNarrative(args: {
   checkIn: WeeklyDebriefCheckIn | null;
   deterministicFallback: WeeklyDebriefNarrative;
   recentFeedback?: Array<{ weekStart: string; helpful: boolean | null; accurate: boolean | null; note: string | null }>;
+  trendsThisWeek?: Array<{ discipline: string; trend: string; confidence: string; summary: string }> | null;
+  scoreTrajectory?: Array<{ date: string; composite: number; execution: number | null; progression: number | null; balance: number | null }> | null;
 }) {
   // Build calibration note from recent feedback
   let calibrationNote = "";
@@ -820,7 +822,7 @@ async function generateNarrative(args: {
     fallback: args.deterministicFallback,
     buildRequest: () => ({
       instructions:
-        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
+        "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. If trendsThisWeek is provided, weave relevant session-over-session trends into observations (e.g. 'Your threshold run shows steady improvement over the last 3 weeks'). If scoreTrajectory is provided, reference the composite Training Score trajectory where it adds insight (e.g. score direction, which dimension is strongest/weakest). Do not over-emphasise scores — use them to contextualise, not replace, the evidence-based narrative. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence. Return valid JSON only with executiveSummary, highlights, observations, carryForward." + calibrationNote,
       input: [
         {
           role: "user" as const,
@@ -845,6 +847,8 @@ async function generateNarrative(args: {
                   notes: args.checkIn.weekNotes
                 } : null,
                 recentFeedback: args.recentFeedback ?? null,
+                trendsThisWeek: args.trendsThisWeek ?? null,
+                scoreTrajectory: args.scoreTrajectory ?? null,
               })
             }
           ]
@@ -2020,15 +2024,32 @@ export async function computeWeeklyDebrief(args: {
   const inputs = await loadWeeklyDebriefInputs(args);
   const base = buildWeeklyDebriefFacts(inputs);
 
-  // Load recent feedback from previous debriefs for AI calibration
-  const { data: feedbackRows } = await args.supabase
-    .from("weekly_debriefs")
-    .select("week_start, helpful, accurate, feedback_note")
-    .eq("athlete_id", args.athleteId)
-    .lt("week_start", args.weekStart)
-    .or("helpful.is.not.null,accurate.is.not.null")
-    .order("week_start", { ascending: false })
-    .limit(4);
+  // Load recent feedback, session comparison trends, and training scores in parallel
+  const [{ data: feedbackRows }, { data: comparisonRows }, { data: scoreRows }] = await Promise.all([
+    args.supabase
+      .from("weekly_debriefs")
+      .select("week_start, helpful, accurate, feedback_note")
+      .eq("athlete_id", args.athleteId)
+      .lt("week_start", args.weekStart)
+      .or("helpful.is.not.null,accurate.is.not.null")
+      .order("week_start", { ascending: false })
+      .limit(4),
+    args.supabase
+      .from("session_comparisons")
+      .select("discipline, trend_direction, trend_confidence, comparison_summary")
+      .eq("user_id", args.athleteId)
+      .gte("created_at", `${args.weekStart}T00:00:00.000Z`)
+      .lte("created_at", `${addDays(args.weekEnd, 1)}T00:00:00.000Z`)
+      .limit(10),
+    args.supabase
+      .from("training_scores")
+      .select("score_date, composite_score, execution_quality, progression_signal, balance_score")
+      .eq("user_id", args.athleteId)
+      .gte("score_date", args.weekStart)
+      .lte("score_date", args.weekEnd)
+      .order("score_date", { ascending: true })
+      .limit(7)
+  ]);
 
   const recentFeedback = (feedbackRows ?? []).map((r) => ({
     weekStart: r.week_start as string,
@@ -2036,6 +2057,31 @@ export async function computeWeeklyDebrief(args: {
     accurate: r.accurate as boolean | null,
     note: r.feedback_note as string | null,
   }));
+
+  // Build trends summary from session comparisons
+  type CompRow = { discipline: string; trend_direction: string; trend_confidence: string; comparison_summary: string };
+  const comparisons = (comparisonRows ?? []) as CompRow[];
+  const trendsThisWeek = comparisons.length > 0
+    ? comparisons.map((c) => ({
+        discipline: c.discipline,
+        trend: c.trend_direction,
+        confidence: c.trend_confidence,
+        summary: c.comparison_summary
+      }))
+    : null;
+
+  // Build score trajectory from daily scores
+  type ScoreRow = { score_date: string; composite_score: number; execution_quality: number | null; progression_signal: number | null; balance_score: number | null };
+  const scores = (scoreRows ?? []) as ScoreRow[];
+  const scoreTrajectory = scores.length > 0
+    ? scores.map((s) => ({
+        date: s.score_date,
+        composite: Math.round(s.composite_score),
+        execution: s.execution_quality != null ? Math.round(s.execution_quality) : null,
+        progression: s.progression_signal != null ? Math.round(s.progression_signal) : null,
+        balance: s.balance_score != null ? Math.round(s.balance_score) : null
+      }))
+    : null;
 
   const generated = await generateNarrative({
     facts: base.facts,
@@ -2045,6 +2091,8 @@ export async function computeWeeklyDebrief(args: {
     checkIn: inputs.checkIn,
     deterministicFallback: base.deterministicNarrative,
     recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
+    trendsThisWeek,
+    scoreTrajectory,
   });
   const narrative = generated.narrative;
   const facts = weeklyDebriefFactsSchema.parse({

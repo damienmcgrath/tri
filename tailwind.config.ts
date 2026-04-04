@@ -21,7 +21,13 @@ const config: Config = {
         run: "var(--color-run)",
         swim: "var(--color-swim)",
         bike: "var(--color-bike)",
-        strength: "var(--color-strength)"
+        strength: "var(--color-strength)",
+        // Intensity zone colours
+        "zone-endurance": "var(--zone-endurance, hsl(210, 50%, 52%))",
+        "zone-tempo": "var(--zone-tempo, hsl(40, 85%, 55%))",
+        "zone-threshold": "var(--zone-threshold, hsl(25, 90%, 55%))",
+        "zone-vo2max": "var(--zone-vo2max, hsl(5, 80%, 55%))",
+        "zone-strength": "var(--zone-strength, hsl(260, 40%, 55%))"
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "sans-serif"],

@@ -15,8 +15,15 @@ import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
 import { WeeklyDebriefCard } from "./weekly-debrief-card";
 import { WeekAheadCard } from "./components/week-ahead-card";
+import { WeekNavigator } from "./components/week-navigator";
+import { TransitionBriefingCard } from "./components/transition-briefing-card";
 import { TrendCards } from "./trend-cards";
+import { MorningBriefCard } from "./components/morning-brief-card";
+import { TrainingScoreCard } from "./components/training-score-card";
 import { detectTrends } from "@/lib/training/trends";
+import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib/training/week-transition";
+import { getOrGenerateMorningBrief } from "@/lib/training/morning-brief";
+import { getOrComputeTrainingScore } from "@/lib/training/scoring";
 
 type Session = {
   id: string;
@@ -467,11 +474,15 @@ export default async function DashboardPage({
   const todayIso = localIsoDate(new Date().toISOString(), timeZone);
   const activityRangeStart = `${addDays(weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(weekEnd, 1)}T00:00:00.000Z`;
-  const showWeeklyDebriefCard = weekStart === currentWeekStart;
+  const isCurrentWeek = weekStart === currentWeekStart;
+  const showWeeklyDebriefCard = isCurrentWeek;
 
   // Show Week Ahead card on Sunday (UTC day 0) or Monday (UTC day 1) of the current week
   const todayDayOfWeek = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`).getUTCDay();
-  const showWeekAheadCard = weekStart === currentWeekStart && (todayDayOfWeek === 0 || todayDayOfWeek === 1);
+  const showWeekAheadCard = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1);
+
+  // Show transition briefing on Monday/Tuesday of current week
+  const showTransitionBriefing = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
@@ -490,6 +501,35 @@ export default async function DashboardPage({
   const plans = (plansData ?? []) as Plan[];
   const hasAnyPlan = plans.length > 0;
   const activePlanId = profile?.active_plan_id ?? plans[0]?.id ?? null;
+
+  // Fetch week navigation data (training_weeks for plan)
+  let weekOptions: Array<{ weekStart: string; label: string; blockLabel: string | null }> = [];
+  let currentBlockLabel: string | null = null;
+  let currentWeekNumber: number | null = null;
+  if (activePlanId) {
+    const { data: weeksData } = await supabase
+      .from("training_weeks")
+      .select("week_index,week_start_date,focus")
+      .eq("plan_id", activePlanId)
+      .order("week_index", { ascending: true });
+    if (weeksData && weeksData.length > 0) {
+      weekOptions = (weeksData as Array<{ week_index: number; week_start_date: string; focus: string }>).map((w) => ({
+        weekStart: w.week_start_date,
+        label: `Week ${w.week_index}`,
+        blockLabel: w.focus
+      }));
+      const currentWeekEntry = weekOptions.find((w) => w.weekStart === weekStart);
+      if (currentWeekEntry) {
+        currentBlockLabel = currentWeekEntry.blockLabel;
+        currentWeekNumber = weekOptions.indexOf(currentWeekEntry) + 1;
+      }
+    }
+  }
+  // Ensure current week is always in options even if plan doesn't cover it
+  if (!weekOptions.some((w) => w.weekStart === currentWeekStart)) {
+    weekOptions.push({ weekStart: currentWeekStart, label: "Current week", blockLabel: null });
+  }
+  weekOptions.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 
   let sessionsData: unknown[] | null = [];
 
@@ -783,6 +823,31 @@ export default async function DashboardPage({
 
   return (
     <section className="space-y-4">
+      {/* Week Navigation */}
+      {weekOptions.length > 1 ? (
+        <WeekNavigator
+          weekStart={weekStart}
+          currentWeekStart={currentWeekStart}
+          weekOptions={weekOptions}
+          blockLabel={currentBlockLabel}
+          weekNumber={currentWeekNumber}
+        />
+      ) : null}
+
+      {/* Morning Brief — shows on current week only */}
+      {isCurrentWeek ? (
+        <Suspense fallback={null}>
+          <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
+        </Suspense>
+      ) : null}
+
+      {/* Transition Briefing — shows Mon/Tue of current week */}
+      {showTransitionBriefing ? (
+        <Suspense fallback={null}>
+          <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
+        </Suspense>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -962,9 +1027,15 @@ export default async function DashboardPage({
         </Suspense>
       ) : null}
 
-      {showWeeklyDebriefCard ? (
+      {/* Show debrief for current week or for historical week views */}
+      <Suspense fallback={null}>
+        <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
+      </Suspense>
+
+      {/* Training Score */}
+      {isCurrentWeek ? (
         <Suspense fallback={null}>
-          <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
+          <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
         </Suspense>
       ) : null}
 
@@ -1022,6 +1093,52 @@ async function DashboardWeekAhead(props: {
     const preview = await generateWeekPreview(supabase, userId, nextWeekStart, macroCtx);
     if (!preview) return null;
     return <WeekAheadCard preview={preview} />;
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardTransitionBriefing(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart } = props;
+  try {
+    const briefing = await generateWeekTransitionBriefing(supabase, userId, weekStart);
+    if (briefing.dismissedAt) return null;
+    return <TransitionBriefingCard briefing={briefing} />;
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardMorningBrief(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  todayIso: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, todayIso } = props;
+  try {
+    const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
+    return <MorningBriefCard brief={brief} />;
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardTrainingScore(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  todayIso: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, todayIso } = props;
+  try {
+    const score = await getOrComputeTrainingScore(supabase, userId, todayIso);
+    return <TrainingScoreCard score={score} />;
   } catch {
     return null;
   }

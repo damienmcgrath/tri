@@ -431,16 +431,19 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     existingVerdictData = existingVerdict as typeof existingVerdictData;
   }
 
-  // Load session comparison and trends for completed sessions
+  // Load session comparison, AI comparisons, and trends for completed sessions
   let sessionComparison = null;
   let sessionTrends = null;
+  let storedComparisons: Awaited<ReturnType<typeof import("@/lib/training/session-comparison-engine").getStoredComparisons>> = [];
   if (session.status === "completed") {
-    const [comparisonResult, trendsResult] = await Promise.allSettled([
+    const [comparisonResult, trendsResult, storedResult] = await Promise.allSettled([
       import("@/lib/training/session-comparison").then(({ getSessionComparison }) => getSessionComparison(supabase, session.id, user.id)),
-      import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6))
+      import("@/lib/training/trends").then(({ detectTrends }) => detectTrends(supabase, user.id, 6)),
+      import("@/lib/training/session-comparison-engine").then(({ getStoredComparisons }) => getStoredComparisons(supabase, session.id, user.id))
     ]);
     sessionComparison = comparisonResult.status === "fulfilled" ? comparisonResult.value : null;
     sessionTrends = trendsResult.status === "fulfilled" ? trendsResult.value : null;
+    storedComparisons = storedResult.status === "fulfilled" ? storedResult.value : [];
   }
 
   const reviewVm = createReviewViewModel(session);
@@ -726,7 +729,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         </DetailsAccordion>
       ) : null}
 
-      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} /> : null}
+      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} /> : null}
 
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
