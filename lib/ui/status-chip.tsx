@@ -22,7 +22,7 @@ const statusMeta: Record<SessionStatus, { label: string; icon: ReactNode; classN
   unmatched_upload: { label: getSessionLifecycleLabel("unmatched_upload"), icon: "?", className: "status-chip-unmatched" }
 };
 
-export function getSessionStatusMeta(status: SessionStatus) {
+function getSessionStatusMeta(status: SessionStatus) {
   return statusMeta[status];
 }
 

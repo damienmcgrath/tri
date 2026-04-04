@@ -5,31 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { syncSessionLoad } from "@/lib/training/load-sync";
 import { syncSessionExecutionAfterUnlink, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 import { postSessionSyncSideEffects } from "@/lib/workouts/post-sync-effects";
-
-async function updateUploadStatusForActivity(params: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
-  activityId: string;
-  status: "uploaded" | "parsed" | "matched" | "error";
-}) {
-  const { supabase, userId, activityId, status } = params;
-  const { data: activity, error: loadError } = await supabase
-    .from("completed_activities")
-    .select("upload_id")
-    .eq("id", activityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (loadError || !activity?.upload_id) {
-    return;
-  }
-
-  await supabase
-    .from("activity_uploads")
-    .update({ status, error_message: null })
-    .eq("id", activity.upload_id)
-    .eq("user_id", userId);
-}
+import { updateUploadStatusForActivity } from "@/lib/workouts/upload-status";
 
 export async function linkActivityAction(activityId: string, plannedSessionId: string) {
   const supabase = await createClient();

@@ -1,8 +1,8 @@
 export type Sport = "swim" | "bike" | "run" | "strength" | "other";
 
 export type IntentMatchStatus = "matched_intent" | "partial_intent" | "missed_intent";
-export type DiagnosisConfidence = "high" | "medium" | "low";
-export type ExecutionScoreBand = "On target" | "Solid" | "Partial match" | "Missed intent";
+type DiagnosisConfidence = "high" | "medium" | "low";
+type ExecutionScoreBand = "On target" | "Solid" | "Partial match" | "Missed intent";
 
 export type PlannedTargetBand = {
   hr?: { min?: number; max?: number };
@@ -10,7 +10,7 @@ export type PlannedTargetBand = {
   pace?: { min?: number; max?: number };
 };
 
-export type PlannedSessionDiagnosisInput = {
+type PlannedSessionDiagnosisInput = {
   sport?: Sport;
   plannedDurationSec?: number | null;
   intentCategory?: string | null;
@@ -27,7 +27,7 @@ export type SplitMetrics = {
   lastHalfPaceSPerKm?: number;
 };
 
-export type CompletedSessionDiagnosisInput = {
+type CompletedSessionDiagnosisInput = {
   durationSec?: number | null;
   avgHr?: number | null;
   avgPower?: number | null;

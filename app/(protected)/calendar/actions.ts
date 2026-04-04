@@ -7,6 +7,7 @@ import { getAuthedClient } from "@/lib/actions-utils";
 import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 import { isMissingColumnError } from "@/lib/supabase/schema-compat";
 import { postExtraSyncSideEffects } from "@/lib/workouts/post-sync-effects";
+import { updateUploadStatusForActivity } from "@/lib/workouts/upload-status";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -127,30 +128,7 @@ async function persistExtraActivityMarker(params: {
   }
 }
 
-async function updateUploadStatusForActivity(params: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
-  activityId: string;
-  status: "uploaded" | "parsed" | "matched" | "error";
-}) {
-  const { supabase, userId, activityId, status } = params;
-  const { data: activity, error: loadError } = await supabase
-    .from("completed_activities")
-    .select("upload_id")
-    .eq("id", activityId)
-    .eq("user_id", userId)
-    .maybeSingle();
 
-  if (loadError || !activity?.upload_id) {
-    return;
-  }
-
-  await supabase
-    .from("activity_uploads")
-    .update({ status, error_message: null })
-    .eq("id", activity.upload_id)
-    .eq("user_id", userId);
-}
 
 export async function moveSessionAction(input: { sessionId: string; newDate: string }) {
   const parsed = moveSessionSchema.parse(input);

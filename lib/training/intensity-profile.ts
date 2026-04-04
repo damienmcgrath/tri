@@ -44,16 +44,6 @@ const ZONE_COLOURS: Record<ZoneKey, string> = {
   strength: "hsl(260, 40%, 55%)" // slate purple
 };
 
-// CSS custom property names for Tailwind integration
-export const ZONE_CSS_VARS: Record<ZoneKey, string> = {
-  z1: "--zone-endurance",
-  z2: "--zone-endurance",
-  z3: "--zone-tempo",
-  z4: "--zone-threshold",
-  z5: "--zone-vo2max",
-  strength: "--zone-strength"
-};
-
 // Stress multiplier per zone (higher zone = more stress per minute)
 const ZONE_STRESS_FACTOR: Record<ZoneKey, number> = {
   z1: 0.4,

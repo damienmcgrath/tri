@@ -1,6 +1,6 @@
 import { pickAutoMatch, scoreCandidate } from "@/lib/workouts/activity-matching";
 
-export type ActivityForMatching = {
+type ActivityForMatching = {
   id: string;
   userId: string;
   sportType: string;
@@ -9,7 +9,7 @@ export type ActivityForMatching = {
   distanceM?: number | null;
 };
 
-export type PlannedSessionForMatching = {
+type PlannedSessionForMatching = {
   id: string;
   userId: string;
   date: string;
@@ -20,7 +20,7 @@ export type PlannedSessionForMatching = {
   startTimeUtc?: string | null;
 };
 
-export type MatchSuggestion = {
+type MatchSuggestion = {
   plannedSessionId: string;
   confidence: number;
   matchMethod: "tolerance_auto";
