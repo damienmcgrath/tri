@@ -9,6 +9,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
+import { SessionVerdictCard } from "./components/session-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { DetailsAccordion } from "../../details-accordion";
 
@@ -389,17 +390,45 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   session.has_linked_activity = hasLinkedActivity;
 
   // Query session_feels for completed sessions (skip for activity-route synthetic sessions)
-  let hasExistingFeel = false;
+  let existingFeelData: {
+    overall_feel: number | null;
+    energy_level: string | null;
+    legs_feel: string | null;
+    motivation: string | null;
+    sleep_quality: string | null;
+    life_stress: string | null;
+    note: string | null;
+  } | null = null;
   if (session.status === "completed" && !activityId) {
     const { data: existingFeel } = await supabase
       .from("session_feels")
-      .select("id")
+      .select("overall_feel, energy_level, legs_feel, motivation, sleep_quality, life_stress, note")
       .eq("session_id", session.id)
       .maybeSingle();
-    hasExistingFeel = Boolean(existingFeel);
+    existingFeelData = existingFeel as typeof existingFeelData;
   }
 
-  const showFeelCapture = session.status === "completed" && !activityId && !hasExistingFeel;
+  const showFeelCapture = session.status === "completed" && !activityId;
+
+  // Fetch existing session verdict for completed sessions
+  let existingVerdictData: {
+    purpose_statement: string;
+    training_block_context: string | null;
+    execution_summary: string;
+    verdict_status: string;
+    metric_comparisons: unknown[];
+    key_deviations: unknown[] | null;
+    adaptation_signal: string;
+    adaptation_type: string | null;
+  } | null = null;
+  if (session.status === "completed") {
+    const { data: existingVerdict } = await supabase
+      .from("session_verdicts")
+      .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type")
+      .eq("session_id", session.id)
+      .maybeSingle();
+    existingVerdictData = existingVerdict as typeof existingVerdictData;
+  }
 
   // Load session comparison and trends for completed sessions
   let sessionComparison = null;
@@ -688,7 +717,15 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
       {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} /> : null}
 
-      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} /> : null}
+      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
+
+      {session.status === "completed" ? (
+        <SessionVerdictCard
+          sessionId={session.id}
+          existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
+          sessionCompleted={true}
+        />
+      ) : null}
 
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

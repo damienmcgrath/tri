@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
+import { CoachNoteCards } from "./components/coach-note-card";
 import { computeWeekMinuteTotals, computeWeekSessionCounts } from "@/lib/training/week-metrics";
 import { buildCalendarDisplayItems } from "@/lib/calendar/day-items";
 import { loadCompletedActivities } from "@/lib/activities/completed-activities";
@@ -196,7 +197,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .filter((uploadId): uploadId is string => Boolean(uploadId))
   });
 
-  const [{ data: legacyCompleted }, { data: links }, { data: pendingAdaptationsData }] = await Promise.all([
+  const [{ data: legacyCompleted }, { data: links }, { data: pendingAdaptationsData }, { data: pendingRationalesData }] = await Promise.all([
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     supabase
       .from("session_activity_links")
@@ -208,7 +209,14 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .eq("athlete_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
-      .limit(3)
+      .limit(3),
+    supabase
+      .from("adaptation_rationales")
+      .select("id,trigger_type,rationale_text,changes_summary,preserved_elements,training_block,week_number,status,created_at")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5)
   ]);
 
   const timeZone =
@@ -273,8 +281,13 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   type AdaptationRow = { id: string; trigger_type: string; options: unknown };
   const pendingAdaptations = (pendingAdaptationsData ?? []) as AdaptationRow[];
 
+  type ChangeItem = { session_id?: string | null; session_label: string; change_type: string; before: string; after: string };
+  type RationaleRow = { id: string; trigger_type: string; rationale_text: string; changes_summary: ChangeItem[]; preserved_elements: string[] | null; training_block: string | null; week_number: number | null; status: string; created_at: string };
+  const pendingRationales = (pendingRationalesData ?? []) as RationaleRow[];
+
   return (
     <section className="space-y-3">
+      <CoachNoteCards rationales={pendingRationales} />
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}

@@ -272,18 +272,7 @@ export default async function DebriefPage({
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
             </div>
-            <ShareSummaryButton
-              data={{
-                weekLabel: artifact.facts.weekLabel,
-                weekRange: artifact.facts.weekRange,
-                completionPct: artifact.facts.completionPct,
-                title: artifact.facts.title,
-                executiveSummary: artifact.narrative.executiveSummary,
-                raceName: macroCtx.raceName,
-                daysToRace: macroCtx.daysToRace,
-                sportMinutes
-              }}
-            />
+            <ShareSummaryButton weekOf={artifact.weekStart} />
           </div>
         </div>
 

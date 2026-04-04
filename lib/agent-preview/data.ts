@@ -31,7 +31,10 @@ type PreviewTableName =
   | "athlete_checkins"
   | "athlete_observed_patterns"
   | "weekly_debriefs"
-  | "ingestion_events";
+  | "ingestion_events"
+  | "session_feels"
+  | "session_verdicts"
+  | "adaptation_rationales";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -1027,7 +1030,10 @@ export function createPreviewDatabase(): PreviewDatabase {
         }
       }
     ],
-    ingestion_events: []
+    ingestion_events: [],
+    session_feels: [],
+    session_verdicts: [],
+    adaptation_rationales: []
   };
 }
 
