@@ -651,7 +651,7 @@ function formatSecondsToPacePerKm(sec: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}/km`;
 }
 
-function normalizeUnitString(text: string): string {
+export function normalizeUnitString(text: string): string {
   // Replace bare seconds (e.g. "2,239 s", "2239s", "2700 sec", "4500 seconds") — not s/km
   let result = text.replace(/(\d[\d,]*(?:\.\d+)?)\s*(?:seconds?|secs?|s\b)(?!\/km)/g, (_match, numStr: string) => {
     const sec = parseFloat(numStr.replace(/,/g, ""));
