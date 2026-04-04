@@ -131,9 +131,10 @@ export async function GET(request: NextRequest) {
   const truncatedSummary = smartTruncate(weekHeadline, summaryLimit);
 
   // Format-aware content: all formats show highlights, story also shows carry-forward
+  // Feed caps at 2 highlights to avoid overflowing the 1350px canvas
   const showHighlights = highlights.length > 0;
   const showCarryForward = isStory && carryForward.length > 0;
-  // Square truncates highlight text more aggressively
+  const maxHighlights = isStory ? 3 : isFeed ? 2 : 3;
   const highlightLimit = isStory ? 180 : isFeed ? 100 : 80;
 
   // Sports with non-zero minutes for the bar & legend
@@ -245,7 +246,7 @@ export async function GET(request: NextRequest) {
             <span style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px" }}>
               Highlights
             </span>
-            {highlights.slice(0, 3).map((h, i) => (
+            {highlights.slice(0, maxHighlights).map((h, i) => (
               <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                 <span style={{ fontSize: "22px", color: ACCENT, flexShrink: 0, marginTop: "2px" }}>•</span>
                 <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)", lineHeight: 1.35 }}>

@@ -103,11 +103,11 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
           </button>
         </div>
 
-        {/* Live preview */}
+        {/* Live preview — height-constrained so the aspect ratio drives the width */}
         <div className="mt-4 flex justify-center">
           <div
-            className="relative w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)]"
-            style={{ aspectRatio: ASPECT_RATIOS[selectedFormat], maxHeight: "320px" }}
+            className="relative overflow-hidden rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)]"
+            style={{ aspectRatio: ASPECT_RATIOS[selectedFormat], height: "320px", maxWidth: "100%" }}
           >
             {previewLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
