@@ -9,6 +9,9 @@ export type Database = {
           athlete_id: string;
           user_id: string;
           title: string;
+          topic_classification: string | null;
+          summary: string | null;
+          summary_updated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -17,6 +20,9 @@ export type Database = {
           athlete_id?: string;
           user_id: string;
           title: string;
+          topic_classification?: string | null;
+          summary?: string | null;
+          summary_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -30,6 +36,10 @@ export type Database = {
           user_id: string;
           role: "user" | "assistant";
           content: string;
+          metadata: Json;
+          citations: Json;
+          proposed_changes: Json | null;
+          structured_content: Json | null;
           created_at: string;
         };
         Insert: {
@@ -39,9 +49,36 @@ export type Database = {
           user_id: string;
           role: "user" | "assistant";
           content: string;
+          metadata?: Json;
+          citations?: Json;
+          proposed_changes?: Json | null;
+          structured_content?: Json | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_messages"]["Insert"]>;
+      };
+      conversation_summaries: {
+        Row: {
+          id: string;
+          user_id: string;
+          athlete_id: string;
+          conversation_id: string;
+          summary: string;
+          key_topics: string[];
+          key_decisions: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          athlete_id: string;
+          conversation_id: string;
+          summary: string;
+          key_topics?: string[];
+          key_decisions?: string[];
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["conversation_summaries"]["Insert"]>;
       };
       training_plans: {
         Row: {

@@ -190,8 +190,8 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
       .maybeSingle()
   ]);
 
-  const priorityEventName = profile?.race_name ?? context?.priority_event_name ?? null;
-  const priorityEventDate = profile?.race_date ?? context?.priority_event_date ?? null;
+  const priorityEventName = context?.priority_event_name ?? profile?.race_name ?? null;
+  const priorityEventDate = context?.priority_event_date ?? profile?.race_date ?? null;
   const updatedAt = context?.updated_at ?? null;
 
   return {
