@@ -39,7 +39,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
   const [attachError, setAttachError] = useState<string>("");
   const [occupiedSessionIds, setOccupiedSessionIds] = useState(() => new Set(initialOccupiedSessionIds));
   const [isPending, startTransition] = useTransition();
-  const [isAttaching, setIsAttaching] = useState(false);
+  const [attachingId, setAttachingId] = useState<string | null>(null);
 
   const detail = uploads.find((item) => item.id === detailId) ?? null;
 
@@ -195,9 +195,9 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                   <span>{candidate.date} · {candidate.sport} · {candidate.type}</span>
                   <button
                     className="btn-secondary"
-                    disabled={isAttaching || isPending}
+                    disabled={attachingId === candidate.id || isPending}
                     onClick={async () => {
-                      setIsAttaching(true);
+                      setAttachingId(candidate.id);
                       setAttachError("");
                       try {
                         const response = await fetch(`/api/uploads/activities/${attachFor.id}/attach`, {
@@ -237,11 +237,11 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                       } catch {
                         setAttachError("Network error — could not reach the server");
                       } finally {
-                        setIsAttaching(false);
+                        setAttachingId(null);
                       }
                     }}
                   >
-                    {isAttaching ? "Attaching…" : "Attach"}
+                    {attachingId === candidate.id ? "Attaching…" : "Attach"}
                   </button>
                 </li>
               ))}
