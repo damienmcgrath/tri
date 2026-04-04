@@ -121,6 +121,21 @@ function createSupabaseMock(params: { sessions: unknown[]; links?: unknown[] }) 
           },
           sessions: {
             data: sessions
+          },
+          training_weeks: {
+            data: []
+          },
+          weekly_debriefs: {
+            data: null
+          },
+          week_transition_briefings: {
+            data: null
+          },
+          morning_briefs: {
+            data: null
+          },
+          training_scores: {
+            data: null
           }
         };
 

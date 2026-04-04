@@ -52,10 +52,11 @@ export async function GET(request: NextRequest) {
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
   // Fetch data
-  const [{ data: sessions }, { data: profile }, { data: debrief }] = await Promise.all([
+  const [{ data: sessions }, { data: profile }, { data: debrief }, { data: scoreRow }] = await Promise.all([
     supabase.from("sessions").select("sport, duration_minutes, status, is_key").eq("user_id", user.id).gte("date", weekStart).lt("date", weekEnd),
     supabase.from("profiles").select("display_name, race_name, race_date").eq("id", user.id).maybeSingle(),
-    supabase.from("weekly_debriefs").select("facts, narrative").eq("athlete_id", user.id).eq("week_start", weekStart).maybeSingle()
+    supabase.from("weekly_debriefs").select("facts, narrative").eq("athlete_id", user.id).eq("week_start", weekStart).maybeSingle(),
+    supabase.from("training_scores").select("composite_score, score_delta_7d").eq("user_id", user.id).eq("score_date", weekEnd).maybeSingle()
   ]);
 
   type SessionRow = { sport: string; duration_minutes: number | null; status: string | null; is_key: boolean | null };
@@ -172,9 +173,24 @@ export async function GET(request: NextRequest) {
           </div>
         )}
 
-        {/* Total hours */}
-        <div style={{ marginTop: "32px", fontSize: "22px", color: "rgba(255,255,255,0.35)" }}>
-          Total: {formatMinutes(totalMinutes)}
+        {/* Total hours + Training Score */}
+        <div style={{ marginTop: "32px", display: "flex", alignItems: "center", gap: "32px" }}>
+          <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.35)" }}>
+            Total: {formatMinutes(totalMinutes)}
+          </span>
+          {scoreRow?.composite_score != null && (
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "28px", fontWeight: 700, color: scoreRow.composite_score >= 75 ? "#2dd4bf" : scoreRow.composite_score >= 50 ? "white" : "#fbbf24" }}>
+                {Math.round(scoreRow.composite_score)}
+              </span>
+              <span style={{ fontSize: "18px", color: "rgba(255,255,255,0.35)" }}>Training Score</span>
+              {scoreRow.score_delta_7d != null && scoreRow.score_delta_7d !== 0 && (
+                <span style={{ fontSize: "18px", fontWeight: 600, color: scoreRow.score_delta_7d > 0 ? "#2dd4bf" : "#f87171" }}>
+                  {scoreRow.score_delta_7d > 0 ? "+" : ""}{Math.round(scoreRow.score_delta_7d)}
+                </span>
+              )}
+            </span>
+          )}
         </div>
 
         {/* Executive summary */}

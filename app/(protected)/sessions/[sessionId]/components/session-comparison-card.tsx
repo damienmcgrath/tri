@@ -1,5 +1,6 @@
 import type { SessionComparison } from "@/lib/training/session-comparison";
 import type { WeeklyTrend } from "@/lib/training/trends";
+import type { StoredComparison } from "@/lib/training/session-comparison-engine";
 
 const comparisonDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -11,9 +12,16 @@ const comparisonDateFormatter = new Intl.DateTimeFormat("en-US", {
 type Props = {
   comparison: SessionComparison;
   trends?: WeeklyTrend[];
+  aiComparisons?: StoredComparison[];
 };
 
-export function SessionComparisonCard({ comparison, trends = [] }: Props) {
+function trendBadge(direction: string) {
+  if (direction === "improving") return { label: "Improving", className: "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.1)] text-success" };
+  if (direction === "declining") return { label: "Declining", className: "border-[rgba(255,90,40,0.3)] bg-[rgba(255,90,40,0.1)] text-danger" };
+  return { label: "Stable", className: "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] text-tertiary" };
+}
+
+export function SessionComparisonCard({ comparison, trends = [], aiComparisons = [] }: Props) {
   const previousDateLabel = comparisonDateFormatter.format(new Date(`${comparison.previousDate}T00:00:00.000Z`));
 
   // Match trends to metrics in this comparison
@@ -23,10 +31,27 @@ export function SessionComparisonCard({ comparison, trends = [] }: Props) {
     )
   );
 
+  // Get best AI narrative (prefer recent range)
+  const bestAiComparison = aiComparisons.find((c) => c.comparisonRange === "recent") ?? aiComparisons[0];
+
   return (
     <article className="surface p-5">
-      <p className="label">Compared to last time</p>
-      <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="label">Compared to previous</p>
+          <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
+        </div>
+        {bestAiComparison ? (
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] ${trendBadge(bestAiComparison.trendDirection).className}`}>
+            {trendBadge(bestAiComparison.trendDirection).label}
+          </span>
+        ) : null}
+      </div>
+
+      {/* AI narrative */}
+      {bestAiComparison ? (
+        <p className="mt-3 text-sm text-white">{bestAiComparison.comparisonSummary}</p>
+      ) : null}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {comparison.metrics.map((m) => (

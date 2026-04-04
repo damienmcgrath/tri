@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
 import { getSessionIntentLabel } from "@/lib/training/semantics";
+import { computeSessionIntensityProfile, computeWeeklyIntensitySummary, getVisualWeight, type SessionIntensityProfile } from "@/lib/training/intensity-profile";
+import { IntensityBar } from "./components/intensity-bar";
+import { WeeklyIntensityHeader } from "./components/weekly-intensity-header";
 import {
   createSessionAction,
   deleteSessionAction,
@@ -343,6 +346,34 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
     [selectedWeek?.id, sessions]
   );
 
+  // Compute intensity profiles for current week sessions
+  const { sessionProfileMap, weekIntensitySummary } = useMemo(() => {
+    const rawProfiles = weekSessions.map((s) =>
+      computeSessionIntensityProfile({
+        id: s.id,
+        sport: s.sport,
+        type: s.type,
+        target: s.target,
+        notes: s.notes,
+        durationMinutes: s.duration_minutes,
+        intentCategory: s.intent_category ?? null
+      })
+    );
+    const maxStress = Math.max(...rawProfiles.map((p) => p.rawStress), 1);
+    const profiles: SessionIntensityProfile[] = rawProfiles.map((p) => ({
+      ...p,
+      visualWeight: getVisualWeight(p.rawStress, maxStress)
+    }));
+    const profileMap = new Map<string, SessionIntensityProfile>();
+    for (const p of profiles) profileMap.set(p.sessionId, p);
+
+    const summary = selectedWeek
+      ? computeWeeklyIntensitySummary(profiles, selectedWeek.week_start_date)
+      : null;
+
+    return { sessionProfileMap: profileMap, weekIntensitySummary: summary };
+  }, [weekSessions, selectedWeek]);
+
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
 
@@ -573,6 +604,13 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
         </section>
       ) : null}
 
+      {weekIntensitySummary && weekIntensitySummary.sessionCount > 0 ? (
+        <section className="surface-subtle px-4 py-3">
+          <p className="card-kicker mb-2">Intensity distribution</p>
+          <WeeklyIntensityHeader summary={weekIntensitySummary} />
+        </section>
+      ) : null}
+
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
@@ -621,6 +659,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   const intensityColor = getIntensityDotColor(session.intent_category);
+                  const sessionProfile = sessionProfileMap.get(session.id);
                   return (
                     <button
                       key={session.id}
@@ -629,8 +668,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left"
                       style={{
                         borderColor: "rgba(255,255,255,0.06)",
-                        borderLeftWidth: "2px",
-                        borderLeftColor: disciplineBorderColor(session.sport)
+                        borderLeftWidth: "3px",
+                        borderLeftColor: sessionProfile?.intensityColour ?? disciplineBorderColor(session.sport)
                       }}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -664,6 +703,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </p>
                       ) : null}
                       <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
+                      {(() => {
+                        const profile = sessionProfileMap.get(session.id);
+                        return profile ? <IntensityBar zoneDistribution={profile.zoneDistribution} height={4} className="mt-1" /> : null;
+                      })()}
                     </button>
                   );
                 })}
@@ -687,6 +730,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
                   const intensityColor = getIntensityDotColor(session.intent_category);
+                  const mobileProfile = sessionProfileMap.get(session.id);
                   return (
                     <button
                       key={session.id}
@@ -695,8 +739,8 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left text-xs"
                       style={{
                         borderColor: "rgba(255,255,255,0.06)",
-                        borderLeftWidth: "2px",
-                        borderLeftColor: disciplineBorderColor(session.sport)
+                        borderLeftWidth: "3px",
+                        borderLeftColor: mobileProfile?.intensityColour ?? disciplineBorderColor(session.sport)
                       }}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -730,6 +774,10 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                         </p>
                       ) : null}
                       <p className="text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
+                      {(() => {
+                        const profile = sessionProfileMap.get(session.id);
+                        return profile ? <IntensityBar zoneDistribution={profile.zoneDistribution} height={4} className="mt-1" /> : null;
+                      })()}
                     </button>
                   );
                 })}

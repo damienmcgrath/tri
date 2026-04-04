@@ -3,11 +3,13 @@ import Link from "next/link";
 import { CoachChat } from "./coach-chat";
 import { CoachBriefingCard } from "./CoachBriefingCard";
 import { WeeklyCheckinCard } from "./weekly-checkin-card";
+import { TransitionBriefingCard } from "@/app/(protected)/dashboard/components/transition-briefing-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
 import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getSessionDisplayName } from "@/lib/training/session";
+import { getWeekTransitionBriefing } from "@/lib/training/week-transition";
 
 type SessionRow = {
   id: string;
@@ -262,10 +264,11 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
   const weekStart = getCurrentWeekStart();
   const weekEnd = addDays(weekStart, 6);
 
-  const [diagnosisSessions, briefingContext, athleteContext] = await Promise.all([
+  const [diagnosisSessions, briefingContext, athleteContext, transitionBriefing] = await Promise.all([
     user ? getDiagnosisSessions(supabase, user.id, weekStart, weekEnd) : [],
     user ? getBriefingContext(supabase, user.id, weekStart, weekEnd) : getBriefingContext(supabase, "", weekStart, weekEnd),
-    user ? getAthleteContextSnapshot(supabase, user.id) : null
+    user ? getAthleteContextSnapshot(supabase, user.id) : null,
+    user ? getWeekTransitionBriefing(supabase, user.id, weekStart).catch(() => null) : null
   ]);
 
   const weeklyBrief = user && athleteContext
@@ -291,6 +294,10 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
 
         {/* ── Context sidebar ────────────────────────────────────────────── */}
         <aside className="order-1 space-y-3 xl:order-2">
+          {transitionBriefing && !transitionBriefing.dismissedAt ? (
+            <TransitionBriefingCard briefing={transitionBriefing} />
+          ) : null}
+
           {weeklyBrief ? (
             <CoachBriefingCard
               brief={weeklyBrief}

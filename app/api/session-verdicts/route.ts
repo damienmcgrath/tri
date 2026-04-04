@@ -5,6 +5,7 @@ import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 import { generateSessionVerdict, SESSION_VERDICT_PROMPT_VERSION } from "@/lib/ai/prompts/session-verdict";
 import { createRationaleFromVerdict } from "@/lib/ai/prompts/adaptation-rationale";
+import { triggerComparisonAfterVerdict } from "@/lib/training/session-comparison-engine";
 import { getCoachModel } from "@/lib/openai";
 
 function tryParseJson(value: string): unknown {
@@ -127,6 +128,11 @@ export async function POST(request: Request) {
         // Non-blocking — verdict still saved successfully
       }
     }
+
+    // Fire-and-forget: trigger session comparison after verdict
+    triggerComparisonAfterVerdict(supabase, body.sessionId, user.id).catch((e) => {
+      console.warn("[SESSION_VERDICTS] Comparison trigger failed:", e);
+    });
 
     return NextResponse.json({ verdict: saved ?? verdict, source });
   } catch (error) {
