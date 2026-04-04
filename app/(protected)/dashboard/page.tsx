@@ -21,9 +21,9 @@ import { TrendCards } from "./trend-cards";
 import { MorningBriefCard } from "./components/morning-brief-card";
 import { TrainingScoreCard } from "./components/training-score-card";
 import { detectTrends } from "@/lib/training/trends";
-import { getWeekTransitionBriefing } from "@/lib/training/week-transition";
-import { getMorningBrief } from "@/lib/training/morning-brief";
-import { getTrainingScore } from "@/lib/training/scoring";
+import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib/training/week-transition";
+import { getOrGenerateMorningBrief } from "@/lib/training/morning-brief";
+import { getOrComputeTrainingScore } from "@/lib/training/scoring";
 
 type Session = {
   id: string;
@@ -1106,8 +1106,8 @@ async function DashboardTransitionBriefing(props: {
   if (!props?.supabase) return null;
   const { supabase, userId, weekStart } = props;
   try {
-    const briefing = await getWeekTransitionBriefing(supabase, userId, weekStart);
-    if (!briefing || briefing.dismissedAt) return null;
+    const briefing = await generateWeekTransitionBriefing(supabase, userId, weekStart);
+    if (briefing.dismissedAt) return null;
     return <TransitionBriefingCard briefing={briefing} />;
   } catch {
     return null;
@@ -1122,8 +1122,7 @@ async function DashboardMorningBrief(props: {
   if (!props?.supabase) return null;
   const { supabase, userId, todayIso } = props;
   try {
-    const brief = await getMorningBrief(supabase, userId, todayIso);
-    if (!brief) return null;
+    const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
     return <MorningBriefCard brief={brief} />;
   } catch {
     return null;
@@ -1138,8 +1137,7 @@ async function DashboardTrainingScore(props: {
   if (!props?.supabase) return null;
   const { supabase, userId, todayIso } = props;
   try {
-    const score = await getTrainingScore(supabase, userId, todayIso);
-    if (!score) return null;
+    const score = await getOrComputeTrainingScore(supabase, userId, todayIso);
     return <TrainingScoreCard score={score} />;
   } catch {
     return null;

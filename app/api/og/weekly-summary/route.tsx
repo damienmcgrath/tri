@@ -50,13 +50,15 @@ export async function GET(request: NextRequest) {
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const weekStart = new Date(d.getTime() + mondayOffset * 86400000).toISOString().slice(0, 10);
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  // Sunday = last day of the week (weekStart + 6) — used for score lookup
+  const weekSunday = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
 
   // Fetch data
   const [{ data: sessions }, { data: profile }, { data: debrief }, { data: scoreRow }] = await Promise.all([
     supabase.from("sessions").select("sport, duration_minutes, status, is_key").eq("user_id", user.id).gte("date", weekStart).lt("date", weekEnd),
     supabase.from("profiles").select("display_name, race_name, race_date").eq("id", user.id).maybeSingle(),
     supabase.from("weekly_debriefs").select("facts, narrative").eq("athlete_id", user.id).eq("week_start", weekStart).maybeSingle(),
-    supabase.from("training_scores").select("composite_score, score_delta_7d").eq("user_id", user.id).eq("score_date", weekEnd).maybeSingle()
+    supabase.from("training_scores").select("composite_score, score_delta_7d").eq("user_id", user.id).eq("score_date", weekSunday).maybeSingle()
   ]);
 
   type SessionRow = { sport: string; duration_minutes: number | null; status: string | null; is_key: boolean | null };

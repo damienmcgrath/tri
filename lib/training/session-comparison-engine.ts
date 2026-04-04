@@ -158,8 +158,8 @@ export async function generateAndStoreComparison(
   matchFactors: Record<string, number>,
   range: "recent" | "extended"
 ): Promise<StoredComparison | null> {
-  // Get the metric comparison using existing infrastructure
-  const comparison = await getSessionComparison(supabase, currentSessionId, athleteId);
+  // Get the metric comparison using the specific comparison session
+  const comparison = await getSessionComparison(supabase, currentSessionId, athleteId, comparisonSessionId);
   if (!comparison || comparison.metrics.length === 0) return null;
 
   // Get session details for context
@@ -209,7 +209,7 @@ export async function generateAndStoreComparison(
         session_type: currentSession.type,
         comparison_range: range
       },
-      { onConflict: "id" }
+      { onConflict: "current_session_id,comparison_range" }
     )
     .select("*")
     .maybeSingle();

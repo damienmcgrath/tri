@@ -395,3 +395,17 @@ export async function getTrainingScore(
     goalRaceType: (data.goal_race_type as string | null) ?? null
   };
 }
+
+/**
+ * Get an existing training score or compute and store a new one.
+ */
+export async function getOrComputeTrainingScore(
+  supabase: SupabaseClient,
+  userId: string,
+  date: string
+): Promise<TrainingScore> {
+  const existing = await getTrainingScore(supabase, userId, date);
+  if (existing) return existing;
+
+  return computeTrainingScore(supabase, userId, date);
+}

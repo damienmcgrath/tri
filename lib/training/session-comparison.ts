@@ -210,7 +210,8 @@ function buildSwimMetrics(current: ActivityMetrics, previous: ActivityMetrics, p
 export async function getSessionComparison(
   supabase: SupabaseClient,
   sessionId: string,
-  athleteId: string
+  athleteId: string,
+  comparisonSessionId?: string
 ): Promise<SessionComparison | null> {
   // Load the target session
   const { data: targetSession } = await supabase
@@ -225,40 +226,57 @@ export async function getSessionComparison(
 
   if (session.status !== "completed") return null;
 
-  // Find candidate previous sessions by type+sport match, before the current date
-  const durationMin = session.duration_minutes ? session.duration_minutes * 0.8 : 0;
-  const durationMax = session.duration_minutes ? session.duration_minutes * 1.2 : 99999;
+  let previousSession: SessionRow | null = null;
 
-  let { data: candidates } = await supabase
-    .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status")
-    .eq("user_id", athleteId)
-    .eq("sport", session.sport)
-    .eq("type", session.type)
-    .eq("status", "completed")
-    .lt("date", session.date)
-    .order("date", { ascending: false })
-    .limit(5);
+  // If a specific comparison session was requested, use it directly
+  if (comparisonSessionId) {
+    const { data: specifiedSession } = await supabase
+      .from("sessions")
+      .select("id,date,sport,type,duration_minutes,status")
+      .eq("id", comparisonSessionId)
+      .eq("user_id", athleteId)
+      .maybeSingle();
+    previousSession = specifiedSession as SessionRow | null;
+  }
 
-  // Fallback: match by sport + similar duration if no type match
-  if (!candidates || candidates.length === 0) {
-    const { data: fallback } = await supabase
+  // Otherwise, find candidate previous sessions by type+sport match
+  if (!previousSession) {
+    const durationMin = session.duration_minutes ? session.duration_minutes * 0.8 : 0;
+    const durationMax = session.duration_minutes ? session.duration_minutes * 1.2 : 99999;
+
+    let { data: candidates } = await supabase
       .from("sessions")
       .select("id,date,sport,type,duration_minutes,status")
       .eq("user_id", athleteId)
       .eq("sport", session.sport)
+      .eq("type", session.type)
       .eq("status", "completed")
       .lt("date", session.date)
-      .gte("duration_minutes", Math.floor(durationMin))
-      .lte("duration_minutes", Math.ceil(durationMax))
       .order("date", { ascending: false })
       .limit(5);
-    candidates = fallback;
+
+    // Fallback: match by sport + similar duration if no type match
+    if (!candidates || candidates.length === 0) {
+      const { data: fallback } = await supabase
+        .from("sessions")
+        .select("id,date,sport,type,duration_minutes,status")
+        .eq("user_id", athleteId)
+        .eq("sport", session.sport)
+        .eq("status", "completed")
+        .lt("date", session.date)
+        .gte("duration_minutes", Math.floor(durationMin))
+        .lte("duration_minutes", Math.ceil(durationMax))
+        .order("date", { ascending: false })
+        .limit(5);
+      candidates = fallback;
+    }
+
+    if (candidates && candidates.length > 0) {
+      previousSession = (candidates as SessionRow[])[0];
+    }
   }
 
-  if (!candidates || candidates.length === 0) return null;
-
-  const previousSession = (candidates as SessionRow[])[0];
+  if (!previousSession) return null;
 
   // Load linked activity metrics for both sessions
   async function getActivityMetrics(sid: string): Promise<ActivityMetrics> {
