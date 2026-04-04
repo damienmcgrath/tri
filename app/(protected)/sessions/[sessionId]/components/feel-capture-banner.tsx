@@ -6,6 +6,7 @@ type FeelCaptureBannerProps = {
   sessionId: string;
   existingFeel?: {
     overall_feel: number | null;
+    rpe: number | null;
     energy_level: string | null;
     legs_feel: string | null;
     motivation: string | null;
@@ -90,8 +91,10 @@ function PillSelector({ label, options, value, onChange }: {
 }
 
 function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["existingFeel"]> }) {
-  const option = FEEL_OPTIONS.find((o) => o.value === feel.overall_feel);
-  if (!option) return null;
+  // Support both new overall_feel (1-5) and legacy rpe (1-10) rows
+  const option = feel.overall_feel
+    ? FEEL_OPTIONS.find((o) => o.value === feel.overall_feel)
+    : null;
 
   const secondaryItems: string[] = [];
   if (feel.energy_level) secondaryItems.push(`Energy: ${feel.energy_level}`);
@@ -99,6 +102,20 @@ function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["exist
   if (feel.motivation) secondaryItems.push(`Motivation: ${feel.motivation}`);
   if (feel.sleep_quality) secondaryItems.push(`Sleep: ${feel.sleep_quality}`);
   if (feel.life_stress) secondaryItems.push(`Stress: ${feel.life_stress}`);
+
+  // Legacy RPE-only rows: show RPE value directly
+  if (!option && feel.rpe) {
+    return (
+      <article className="surface border border-[hsl(var(--border))] p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted">RPE {feel.rpe}/10</span>
+        </div>
+        {feel.note && <p className="mt-1.5 text-xs text-muted">{feel.note}</p>}
+      </article>
+    );
+  }
+
+  if (!option) return null;
 
   return (
     <article className="surface border border-[hsl(var(--border))] p-4">
@@ -129,8 +146,8 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
   const promptShownAt = useRef(new Date().toISOString());
   const interactionStartRef = useRef<number | null>(null);
 
-  // Show summary if feel already captured
-  if (existingFeel?.overall_feel) {
+  // Show summary if feel already captured (either new overall_feel or legacy rpe)
+  if (existingFeel?.overall_feel || existingFeel?.rpe) {
     return <FeelSummary feel={existingFeel} />;
   }
 

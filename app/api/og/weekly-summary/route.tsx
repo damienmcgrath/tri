@@ -74,10 +74,10 @@ export async function GET(request: NextRequest) {
   const totalMinutes = sportMinutes.swim + sportMinutes.bike + sportMinutes.run;
   const completionPct = plannedCount > 0 ? Math.round((completedCount / plannedCount) * 100) : 0;
 
-  // Extract debrief data
+  // Extract debrief data (JSONB uses camelCase keys)
   const facts = debrief?.facts as Record<string, unknown> | null;
   const narrative = debrief?.narrative as Record<string, unknown> | null;
-  const weekHeadline = (narrative?.executive_summary as string) ?? "";
+  const weekHeadline = (narrative?.executiveSummary as string) ?? "";
 
   // Race countdown
   let daysToRace: number | null = null;
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Week label
-  const weekShape = (facts?.week_shape as string) ?? null;
+  const weekShape = (facts?.weekShape as string) ?? null;
   const weekLabel = weekShape === "recovery" ? "Recovery Week" : `Week of ${new Date(`${weekStart}T00:00:00.000Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 
   const athleteName = showName ? (profile?.display_name ?? user.user_metadata?.full_name ?? null) : null;
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
       width,
       height,
       headers: {
-        "Cache-Control": "public, max-age=3600, s-maxage=3600"
+        "Cache-Control": "private, max-age=3600"
       }
     }
   );

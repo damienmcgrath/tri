@@ -392,6 +392,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   // Query session_feels for completed sessions (skip for activity-route synthetic sessions)
   let existingFeelData: {
     overall_feel: number | null;
+    rpe: number | null;
     energy_level: string | null;
     legs_feel: string | null;
     motivation: string | null;
@@ -402,7 +403,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   if (session.status === "completed" && !activityId) {
     const { data: existingFeel } = await supabase
       .from("session_feels")
-      .select("overall_feel, energy_level, legs_feel, motivation, sleep_quality, life_stress, note")
+      .select("overall_feel, rpe, energy_level, legs_feel, motivation, sleep_quality, life_stress, note")
       .eq("session_id", session.id)
       .maybeSingle();
     existingFeelData = existingFeel as typeof existingFeelData;

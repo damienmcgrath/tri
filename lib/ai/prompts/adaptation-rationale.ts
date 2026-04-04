@@ -243,6 +243,17 @@ export async function createRationaleFromVerdict(
 
   const { rationale } = await generateAdaptationRationale(ctx);
 
+  // Delete any existing pending rationale for this verdict before inserting,
+  // so regenerating a verdict doesn't accumulate duplicate coach notes
+  if (verdict.id) {
+    await supabase
+      .from("adaptation_rationales")
+      .delete()
+      .eq("user_id", userId)
+      .eq("source_verdict_id", verdict.id)
+      .eq("status", "pending");
+  }
+
   // Insert rationale
   await supabase.from("adaptation_rationales").insert({
     user_id: userId,
