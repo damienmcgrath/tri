@@ -176,4 +176,24 @@ describe("normalizeVerdictUnitsForTest", () => {
   test("does not corrupt s/km when converting bare seconds in the same string", () => {
     expect(normalizeVerdictUnitsForTest("2,239 s at 341 s/km")).toBe("37 min at 5:41/km");
   });
+
+  test("converts 'sec' variant to minutes", () => {
+    expect(normalizeVerdictUnitsForTest("The session duration matched plan (2700 sec / 45 min)")).toBe("The session duration matched plan (45 min / 45 min)");
+  });
+
+  test("converts 'secs' variant to minutes", () => {
+    expect(normalizeVerdictUnitsForTest("You ran for 2700 secs total")).toBe("You ran for 45 min total");
+  });
+
+  test("converts 'seconds' variant to hours and minutes", () => {
+    expect(normalizeVerdictUnitsForTest("Duration was 4500 seconds")).toBe("Duration was 1 h 15 min");
+  });
+
+  test("converts sec/km pace to min:sec/km", () => {
+    expect(normalizeVerdictUnitsForTest("Pace was 341 sec/km")).toBe("Pace was 5:41/km");
+  });
+
+  test("handles mixed sec duration and s/km pace", () => {
+    expect(normalizeVerdictUnitsForTest("2700 sec at 341 s/km")).toBe("45 min at 5:41/km");
+  });
 });

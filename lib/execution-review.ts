@@ -652,13 +652,13 @@ function formatSecondsToPacePerKm(sec: number): string {
 }
 
 function normalizeUnitString(text: string): string {
-  // Replace bare seconds (e.g. "2,239 s", "2239s", "37.5 s") — not s/km
-  let result = text.replace(/(\d[\d,]*(?:\.\d+)?)\s*s\b(?!\/km)/g, (_match, numStr: string) => {
+  // Replace bare seconds (e.g. "2,239 s", "2239s", "2700 sec", "4500 seconds") — not s/km
+  let result = text.replace(/(\d[\d,]*(?:\.\d+)?)\s*(?:seconds?|secs?|s\b)(?!\/km)/g, (_match, numStr: string) => {
     const sec = parseFloat(numStr.replace(/,/g, ""));
     return formatSecondsToDuration(sec);
   });
-  // Replace pace in s/km (e.g. "341.63 s/km", "341 s/km")
-  result = result.replace(/(\d+(?:\.\d+)?)\s*s\/km/g, (_match, numStr: string) => {
+  // Replace pace in s/km (e.g. "341.63 s/km", "341 sec/km", "341 seconds/km")
+  result = result.replace(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\/km/g, (_match, numStr: string) => {
     return formatSecondsToPacePerKm(parseFloat(numStr));
   });
   return result;
