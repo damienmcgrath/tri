@@ -18,11 +18,11 @@ import { WeekAheadCard } from "./components/week-ahead-card";
 import { WeekNavigator } from "./components/week-navigator";
 import { TransitionBriefingCard } from "./components/transition-briefing-card";
 import { TrendCards } from "./trend-cards";
-import { MorningBriefCard } from "./components/morning-brief-card";
+// import { MorningBriefCard } from "./components/morning-brief-card";
 import { TrainingScoreCard } from "./components/training-score-card";
 import { detectTrends } from "@/lib/training/trends";
 import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib/training/week-transition";
-import { getOrGenerateMorningBrief } from "@/lib/training/morning-brief";
+// import { getOrGenerateMorningBrief } from "@/lib/training/morning-brief";
 import { getOrComputeTrainingScore } from "@/lib/training/scoring";
 
 type Session = {
@@ -834,12 +834,12 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      {/* Morning Brief — shows on current week only */}
-      {isCurrentWeek ? (
+      {/* Morning Brief — hidden for now, will re-address later */}
+      {/* {isCurrentWeek ? (
         <Suspense fallback={null}>
           <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
         </Suspense>
-      ) : null}
+      ) : null} */}
 
       {/* Transition Briefing — shows Mon/Tue of current week */}
       {showTransitionBriefing ? (
@@ -1114,20 +1114,21 @@ async function DashboardTransitionBriefing(props: {
   }
 }
 
-async function DashboardMorningBrief(props: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
-  todayIso: string;
-}) {
-  if (!props?.supabase) return null;
-  const { supabase, userId, todayIso } = props;
-  try {
-    const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
-    return <MorningBriefCard brief={brief} />;
-  } catch {
-    return null;
-  }
-}
+// Hidden for now — will re-address later
+// async function DashboardMorningBrief(props: {
+//   supabase: Awaited<ReturnType<typeof createClient>>;
+//   userId: string;
+//   todayIso: string;
+// }) {
+//   if (!props?.supabase) return null;
+//   const { supabase, userId, todayIso } = props;
+//   try {
+//     const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
+//     return <MorningBriefCard brief={brief} />;
+//   } catch {
+//     return null;
+//   }
+// }
 
 async function DashboardTrainingScore(props: {
   supabase: Awaited<ReturnType<typeof createClient>>;
