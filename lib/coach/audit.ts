@@ -1,8 +1,8 @@
 import type { CoachAuthContext } from "@/lib/coach/types";
 
-export type CoachAuditLevel = "info" | "warn" | "error";
+type CoachAuditLevel = "info" | "warn" | "error";
 
-export function sanitizeToolArgs(args: unknown) {
+function sanitizeToolArgs(args: unknown) {
   if (!args || typeof args !== "object") {
     return {};
   }

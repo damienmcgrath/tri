@@ -1,0 +1,30 @@
+import type { createClient } from "@/lib/supabase/server";
+
+/**
+ * After linking/unlinking an activity, update the parent upload row's status
+ * so the UI reflects the current state.
+ */
+export async function updateUploadStatusForActivity(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  activityId: string;
+  status: "uploaded" | "parsed" | "matched" | "error";
+}) {
+  const { supabase, userId, activityId, status } = params;
+  const { data: activity, error: loadError } = await supabase
+    .from("completed_activities")
+    .select("upload_id")
+    .eq("id", activityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (loadError || !activity?.upload_id) {
+    return;
+  }
+
+  await supabase
+    .from("activity_uploads")
+    .update({ status, error_message: null })
+    .eq("id", activity.upload_id)
+    .eq("user_id", userId);
+}

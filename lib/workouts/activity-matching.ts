@@ -13,7 +13,7 @@ export type MatchInput = {
   distanceM?: number | null;
 };
 
-export type ScoredCandidate = {
+type ScoredCandidate = {
   candidateId: string;
   confidence: number;
   reason: Record<string, number | string | boolean>;
