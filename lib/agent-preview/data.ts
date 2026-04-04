@@ -1163,12 +1163,17 @@ export function createPreviewDatabase(): PreviewDatabase {
 }
 
 const globalKey = "__tri_preview_database__" as const;
+const globalVersionKey = "__tri_preview_database_version__" as const;
+// Bump this when the seed schema changes (new tables, new columns, etc.)
+const PREVIEW_DATABASE_VERSION = 2;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
-  if (existing) return existing;
+  const version = (globalThis as Record<string, unknown>)[globalVersionKey] as number | undefined;
+  if (existing && version === PREVIEW_DATABASE_VERSION) return existing;
   const db = createPreviewDatabase();
   (globalThis as Record<string, unknown>)[globalKey] = db;
+  (globalThis as Record<string, unknown>)[globalVersionKey] = PREVIEW_DATABASE_VERSION;
   return db;
 }
 
