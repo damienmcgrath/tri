@@ -27,6 +27,12 @@ export default function SettingsPage() {
           <h2 className="mt-3 text-lg">Athlete context</h2>
           <p className="mt-1 text-sm text-muted">Set the durable context Coach should use across reviews, briefs, and chat.</p>
         </Link>
+
+        <Link href="/settings/locale" className="surface p-5 transition hover:border-[var(--border-default)]">
+          <p className="label">Preferences</p>
+          <h2 className="mt-3 text-lg">Language &amp; units</h2>
+          <p className="mt-1 text-sm text-muted">Set your language, units, timezone, and week start day.</p>
+        </Link>
       </div>
     </section>
   );

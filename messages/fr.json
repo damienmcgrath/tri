@@ -1,0 +1,143 @@
+{
+  "common": {
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "plan": "Plan",
+      "calendar": "Calendrier",
+      "coach": "Coach"
+    },
+    "actions": {
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "apply": "Appliquer",
+      "dismiss": "Rejeter",
+      "delete": "Supprimer",
+      "edit": "Modifier",
+      "back": "Retour",
+      "close": "Fermer",
+      "confirm": "Confirmer",
+      "retry": "R\u00e9essayer",
+      "loading": "Chargement\u2026"
+    },
+    "status": {
+      "planned": "Planifi\u00e9",
+      "completed": "Termin\u00e9",
+      "skipped": "Ignor\u00e9",
+      "active": "Actif",
+      "pending": "En attente"
+    },
+    "sport": {
+      "swim": "Natation",
+      "bike": "V\u00e9lo",
+      "run": "Course",
+      "strength": "Renforcement",
+      "other": "Autre"
+    },
+    "time": {
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "thisWeek": "Cette semaine",
+      "lastWeek": "Semaine derni\u00e8re",
+      "daysAgo": "{count, plural, one {il y a # jour} other {il y a # jours}}",
+      "daysToGo": "{count, plural, one {encore # jour} other {encore # jours}}"
+    }
+  },
+  "settings": {
+    "title": "Param\u00e8tres",
+    "description": "G\u00e9rer les objectifs de course, le contexte athl\u00e8te et les int\u00e9grations.",
+    "race": {
+      "title": "Param\u00e8tres de course",
+      "description": "D\u00e9finir le nom et la date de course pour le compte \u00e0 rebours.",
+      "raceName": "Nom de la course",
+      "raceNamePlaceholder": "Nice 70.3",
+      "raceDate": "Date de la course",
+      "saveButton": "Enregistrer les param\u00e8tres",
+      "backToDashboard": "Retour au tableau de bord"
+    },
+    "integrations": {
+      "title": "Int\u00e9grations & t\u00e9l\u00e9chargements",
+      "description": "Connecter Strava, t\u00e9l\u00e9charger des fichiers FIT/TCX et g\u00e9rer les activit\u00e9s."
+    },
+    "athleteContext": {
+      "title": "Contexte athl\u00e8te",
+      "description": "D\u00e9finir le contexte utilis\u00e9 par le Coach pour les bilans, briefings et conversations."
+    },
+    "locale": {
+      "title": "Langue & unit\u00e9s",
+      "description": "D\u00e9finir la langue, les unit\u00e9s, le fuseau horaire et le d\u00e9but de semaine.",
+      "language": "Langue",
+      "units": "Unit\u00e9s",
+      "metric": "M\u00e9trique",
+      "imperial": "Imp\u00e9rial",
+      "timezone": "Fuseau horaire",
+      "weekStartDay": "La semaine commence le",
+      "monday": "Lundi",
+      "sunday": "Dimanche",
+      "comingSoon": "Bient\u00f4t disponible",
+      "saveButton": "Enregistrer les pr\u00e9f\u00e9rences"
+    }
+  },
+  "coach": {
+    "title": "Coach",
+    "newConversation": "Nouvelle conversation",
+    "typeMessage": "Saisir un message\u2026",
+    "send": "Envoyer",
+    "thinking": "Le Coach r\u00e9fl\u00e9chit\u2026",
+    "noConversations": "Aucune conversation",
+    "startConversation": "D\u00e9marrer une conversation avec votre coach",
+    "suggestedQuestions": {
+      "tracking": "O\u00f9 en suis-je pour {raceName}\u00a0?",
+      "adjust": "Dois-je ajuster le plan de cette semaine\u00a0?",
+      "limiter": "Quel est mon plus grand facteur limitant\u00a0?",
+      "explainScore": "Expliquer mon Training Score"
+    },
+    "conversationHistory": "Historique des conversations",
+    "searchConversations": "Rechercher des conversations\u2026"
+  },
+  "plan": {
+    "title": "Plan",
+    "weekView": "Semaine",
+    "blockView": "Bloc",
+    "seasonView": "Saison",
+    "noActivePlan": "Aucun plan d'entra\u00eenement actif",
+    "balance": {
+      "title": "\u00c9quilibre des disciplines",
+      "overInvested": "+{delta}% au-dessus de l'objectif",
+      "underInvested": "\u2212{delta}% en dessous de l'objectif",
+      "onTarget": "Dans l'objectif",
+      "actual": "R\u00e9el",
+      "target": "Cible"
+    }
+  },
+  "dashboard": {
+    "morningBrief": {
+      "greeting": "Briefing du matin",
+      "restDay": "Pas de s\u00e9ance aujourd'hui. Votre corps consolide le travail de cette semaine.",
+      "sessionsCompleted": "{completed} sur {planned} s\u00e9ances cette semaine"
+    },
+    "upload": {
+      "title": "T\u00e9l\u00e9charger une activit\u00e9",
+      "dropzone": "D\u00e9posez un fichier FIT ou TCX ici, ou cliquez pour parcourir",
+      "uploading": "T\u00e9l\u00e9chargement\u2026",
+      "success": "Activit\u00e9 t\u00e9l\u00e9charg\u00e9e avec succ\u00e8s",
+      "duplicate": "Cette activit\u00e9 a d\u00e9j\u00e0 \u00e9t\u00e9 t\u00e9l\u00e9charg\u00e9e"
+    }
+  },
+  "sessions": {
+    "verdict": {
+      "achieved": "La s\u00e9ance a atteint son objectif",
+      "partial": "La s\u00e9ance a partiellement atteint son objectif",
+      "missed": "La s\u00e9ance n'a pas atteint son objectif"
+    },
+    "feel": {
+      "title": "Comment cette s\u00e9ance s'est-elle pass\u00e9e\u00a0?",
+      "overall": "Ressenti global",
+      "save": "Enregistrer le ressenti"
+    }
+  },
+  "debrief": {
+    "title": "Bilan hebdomadaire",
+    "notReady": "Bilan pas encore pr\u00eat",
+    "generating": "G\u00e9n\u00e9ration du bilan\u2026"
+  }
+}

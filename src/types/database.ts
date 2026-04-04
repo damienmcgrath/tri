@@ -157,6 +157,39 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["coach_plan_change_proposals"]["Insert"]>;
       };
+      profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          display_name: string | null;
+          avatar_url: string | null;
+          active_plan_id: string | null;
+          race_name: string | null;
+          race_date: string | null;
+          locale: string;
+          units: "metric" | "imperial";
+          timezone: string;
+          week_start_day: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          display_name?: string | null;
+          avatar_url?: string | null;
+          active_plan_id?: string | null;
+          race_name?: string | null;
+          race_date?: string | null;
+          locale?: string;
+          units?: "metric" | "imperial";
+          timezone?: string;
+          week_start_day?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+      };
       recovery_logs: {
         Row: {
           id: string;
