@@ -1212,12 +1212,6 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
 }
 
 function TaskOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, []);
-
   return (
     <div className="fixed inset-0 z-40 overflow-hidden bg-black/55 backdrop-blur-[2px]">
       <button type="button" aria-label="Close overlay" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
