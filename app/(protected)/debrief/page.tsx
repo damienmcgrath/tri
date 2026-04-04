@@ -202,7 +202,7 @@ export default async function DebriefPage({
 
   const artifact = snapshot.artifact;
   const weekEnd = addDays(weekStart, 6);
-  const [adjacent, macroCtx, sessionsForSportMinutes, previousDebriefRow] = await Promise.all([
+  const [adjacent, macroCtx, sessionsForSportMinutes, previousDebriefRow, profileRow] = await Promise.all([
     getAdjacentWeeklyDebriefs({ supabase, athleteId: user.id, weekStart }),
     getMacroContext(supabase, user.id),
     supabase
@@ -218,8 +218,14 @@ export default async function DebriefPage({
       .lt("week_start", weekStart)
       .order("week_start", { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
       .maybeSingle()
   ]);
+  const athleteDisplayName: string | null = (profileRow.data?.display_name as string) ?? user.user_metadata?.full_name ?? null;
   type SportRow = { sport: string; duration_minutes: number | null; status: string | null };
   const rawSessions: SportRow[] = (sessionsForSportMinutes.data ?? []) as SportRow[];
   const completedSessionsForWeek = rawSessions.filter((s) => s.status === "completed");
@@ -272,7 +278,7 @@ export default async function DebriefPage({
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
             </div>
-            <ShareSummaryButton weekOf={artifact.weekStart} />
+            <ShareSummaryButton weekOf={artifact.weekStart} displayName={athleteDisplayName} />
           </div>
         </div>
 

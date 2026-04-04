@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 type Format = "story" | "feed" | "square";
 type Props = {
   weekOf: string;
+  displayName: string | null;
   onClose: () => void;
 };
 
@@ -21,7 +22,8 @@ const ASPECT_RATIOS: Record<Format, string> = {
   square: "1/1"
 };
 
-export function ShareCardModal({ weekOf, onClose }: Props) {
+export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
+  const hasName = !!displayName;
   const [selectedFormat, setSelectedFormat] = useState<Format>("story");
   const [showName, setShowName] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -149,16 +151,22 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
           })}
         </div>
 
-        {/* Name toggle */}
-        <label className="mt-4 flex items-center gap-2 text-sm text-muted">
-          <input
-            type="checkbox"
-            checked={showName}
-            onChange={(e) => setShowName(e.target.checked)}
-            className="rounded border-[hsl(var(--border))]"
-          />
-          Show athlete name
-        </label>
+        {/* Name toggle — only shown when user has a display name */}
+        {hasName ? (
+          <label className="mt-4 flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={showName}
+              onChange={(e) => setShowName(e.target.checked)}
+              className="rounded border-[hsl(var(--border))]"
+            />
+            Show athlete name
+          </label>
+        ) : (
+          <p className="mt-4 text-xs text-tertiary">
+            Set a display name in <a href="/settings/athlete-context" className="underline hover:text-white">Settings</a> to include your name on the card.
+          </p>
+        )}
 
         {/* Actions */}
         <div className="mt-5 flex gap-3">

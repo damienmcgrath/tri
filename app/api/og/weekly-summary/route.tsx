@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
   const isFeed = format === "feed";
   const isSquare = format === "square";
   // Top padding distributes dead space: more padding for taller formats
-  const padTop = isStory ? 140 : isFeed ? 100 : 80;
+  const padTop = isStory ? 180 : isFeed ? 100 : 80;
   const padSide = 80;
   const padBottom = 80;
 
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
   const showHighlights = highlights.length > 0;
   const showCarryForward = isStory && carryForward.length > 0;
   // Square truncates highlight text more aggressively
-  const highlightLimit = isStory ? 140 : isFeed ? 100 : 80;
+  const highlightLimit = isStory ? 180 : isFeed ? 100 : 80;
 
   // Sports with non-zero minutes for the bar & legend
   const activeSports = (["swim", "bike", "run", "strength"] as const).filter(
@@ -239,9 +239,9 @@ export async function GET(request: NextRequest) {
           </div>
         )}
 
-        {/* Highlights — story + feed only */}
+        {/* Highlights */}
         {showHighlights && (
-          <div style={{ marginTop: "32px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ marginTop: isStory ? "40px" : "32px", display: "flex", flexDirection: "column", gap: isStory ? "18px" : "14px" }}>
             <span style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px" }}>
               Highlights
             </span>
@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
 
         {/* Carry forward — story only */}
         {showCarryForward && (
-          <div style={{ marginTop: "32px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "18px" }}>
             <span style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px" }}>
               Focus next week
             </span>
@@ -266,7 +266,7 @@ export async function GET(request: NextRequest) {
               <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                 <span style={{ fontSize: "22px", color: ACCENT, flexShrink: 0, marginTop: "2px" }}>→</span>
                 <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)", lineHeight: 1.35 }}>
-                  {smartTruncate(c, 120)}
+                  {smartTruncate(c, 200)}
                 </span>
               </div>
             ))}
@@ -275,7 +275,7 @@ export async function GET(request: NextRequest) {
 
         {/* Race countdown */}
         {raceName && daysToRace !== null && (
-          <div style={{ marginTop: "40px", fontSize: "28px", fontWeight: 700, color: ACCENT, display: "flex" }}>
+          <div style={{ marginTop: isStory ? "48px" : "40px", fontSize: "28px", fontWeight: 700, color: ACCENT, display: "flex" }}>
             <span>{daysToRace} days to {raceName}</span>
           </div>
         )}
