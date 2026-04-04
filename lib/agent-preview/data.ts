@@ -16,6 +16,7 @@ const PREVIEW_LINK_TWO_ID = "66666666-6666-4666-8666-666666666662";
 const PREVIEW_LINK_EXTRA_RUN_ID = "66666666-6666-4666-8666-666666666663";
 const PREVIEW_LINK_SWIM_ID = "66666666-6666-4666-8666-666666666664";
 const PREVIEW_LINK_LONG_RUN_ID = "66666666-6666-4666-8666-666666666665";
+const PREVIEW_WEEK_FOUR_ID = "33333333-3333-4333-8333-333333333334";
 
 type PreviewTableName =
   | "profiles"
@@ -34,7 +35,13 @@ type PreviewTableName =
   | "ingestion_events"
   | "session_feels"
   | "session_verdicts"
-  | "adaptation_rationales";
+  | "adaptation_rationales"
+  | "morning_briefs"
+  | "training_scores"
+  | "week_transition_briefings"
+  | "session_comparisons"
+  | "session_intensity_profiles"
+  | "weekly_intensity_summaries";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -104,6 +111,16 @@ export function createPreviewDatabase(): PreviewDatabase {
         notes: "Reduce volume and absorb work.",
         target_minutes: 360,
         target_tss: 280
+      },
+      {
+        id: PREVIEW_WEEK_FOUR_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_index: 4,
+        week_start_date: "2026-03-30",
+        focus: "Build",
+        notes: "Ramp back up after recovery. Two key sessions anchor the week.",
+        target_minutes: 540,
+        target_tss: 450
       }
     ],
     sessions: [
@@ -317,6 +334,160 @@ export function createPreviewDatabase(): PreviewDatabase {
         notes: null,
         created_at: "2026-03-08T18:07:00.000Z",
         is_key: false,
+        execution_result: null
+      },
+      // ── Week 4 sessions (current week: 2026-03-30 → 2026-04-05) ──
+      {
+        id: "77777777-7777-4777-8777-77777777778a",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-03-30",
+        sport: "swim",
+        discipline: "swim",
+        type: "CSS Intervals",
+        session_name: "CSS Intervals",
+        target: "10 x 100m @ CSS with 15s rest",
+        duration_minutes: 50,
+        intent_category: "threshold",
+        session_role: "key",
+        status: "completed",
+        day_order: 1,
+        notes: "Smooth turnover through the final set.",
+        created_at: "2026-03-29T18:00:00.000Z",
+        is_key: true,
+        execution_result: {
+          status: "matched_intent",
+          executionScore: 89,
+          executionScoreBand: "On target",
+          executionScoreSummary: "CSS pace held consistently with controlled rest intervals.",
+          whyItMatters: "Threshold swim work builds lactate clearance for race-day pacing.",
+          recommendedNextAction: "Maintain the same send-off; consider adding 2 reps next week."
+        }
+      },
+      {
+        id: "77777777-7777-4777-8777-77777777778b",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-03-31",
+        sport: "bike",
+        discipline: "bike",
+        type: "FTP Intervals",
+        session_name: "FTP Intervals",
+        target: "3 x 12 min @ 92-95% FTP",
+        duration_minutes: 75,
+        intent_category: "threshold",
+        session_role: "key",
+        status: "completed",
+        day_order: 1,
+        notes: null,
+        created_at: "2026-03-29T18:01:00.000Z",
+        is_key: true,
+        execution_result: {
+          status: "matched_intent",
+          executionScore: 85,
+          executionScoreBand: "On target",
+          executionScoreSummary: "Power held steady across all three intervals. Cadence consistent at 88rpm.",
+          whyItMatters: "Clean FTP work confirms threshold capacity is tracking well for race build.",
+          recommendedNextAction: "Maintain this approach. Same targets next time."
+        }
+      },
+      {
+        id: "77777777-7777-4777-8777-77777777778c",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-04-01",
+        sport: "run",
+        discipline: "run",
+        type: "Easy Run",
+        session_name: "Easy Run",
+        target: "40 min easy aerobic",
+        duration_minutes: 40,
+        intent_category: "easy",
+        session_role: "recovery",
+        status: "completed",
+        day_order: 1,
+        notes: null,
+        created_at: "2026-03-29T18:02:00.000Z",
+        is_key: false,
+        execution_result: {
+          status: "matched_intent",
+          executionScore: 92,
+          executionScoreBand: "On target",
+          executionScoreSummary: "A controlled easy run. HR stayed well below the aerobic ceiling.",
+          whyItMatters: "Flush run between key sessions supports recovery.",
+          recommendedNextAction: "Keep these honest — avoid steady-state drift."
+        }
+      },
+      {
+        id: "77777777-7777-4777-8777-77777777778d",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-04-02",
+        sport: "strength",
+        discipline: "strength",
+        type: "Core & Mobility",
+        session_name: "Core & Mobility",
+        target: "Core stability + hip mobility circuit",
+        duration_minutes: 30,
+        intent_category: "recovery",
+        session_role: "supporting",
+        status: "planned",
+        day_order: 1,
+        notes: null,
+        created_at: "2026-03-29T18:03:00.000Z",
+        is_key: false,
+        execution_result: null
+      },
+      {
+        id: "77777777-7777-4777-8777-77777777778e",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-04-04",
+        sport: "run",
+        discipline: "run",
+        type: "Tempo Run",
+        session_name: "Tempo Run",
+        target: "45 min with 3 x 8 min @ threshold",
+        duration_minutes: 45,
+        intent_category: "threshold",
+        session_role: "key",
+        status: "planned",
+        day_order: 1,
+        notes: "Focus on cadence and relaxed shoulders.",
+        created_at: "2026-03-29T18:04:00.000Z",
+        is_key: true,
+        execution_result: null
+      },
+      {
+        id: "77777777-7777-4777-8777-77777777778f",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_id: PREVIEW_WEEK_FOUR_ID,
+        date: "2026-04-05",
+        sport: "bike",
+        discipline: "bike",
+        type: "Long Ride",
+        session_name: "Long Ride",
+        target: "2h30 aerobic with rolling hills",
+        duration_minutes: 150,
+        intent_category: "long",
+        session_role: "key",
+        status: "planned",
+        day_order: 1,
+        notes: "Fuel every 20 min. Cap power on climbs.",
+        created_at: "2026-03-29T18:05:00.000Z",
+        is_key: true,
         execution_result: null
       }
     ],
@@ -1159,14 +1330,118 @@ export function createPreviewDatabase(): PreviewDatabase {
         created_at: "2026-03-15T10:06:00.000Z",
         acknowledged_at: null
       }
-    ]
+    ],
+    morning_briefs: [
+      {
+        id: "bb000001-0000-4000-8000-000000000001",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        brief_date: "2026-04-04",
+        session_preview: "Tempo Run — 45 min with 3 x 8 min at threshold. Key session. Focus on cadence and relaxed shoulders through the final rep.",
+        readiness_context: "You completed Tuesday's FTP intervals cleanly (85/100) and Wednesday's easy run stayed controlled. Legs should be fresh enough for quality threshold work today.",
+        week_context: "3 of 6 sessions done this week. On track for 5h 30m total volume. Two key sessions remaining (today's tempo run and Sunday's long ride).",
+        pending_actions: ["Review Tuesday's adaptation rationale"],
+        brief_text: "Good morning. You're midway through Build Week 4 and the quality sessions are landing well. Today's tempo run is the week's second key session — the threshold reps should feel controlled after two days of lighter work. Keep cadence above 170 and stay relaxed through the shoulders in the final rep block. Sunday's long ride closes the week.",
+        input_data: null,
+        viewed_at: null,
+        created_at: "2026-04-04T06:00:00.000Z",
+        ai_model_used: "preview",
+        ai_prompt_version: "v1"
+      }
+    ],
+    training_scores: [
+      {
+        id: "cc000001-0000-4000-8000-000000000001",
+        user_id: PREVIEW_USER_ID,
+        score_date: "2026-04-04",
+        composite_score: 72,
+        execution_quality: 78,
+        execution_inputs: { verdictCount: 4, keyVerdictCount: 2 },
+        progression_signal: 65,
+        progression_inputs: { comparisonCount: 3, improvingCount: 2 },
+        progression_active: true,
+        balance_score: 70,
+        balance_inputs: {
+          actualDistribution: { swim: 0.18, bike: 0.42, run: 0.30, strength: 0.10 },
+          idealDistribution: { swim: 0.20, bike: 0.40, run: 0.30, strength: 0.10 }
+        },
+        goal_race_type: "half_ironman",
+        training_block: "Build",
+        score_delta_7d: 4,
+        score_delta_28d: 8,
+        created_at: "2026-04-04T06:00:00.000Z"
+      }
+    ],
+    week_transition_briefings: [
+      {
+        id: "dd000001-0000-4000-8000-000000000001",
+        user_id: PREVIEW_USER_ID,
+        athlete_id: PREVIEW_USER_ID,
+        current_week_start: "2026-03-30",
+        last_week_takeaway: "Recovery week absorbed well — fatigue markers dropped and the light sessions felt controlled. You're coming into this build week with solid freshness.",
+        this_week_focus: "Build Week 4 ramps back up with two key sessions: Tuesday's FTP intervals and Saturday's tempo run. The priority is executing the bike intervals cleanly after the recovery week reset.",
+        adaptation_context: "No adaptations carried forward from last week. The pending rationale from the long run fade has been addressed by the recovery block.",
+        pending_rationale_ids: [],
+        coaching_prompt: "Focus on nailing Tuesday's FTP intervals — you should feel fresh coming off recovery. If legs are heavy by Thursday, we can lighten the tempo run to protect Sunday's long ride.",
+        viewed_at: null,
+        dismissed_at: null,
+        created_at: "2026-03-30T06:00:00.000Z",
+        ai_model_used: "preview",
+        ai_prompt_version: "v1"
+      }
+    ],
+    session_comparisons: [
+      {
+        id: "ee000001-0000-4000-8000-000000000001",
+        user_id: PREVIEW_USER_ID,
+        current_session_id: "77777777-7777-4777-8777-77777777778b",
+        comparison_session_id: "77777777-7777-4777-8777-777777777772",
+        match_score: 0.92,
+        match_factors: { discipline: 1.0, type: 1.0, duration: 0.95, intent: 1.0 },
+        comparison_summary: "Your FTP intervals show clear improvement compared to 3 weeks ago. Power held steady across all three reps this time (vs late fade previously), and heart rate response was more proportionate. The threshold stimulus landed cleanly — a meaningful step forward in sustained power capacity.",
+        metric_deltas: [
+          { metric: "Avg Power", currentValue: "237W", previousValue: "228W", direction: "up", magnitude: "moderate" },
+          { metric: "Execution Score", currentValue: "85", previousValue: "74", direction: "up", magnitude: "significant" },
+          { metric: "Cadence", currentValue: "88 rpm", previousValue: "85 rpm", direction: "up", magnitude: "minor" }
+        ],
+        trend_direction: "improving",
+        trend_confidence: "moderate",
+        weeks_apart: 3,
+        discipline: "bike",
+        session_type: "FTP Build",
+        comparison_range: "recent",
+        created_at: "2026-03-31T10:00:00.000Z"
+      },
+      {
+        id: "ee000002-0000-4000-8000-000000000002",
+        user_id: PREVIEW_USER_ID,
+        current_session_id: "77777777-7777-4777-8777-77777777778a",
+        comparison_session_id: "77777777-7777-4777-8777-777777777771",
+        match_score: 0.88,
+        match_factors: { discipline: 1.0, type: 1.0, duration: 0.90, intent: 1.0 },
+        comparison_summary: "CSS intervals remain stable. Pacing control improved slightly in the second half, suggesting better fatigue management. Stroke rate consistency is a strength.",
+        metric_deltas: [
+          { metric: "Avg Pace", currentValue: "1:32/100m", previousValue: "1:33/100m", direction: "up", magnitude: "minor" },
+          { metric: "Execution Score", currentValue: "89", previousValue: "91", direction: "down", magnitude: "minor" }
+        ],
+        trend_direction: "stable",
+        trend_confidence: "moderate",
+        weeks_apart: 3,
+        discipline: "swim",
+        session_type: "CSS Intervals",
+        comparison_range: "recent",
+        created_at: "2026-03-30T10:00:00.000Z"
+      }
+    ],
+    session_intensity_profiles: [],
+    weekly_intensity_summaries: []
   };
 }
 
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 3;
+const PREVIEW_DATABASE_VERSION = 4;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
