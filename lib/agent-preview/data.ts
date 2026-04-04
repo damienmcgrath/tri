@@ -284,16 +284,17 @@ export function createPreviewDatabase(): PreviewDatabase {
         session_role: "key",
         status: "completed",
         day_order: 1,
-        notes: "Solid long run. Kept easy for the first 18km, last 3km drifted to steady.",
+        notes: "Legs felt heavy from the start. HR crept up despite easy pace. Cut the last 3km.",
         created_at: "2026-03-08T18:06:00.000Z",
         is_key: true,
         execution_result: {
-          status: "matched_intent",
-          executionScore: 86,
-          executionScoreBand: "On target",
-          executionScoreSummary: "Aerobic control held well. Final 3km steady as planned.",
-          whyItMatters: "Long run quality supports race-day run durability at the 70.3 distance.",
-          recommendedNextAction: "Keep the easy pace honest on the next long run — the slight drift at the end was fine here."
+          status: "partial_intent",
+          intentMatchStatus: "partial_intent",
+          executionScore: 68,
+          executionScoreBand: "Partial match",
+          executionScoreSummary: "HR elevated 8bpm above easy ceiling. Significant pace drift in the final third. Session cut short by 7 minutes.",
+          whyItMatters: "Elevated HR and late fade suggest incomplete recovery from midweek sessions. The aerobic stimulus was partially delivered but at higher physiological cost than intended.",
+          recommendedNextAction: "Reduce Tuesday's threshold intensity to protect recovery before the next key bike session."
         }
       },
       {
@@ -1165,7 +1166,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 2;
+const PREVIEW_DATABASE_VERSION = 3;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;

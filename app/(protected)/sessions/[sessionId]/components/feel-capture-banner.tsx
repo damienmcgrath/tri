@@ -90,18 +90,20 @@ function PillSelector({ label, options, value, onChange }: {
   );
 }
 
+type SecondaryItem = { label: string; value: string };
+
 function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["existingFeel"]> }) {
   // Support both new overall_feel (1-5) and legacy rpe (1-10) rows
   const option = feel.overall_feel
     ? FEEL_OPTIONS.find((o) => o.value === feel.overall_feel)
     : null;
 
-  const secondaryItems: string[] = [];
-  if (feel.energy_level) secondaryItems.push(`Energy: ${feel.energy_level}`);
-  if (feel.legs_feel) secondaryItems.push(`Legs: ${feel.legs_feel}`);
-  if (feel.motivation) secondaryItems.push(`Motivation: ${feel.motivation}`);
-  if (feel.sleep_quality) secondaryItems.push(`Sleep: ${feel.sleep_quality}`);
-  if (feel.life_stress) secondaryItems.push(`Stress: ${feel.life_stress}`);
+  const secondaryItems: SecondaryItem[] = [];
+  if (feel.energy_level) secondaryItems.push({ label: "Energy", value: feel.energy_level });
+  if (feel.legs_feel) secondaryItems.push({ label: "Legs", value: feel.legs_feel });
+  if (feel.motivation) secondaryItems.push({ label: "Motivation", value: feel.motivation.replace("_", " ") });
+  if (feel.sleep_quality) secondaryItems.push({ label: "Sleep", value: feel.sleep_quality });
+  if (feel.life_stress) secondaryItems.push({ label: "Stress", value: feel.life_stress });
 
   // Legacy RPE-only rows: show RPE value directly
   if (!option && feel.rpe) {
@@ -119,14 +121,30 @@ function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["exist
 
   return (
     <article className="surface border border-[hsl(var(--border))] p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{option.icon}</span>
-        <span className="text-sm font-medium" style={{ color: option.color.text }}>{option.label}</span>
-        {secondaryItems.length > 0 && (
-          <span className="text-xs text-tertiary">{secondaryItems.join(" \u00B7 ")}</span>
-        )}
+      {/* Primary feel — visually dominant */}
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full text-lg" style={{ backgroundColor: option.color.bg }}>
+          {option.icon}
+        </span>
+        <span className="text-sm font-semibold" style={{ color: option.color.text }}>{option.label}</span>
       </div>
-      {feel.note && <p className="mt-1.5 text-xs text-muted">{feel.note}</p>}
+
+      {/* Secondary attributes — 2-column grid */}
+      {secondaryItems.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+          {secondaryItems.map((item) => (
+            <div key={item.label} className="flex items-baseline gap-1.5">
+              <span className="text-[11px] text-tertiary">{item.label}</span>
+              <span className="text-[11px] font-medium text-muted">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Note */}
+      {feel.note && (
+        <p className="mt-2.5 border-t border-[hsl(var(--border))] pt-2.5 text-xs text-muted italic">{feel.note}</p>
+      )}
     </article>
   );
 }

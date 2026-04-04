@@ -560,6 +560,16 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
         </div>
       </article>
 
+      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
+
+      {session.status === "completed" && !activityId ? (
+        <SessionVerdictCard
+          sessionId={session.id}
+          existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
+          sessionCompleted={true}
+        />
+      ) : null}
+
       <section className="surface p-4 md:p-5">
         {reviewVm.isReviewable ? (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -717,16 +727,6 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       ) : null}
 
       {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} /> : null}
-
-      {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
-
-      {session.status === "completed" && !activityId ? (
-        <SessionVerdictCard
-          sessionId={session.id}
-          existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
-          sessionCompleted={true}
-        />
-      ) : null}
 
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
