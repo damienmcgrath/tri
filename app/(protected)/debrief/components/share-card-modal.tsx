@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 type Format = "story" | "feed" | "square";
 type Props = {
@@ -77,7 +78,7 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-6">
         <div className="flex items-center justify-between">
@@ -148,6 +149,7 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
