@@ -286,28 +286,21 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-        {/* ── Chat (primary content — visible without scrolling) ──────────── */}
-        <div className="order-2 xl:order-1">
-          <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
-        </div>
+      <div className="grid gap-4">
+        {/* ── Context cards ─────────────────────────────────────────────── */}
+        <aside className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {transitionBriefing && !transitionBriefing.dismissedAt ? (
+              <TransitionBriefingCard briefing={transitionBriefing} />
+            ) : null}
 
-        {/* ── Context sidebar ────────────────────────────────────────────── */}
-        <aside className="order-1 space-y-3 xl:order-2">
-          {transitionBriefing && !transitionBriefing.dismissedAt ? (
-            <TransitionBriefingCard briefing={transitionBriefing} />
-          ) : null}
-
-          {weeklyBrief ? (
-            <CoachBriefingCard
-              brief={weeklyBrief}
-              athleteContext={athleteContext}
-              briefingContext={briefingContext}
-            />
-          ) : null}
-
-          <div className="space-y-2.5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.25)]">Week context</p>
+            {weeklyBrief ? (
+              <CoachBriefingCard
+                brief={weeklyBrief}
+                athleteContext={athleteContext}
+                briefingContext={briefingContext}
+              />
+            ) : null}
 
             {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : null}
 
@@ -348,6 +341,11 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
             ) : null}
           </div>
         </aside>
+
+        {/* ── Chat (primary content) ────────────────────────────────────── */}
+        <div>
+          <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
+        </div>
       </div>
     </section>
   );
