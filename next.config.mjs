@@ -16,11 +16,15 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()"
   },
-  {
-    key: "Content-Security-Policy",
-    value:
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://api.openai.com; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-  }
+  ...(process.env.NODE_ENV === "production"
+    ? [
+        {
+          key: "Content-Security-Policy",
+          value:
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://api.openai.com; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
+      ]
+    : [])
 ];
 
 const nextConfig = {
