@@ -112,11 +112,11 @@ export async function buildSessionVerdictContext(
   // Fetch linked activity
   const { data: links } = await supabase
     .from("session_activity_links")
-    .select("activity_id")
-    .eq("session_id", sessionId);
+    .select("completed_activity_id")
+    .eq("planned_session_id", sessionId);
 
   let activity: SessionVerdictContext["activity"] = null;
-  const activityId = links?.[0]?.activity_id;
+  const activityId = links?.[0]?.completed_activity_id;
   if (activityId) {
     const { data: act } = await supabase
       .from("completed_activities")
@@ -292,13 +292,99 @@ function buildVerdictInstructions(): string {
 
 // --- Deterministic fallback ---
 
+function formatDuration(sec: number): string {
+  const m = Math.round(sec / 60);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function formatPace100m(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/100m`;
+}
+
 function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput {
   const sport = ctx.session.sport;
   const intentCategory = ctx.session.intentCategory ?? "general";
   const blockCtx = `Week ${ctx.trainingBlock.blockWeek} of ${ctx.trainingBlock.blockTotalWeeks}-week ${ctx.trainingBlock.currentBlock.toLowerCase()} block`;
 
   const hasActivity = ctx.activity !== null;
-  const status: SessionVerdictOutput["verdict_status"] = hasActivity ? "partial" : "missed";
+  const act = ctx.activity;
+
+  // Build metric comparisons from activity data when available
+  const metricComparisons: SessionVerdictOutput["metric_comparisons"] = [];
+  if (act) {
+    if (ctx.session.durationMinutes && act.durationSec) {
+      const plannedMin = ctx.session.durationMinutes;
+      const actualMin = Math.round(act.durationSec / 60);
+      const pct = Math.round((actualMin / plannedMin) * 100);
+      metricComparisons.push({
+        metric: "Duration",
+        target: `${plannedMin}m`,
+        actual: `${actualMin}m (${pct}%)`,
+        assessment: pct >= 90 && pct <= 110 ? "on_target" : pct < 90 ? "below" : "above"
+      });
+    }
+    if (act.avgHr) {
+      metricComparisons.push({
+        metric: "Avg HR",
+        target: "—",
+        actual: `${act.avgHr} bpm`,
+        assessment: "on_target"
+      });
+    }
+    if (act.avgPower) {
+      metricComparisons.push({
+        metric: "Avg Power",
+        target: "—",
+        actual: `${act.avgPower}W`,
+        assessment: "on_target"
+      });
+    }
+    if (sport === "swim" && act.avgPacePer100mSec) {
+      metricComparisons.push({
+        metric: "Avg Pace",
+        target: "—",
+        actual: formatPace100m(act.avgPacePer100mSec),
+        assessment: "on_target"
+      });
+    }
+    if (act.distanceM) {
+      const distKm = (act.distanceM / 1000).toFixed(1);
+      const unit = act.distanceM >= 1000 ? `${distKm}km` : `${act.distanceM}m`;
+      metricComparisons.push({
+        metric: "Distance",
+        target: "—",
+        actual: unit,
+        assessment: "on_target"
+      });
+    }
+  }
+
+  // Determine status based on execution result or activity presence
+  let status: SessionVerdictOutput["verdict_status"] = "missed";
+  let executionSummary = "No activity data linked to this session.";
+  if (hasActivity) {
+    const execResult = ctx.executionResult;
+    const intentMatch = execResult?.intentMatchStatus ?? execResult?.status;
+    if (intentMatch === "matched_intent") {
+      status = "achieved";
+      executionSummary = "Session completed with activity data linked. Metrics available for review.";
+    } else if (intentMatch === "partial_intent") {
+      status = "partial";
+      executionSummary = (execResult?.executionSummary as string) ?? "Session partially matched its intended stimulus.";
+    } else if (intentMatch === "missed_intent") {
+      status = "missed";
+      executionSummary = (execResult?.executionSummary as string) ?? "Session did not match its intended stimulus.";
+    } else {
+      status = "partial";
+      executionSummary = "Session data available but AI analysis unavailable. Review the metrics below.";
+    }
+  }
+
+  const adaptationSignal = hasActivity
+    ? "AI-generated adaptation analysis unavailable. The metrics above provide a baseline for manual review."
+    : "No activity data to assess. If this session was missed, consider how to redistribute its training load.";
 
   return {
     purpose_statement: ctx.session.target
@@ -307,14 +393,12 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
     training_block_context: blockCtx,
     intended_zones: null,
     intended_metrics: null,
-    execution_summary: hasActivity
-      ? "Session data available but AI analysis unavailable. Review the metrics below for a manual assessment."
-      : "No activity data linked to this session.",
+    execution_summary: executionSummary,
     verdict_status: status,
-    metric_comparisons: [],
+    metric_comparisons: metricComparisons,
     key_deviations: null,
-    adaptation_signal: "Unable to generate adaptation signal — AI analysis unavailable. Review manually.",
-    adaptation_type: "flag_review",
+    adaptation_signal: adaptationSignal,
+    adaptation_type: hasActivity ? "proceed" : "flag_review",
     affected_session_ids: null
   };
 }
@@ -334,12 +418,12 @@ export async function generateSessionVerdict(
   const fallback = buildFallbackVerdict(ctx);
 
   // Get linked activity ID for storage
-  const { data: links } = await supabase
+  const { data: storageLinks } = await supabase
     .from("session_activity_links")
-    .select("activity_id")
-    .eq("session_id", sessionId)
+    .select("completed_activity_id")
+    .eq("planned_session_id", sessionId)
     .limit(1);
-  const activityId = links?.[0]?.activity_id ?? null;
+  const activityId = storageLinks?.[0]?.completed_activity_id ?? null;
 
   const result = await callOpenAIWithFallback<SessionVerdictOutput>({
     logTag: "session-verdict",
