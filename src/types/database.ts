@@ -157,6 +157,66 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["coach_plan_change_proposals"]["Insert"]>;
       };
+      discipline_balance_snapshots: {
+        Row: {
+          id: string;
+          user_id: string;
+          athlete_id: string;
+          snapshot_date: string;
+          window_days: number;
+          actual_distribution: Json;
+          target_distribution: Json;
+          target_race_id: string | null;
+          deltas: Json;
+          total_hours: number | null;
+          hours_by_sport: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          athlete_id: string;
+          snapshot_date: string;
+          window_days?: number;
+          actual_distribution: Json;
+          target_distribution: Json;
+          target_race_id?: string | null;
+          deltas: Json;
+          total_hours?: number | null;
+          hours_by_sport?: Json | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["discipline_balance_snapshots"]["Insert"]>;
+      };
+      rebalancing_recommendations: {
+        Row: {
+          id: string;
+          user_id: string;
+          athlete_id: string;
+          snapshot_id: string;
+          recommendation_type: "add" | "swap" | "reduce" | "maintain";
+          sport: string;
+          summary: string;
+          rationale: string;
+          priority: number;
+          status: "active" | "applied" | "dismissed";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          athlete_id: string;
+          snapshot_id: string;
+          recommendation_type: "add" | "swap" | "reduce" | "maintain";
+          sport: string;
+          summary: string;
+          rationale: string;
+          priority?: number;
+          status?: "active" | "applied" | "dismissed";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["rebalancing_recommendations"]["Insert"]>;
+      };
       race_profiles: {
         Row: {
           id: string;
