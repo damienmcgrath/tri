@@ -848,7 +848,7 @@ export default async function DashboardPage({
         </Suspense>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-4">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
