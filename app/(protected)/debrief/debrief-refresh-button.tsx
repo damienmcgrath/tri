@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 type Props = {
   weekStart: string;
@@ -9,7 +8,6 @@ type Props = {
 };
 
 export function DebriefRefreshButton({ weekStart, label = "Refresh" }: Props) {
-  const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   async function onRefresh() {
@@ -25,7 +23,7 @@ export function DebriefRefreshButton({ weekStart, label = "Refresh" }: Props) {
       if (!response.ok) {
         throw new Error(payload.error ?? "Could not refresh Weekly Debrief.");
       }
-      router.refresh();
+      window.location.reload();
     } finally {
       setIsRefreshing(false);
     }
