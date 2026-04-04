@@ -151,39 +151,6 @@ function plannerFocusFromNotes(notes: string) {
   return "";
 }
 
-/** Map intent_category to an intensity zone color (green → red) */
-function getIntensityDotColor(intentCategory?: string | null): string | null {
-  if (!intentCategory) return null;
-  const intent = intentCategory.trim().toLowerCase();
-
-  // Green — low intensity / recovery
-  if (["recovery", "easy_run", "easy_bike", "easy"].includes(intent)) {
-    return "hsl(var(--success))";
-  }
-
-  // Teal — aerobic / endurance
-  if (["z2_endurance", "endurance_ride", "endurance_swim", "aerobic_swim", "long_endurance"].includes(intent)) {
-    return "hsl(160, 70%, 50%)";
-  }
-
-  // Yellow — moderate / tempo
-  if (["tempo", "strength_maintenance", "technique_swim"].includes(intent)) {
-    return "hsl(var(--warning))";
-  }
-
-  // Orange — threshold
-  if (["threshold"].includes(intent)) {
-    return "hsl(25, 95%, 55%)";
-  }
-
-  // Red — high intensity
-  if (["intervals"].includes(intent)) {
-    return "hsl(var(--signal-risk))";
-  }
-
-  return null;
-}
-
 function getSessionIntentCue(intentCategory?: string | null) {
   if (!intentCategory) return null;
 
@@ -658,7 +625,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const role = getOptionalSessionRoleLabel(session);
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
-                  const intensityColor = getIntensityDotColor(session.intent_category);
+
                   const sessionProfile = sessionProfileMap.get(session.id);
                   return (
                     <button
@@ -669,7 +636,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       style={{
                         borderColor: "rgba(255,255,255,0.06)",
                         borderLeftWidth: "3px",
-                        borderLeftColor: sessionProfile?.intensityColour ?? disciplineBorderColor(session.sport)
+                        borderLeftColor: disciplineBorderColor(session.sport)
                       }}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -697,8 +664,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? (
-                        <p className="flex items-center gap-1.5 text-[11px] text-muted">
-                          {intensityColor ? <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: intensityColor }} /> : null}
+                        <p className="text-[11px] text-muted">
                           Intent: {intentCue}
                         </p>
                       ) : null}
@@ -729,7 +695,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   const role = getOptionalSessionRoleLabel(session);
                   const roleCue = getSessionRoleCue(role);
                   const intentCue = getSessionIntentCue(session.intent_category);
-                  const intensityColor = getIntensityDotColor(session.intent_category);
+
                   const mobileProfile = sessionProfileMap.get(session.id);
                   return (
                     <button
@@ -740,7 +706,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       style={{
                         borderColor: "rgba(255,255,255,0.06)",
                         borderLeftWidth: "3px",
-                        borderLeftColor: mobileProfile?.intensityColour ?? disciplineBorderColor(session.sport)
+                        borderLeftColor: disciplineBorderColor(session.sport)
                       }}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -768,8 +734,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? (
-                        <p className="flex items-center gap-1.5 text-[11px] text-muted">
-                          {intensityColor ? <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: intensityColor }} /> : null}
+                        <p className="text-[11px] text-muted">
                           Intent: {intentCue}
                         </p>
                       ) : null}
