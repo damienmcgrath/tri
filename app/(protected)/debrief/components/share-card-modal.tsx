@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 type Format = "story" | "feed" | "square";
@@ -10,9 +10,9 @@ type Props = {
 };
 
 const FORMAT_OPTIONS: Array<{ value: Format; label: string; dimensions: string; ratio: string }> = [
-  { value: "story", label: "Story", dimensions: "1080 \u00D7 1920", ratio: "9:16" },
-  { value: "feed", label: "Feed", dimensions: "1080 \u00D7 1350", ratio: "4:5" },
-  { value: "square", label: "Square", dimensions: "1080 \u00D7 1080", ratio: "1:1" }
+  { value: "story", label: "Story", dimensions: "1080 × 1920", ratio: "9:16" },
+  { value: "feed", label: "Feed", dimensions: "1080 × 1350", ratio: "4:5" },
+  { value: "square", label: "Square", dimensions: "1080 × 1080", ratio: "1:1" }
 ];
 
 const ASPECT_RATIOS: Record<Format, string> = {
@@ -25,6 +25,19 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
   const [selectedFormat, setSelectedFormat] = useState<Format>("story");
   const [showName, setShowName] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced preview URL update
+  useEffect(() => {
+    setPreviewLoading(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPreviewUrl(`/api/og/weekly-summary?weekOf=${weekOf}&format=${selectedFormat}&showName=${showName}`);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [weekOf, selectedFormat, showName]);
 
   function getImageUrl(format: Format): string {
     return `/api/og/weekly-summary?weekOf=${weekOf}&format=${format}&showName=${showName}`;
@@ -88,8 +101,32 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
           </button>
         </div>
 
+        {/* Live preview */}
+        <div className="mt-4 flex justify-center">
+          <div
+            className="relative w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)]"
+            style={{ aspectRatio: ASPECT_RATIOS[selectedFormat], maxHeight: "320px" }}
+          >
+            {previewLoading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-[rgba(255,255,255,0.2)] border-t-[var(--color-accent)]" />
+              </div>
+            )}
+            {previewUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="Share card preview"
+                className={`h-full w-full object-contain transition-opacity ${previewLoading ? "opacity-0" : "opacity-100"}`}
+                onLoad={() => setPreviewLoading(false)}
+                onError={() => setPreviewLoading(false)}
+              />
+            )}
+          </div>
+        </div>
+
         {/* Format selector */}
-        <div className="mt-5 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-3 gap-2">
           {FORMAT_OPTIONS.map((opt) => {
             const isSelected = selectedFormat === opt.value;
             return (
@@ -97,16 +134,12 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
                 key={opt.value}
                 type="button"
                 onClick={() => setSelectedFormat(opt.value)}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-3 transition-colors ${
+                className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-2 transition-colors ${
                   isSelected
                     ? "border-[rgba(190,255,0,0.4)] bg-[rgba(190,255,0,0.08)]"
                     : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] hover:border-[rgba(255,255,255,0.2)]"
                 }`}
               >
-                <div
-                  className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)]"
-                  style={{ aspectRatio: ASPECT_RATIOS[opt.value], width: opt.value === "story" ? "32px" : opt.value === "feed" ? "40px" : "48px" }}
-                />
                 <span className={`text-xs font-medium ${isSelected ? "text-[var(--color-accent)]" : "text-white"}`}>
                   {opt.label}
                 </span>
@@ -128,7 +161,7 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
         </label>
 
         {/* Actions */}
-        <div className="mt-6 flex gap-3">
+        <div className="mt-5 flex gap-3">
           {typeof navigator !== "undefined" && "share" in navigator && (
             <button
               type="button"
@@ -136,7 +169,7 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
               disabled={generating}
               className="btn-primary flex-1 px-4 py-2.5 text-sm disabled:opacity-40"
             >
-              {generating ? "Generating\u2026" : "Share"}
+              {generating ? "Generating…" : "Share"}
             </button>
           )}
           <button
@@ -145,7 +178,7 @@ export function ShareCardModal({ weekOf, onClose }: Props) {
             disabled={generating}
             className={`${typeof navigator !== "undefined" && "share" in navigator ? "btn-secondary" : "btn-primary"} flex-1 px-4 py-2.5 text-sm disabled:opacity-40`}
           >
-            {generating ? "Generating\u2026" : "Download"}
+            {generating ? "Generating…" : "Download"}
           </button>
         </div>
       </div>
