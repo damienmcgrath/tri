@@ -157,6 +157,114 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["coach_plan_change_proposals"]["Insert"]>;
       };
+      race_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          athlete_id: string;
+          name: string;
+          date: string;
+          distance_type: "sprint" | "olympic" | "70.3" | "ironman" | "custom";
+          priority: "A" | "B" | "C";
+          course_profile: Json;
+          ideal_discipline_distribution: Json | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          athlete_id: string;
+          name: string;
+          date: string;
+          distance_type: "sprint" | "olympic" | "70.3" | "ironman" | "custom";
+          priority?: "A" | "B" | "C";
+          course_profile?: Json;
+          ideal_discipline_distribution?: Json | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["race_profiles"]["Insert"]>;
+      };
+      seasons: {
+        Row: {
+          id: string;
+          user_id: string;
+          athlete_id: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          primary_goal: string | null;
+          secondary_goals: string[];
+          status: "planning" | "active" | "completed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          athlete_id: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          primary_goal?: string | null;
+          secondary_goals?: string[];
+          status?: "planning" | "active" | "completed";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["seasons"]["Insert"]>;
+      };
+      season_races: {
+        Row: {
+          id: string;
+          season_id: string;
+          race_profile_id: string;
+        };
+        Insert: {
+          id?: string;
+          season_id: string;
+          race_profile_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["season_races"]["Insert"]>;
+      };
+      training_blocks: {
+        Row: {
+          id: string;
+          season_id: string | null;
+          plan_id: string | null;
+          user_id: string;
+          name: string;
+          block_type: "Base" | "Build" | "Peak" | "Taper" | "Race" | "Recovery" | "Transition";
+          start_date: string;
+          end_date: string;
+          target_race_id: string | null;
+          emphasis: Json;
+          notes: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          season_id?: string | null;
+          plan_id?: string | null;
+          user_id: string;
+          name: string;
+          block_type: "Base" | "Build" | "Peak" | "Taper" | "Race" | "Recovery" | "Transition";
+          start_date: string;
+          end_date: string;
+          target_race_id?: string | null;
+          emphasis?: Json;
+          notes?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["training_blocks"]["Insert"]>;
+      };
       profiles: {
         Row: {
           id: string;

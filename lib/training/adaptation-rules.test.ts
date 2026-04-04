@@ -39,6 +39,10 @@ function makeMacroCtx(overrides: Partial<MacroContext> = {}): MacroContext {
       bike: { plannedMinutes: 300, actualMinutes: 300, deltaPct: 0 },
       run: { plannedMinutes: 240, actualMinutes: 220, deltaPct: -8 }
     },
+    trainingBlockId: null,
+    trainingBlockType: null,
+    targetRaceId: null,
+    seasonId: null,
     ...overrides
   };
 }
