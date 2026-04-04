@@ -1029,7 +1029,8 @@ function AssignUploadModal({
   onError: () => void;
 }) {
   const [selectedSessionId, setSelectedSessionId] = useState(() => getSuggestedSessionId(upload, candidateSessions));
-  const [isSaving, setIsSaving] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isMarkingExtra, setIsMarkingExtra] = useState(false);
 
   useEffect(() => {
     setSelectedSessionId(getSuggestedSessionId(upload, candidateSessions));
@@ -1065,33 +1066,33 @@ function AssignUploadModal({
           <p className="mt-1 text-xs text-muted">This workout wasn&apos;t part of your training plan.</p>
           <button
             type="button"
-            disabled={isSaving}
+            disabled={isMarkingExtra || isAssigning}
             onClick={async () => {
               const activityId = getActivityId(upload.id);
               if (!activityId) { onError(); return; }
-              setIsSaving(true);
+              setIsMarkingExtra(true);
               try {
                 await markActivityExtraAction({ activityId });
                 onMarkedExtra();
               } catch {
                 onError();
               } finally {
-                setIsSaving(false);
+                setIsMarkingExtra(false);
               }
             }}
             className="btn-secondary mt-2 px-2 py-1 text-xs"
           >
-            {isSaving ? "Saving\u2026" : "Mark as extra"}
+            {isMarkingExtra ? "Saving\u2026" : "Mark as extra"}
           </button>
         </div>
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
           <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
           <button
             type="button"
-            disabled={isSaving || !selectedSessionId || candidateSessions.length === 0}
+            disabled={isAssigning || isMarkingExtra || !selectedSessionId || candidateSessions.length === 0}
             onClick={async () => {
               if (!selectedSessionId) return;
-              setIsSaving(true);
+              setIsAssigning(true);
               try {
                 if (upload.source?.uploadId) {
                   // FIT/TCX upload — use the upload attach API
@@ -1112,12 +1113,12 @@ function AssignUploadModal({
               } catch {
                 onError();
               } finally {
-                setIsSaving(false);
+                setIsAssigning(false);
               }
             }}
             className="btn-primary px-2 py-1 text-xs"
           >
-            {isSaving ? "Assigning\u2026" : "Assign to session"}
+            {isAssigning ? "Assigning\u2026" : "Assign to session"}
           </button>
         </div>
       </div>
