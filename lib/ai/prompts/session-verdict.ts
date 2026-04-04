@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
+import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
 
 export const SESSION_VERDICT_PROMPT_VERSION = "v1";
@@ -404,6 +405,30 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
   };
 }
 
+// --- Post-process AI output to remove raw seconds ---
+
+function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVerdictOutput {
+  const n = normalizeUnitString;
+  return {
+    ...verdict,
+    purpose_statement: n(verdict.purpose_statement),
+    training_block_context: n(verdict.training_block_context),
+    intended_zones: n(verdict.intended_zones),
+    intended_metrics: n(verdict.intended_metrics),
+    execution_summary: n(verdict.execution_summary),
+    adaptation_signal: n(verdict.adaptation_signal),
+    metric_comparisons: verdict.metric_comparisons.map(mc => ({
+      ...mc,
+      target: n(mc.target),
+      actual: n(mc.actual),
+    })),
+    key_deviations: verdict.key_deviations.map(d => ({
+      ...d,
+      description: n(d.description),
+    })),
+  };
+}
+
 // --- Main generation function ---
 
 export async function generateSessionVerdict(
@@ -445,13 +470,23 @@ export async function generateSessionVerdict(
           content: [
             {
               type: "input_text" as const,
-              text: JSON.stringify(ctx)
+              text: JSON.stringify({
+                ...ctx,
+                activity: ctx.activity ? {
+                  ...ctx.activity,
+                  durationSec: undefined,
+                  durationFormatted: ctx.activity.durationSec
+                    ? formatDuration(ctx.activity.durationSec)
+                    : null,
+                } : null,
+              })
             }
           ]
         }
       ]
     }),
-    schema: sessionVerdictOutputSchema
+    schema: sessionVerdictOutputSchema,
+    postProcess: normalizeSessionVerdictUnits
   });
 
   return { verdict: result.value, source: result.source, activityId };
