@@ -181,7 +181,7 @@ export async function POST(request: Request) {
   const injection = detectPromptInjection(payload.message);
   if (injection.suspicious) {
     logCoachAudit("warn", "coach.chat.prompt_injection_detected", {
-      reason: `Suspicious pattern: ${injection.matchedPattern} in message: ${payload.message.slice(0, 80)}`,
+      reason: `Matched pattern: ${injection.matchedPattern}`,
     });
   }
 

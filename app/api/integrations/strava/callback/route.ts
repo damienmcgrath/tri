@@ -80,8 +80,8 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.redirect(`${baseUrl}/settings/integrations?error=strava_invalid`);
   }
 
-  // Exchange code for tokens
-  const redirectUri = `${baseUrl}/api/integrations/strava/callback`;
+  // Exchange code for tokens — redirect_uri must match the one used in the connect step
+  const redirectUri = process.env.STRAVA_REDIRECT_URI ?? `${baseUrl}/api/integrations/strava/callback`;
   let tokens;
   try {
     tokens = await exchangeCodeForTokens(code, redirectUri);
