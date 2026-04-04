@@ -121,15 +121,20 @@ export async function GET(request: NextRequest) {
   const isStory = format === "story";
   const isFeed = format === "feed";
   const isSquare = format === "square";
-  const pad = 80;
+  // Top padding distributes dead space: more padding for taller formats
+  const padTop = isStory ? 140 : isFeed ? 100 : 80;
+  const padSide = 80;
+  const padBottom = 80;
 
   // Format-aware truncation
   const summaryLimit = isStory ? 280 : isFeed ? 220 : 180;
   const truncatedSummary = smartTruncate(weekHeadline, summaryLimit);
 
-  // Format-aware content: story shows highlights + carry-forward, feed shows highlights only
-  const showHighlights = (isStory || isFeed) && highlights.length > 0;
+  // Format-aware content: all formats show highlights, story also shows carry-forward
+  const showHighlights = highlights.length > 0;
   const showCarryForward = isStory && carryForward.length > 0;
+  // Square truncates highlight text more aggressively
+  const highlightLimit = isStory ? 140 : isFeed ? 100 : 80;
 
   // Sports with non-zero minutes for the bar & legend
   const activeSports = (["swim", "bike", "run", "strength"] as const).filter(
@@ -144,15 +149,12 @@ export async function GET(request: NextRequest) {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          alignItems: "stretch",
-          justifyContent: "center",
-          padding: `${pad}px`,
+          padding: `${padTop}px ${padSide}px ${padBottom}px`,
           background: "linear-gradient(180deg, #0c1220 0%, #0a0a0b 100%)",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           color: "white"
         }}
       >
-       <div style={{ display: "flex", flexDirection: "column" }}>
         {/* Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ fontSize: "28px", fontWeight: 700, color: ACCENT }}>TRI.AI</span>
@@ -247,7 +249,7 @@ export async function GET(request: NextRequest) {
               <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                 <span style={{ fontSize: "22px", color: ACCENT, flexShrink: 0, marginTop: "2px" }}>•</span>
                 <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)", lineHeight: 1.35 }}>
-                  {smartTruncate(h, isStory ? 140 : 100)}
+                  {smartTruncate(h, highlightLimit)}
                 </span>
               </div>
             ))}
@@ -282,7 +284,6 @@ export async function GET(request: NextRequest) {
         <div style={{ marginTop: "24px", fontSize: "18px", color: "rgba(255,255,255,0.3)" }}>
           Built with tri.ai
         </div>
-       </div>
       </div>
     ),
     {
