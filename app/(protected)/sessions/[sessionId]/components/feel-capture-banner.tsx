@@ -134,8 +134,8 @@ function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["exist
         <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
           {secondaryItems.map((item) => (
             <div key={item.label} className="flex items-baseline gap-1.5">
-              <span className="text-[11px] text-tertiary">{item.label}</span>
-              <span className="text-[11px] font-medium text-muted">{item.value}</span>
+              <span className="text-xs text-tertiary">{item.label}</span>
+              <span className="text-xs font-medium text-muted">{item.value}</span>
             </div>
           ))}
         </div>
