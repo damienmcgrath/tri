@@ -204,8 +204,8 @@ export async function GET(request: NextRequest) {
 
         {/* Race countdown — pushed toward bottom */}
         {raceName && daysToRace !== null && (
-          <div style={{ marginTop: "auto", paddingTop: "40px", fontSize: "28px", fontWeight: 700, color: ACCENT }}>
-            {daysToRace} days to {raceName}
+          <div style={{ display: "flex", marginTop: "auto", paddingTop: "40px", fontSize: "28px", fontWeight: 700, color: ACCENT }}>
+            <span>{daysToRace} days to {raceName}</span>
           </div>
         )}
 
