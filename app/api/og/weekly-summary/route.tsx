@@ -144,6 +144,7 @@ export async function GET(request: NextRequest) {
           height: "100%",
           display: "flex",
           flexDirection: "column",
+          alignItems: "stretch",
           justifyContent: "center",
           padding: `${pad}px`,
           background: "linear-gradient(180deg, #0c1220 0%, #0a0a0b 100%)",
@@ -151,6 +152,7 @@ export async function GET(request: NextRequest) {
           color: "white"
         }}
       >
+       <div style={{ display: "flex", flexDirection: "column" }}>
         {/* Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ fontSize: "28px", fontWeight: 700, color: ACCENT }}>TRI.AI</span>
@@ -280,6 +282,7 @@ export async function GET(request: NextRequest) {
         <div style={{ marginTop: "24px", fontSize: "18px", color: "rgba(255,255,255,0.3)" }}>
           Built with tri.ai
         </div>
+       </div>
       </div>
     ),
     {
