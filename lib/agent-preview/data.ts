@@ -31,7 +31,10 @@ type PreviewTableName =
   | "athlete_checkins"
   | "athlete_observed_patterns"
   | "weekly_debriefs"
-  | "ingestion_events";
+  | "ingestion_events"
+  | "session_feels"
+  | "session_verdicts"
+  | "adaptation_rationales";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -281,16 +284,17 @@ export function createPreviewDatabase(): PreviewDatabase {
         session_role: "key",
         status: "completed",
         day_order: 1,
-        notes: "Solid long run. Kept easy for the first 18km, last 3km drifted to steady.",
+        notes: "Legs felt heavy from the start. HR crept up despite easy pace. Cut the last 3km.",
         created_at: "2026-03-08T18:06:00.000Z",
         is_key: true,
         execution_result: {
-          status: "matched_intent",
-          executionScore: 86,
-          executionScoreBand: "On target",
-          executionScoreSummary: "Aerobic control held well. Final 3km steady as planned.",
-          whyItMatters: "Long run quality supports race-day run durability at the 70.3 distance.",
-          recommendedNextAction: "Keep the easy pace honest on the next long run — the slight drift at the end was fine here."
+          status: "partial_intent",
+          intentMatchStatus: "partial_intent",
+          executionScore: 68,
+          executionScoreBand: "Partial match",
+          executionScoreSummary: "HR elevated 8bpm above easy ceiling. Significant pace drift in the final third. Session cut short by 7 minutes.",
+          whyItMatters: "Elevated HR and late fade suggest incomplete recovery from midweek sessions. The aerobic stimulus was partially delivered but at higher physiological cost than intended.",
+          recommendedNextAction: "Reduce Tuesday's threshold intensity to protect recovery before the next key bike session."
         }
       },
       {
@@ -1027,17 +1031,150 @@ export function createPreviewDatabase(): PreviewDatabase {
         }
       }
     ],
-    ingestion_events: []
+    ingestion_events: [],
+    session_feels: [
+      {
+        id: "88888888-8888-4888-8888-888888888881",
+        user_id: PREVIEW_USER_ID,
+        session_id: "77777777-7777-4777-8777-777777777772",
+        rpe: null,
+        overall_feel: 4,
+        energy_level: "normal",
+        legs_feel: "normal",
+        motivation: "fired_up",
+        sleep_quality: "great",
+        life_stress: "normal",
+        note: "Felt strong on the bike. Power numbers were solid throughout.",
+        was_prompted: true,
+        prompt_shown_at: "2026-03-10T08:00:00.000Z",
+        completed_at: "2026-03-10T08:00:12.000Z",
+        completion_time_ms: 12000,
+        dismissed: false,
+        created_at: "2026-03-10T08:00:12.000Z"
+      },
+      {
+        id: "88888888-8888-4888-8888-888888888882",
+        user_id: PREVIEW_USER_ID,
+        session_id: "77777777-7777-4777-8777-777777777777",
+        rpe: null,
+        overall_feel: 2,
+        energy_level: "low",
+        legs_feel: "heavy",
+        motivation: "struggled",
+        sleep_quality: "poor",
+        life_stress: "high",
+        note: "Legs felt dead from the start. Had to cut the last 3km short.",
+        was_prompted: true,
+        prompt_shown_at: "2026-03-15T10:00:00.000Z",
+        completed_at: "2026-03-15T10:00:08.000Z",
+        completion_time_ms: 8000,
+        dismissed: false,
+        created_at: "2026-03-15T10:00:08.000Z"
+      }
+    ],
+    session_verdicts: [
+      {
+        id: "99999999-9999-4999-8999-999999999991",
+        user_id: PREVIEW_USER_ID,
+        session_id: "77777777-7777-4777-8777-777777777772",
+        activity_id: PREVIEW_ACTIVITY_ONE_ID,
+        purpose_statement: "FTP Build: 3 x 12 min @ 92-95% FTP — targeting sustained power at threshold to develop lactate clearance and muscular endurance for the bike leg.",
+        training_block_context: "Week 1 of 3-week build block",
+        intended_zones: { power: { min: 230, max: 245 } },
+        intended_metrics: { duration_minutes: 75, intervals: 3 },
+        execution_summary: "Power held steady at 237W average across all three intervals (target: 230-245W). Heart rate response was proportional, averaging 158bpm with no late drift. Cadence was consistent at 88rpm. The session delivered its intended FTP stimulus cleanly.",
+        verdict_status: "achieved",
+        metric_comparisons: [
+          { metric: "Avg Power", target: "230-245W", actual: "237W", assessment: "on_target" },
+          { metric: "Avg HR", target: "155-165 bpm", actual: "158 bpm", assessment: "on_target" },
+          { metric: "Duration", target: "75m", actual: "73m (97%)", assessment: "on_target" },
+          { metric: "Cadence", target: "85-95 rpm", actual: "88 rpm", assessment: "on_target" }
+        ],
+        key_deviations: null,
+        adaptation_signal: "This confirms your FTP capacity is tracking well. Thursday's tempo ride will proceed as planned at the same intensity targets.",
+        adaptation_type: "proceed",
+        affected_session_ids: null,
+        discipline: "bike",
+        feel_data: { overall_feel: 4, energy_level: "normal", motivation: "fired_up" },
+        raw_ai_response: null,
+        ai_model_used: "preview",
+        ai_prompt_version: "v1",
+        created_at: "2026-03-10T08:05:00.000Z",
+        updated_at: "2026-03-10T08:05:00.000Z"
+      },
+      {
+        id: "99999999-9999-4999-8999-999999999992",
+        user_id: PREVIEW_USER_ID,
+        session_id: "77777777-7777-4777-8777-777777777777",
+        activity_id: PREVIEW_ACTIVITY_LONG_RUN_ID,
+        purpose_statement: "Sunday Long Run: 95 min easy with last 20 min at steady — building aerobic durability and progressive fatigue resistance for the run leg.",
+        training_block_context: "Week 2 of 3-week build block",
+        intended_zones: { hr: { min: 130, max: 148 } },
+        intended_metrics: { duration_minutes: 95 },
+        execution_summary: "HR averaged 8bpm above expected for the easy portion (146 vs target 130-140), suggesting incomplete recovery from midweek sessions. Pace drift was significant: +12 sec/km over the final 5km. The session partially delivered its aerobic stimulus but at a higher physiological cost than intended.",
+        verdict_status: "partial",
+        metric_comparisons: [
+          { metric: "Avg HR", target: "130-140 bpm", actual: "146 bpm", assessment: "above" },
+          { metric: "Duration", target: "95m", actual: "88m (93%)", assessment: "below" },
+          { metric: "Pace Drift", target: "< 5 sec/km", actual: "+12 sec/km", assessment: "above" }
+        ],
+        key_deviations: [
+          { metric: "Heart Rate", description: "HR averaged 8bpm above the easy ceiling, indicating higher-than-expected cardiovascular cost.", severity: "moderate" },
+          { metric: "Late Fade", description: "Significant pace drift in the final third suggests residual fatigue from the week.", severity: "significant" }
+        ],
+        adaptation_signal: "Your HR was elevated and pace faded late, suggesting incomplete recovery. I've flagged Tuesday's threshold session for potential intensity reduction to protect the rest of this build block.",
+        adaptation_type: "modify",
+        affected_session_ids: ["77777777-7777-4777-8777-777777777774"],
+        discipline: "run",
+        feel_data: { overall_feel: 2, energy_level: "low", legs_feel: "heavy" },
+        raw_ai_response: null,
+        ai_model_used: "preview",
+        ai_prompt_version: "v1",
+        created_at: "2026-03-15T10:05:00.000Z",
+        updated_at: "2026-03-15T10:05:00.000Z"
+      }
+    ],
+    adaptation_rationales: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        user_id: PREVIEW_USER_ID,
+        trigger_type: "recovery_signal",
+        trigger_data: {
+          sourceSessionId: "77777777-7777-4777-8777-777777777777",
+          sourceSessionName: "Sunday Long Run",
+          verdictStatus: "partial",
+          verdictSummary: "HR elevated 8bpm above expected, significant pace drift in final third."
+        },
+        rationale_text: "I'm reducing Tuesday's threshold intensity from Z4 to high Z3 because your long run showed elevated HR and late-stage fade — signs of incomplete recovery. This protects the quality of Thursday's key bike session, which is the priority for this build week.",
+        changes_summary: [
+          { session_id: "77777777-7777-4777-8777-777777777774", session_label: "Tuesday Threshold Run", change_type: "intensity_reduced", before: "5 x 6 min @ threshold (Z4)", after: "5 x 6 min @ high tempo (Z3)" }
+        ],
+        preserved_elements: ["Thursday's FTP intervals unchanged — this is the week's key session", "Weekend long ride volume preserved"],
+        week_number: 2,
+        training_block: "Build",
+        affected_sessions: ["77777777-7777-4777-8777-777777777774"],
+        source_verdict_id: "99999999-9999-4999-8999-999999999992",
+        status: "pending",
+        athlete_response: null,
+        created_at: "2026-03-15T10:06:00.000Z",
+        acknowledged_at: null
+      }
+    ]
   };
 }
 
 const globalKey = "__tri_preview_database__" as const;
+const globalVersionKey = "__tri_preview_database_version__" as const;
+// Bump this when the seed schema changes (new tables, new columns, etc.)
+const PREVIEW_DATABASE_VERSION = 3;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
-  if (existing) return existing;
+  const version = (globalThis as Record<string, unknown>)[globalVersionKey] as number | undefined;
+  if (existing && version === PREVIEW_DATABASE_VERSION) return existing;
   const db = createPreviewDatabase();
   (globalThis as Record<string, unknown>)[globalKey] = db;
+  (globalThis as Record<string, unknown>)[globalVersionKey] = PREVIEW_DATABASE_VERSION;
   return db;
 }
 

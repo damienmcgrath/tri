@@ -6,10 +6,26 @@ import { createClient } from "@/lib/supabase/server";
 
 const sessionFeelSchema = z.object({
   sessionId: z.string().uuid(),
-  rpe: z.number().int().min(1).max(10),
-  note: z.string().max(200).nullable().optional(),
-  wasPrompted: z.boolean().optional().default(true)
-});
+  // Legacy RPE (1-10) — optional for backward compat
+  rpe: z.number().int().min(1).max(10).nullable().optional(),
+  // New 5-point overall feel
+  overallFeel: z.number().int().min(1).max(5).nullable().optional(),
+  // Secondary inputs
+  energyLevel: z.enum(["low", "normal", "high"]).nullable().optional(),
+  legsFeel: z.enum(["heavy", "normal", "fresh"]).nullable().optional(),
+  motivation: z.enum(["struggled", "neutral", "fired_up"]).nullable().optional(),
+  sleepQuality: z.enum(["poor", "ok", "great"]).nullable().optional(),
+  lifeStress: z.enum(["high", "normal", "low"]).nullable().optional(),
+  // Free text note (expanded to 280 chars)
+  note: z.string().max(280).nullable().optional(),
+  wasPrompted: z.boolean().optional().default(true),
+  // Timing metadata
+  promptShownAt: z.string().datetime().nullable().optional(),
+  completionTimeMs: z.number().int().min(0).nullable().optional()
+}).refine(
+  (data) => data.rpe != null || data.overallFeel != null,
+  { message: "Either rpe or overallFeel must be provided" }
+);
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
@@ -43,9 +59,18 @@ export async function POST(request: Request) {
       {
         user_id: user.id,
         session_id: body.sessionId,
-        rpe: body.rpe,
+        rpe: body.rpe ?? null,
+        overall_feel: body.overallFeel ?? null,
+        energy_level: body.energyLevel ?? null,
+        legs_feel: body.legsFeel ?? null,
+        motivation: body.motivation ?? null,
+        sleep_quality: body.sleepQuality ?? null,
+        life_stress: body.lifeStress ?? null,
         note: body.note ?? null,
-        was_prompted: body.wasPrompted
+        was_prompted: body.wasPrompted,
+        prompt_shown_at: body.promptShownAt ?? null,
+        completed_at: new Date().toISOString(),
+        completion_time_ms: body.completionTimeMs ?? null
       },
       { onConflict: "session_id" }
     );
