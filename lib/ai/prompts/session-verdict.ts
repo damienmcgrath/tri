@@ -25,8 +25,8 @@ const deviationSchema = z.object({
 export const sessionVerdictOutputSchema = z.object({
   purpose_statement: z.string().min(1).max(600),
   training_block_context: z.string().min(1).max(200),
-  intended_zones: z.record(z.unknown()).nullable().optional(),
-  intended_metrics: z.record(z.unknown()).nullable().optional(),
+  intended_zones: z.string().max(500).nullable().optional(),
+  intended_metrics: z.string().max(500).nullable().optional(),
   execution_summary: z.string().min(1).max(1000),
   verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
   metric_comparisons: z.array(metricComparisonSchema).max(10),

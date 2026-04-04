@@ -7,6 +7,10 @@ import { generateSessionVerdict, SESSION_VERDICT_PROMPT_VERSION } from "@/lib/ai
 import { createRationaleFromVerdict } from "@/lib/ai/prompts/adaptation-rationale";
 import { getCoachModel } from "@/lib/openai";
 
+function tryParseJson(value: string): unknown {
+  try { return JSON.parse(value); } catch { return value; }
+}
+
 const requestSchema = z.object({
   sessionId: z.string().uuid(),
   regenerate: z.boolean().optional().default(false)
@@ -61,8 +65,8 @@ export async function POST(request: Request) {
         activity_id: activityId,
         purpose_statement: verdict.purpose_statement,
         training_block_context: verdict.training_block_context,
-        intended_zones: verdict.intended_zones ?? null,
-        intended_metrics: verdict.intended_metrics ?? null,
+        intended_zones: verdict.intended_zones ? tryParseJson(verdict.intended_zones) : null,
+        intended_metrics: verdict.intended_metrics ? tryParseJson(verdict.intended_metrics) : null,
         execution_summary: verdict.execution_summary,
         verdict_status: verdict.verdict_status,
         metric_comparisons: verdict.metric_comparisons,
