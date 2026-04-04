@@ -178,7 +178,6 @@ function extractDecisions(text: string): string[] {
   return decisions.slice(0, 5);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSummaryRow(row: any): ConversationSummary {
   return {
     id: row.id,

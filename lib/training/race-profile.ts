@@ -166,7 +166,6 @@ export async function getTargetDistribution(
 
 // ─── Row mappers ──────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRaceProfileRow(row: any): RaceProfile {
   return {
     id: row.id,
@@ -183,7 +182,6 @@ function mapRaceProfileRow(row: any): RaceProfile {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapTrainingBlockRow(row: any): TrainingBlock {
   return {
     id: row.id,
