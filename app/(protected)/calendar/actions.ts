@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { appendConfirmedSkipTag, appendSkipTag, clearSkipTag, syncSkipTagForStatus } from "@/lib/plans/skip-notes";
 import { isMissingColumnError } from "@/lib/supabase/schema-compat";
+import { postExtraSyncSideEffects } from "@/lib/workouts/post-sync-effects";
 
 const moveSessionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -546,8 +547,25 @@ export async function markActivityExtraAction(input: { activityId: string }) {
   await persistExtraActivityMarker({ supabase, userId: user.id, activityId: parsed.activityId });
   await updateUploadStatusForActivity({ supabase, userId: user.id, activityId: parsed.activityId, status: "matched" });
 
+  // Fetch activity date to determine which week's debrief to refresh
+  const { data: activity } = await supabase
+    .from("completed_activities")
+    .select("start_time_utc")
+    .eq("id", parsed.activityId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const activityDate = activity?.start_time_utc ? activity.start_time_utc.slice(0, 10) : null;
+
+  // Fire-and-forget: refresh weekly debrief to include the extra activity
+  postExtraSyncSideEffects({
+    supabase,
+    userId: user.id,
+    activityDate,
+  }).catch((e) => console.error("[post-sync] Extra activity side effects failed:", e));
+
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/debrief");
   revalidatePath(`/activities/${parsed.activityId}`);
 }
 

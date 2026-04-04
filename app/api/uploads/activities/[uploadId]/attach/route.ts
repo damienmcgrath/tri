@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSameOrigin } from "@/lib/security/request";
 import { syncSessionLoad } from "@/lib/training/load-sync";
 import { syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
+import { postSessionSyncSideEffects } from "@/lib/workouts/post-sync-effects";
 
 const schema = z.object({
   plannedSessionId: z.string().uuid(),
@@ -30,11 +31,11 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
 
   if (!activity) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
 
-  let session: { id: string; intent_category: string | null } | null = null;
+  let session: { id: string; intent_category: string | null; date: string | null } | null = null;
 
   const { data: sessionData } = await supabase
     .from("sessions")
-    .select("id,intent_category")
+    .select("id,intent_category,date")
     .eq("id", body.data.plannedSessionId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -44,11 +45,11 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
   } else {
     const { data: legacySession } = await supabase
       .from("planned_sessions")
-      .select("id,intent_category")
+      .select("id,intent_category,date")
       .eq("id", body.data.plannedSessionId)
       .eq("user_id", user.id)
       .maybeSingle();
-    if (legacySession) session = legacySession;
+    if (legacySession) session = { ...legacySession, date: (legacySession as any).date ?? null };
   }
 
   if (!session) return NextResponse.json({ error: "Planned session not found" }, { status: 404 });
@@ -93,8 +94,18 @@ export async function POST(request: Request, { params }: { params: { uploadId: s
     console.error("[training-load] Failed to sync linked activity load:", syncError);
   }
 
+  // Fire-and-forget: verdict generation, debrief refresh, comparison, adaptation rationale
+  postSessionSyncSideEffects({
+    supabase,
+    userId: user.id,
+    sessionId: body.data.plannedSessionId,
+    activityId: activity.id,
+    sessionDate: session.date,
+  }).catch((e) => console.error("[post-sync] Side effects failed:", e));
+
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/debrief");
   revalidatePath(`/sessions/${body.data.plannedSessionId}`);
 
   return NextResponse.json({ ok: true });

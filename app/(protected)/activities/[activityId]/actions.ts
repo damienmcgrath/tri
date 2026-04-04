@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncSessionLoad } from "@/lib/training/load-sync";
 import { syncSessionExecutionAfterUnlink, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
+import { postSessionSyncSideEffects } from "@/lib/workouts/post-sync-effects";
 
 async function updateUploadStatusForActivity(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -35,7 +36,7 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const { data: session } = await supabase.from("sessions").select("id,intent_category").eq("id", plannedSessionId).eq("user_id", user.id).maybeSingle();
+  const { data: session } = await supabase.from("sessions").select("id,intent_category,date").eq("id", plannedSessionId).eq("user_id", user.id).maybeSingle();
   if (!session) return { error: "Session not found" };
 
   await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
@@ -69,9 +70,20 @@ export async function linkActivityAction(activityId: string, plannedSessionId: s
     console.error("[training-load] Failed to sync linked activity load:", syncError);
   }
 
+  // Fire-and-forget: verdict generation, debrief refresh, comparison, adaptation rationale
+  postSessionSyncSideEffects({
+    supabase,
+    userId: user.id,
+    sessionId: plannedSessionId,
+    activityId,
+    sessionDate: session.date ?? null,
+  }).catch((e) => console.error("[post-sync] Side effects failed:", e));
+
   revalidatePath(`/activities/${activityId}`);
   revalidatePath(`/sessions/${plannedSessionId}`);
+  revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/debrief");
   return { ok: true };
 }
 
