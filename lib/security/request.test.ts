@@ -73,9 +73,9 @@ describe("getClientIp", () => {
 describe("isSameOrigin", () => {
   // --- no origin header (e.g. server-to-server or same-origin GET) ---
 
-  it("returns true when the origin header is absent", () => {
+  it("returns false when the origin header is absent (CSRF protection)", () => {
     const req = makeRequest({ host: "app.example.com" });
-    expect(isSameOrigin(req)).toBe(true);
+    expect(isSameOrigin(req)).toBe(false);
   });
 
   // --- matching origin ---
@@ -191,9 +191,8 @@ describe("isSameOrigin", () => {
       origin: "",
       host: "app.example.com",
     });
-    // An empty string header is falsy — the early-return `true` branch fires.
-    // (Behaviour documented here so the expectation is explicit.)
-    expect(isSameOrigin(req)).toBe(true);
+    // An empty string header is falsy — the early-return `false` branch fires (CSRF protection).
+    expect(isSameOrigin(req)).toBe(false);
   });
 
   // --- port handling ---

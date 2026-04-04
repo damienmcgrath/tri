@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getClientIp } from "@/lib/security/request";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import {
   generateWeekTransitionBriefing,
   getWeekTransitionBriefing,
@@ -33,6 +35,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit("week-transition-ip", ip, { maxRequests: 20, windowMs: 60_000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

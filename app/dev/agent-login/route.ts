@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/"
+    path: "/",
+    maxAge: 3600
   });
   return response;
 }

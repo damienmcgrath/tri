@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { sanitizeRedirectPath } from "@/lib/security/redirect";
 
 export function SignInForm() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export function SignInForm() {
       return;
     }
 
-    const nextPath = searchParams.get("next") || "/dashboard";
+    const nextPath = sanitizeRedirectPath(searchParams.get("next"));
     router.push(nextPath);
     router.refresh();
   }
@@ -61,7 +62,7 @@ export function SignInForm() {
     setIsSendingLink(true);
 
     const supabase = createClient();
-    const nextPath = searchParams.get("next") || "/dashboard";
+    const nextPath = sanitizeRedirectPath(searchParams.get("next"));
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     callbackUrl.searchParams.set("next", nextPath);
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncSessionLoad } from "@/lib/training/load-sync";
 import { rebuildFitnessHistory } from "@/lib/training/fitness-model";
+import { isSameOrigin } from "@/lib/security/request";
 
 /**
  * POST /api/training-load/backfill
@@ -11,7 +12,11 @@ import { rebuildFitnessHistory } from "@/lib/training/fitness-model";
  *
  * This is an idempotent operation — safe to re-run.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const supabase = await createClient();
 
   const {
