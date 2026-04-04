@@ -157,10 +157,10 @@ export type CoachVerdict = {
     nextCall: "move_on" | "proceed_with_caution" | "repeat_session" | "protect_recovery" | "adjust_next_key_session";
   };
   explanation: {
-    sessionIntent?: string;
+    sessionIntent?: string | null;
     whatHappened: string;
     whyItMatters: string;
-    oneThingToChange?: string;
+    oneThingToChange?: string | null;
     whatToDoNextTime: string;
     whatToDoThisWeek: string;
   };
@@ -269,10 +269,10 @@ const coachVerdictSchema = z.object({
     nextCall: z.enum(["move_on", "proceed_with_caution", "repeat_session", "protect_recovery", "adjust_next_key_session"])
   }),
   explanation: z.object({
-    sessionIntent: z.string().min(1).max(300).optional(),
+    sessionIntent: z.string().min(1).max(300).nullable().optional(),
     whatHappened: z.string().min(1).max(500),
     whyItMatters: z.string().min(1).max(500),
-    oneThingToChange: z.string().min(1).max(500).optional(),
+    oneThingToChange: z.string().min(1).max(500).nullable().optional(),
     whatToDoNextTime: z.string().min(1).max(500),
     whatToDoThisWeek: z.string().min(1).max(500)
   }),
