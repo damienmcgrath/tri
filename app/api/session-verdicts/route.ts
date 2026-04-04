@@ -70,10 +70,10 @@ export async function POST(request: Request) {
         execution_summary: verdict.execution_summary,
         verdict_status: verdict.verdict_status,
         metric_comparisons: verdict.metric_comparisons,
-        key_deviations: verdict.key_deviations ?? null,
+        key_deviations: verdict.key_deviations.length > 0 ? verdict.key_deviations : null,
         adaptation_signal: verdict.adaptation_signal,
         adaptation_type: verdict.adaptation_type,
-        affected_session_ids: verdict.affected_session_ids ?? null,
+        affected_session_ids: verdict.affected_session_ids.length > 0 ? verdict.affected_session_ids : null,
         discipline: verdict.purpose_statement ? "run" : "other", // Will be overridden below
         raw_ai_response: verdict as unknown as Record<string, unknown>,
         ai_model_used: getCoachModel(),

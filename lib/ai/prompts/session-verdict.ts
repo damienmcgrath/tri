@@ -25,15 +25,15 @@ const deviationSchema = z.object({
 export const sessionVerdictOutputSchema = z.object({
   purpose_statement: z.string().min(1).max(600),
   training_block_context: z.string().min(1).max(200),
-  intended_zones: z.string().max(500).nullable().optional(),
-  intended_metrics: z.string().max(500).nullable().optional(),
+  intended_zones: z.string().max(500),
+  intended_metrics: z.string().max(500),
   execution_summary: z.string().min(1).max(1000),
   verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
   metric_comparisons: z.array(metricComparisonSchema).max(10),
-  key_deviations: z.array(deviationSchema).max(5).nullable().optional(),
+  key_deviations: z.array(deviationSchema).max(5),
   adaptation_signal: z.string().min(1).max(600),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
-  affected_session_ids: z.array(z.string()).max(5).nullable().optional()
+  affected_session_ids: z.array(z.string()).max(5)
 });
 
 export type SessionVerdictOutput = z.infer<typeof sessionVerdictOutputSchema>;
@@ -391,15 +391,15 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
       ? `${ctx.session.sessionName ?? ctx.session.type}: ${ctx.session.target}`
       : `${ctx.session.sessionName ?? ctx.session.type} — ${intentCategory} ${sport} session.`,
     training_block_context: blockCtx,
-    intended_zones: null,
-    intended_metrics: null,
+    intended_zones: "",
+    intended_metrics: "",
     execution_summary: executionSummary,
     verdict_status: status,
     metric_comparisons: metricComparisons,
-    key_deviations: null,
+    key_deviations: [],
     adaptation_signal: adaptationSignal,
     adaptation_type: hasActivity ? "proceed" : "flag_review",
-    affected_session_ids: null
+    affected_session_ids: []
   };
 }
 
