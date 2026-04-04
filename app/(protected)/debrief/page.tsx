@@ -265,7 +265,7 @@ export default async function DebriefPage({
               <p className="mt-3 max-w-2xl text-sm text-muted">{artifact.facts.artifactStateNote}</p>
             ) : null}
           </div>
-          <div className="relative flex min-w-[220px] flex-col items-start gap-3">
+          <div className="relative z-10 flex min-w-[220px] flex-col items-start gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 text-xs">
                 Coach brief
