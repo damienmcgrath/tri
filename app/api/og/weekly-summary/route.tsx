@@ -12,10 +12,11 @@ const DIMENSIONS: Record<Format, { width: number; height: number }> = {
   square: { width: 1080, height: 1080 }
 };
 
-const SPORT_COLORS = {
+const SPORT_COLORS: Record<string, string> = {
   swim: "#63b3ed",
   bike: "#34d399",
-  run: "#ff5a28"
+  run: "#ff5a28",
+  strength: "#a78bfa"
 };
 
 const ACCENT = "#beff00";
@@ -25,6 +26,23 @@ function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Truncate text to the last complete sentence within `maxChars`, falling back to word boundary + "..." */
+function smartTruncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const trimmed = text.slice(0, maxChars);
+  // Try to find the last sentence boundary (. ! ?) followed by a space or end
+  const sentenceEnd = trimmed.search(/[.!?][^.!?]*$/);
+  if (sentenceEnd > maxChars * 0.5) {
+    return trimmed.slice(0, sentenceEnd + 1);
+  }
+  // Fall back to last word boundary
+  const lastSpace = trimmed.lastIndexOf(" ");
+  if (lastSpace > maxChars * 0.5) {
+    return trimmed.slice(0, lastSpace) + "…";
+  }
+  return trimmed + "…";
 }
 
 export async function GET(request: NextRequest) {
@@ -50,7 +68,6 @@ export async function GET(request: NextRequest) {
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const weekStart = new Date(d.getTime() + mondayOffset * 86400000).toISOString().slice(0, 10);
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 7 * 86400000).toISOString().slice(0, 10);
-  // Sunday = last day of the week (weekStart + 6) — used for score lookup
   const weekSunday = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
 
   // Fetch data
@@ -66,21 +83,23 @@ export async function GET(request: NextRequest) {
   const completedCount = allSessions.filter((s: SessionRow) => s.status === "completed").length;
   const plannedCount = allSessions.length;
 
-  // Sport minutes
-  const sportMinutes = { swim: 0, bike: 0, run: 0 };
+  // Sport minutes — includes strength
+  const sportMinutes: Record<string, number> = { swim: 0, bike: 0, run: 0, strength: 0 };
   for (const s of allSessions) {
     if (s.status === "completed" && s.duration_minutes) {
-      const sport = s.sport as keyof typeof sportMinutes;
+      const sport = s.sport;
       if (sport in sportMinutes) sportMinutes[sport] += s.duration_minutes;
     }
   }
-  const totalMinutes = sportMinutes.swim + sportMinutes.bike + sportMinutes.run;
+  const totalMinutes = Object.values(sportMinutes).reduce((a, b) => a + b, 0);
   const completionPct = plannedCount > 0 ? Math.round((completedCount / plannedCount) * 100) : 0;
 
-  // Extract debrief data (JSONB uses camelCase keys)
+  // Extract debrief data
   const facts = debrief?.facts as Record<string, unknown> | null;
   const narrative = debrief?.narrative as Record<string, unknown> | null;
   const weekHeadline = (narrative?.executiveSummary as string) ?? "";
+  const highlights = (narrative?.highlights as string[]) ?? [];
+  const carryForward = (narrative?.carryForward as string[]) ?? [];
 
   // Race countdown
   let daysToRace: number | null = null;
@@ -100,7 +119,28 @@ export async function GET(request: NextRequest) {
 
   const { width, height } = DIMENSIONS[format];
   const isStory = format === "story";
-  const pad = 80;
+  const isFeed = format === "feed";
+  const isSquare = format === "square";
+  // Top padding distributes dead space: more padding for taller formats
+  const padTop = isStory ? 180 : isFeed ? 100 : 80;
+  const padSide = 80;
+  const padBottom = 80;
+
+  // Format-aware truncation
+  const summaryLimit = isStory ? 280 : isFeed ? 220 : 180;
+  const truncatedSummary = smartTruncate(weekHeadline, summaryLimit);
+
+  // Format-aware content: all formats show highlights, story also shows carry-forward
+  // Feed caps at 2 highlights to avoid overflowing the 1350px canvas
+  const showHighlights = highlights.length > 0;
+  const showCarryForward = isStory && carryForward.length > 0;
+  const maxHighlights = isStory ? 3 : isFeed ? 2 : 3;
+  const highlightLimit = isStory ? 180 : isFeed ? 100 : 80;
+
+  // Sports with non-zero minutes for the bar & legend
+  const activeSports = (["swim", "bike", "run", "strength"] as const).filter(
+    (s) => sportMinutes[s] > 0
+  );
 
   return new ImageResponse(
     (
@@ -110,7 +150,7 @@ export async function GET(request: NextRequest) {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          padding: `${isStory ? 180 : 80}px ${pad}px ${pad}px`,
+          padding: `${padTop}px ${padSide}px ${padBottom}px`,
           background: "linear-gradient(180deg, #0c1220 0%, #0a0a0b 100%)",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           color: "white"
@@ -125,27 +165,26 @@ export async function GET(request: NextRequest) {
         </div>
 
         {/* Week label */}
-        <div style={{ marginTop: "24px", fontSize: "28px", fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>
+        <div style={{ marginTop: "20px", fontSize: "28px", fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>
           {weekLabel}
         </div>
 
         {/* Completion % */}
-        <div style={{ marginTop: isStory ? "60px" : "40px", display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: isStory ? "160px" : "120px", fontWeight: 700, color: ACCENT, lineHeight: 1 }}>
+        <div style={{ marginTop: isStory ? "48px" : "32px", display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: isStory ? "160px" : isSquare ? "110px" : "120px", fontWeight: 700, color: ACCENT, lineHeight: 1 }}>
             {completionPct}%
           </span>
-          <span style={{ fontSize: "28px", fontWeight: 500, color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>
+          <span style={{ fontSize: "26px", fontWeight: 500, color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>
             weekly completion ({completedCount}/{plannedCount} sessions)
           </span>
         </div>
 
         {/* Sport bars */}
         {totalMinutes > 0 && (
-          <div style={{ marginTop: isStory ? "60px" : "40px", display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={{ display: "flex", height: "20px", borderRadius: "10px", overflow: "hidden", gap: "4px" }}>
-              {(["swim", "bike", "run"] as const).map((sport) => {
+          <div style={{ marginTop: isStory ? "48px" : "32px", display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ display: "flex", height: "28px", borderRadius: "14px", overflow: "hidden", gap: "4px" }}>
+              {activeSports.map((sport) => {
                 const pct = (sportMinutes[sport] / totalMinutes) * 100;
-                if (pct === 0) return null;
                 return (
                   <div
                     key={sport}
@@ -159,58 +198,91 @@ export async function GET(request: NextRequest) {
                 );
               })}
             </div>
-            <div style={{ display: "flex", gap: "32px" }}>
-              {(["swim", "bike", "run"] as const).map((sport) => {
-                if (sportMinutes[sport] === 0) return null;
-                return (
-                  <div key={sport} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: SPORT_COLORS[sport] }} />
-                    <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)" }}>
-                      {sport} {formatMinutes(sportMinutes[sport])}
-                    </span>
-                  </div>
-                );
-              })}
+            <div style={{ display: "flex", gap: "28px" }}>
+              {activeSports.map((sport) => (
+                <div key={sport} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: SPORT_COLORS[sport] }} />
+                  <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)" }}>
+                    {sport} {formatMinutes(sportMinutes[sport])}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Total hours + Training Score */}
-        <div style={{ marginTop: "32px", display: "flex", alignItems: "center", gap: "32px" }}>
+        {/* Total hours */}
+        <div style={{ marginTop: "24px", display: "flex", alignItems: "center", gap: "32px" }}>
           <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.35)" }}>
             Total: {formatMinutes(totalMinutes)}
           </span>
-          {scoreRow?.composite_score != null && (
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "28px", fontWeight: 700, color: scoreRow.composite_score >= 75 ? "#2dd4bf" : scoreRow.composite_score >= 50 ? "white" : "#fbbf24" }}>
-                {Math.round(scoreRow.composite_score)}
-              </span>
-              <span style={{ fontSize: "18px", color: "rgba(255,255,255,0.35)" }}>Training Score</span>
-              {scoreRow.score_delta_7d != null && scoreRow.score_delta_7d !== 0 && (
-                <span style={{ fontSize: "18px", fontWeight: 600, color: scoreRow.score_delta_7d > 0 ? "#2dd4bf" : "#f87171" }}>
-                  {scoreRow.score_delta_7d > 0 ? "+" : ""}{Math.round(scoreRow.score_delta_7d)}
-                </span>
-              )}
-            </span>
-          )}
         </div>
 
-        {/* Executive summary */}
-        {weekHeadline && (
-          <div style={{ marginTop: "32px", fontSize: "26px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4, maxWidth: "920px" }}>
-            {weekHeadline.slice(0, 200)}
+        {/* Training Score — own line for prominence */}
+        {scoreRow?.composite_score != null && (
+          <div style={{ marginTop: "20px", display: "flex", alignItems: "baseline", gap: "12px" }}>
+            <span style={{ fontSize: isSquare ? "28px" : "32px", fontWeight: 700, color: scoreRow.composite_score >= 75 ? "#2dd4bf" : scoreRow.composite_score >= 50 ? "white" : "#fbbf24" }}>
+              {Math.round(scoreRow.composite_score)}
+            </span>
+            <span style={{ fontSize: "20px", color: "rgba(255,255,255,0.35)" }}>Training Score</span>
+            {scoreRow.score_delta_7d != null && scoreRow.score_delta_7d !== 0 && (
+              <span style={{ fontSize: "20px", fontWeight: 600, color: scoreRow.score_delta_7d > 0 ? "#2dd4bf" : "#f87171" }}>
+                {scoreRow.score_delta_7d > 0 ? "+" : ""}{Math.round(scoreRow.score_delta_7d)}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Race countdown — pushed toward bottom */}
+        {/* Executive summary */}
+        {truncatedSummary && (
+          <div style={{ marginTop: "28px", fontSize: isSquare ? "24px" : "26px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4, maxWidth: "920px" }}>
+            {truncatedSummary}
+          </div>
+        )}
+
+        {/* Highlights */}
+        {showHighlights && (
+          <div style={{ marginTop: isStory ? "40px" : "32px", display: "flex", flexDirection: "column", gap: isStory ? "18px" : "14px" }}>
+            <span style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px" }}>
+              Highlights
+            </span>
+            {highlights.slice(0, maxHighlights).map((h, i) => (
+              <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "22px", color: ACCENT, flexShrink: 0, marginTop: "2px" }}>•</span>
+                <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)", lineHeight: 1.35 }}>
+                  {smartTruncate(h, highlightLimit)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Carry forward — story only */}
+        {showCarryForward && (
+          <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <span style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px" }}>
+              Focus next week
+            </span>
+            {carryForward.slice(0, 2).map((c, i) => (
+              <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "22px", color: ACCENT, flexShrink: 0, marginTop: "2px" }}>→</span>
+                <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.5)", lineHeight: 1.35 }}>
+                  {smartTruncate(c, 200)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Race countdown */}
         {raceName && daysToRace !== null && (
-          <div style={{ display: "flex", marginTop: "auto", paddingTop: "40px", fontSize: "28px", fontWeight: 700, color: ACCENT }}>
+          <div style={{ marginTop: isStory ? "48px" : "40px", fontSize: "28px", fontWeight: 700, color: ACCENT, display: "flex" }}>
             <span>{daysToRace} days to {raceName}</span>
           </div>
         )}
 
         {/* Footer branding */}
-        <div style={{ marginTop: raceName ? "20px" : "auto", paddingTop: raceName ? "0" : "40px", fontSize: "16px", color: "rgba(255,255,255,0.2)" }}>
+        <div style={{ marginTop: "24px", fontSize: "18px", color: "rgba(255,255,255,0.3)" }}>
           Built with tri.ai
         </div>
       </div>

@@ -5,9 +5,10 @@ import { ShareCardModal } from "./share-card-modal";
 
 type Props = {
   weekOf: string;
+  displayName: string | null;
 };
 
-export function ShareSummaryButton({ weekOf }: Props) {
+export function ShareSummaryButton({ weekOf, displayName }: Props) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -24,7 +25,7 @@ export function ShareSummaryButton({ weekOf }: Props) {
         </svg>
         Share
       </button>
-      {showModal && <ShareCardModal weekOf={weekOf} onClose={() => setShowModal(false)} />}
+      {showModal && <ShareCardModal weekOf={weekOf} displayName={displayName} onClose={() => setShowModal(false)} />}
     </>
   );
 }
