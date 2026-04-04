@@ -1,10 +1,14 @@
 import { cache } from "react";
+import Link from "next/link";
 import { CoachChat } from "./coach-chat";
+import { CoachContextPanel } from "./coach-context-panel";
+import { CoachBriefingCard } from "./CoachBriefingCard";
+import { WeeklyCheckinCard } from "./weekly-checkin-card";
 import { TransitionBriefingCard } from "@/app/(protected)/dashboard/components/transition-briefing-card";
 import { createClient } from "@/lib/supabase/server";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
-import { getCurrentWeekStart } from "@/lib/athlete-context";
-import { parsePersistedExecutionReview } from "@/lib/execution-review";
+import { getAthleteContextSnapshot, getCurrentWeekStart } from "@/lib/athlete-context";
+import { buildWeeklyExecutionBrief, parsePersistedExecutionReview } from "@/lib/execution-review";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getWeekTransitionBriefing } from "@/lib/training/week-transition";
 
@@ -235,6 +239,24 @@ function addDays(dateIso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function isContextIncomplete(snapshot: Awaited<ReturnType<typeof getAthleteContextSnapshot>>) {
+  return !snapshot.declared.experienceLevel.value ||
+    !snapshot.goals.priorityEventName ||
+    snapshot.declared.limiters.length === 0 ||
+    snapshot.declared.strongestDisciplines.length === 0 ||
+    snapshot.declared.weeklyConstraints.length === 0;
+}
+
+function getMissingContextLabels(snapshot: Awaited<ReturnType<typeof getAthleteContextSnapshot>>) {
+  return [
+    !snapshot.declared.experienceLevel.value ? "Experience level" : null,
+    !snapshot.goals.goalType ? "Goal type" : null,
+    snapshot.declared.limiters.length === 0 ? "Limiter" : null,
+    snapshot.declared.strongestDisciplines.length === 0 ? "Strongest discipline" : null,
+    snapshot.declared.weeklyConstraints.length === 0 ? "Weekly constraint" : null
+  ].filter((item): item is string => Boolean(item));
+}
+
 export default async function CoachPage({ searchParams }: { searchParams?: { prompt?: string } }) {
   const supabase = await createClient();
   const {
@@ -243,22 +265,99 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
   const weekStart = getCurrentWeekStart();
   const weekEnd = addDays(weekStart, 6);
 
-  const [diagnosisSessions, briefingContext, transitionBriefing] = await Promise.all([
+  const [diagnosisSessions, briefingContext, athleteContext, transitionBriefing] = await Promise.all([
     user ? getDiagnosisSessions(supabase, user.id, weekStart, weekEnd) : [],
     user ? getBriefingContext(supabase, user.id, weekStart, weekEnd) : getBriefingContext(supabase, "", weekStart, weekEnd),
+    user ? getAthleteContextSnapshot(supabase, user.id) : null,
     user ? getWeekTransitionBriefing(supabase, user.id, weekStart).catch(() => null) : null
   ]);
 
+  const weeklyBrief = user && athleteContext
+    ? await buildWeeklyExecutionBrief({
+      supabase,
+      athleteId: user.id,
+      weekStart,
+      weekEnd,
+      athleteContext,
+      extraActivityCount: briefingContext.extraActivityCount
+    })
+    : null;
+  const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;
+  const missingContextLabels = athleteContext ? getMissingContextLabels(athleteContext) : [];
+
+  // Build summary chips for the collapsed context bar
+  const contextSummaryItems: Array<{ label: string; accent?: boolean }> = [];
+  if (transitionBriefing && !transitionBriefing.dismissedAt) {
+    contextSummaryItems.push({ label: "Week transition", accent: true });
+  }
+  if (weeklyBrief) {
+    const reviewCount = briefingContext.reviewedSessionCount;
+    contextSummaryItems.push({ label: reviewCount > 0 ? `${reviewCount} reviewed` : "Briefing" });
+  }
+  if (athleteContext) {
+    contextSummaryItems.push({ label: "Check-in" });
+  }
+  if (athleteContext) {
+    contextSummaryItems.push({ label: contextIncomplete ? "Profile incomplete" : "Profile ready" });
+  }
 
   return (
     <section className="space-y-3">
-      {/* ── Transition briefing banner (compact, dismissible) ──────────── */}
-      {transitionBriefing && !transitionBriefing.dismissedAt ? (
-        <TransitionBriefingCard briefing={transitionBriefing} />
-      ) : null}
+      {/* ── Collapsible context panel ──────────────────────────────────── */}
+      <CoachContextPanel summaryItems={contextSummaryItems}>
+        {transitionBriefing && !transitionBriefing.dismissedAt ? (
+          <TransitionBriefingCard briefing={transitionBriefing} />
+        ) : null}
 
-      {/* ── Chat (primary content — full width, built-in briefing panel) ─ */}
-      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} />
+        {weeklyBrief ? (
+          <CoachBriefingCard
+            brief={weeklyBrief}
+            athleteContext={athleteContext}
+            briefingContext={briefingContext}
+          />
+        ) : null}
+
+        {athleteContext ? <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} /> : null}
+
+        {athleteContext ? (
+          <article className="surface p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="label">Coaching profile</p>
+                <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
+                <p className="mt-1 text-sm text-muted">
+                  {contextIncomplete
+                    ? "Finish a few fields so Coach can personalize advice."
+                    : "Coach has your baseline context for briefing, reviews, and chat."}
+                </p>
+              </div>
+              <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md"}>
+                {contextIncomplete ? "Complete profile" : "Edit profile"}
+              </Link>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {contextIncomplete
+                ? missingContextLabels.map((label) => (
+                  <span key={label} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{label}</span>
+                ))
+                : (
+                  <>
+                    {athleteContext.goals.priorityEventName ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.priorityEventName}</span> : null}
+                    {athleteContext.goals.goalType ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.goalType}</span> : null}
+                    {athleteContext.declared.experienceLevel.value ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.declared.experienceLevel.value}</span> : null}
+                    {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
+                      <span key={limiter.value} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{limiter.value}</span>
+                    ))}
+                  </>
+                )}
+            </div>
+          </article>
+        ) : null}
+      </CoachContextPanel>
+
+      {/* ── Chat (primary content — full width) ────────────────────────── */}
+      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
     </section>
   );
 }
