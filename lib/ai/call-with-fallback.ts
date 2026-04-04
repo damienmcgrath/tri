@@ -85,6 +85,15 @@ export async function callOpenAIWithFallback<T>(
       return { value: fallback, source: "fallback" };
     }
 
+    if (response.incomplete_details?.reason === "max_output_tokens") {
+      console.warn(`[${logTag}] Falling back: output truncated by max_output_tokens`, {
+        ...logContext,
+        outputLength: text.length,
+        elapsedMs: Date.now() - startedAt
+      });
+      return { value: fallback, source: "fallback" };
+    }
+
     const rawJson = extractJsonObject(text);
     if (rawJson == null) {
       console.warn(`[${logTag}] Falling back: could not parse model output as JSON`, {

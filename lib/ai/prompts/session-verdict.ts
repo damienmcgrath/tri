@@ -23,15 +23,15 @@ const deviationSchema = z.object({
 });
 
 export const sessionVerdictOutputSchema = z.object({
-  purpose_statement: z.string().min(1).max(600),
+  purpose_statement: z.string().min(1).max(400),
   training_block_context: z.string().min(1).max(200),
   intended_zones: z.string().max(500),
   intended_metrics: z.string().max(500),
-  execution_summary: z.string().min(1).max(1000),
+  execution_summary: z.string().min(1).max(600),
   verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
-  metric_comparisons: z.array(metricComparisonSchema).max(10),
+  metric_comparisons: z.array(metricComparisonSchema).max(6),
   key_deviations: z.array(deviationSchema).max(5),
-  adaptation_signal: z.string().min(1).max(600),
+  adaptation_signal: z.string().min(1).max(400),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
   affected_session_ids: z.array(z.string()).max(5)
 });
@@ -286,6 +286,7 @@ function buildVerdictInstructions(): string {
     "- Keep metric_comparisons to the 3-5 most important metrics.",
     "- Keep key_deviations only for meaningful deviations (not minor noise).",
     "- If evidence is limited, reflect that by keeping recommendations conservative.",
+    "- Be concise. Each field should use the minimum words needed to convey the insight.",
     "- Return exactly one JSON object matching the required schema."
   ].join("\n");
 }
@@ -431,8 +432,8 @@ export async function generateSessionVerdict(
     logContext: { sessionId, userId },
     buildRequest: () => ({
       instructions: buildVerdictInstructions(),
-      reasoning: { effort: "medium" },
-      max_output_tokens: 2000,
+      reasoning: { effort: "low" },
+      max_output_tokens: 3000,
       text: {
         format: zodTextFormat(sessionVerdictOutputSchema, "session_verdict", {
           description: "Structured three-part session verdict."
