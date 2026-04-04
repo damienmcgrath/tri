@@ -1,6 +1,3 @@
-export type DisciplineTexture = "solid" | "dashed" | "dot-grid";
-export type DisciplineShape = "circle" | "square" | "triangle" | "diamond" | "hex";
-
 const disciplineConfig = {
   swim: { label: "Swim", className: "discipline-swim", icon: "◉", shape: "circle", texture: "dot-grid" },
   bike: { label: "Bike", className: "discipline-bike", icon: "▦", shape: "square", texture: "solid" },

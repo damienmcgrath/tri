@@ -1,6 +1,6 @@
 import { hasConfirmedPlannedSessionLink } from "@/lib/activities/completed-activities";
 
-export type ActivityClassification = "linked" | "extra" | "unreviewed";
+type ActivityClassification = "linked" | "extra" | "unreviewed";
 
 /**
  * Single source of truth for determining an activity's classification.
