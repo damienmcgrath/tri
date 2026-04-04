@@ -411,7 +411,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   const showFeelCapture = session.status === "completed" && !activityId;
 
-  // Fetch existing session verdict for completed sessions
+  // Fetch existing session verdict for completed sessions (skip for activity-route synthetic sessions)
   let existingVerdictData: {
     purpose_statement: string;
     training_block_context: string | null;
@@ -422,7 +422,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     adaptation_signal: string;
     adaptation_type: string | null;
   } | null = null;
-  if (session.status === "completed") {
+  if (session.status === "completed" && !activityId) {
     const { data: existingVerdict } = await supabase
       .from("session_verdicts")
       .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type")
@@ -720,7 +720,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
 
-      {session.status === "completed" ? (
+      {session.status === "completed" && !activityId ? (
         <SessionVerdictCard
           sessionId={session.id}
           existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
