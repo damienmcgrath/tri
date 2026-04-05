@@ -1,0 +1,143 @@
+{
+  "common": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "plan": "Plan",
+      "calendar": "Kalender",
+      "coach": "Coach"
+    },
+    "actions": {
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "apply": "Anwenden",
+      "dismiss": "Verwerfen",
+      "delete": "L\u00f6schen",
+      "edit": "Bearbeiten",
+      "back": "Zur\u00fcck",
+      "close": "Schlie\u00dfen",
+      "confirm": "Best\u00e4tigen",
+      "retry": "Wiederholen",
+      "loading": "Laden\u2026"
+    },
+    "status": {
+      "planned": "Geplant",
+      "completed": "Abgeschlossen",
+      "skipped": "\u00dcbersprungen",
+      "active": "Aktiv",
+      "pending": "Ausstehend"
+    },
+    "sport": {
+      "swim": "Schwimmen",
+      "bike": "Rad",
+      "run": "Lauf",
+      "strength": "Kraft",
+      "other": "Sonstiges"
+    },
+    "time": {
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "thisWeek": "Diese Woche",
+      "lastWeek": "Letzte Woche",
+      "daysAgo": "{count, plural, one {vor # Tag} other {vor # Tagen}}",
+      "daysToGo": "{count, plural, one {noch # Tag} other {noch # Tage}}"
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Verwalte Rennziele, Athletenkontext und Integrationen.",
+    "race": {
+      "title": "Renneinstellungen",
+      "description": "Setze Rennname und Datum f\u00fcr den Dashboard-Countdown.",
+      "raceName": "Rennname",
+      "raceNamePlaceholder": "Hamburg 70.3",
+      "raceDate": "Renndatum",
+      "saveButton": "Renneinstellungen speichern",
+      "backToDashboard": "Zur\u00fcck zum Dashboard"
+    },
+    "integrations": {
+      "title": "Integrationen & Uploads",
+      "description": "Strava verbinden, FIT/TCX-Dateien hochladen und Aktivit\u00e4tsdaten verwalten."
+    },
+    "athleteContext": {
+      "title": "Athletenkontext",
+      "description": "Setze den dauerhaften Kontext, den der Coach f\u00fcr Reviews, Briefs und Chat nutzt."
+    },
+    "locale": {
+      "title": "Sprache & Einheiten",
+      "description": "Sprache, Einheiten, Zeitzone und Wochenstart festlegen.",
+      "language": "Sprache",
+      "units": "Einheiten",
+      "metric": "Metrisch",
+      "imperial": "Imperial",
+      "timezone": "Zeitzone",
+      "weekStartDay": "Woche beginnt am",
+      "monday": "Montag",
+      "sunday": "Sonntag",
+      "comingSoon": "Bald verf\u00fcgbar",
+      "saveButton": "Einstellungen speichern"
+    }
+  },
+  "coach": {
+    "title": "Coach",
+    "newConversation": "Neues Gespr\u00e4ch",
+    "typeMessage": "Nachricht eingeben\u2026",
+    "send": "Senden",
+    "thinking": "Coach denkt nach\u2026",
+    "noConversations": "Noch keine Gespr\u00e4che",
+    "startConversation": "Starte ein Gespr\u00e4ch mit deinem Coach",
+    "suggestedQuestions": {
+      "tracking": "Wie liege ich f\u00fcr {raceName} im Plan?",
+      "adjust": "Soll ich den Wochenplan anpassen?",
+      "limiter": "Was ist aktuell mein gr\u00f6\u00dfter Begrenzer?",
+      "explainScore": "Erkl\u00e4re meinen Training Score"
+    },
+    "conversationHistory": "Gespr\u00e4chsverlauf",
+    "searchConversations": "Gespr\u00e4che suchen\u2026"
+  },
+  "plan": {
+    "title": "Plan",
+    "weekView": "Woche",
+    "blockView": "Block",
+    "seasonView": "Saison",
+    "noActivePlan": "Kein aktiver Trainingsplan",
+    "balance": {
+      "title": "Disziplin-Balance",
+      "overInvested": "+{delta}% \u00fcber Ziel",
+      "underInvested": "\u2212{delta}% unter Ziel",
+      "onTarget": "Im Ziel",
+      "actual": "Ist",
+      "target": "Soll"
+    }
+  },
+  "dashboard": {
+    "morningBrief": {
+      "greeting": "Morgen-Briefing",
+      "restDay": "Heute kein Training. Dein K\u00f6rper verarbeitet die Arbeit dieser Woche.",
+      "sessionsCompleted": "{completed} von {planned} Einheiten diese Woche"
+    },
+    "upload": {
+      "title": "Aktivit\u00e4t hochladen",
+      "dropzone": "FIT- oder TCX-Datei hierher ziehen oder klicken",
+      "uploading": "Wird hochgeladen\u2026",
+      "success": "Aktivit\u00e4t erfolgreich hochgeladen",
+      "duplicate": "Diese Aktivit\u00e4t wurde bereits hochgeladen"
+    }
+  },
+  "sessions": {
+    "verdict": {
+      "achieved": "Einheit hat ihren Zweck erf\u00fcllt",
+      "partial": "Einheit hat ihren Zweck teilweise erf\u00fcllt",
+      "missed": "Einheit hat ihr Ziel nicht erreicht"
+    },
+    "feel": {
+      "title": "Wie hat sich die Einheit angef\u00fchlt?",
+      "overall": "Gesamtgef\u00fchl",
+      "save": "Gef\u00fchl speichern"
+    }
+  },
+  "debrief": {
+    "title": "Wochenr\u00fcckblick",
+    "notReady": "R\u00fcckblick noch nicht bereit",
+    "generating": "R\u00fcckblick wird erstellt\u2026"
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "common": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "plan": "Plan",
+      "calendar": "Calendar",
+      "coach": "Coach"
+    },
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "dismiss": "Dismiss",
+      "delete": "Delete",
+      "edit": "Edit",
+      "back": "Back",
+      "close": "Close",
+      "confirm": "Confirm",
+      "retry": "Retry",
+      "loading": "Loading\u2026"
+    },
+    "status": {
+      "planned": "Planned",
+      "completed": "Completed",
+      "skipped": "Skipped",
+      "active": "Active",
+      "pending": "Pending"
+    },
+    "sport": {
+      "swim": "Swim",
+      "bike": "Bike",
+      "run": "Run",
+      "strength": "Strength",
+      "other": "Other"
+    },
+    "time": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
+      "daysToGo": "{count, plural, one {# day to go} other {# days to go}}"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage race targets, athlete context, and integration workflows.",
+    "race": {
+      "title": "Race settings",
+      "description": "Set your race name and date for dashboard countdown context.",
+      "raceName": "Race name",
+      "raceNamePlaceholder": "Warsaw 70.3",
+      "raceDate": "Race date",
+      "saveButton": "Save race settings",
+      "backToDashboard": "Back to dashboard"
+    },
+    "integrations": {
+      "title": "Integrations & uploads",
+      "description": "Connect Strava, upload FIT/TCX files, and manage activity data."
+    },
+    "athleteContext": {
+      "title": "Athlete context",
+      "description": "Set the durable context Coach should use across reviews, briefs, and chat."
+    },
+    "locale": {
+      "title": "Language & units",
+      "description": "Set your language, units, timezone, and week start day.",
+      "language": "Language",
+      "units": "Units",
+      "metric": "Metric",
+      "imperial": "Imperial",
+      "timezone": "Timezone",
+      "weekStartDay": "Week starts on",
+      "monday": "Monday",
+      "sunday": "Sunday",
+      "comingSoon": "Coming soon",
+      "saveButton": "Save preferences"
+    }
+  },
+  "coach": {
+    "title": "Coach",
+    "newConversation": "New conversation",
+    "typeMessage": "Type a message\u2026",
+    "send": "Send",
+    "thinking": "Coach is thinking\u2026",
+    "noConversations": "No conversations yet",
+    "startConversation": "Start a conversation with your coach",
+    "suggestedQuestions": {
+      "tracking": "How am I tracking for {raceName}?",
+      "adjust": "Should I adjust this week's plan?",
+      "limiter": "What's my biggest limiter right now?",
+      "explainScore": "Explain my Training Score"
+    },
+    "conversationHistory": "Conversation history",
+    "searchConversations": "Search conversations\u2026"
+  },
+  "plan": {
+    "title": "Plan",
+    "weekView": "Week",
+    "blockView": "Block",
+    "seasonView": "Season",
+    "noActivePlan": "No active training plan",
+    "balance": {
+      "title": "Discipline Balance",
+      "overInvested": "+{delta}% over target",
+      "underInvested": "\u2212{delta}% under target",
+      "onTarget": "On target",
+      "actual": "Actual",
+      "target": "Target"
+    }
+  },
+  "dashboard": {
+    "morningBrief": {
+      "greeting": "Morning brief",
+      "restDay": "No session today. Your body is consolidating the work from this week.",
+      "sessionsCompleted": "{completed} of {planned} sessions this week"
+    },
+    "upload": {
+      "title": "Upload activity",
+      "dropzone": "Drop a FIT or TCX file here, or click to browse",
+      "uploading": "Uploading\u2026",
+      "success": "Activity uploaded successfully",
+      "duplicate": "This activity has already been uploaded"
+    }
+  },
+  "sessions": {
+    "verdict": {
+      "achieved": "Session achieved its purpose",
+      "partial": "Session partially achieved its purpose",
+      "missed": "Session did not achieve its intended purpose"
+    },
+    "feel": {
+      "title": "How did this session feel?",
+      "overall": "Overall feel",
+      "save": "Save feel"
+    }
+  },
+  "debrief": {
+    "title": "Weekly Debrief",
+    "notReady": "Debrief not ready yet",
+    "generating": "Generating debrief\u2026"
+  }
+}

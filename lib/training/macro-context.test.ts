@@ -31,6 +31,10 @@ function makeMacroContext(overrides: Partial<MacroContext> = {}): MacroContext {
       bike: { plannedMinutes: 600, actualMinutes: 580, deltaPct: -3 },
       run: { plannedMinutes: 360, actualMinutes: 300, deltaPct: -17 }
     },
+    trainingBlockId: null,
+    trainingBlockType: null,
+    targetRaceId: null,
+    seasonId: null,
     ...overrides
   };
 }

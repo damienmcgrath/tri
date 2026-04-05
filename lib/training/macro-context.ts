@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getBlockForDate } from "./race-profile";
 
 export type MacroContext = {
   raceName: string | null;
@@ -14,6 +15,11 @@ export type MacroContext = {
     bike: { plannedMinutes: number; actualMinutes: number; deltaPct: number };
     run: { plannedMinutes: number; actualMinutes: number; deltaPct: number };
   };
+  // Phase 3: formal training block context
+  trainingBlockId: string | null;
+  trainingBlockType: string | null;
+  targetRaceId: string | null;
+  seasonId: string | null;
 };
 
 function getTodayUtc() {
@@ -99,21 +105,28 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
   const totalPlanWeeks = activePlan?.duration_weeks ?? 12;
   const currentPlanWeek = activePlan?.start_date ? getCurrentPlanWeek(activePlan.start_date, todayIso) : 1;
 
+  // Phase 3: check for formal training blocks first
+  const formalBlock = await getBlockForDate(supabase, athleteId, todayIso).catch(() => null);
+
   if (!planId) {
     return {
       raceName,
       raceDate,
       daysToRace,
-      currentBlock: "Build",
-      blockWeek: 1,
-      blockTotalWeeks: 1,
+      currentBlock: formalBlock?.blockType ?? "Build",
+      blockWeek: formalBlock ? weekInBlock(formalBlock.startDate, todayIso) : 1,
+      blockTotalWeeks: formalBlock ? totalBlockWeeks(formalBlock.startDate, formalBlock.endDate) : 1,
       totalPlanWeeks,
       currentPlanWeek,
       cumulativeVolumeByDiscipline: {
         swim: { plannedMinutes: 0, actualMinutes: 0, deltaPct: 0 },
         bike: { plannedMinutes: 0, actualMinutes: 0, deltaPct: 0 },
         run: { plannedMinutes: 0, actualMinutes: 0, deltaPct: 0 }
-      }
+      },
+      trainingBlockId: formalBlock?.id ?? null,
+      trainingBlockType: formalBlock?.blockType ?? null,
+      targetRaceId: formalBlock?.targetRaceId ?? null,
+      seasonId: formalBlock?.seasonId ?? null,
     };
   }
 
@@ -155,13 +168,29 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
     raceName,
     raceDate,
     daysToRace,
-    currentBlock: blockPosition.currentBlock,
-    blockWeek: blockPosition.blockWeek,
-    blockTotalWeeks: blockPosition.blockTotalWeeks,
+    currentBlock: formalBlock?.blockType ?? blockPosition.currentBlock,
+    blockWeek: formalBlock ? weekInBlock(formalBlock.startDate, todayIso) : blockPosition.blockWeek,
+    blockTotalWeeks: formalBlock ? totalBlockWeeks(formalBlock.startDate, formalBlock.endDate) : blockPosition.blockTotalWeeks,
     totalPlanWeeks,
     currentPlanWeek,
-    cumulativeVolumeByDiscipline
+    cumulativeVolumeByDiscipline,
+    trainingBlockId: formalBlock?.id ?? null,
+    trainingBlockType: formalBlock?.blockType ?? null,
+    targetRaceId: formalBlock?.targetRaceId ?? null,
+    seasonId: formalBlock?.seasonId ?? null,
   };
+}
+
+function weekInBlock(blockStartIso: string, todayIso: string): number {
+  const start = new Date(`${blockStartIso}T00:00:00.000Z`);
+  const today = new Date(`${todayIso}T00:00:00.000Z`);
+  return Math.max(1, Math.floor((today.getTime() - start.getTime()) / (7 * 86400000)) + 1);
+}
+
+function totalBlockWeeks(startIso: string, endIso: string): number {
+  const start = new Date(`${startIso}T00:00:00.000Z`);
+  const end = new Date(`${endIso}T00:00:00.000Z`);
+  return Math.max(1, Math.ceil((end.getTime() - start.getTime() + 86400000) / (7 * 86400000)));
 }
 
 /** Formats macro context as a one-line string for use in AI prompts */

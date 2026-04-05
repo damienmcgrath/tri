@@ -103,6 +103,12 @@ export type AthleteContextSnapshot = {
     formattedValue: string;
     date: string;
   }>;
+  locale: {
+    language: string;
+    units: "metric" | "imperial";
+    timezone: string;
+    weekStartDay: number;
+  };
 };
 
 // asStringArray is now imported from @/lib/openai
@@ -145,7 +151,7 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
   const todayIso = getTodayUtc();
 
   const [{ data: profile }, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }, { data: latestFtp }] = await Promise.all([
-    supabase.from("profiles").select("id,display_name,race_name,race_date,active_plan_id").eq("id", athleteId).maybeSingle(),
+    supabase.from("profiles").select("id,display_name,race_name,race_date,active_plan_id,locale,units,timezone,week_start_day").eq("id", athleteId).maybeSingle(),
     supabase.from("athlete_context").select("*").eq("athlete_id", athleteId).maybeSingle(),
     supabase
       .from("training_plans")
@@ -184,8 +190,8 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
       .maybeSingle()
   ]);
 
-  const priorityEventName = profile?.race_name ?? context?.priority_event_name ?? null;
-  const priorityEventDate = profile?.race_date ?? context?.priority_event_date ?? null;
+  const priorityEventName = context?.priority_event_name ?? profile?.race_name ?? null;
+  const priorityEventDate = context?.priority_event_date ?? profile?.race_date ?? null;
   const updatedAt = context?.updated_at ?? null;
 
   return {
@@ -267,7 +273,13 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
           .catch(() => [] as Array<{ sport: string; label: string; formattedValue: string; date: string }>)
       ]);
       return { fitness: fitnessResult, recentBests: benchmarkResult };
-    })())
+    })()),
+    locale: {
+      language: (profile?.locale as string) ?? "en",
+      units: ((profile?.units as string) === "imperial" ? "imperial" : "metric") as "metric" | "imperial",
+      timezone: (profile?.timezone as string) ?? "UTC",
+      weekStartDay: typeof profile?.week_start_day === "number" ? profile.week_start_day : 1,
+    },
   };
 });
 

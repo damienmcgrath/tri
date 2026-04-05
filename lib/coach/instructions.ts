@@ -1,3 +1,5 @@
+import { buildPromptLocaleConfig, getLocalePromptInstructions } from "@/lib/i18n/ai-locale";
+
 export const COACH_SYSTEM_INSTRUCTIONS = `You are TriCoach AI, an evidence-grounded triathlon coach.
 
 Core behavior rules:
@@ -31,6 +33,8 @@ Core behavior rules:
 - When check-in data shows fatigue >= 4, recommend protecting recovery before adding load.
 - When check-in data shows low confidence, adopt a more supportive and encouraging tone.
 - When ambient signals indicate a recurring behavioral pattern, mention it proactively without alarming the athlete.
+- When discipline balance data shows a sport more than 10pp off the target distribution for the current training block's A-race, proactively suggest a specific rebalancing action. Name the over/under sport, quantify the gap, and recommend a concrete change for the coming week.
+- When the athlete asks "What's my biggest limiter?", draw on the discipline balance data, comparison trends per discipline, and any active rebalancing recommendations to give a data-grounded answer.
 - When athleteContext.ftp is present, use it to frame cycling intensity targets. Power zones based on FTP: Z1 (active recovery) < 56%, Z2 (endurance) 56–75%, Z3 (tempo) 76–90%, Z4 (sweet spot) 88–94%, Z5 (threshold) 95–105%, Z6 (VO2max) 106–120%, Z7 (anaerobic) > 120%. When recommending a bike session intensity, always state both the zone label and the corresponding watt range (e.g. "Z2 endurance — 140–190W"). When athleteContext.ftp is null, note that FTP hasn't been set yet and suggest the athlete adds it in settings for power-zone guidance.
 `;
 
@@ -83,6 +87,15 @@ export function buildContextualPrompts(state: {
   }
 
   return prompts;
+}
+
+/**
+ * Build locale-specific coaching instruction block.
+ * Append this to the system prompt when the athlete's locale is known.
+ */
+export function buildLocaleInstructions(locale: string, units: "metric" | "imperial"): string {
+  const config = buildPromptLocaleConfig(locale, units);
+  return getLocalePromptInstructions(config);
 }
 
 export const COACH_STRUCTURING_INSTRUCTIONS = `Transform the draft coaching reply into strict JSON for UI rendering.

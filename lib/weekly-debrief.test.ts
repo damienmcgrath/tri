@@ -287,7 +287,8 @@ describe("weekly debrief helpers", () => {
           updatedAt: "2026-03-13T09:00:00.000Z"
         },
         ftp: null,
-        fitness: null
+        fitness: null,
+        locale: { language: "en", units: "metric", timezone: "UTC", weekStartDay: 1 }
       },
       timeZone: "UTC",
       weekStart: "2026-03-09",

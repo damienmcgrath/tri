@@ -94,3 +94,46 @@ export async function updateRaceSettingsAction(formData: FormData) {
   revalidatePath("/settings/race");
   revalidatePath("/settings");
 }
+
+const localeSettingsSchema = z.object({
+  locale: z.enum(["en", "de", "fr"]).default("en"),
+  units: z.enum(["metric", "imperial"]).default("metric"),
+  timezone: z.string().trim().max(64).default("UTC"),
+  weekStartDay: z.coerce.number().int().min(0).max(6).default(1)
+});
+
+export async function updateLocaleSettingsAction(formData: FormData) {
+  const parsed = localeSettingsSchema.parse({
+    locale: formData.get("locale") ?? "en",
+    units: formData.get("units") ?? "metric",
+    timezone: formData.get("timezone") ?? "UTC",
+    weekStartDay: formData.get("weekStartDay") ?? "1"
+  });
+
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const { error } = await supabase.from("profiles").upsert(
+    {
+      id: user.id,
+      locale: parsed.locale,
+      units: parsed.units,
+      timezone: parsed.timezone,
+      week_start_day: parsed.weekStartDay
+    },
+    { onConflict: "id" }
+  );
+
+  if (error && !isMissingProfilesTable(error)) {
+    throw new Error(error.message ?? "Could not save locale settings.");
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/settings/locale");
+}
