@@ -12,6 +12,7 @@ import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionVerdictCard } from "./components/session-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { DetailsAccordion } from "../../details-accordion";
+import { getMonday } from "../../week-context";
 
 type SessionRow = SessionReviewRow;
 
@@ -155,7 +156,8 @@ async function loadActivityReviewRow(params: {
   return null;
 }
 
-export default async function SessionReviewPage({ params }: { params: { sessionId: string } }) {
+export default async function SessionReviewPage({ params, searchParams }: { params: { sessionId: string }; searchParams?: { postUpload?: string } }) {
+  const isPostUpload = searchParams?.postUpload === "true";
   const supabase = await createClient();
   const {
     data: { user }
@@ -331,6 +333,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
       const confirmedLink = data.find((row) => {
         if (!("completed_activity_id" in row) || !row.completed_activity_id) return false;
         if (!("confirmation_status" in row)) return true;
+        if (isPostUpload && row.confirmation_status === "suggested") return true;
         return row.confirmation_status === "confirmed" || row.confirmation_status === null;
       });
       hasLinkedActivity = Boolean(confirmedLink);
@@ -412,7 +415,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
   const showFeelCapture = session.status === "completed" && !activityId;
 
   // Fetch existing session verdict for completed sessions (skip for activity-route synthetic sessions)
-  let existingVerdictData: {
+  type VerdictData = {
     purpose_statement: string;
     training_block_context: string | null;
     execution_summary: string;
@@ -421,7 +424,8 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     key_deviations: unknown[] | null;
     adaptation_signal: string;
     adaptation_type: string | null;
-  } | null = null;
+  } | null;
+  let existingVerdictData: VerdictData = null as VerdictData;
   if (session.status === "completed" && !activityId) {
     const { data: existingVerdict } = await supabase
       .from("session_verdicts")
@@ -446,6 +450,50 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     storedComparisons = storedResult.status === "fulfilled" ? storedResult.value : [];
   }
 
+  // Compute week start for breadcrumb links
+  const sessionMonday = getMonday(new Date(`${session.date}T00:00:00.000Z`));
+  const weekStartIso = sessionMonday.toISOString().slice(0, 10);
+
+  // Query for next session in the same week for forward navigation
+  // Uses gte + neq to include same-day sessions, filters out skipped, and
+  // orders by date then created_at so double-session days resolve correctly.
+  type NextSessionInfo = { id: string; session_name: string | null; type: string; date: string } | null;
+  let nextSession: NextSessionInfo = null as NextSessionInfo;
+  if (!activityId) {
+    const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const { data: nextCandidates } = await supabase
+      .from("sessions")
+      .select("id,session_name,type,date,created_at")
+      .eq("user_id", user.id)
+      .gte("date", session.date)
+      .lte("date", weekEndIso)
+      .in("status", ["planned", "completed"])
+      .neq("id", session.id)
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(5);
+    // The query already excludes the current session (neq) and orders by date + created_at,
+    // so the first candidate is the correct next session, even for same-day doubles.
+    nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
+  }
+
+  // Week completion stats for post-upload flow
+  let weekCompletedCount = 0;
+  let weekTotalCount = 0;
+  if (isPostUpload && !activityId) {
+    const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const { data: weekSessions } = await supabase
+      .from("sessions")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .gte("date", weekStartIso)
+      .lte("date", weekEndIso);
+    if (weekSessions) {
+      weekTotalCount = weekSessions.length;
+      weekCompletedCount = weekSessions.filter((s: { status?: string }) => s.status === "completed").length;
+    }
+  }
+
   const reviewVm = createReviewViewModel(session);
 
   const sessionTitle = getSessionDisplayName({
@@ -456,6 +504,7 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     intentCategory: session.intent_category
   });
 
+  const verdictAdaptationType = existingVerdictData?.adaptation_type ?? null;
   const disciplineLabel = getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
@@ -474,7 +523,14 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   return (
     <section className="space-y-4">
-      <Link href="/calendar" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-cyan-300 underline-offset-2 hover:underline lg:min-h-0">← Back to Calendar</Link>
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm text-tertiary" aria-label="Breadcrumb">
+        <Link href="/dashboard" className="text-cyan-400 hover:text-cyan-300">Dashboard</Link>
+        <span className="text-[rgba(255,255,255,0.3)]">/</span>
+        <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">Calendar</Link>
+        <span className="text-[rgba(255,255,255,0.3)]">/</span>
+        <span className="truncate text-[rgba(255,255,255,0.6)]">{sessionTitle}</span>
+      </nav>
 
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -571,6 +627,29 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
           sessionCompleted={true}
         />
+      ) : null}
+
+      {/* Post-upload: Impact on your week */}
+      {isPostUpload && weekTotalCount > 0 ? (
+        <article className="surface p-4 md:p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">Impact on your week</p>
+          <p className="mt-2 text-sm text-white">
+            {weekCompletedCount} of {weekTotalCount} session{weekTotalCount === 1 ? "" : "s"} complete this week
+          </p>
+          {verdictAdaptationType === "modify" || verdictAdaptationType === "redistribute" ? (
+            <p className="mt-2 text-sm text-[hsl(var(--warning))]">
+              This session has triggered an adjustment to your upcoming training.{" "}
+              <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">View adaptation →</Link>
+            </p>
+          ) : verdictAdaptationType === "proceed" ? (
+            <p className="mt-2 text-sm text-muted">No changes needed — your plan continues as prescribed.</p>
+          ) : null}
+          {nextSession ? (
+            <p className="mt-2 text-sm text-muted">
+              Next up: <Link href={`/sessions/${nextSession.id}`} className="text-cyan-400 hover:text-cyan-300">{nextSession.session_name ?? nextSession.type}</Link> on {new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${nextSession.date}T00:00:00Z`))}
+            </p>
+          ) : null}
+        </article>
       ) : null}
 
       <section className="surface p-4 md:p-5">
@@ -756,6 +835,49 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           ))}
         </div>
       </section>
+
+      {/* Navigation footer */}
+      <nav className="flex flex-wrap items-center gap-3 border-t border-[hsl(var(--border))] pt-4">
+        {isPostUpload ? (
+          <>
+            <Link
+              href="/dashboard"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
+            >
+              Back to Dashboard
+            </Link>
+            <Link
+              href={`/calendar?weekStart=${weekStartIso}`}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+            >
+              View Calendar
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href={`/calendar?weekStart=${weekStartIso}`}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
+            >
+              ← Back to Calendar
+            </Link>
+            {nextSession ? (
+              <Link
+                href={`/sessions/${nextSession.id}`}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+              >
+                Next: {nextSession.session_name ?? nextSession.type} →
+              </Link>
+            ) : null}
+          </>
+        )}
+        <Link
+          href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: What should I focus on for my next session?`)}`}
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 lg:min-h-0"
+        >
+          Ask Coach about this
+        </Link>
+      </nav>
     </section>
   );
 }

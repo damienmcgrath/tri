@@ -65,8 +65,19 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
       setMessage(payload.error ?? "Upload failed");
       return;
     }
-    setMessage(payload.duplicate ? "Duplicate file already uploaded." : "Upload successful.");
-    window.location.reload();
+    if (payload.duplicate) {
+      setMessage("Duplicate file already uploaded.");
+      return;
+    }
+    // Redirect to session review if auto-matched, otherwise to activity page
+    if (payload.matchedSessionId) {
+      router.push(`/sessions/${payload.matchedSessionId}?postUpload=true`);
+    } else if (payload.completedActivityId) {
+      router.push(`/activities/${payload.completedActivityId}`);
+    } else {
+      setMessage("Upload successful.");
+      window.location.reload();
+    }
   }
 
   function deleteUpload(uploadId: string) {
