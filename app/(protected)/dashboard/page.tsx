@@ -495,10 +495,11 @@ export default async function DashboardPage({
   const todayDayOfWeek = weekdayMap[weekdayStr] ?? nowForMoment.getUTCDay();
   const hourOfDay = Number(localParts.find((p) => p.type === "hour")?.value ?? nowForMoment.getUTCHours());
 
-  // Moment detection broadens time restrictions — transition briefing and week ahead
-  // are available beyond their original Mon/Tue windows, controlled by the detected moment
+  // Transition briefing is a Mon/Tue concept (bridging last week → this week).
+  // Sunday (day 0) is end-of-week, not start-of-week — don't show it then.
+  // Week Ahead preview is relevant on Sun/Mon/Tue (looking ahead to next week on Sun, or reviewing this week on Mon/Tue).
   const showWeekAheadCard = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
-  const showTransitionBriefing = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
+  const showTransitionBriefing = isCurrentWeek && (todayDayOfWeek === 1 || todayDayOfWeek === 2);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
     supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
