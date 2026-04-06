@@ -101,6 +101,7 @@ export function getRequiredSliceLabels(config: ContextSliceConfig): string[] {
   if (config.includeWeeklyDebrief) labels.push("weekly_debrief");
   if (config.includeDisciplineBalance) labels.push("discipline_balance");
   if (config.includeSeasonContext) labels.push("season_context");
+  if (config.includeSeasonContext) labels.push("race_week_context");
   if (config.includeComparisonTrends) labels.push("comparison_trends");
   if (config.includeMorningBrief) labels.push("morning_brief");
   if (config.includePastConversations) labels.push("past_conversations");

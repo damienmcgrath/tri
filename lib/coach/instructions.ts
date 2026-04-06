@@ -98,6 +98,74 @@ export function buildLocaleInstructions(locale: string, units: "metric" | "imper
   return getLocalePromptInstructions(config);
 }
 
+/**
+ * Build race-week coaching directives.
+ * Appended to contextual prompts when the athlete is within 14 days of a race
+ * (or in post-race recovery). Shifts coaching priorities toward reassurance,
+ * taper management, and practical race-day guidance.
+ */
+export function buildRaceWeekPrompts(raceWeek: {
+  proximity: string;
+  raceName: string;
+  raceType: string;
+  daysUntil: number;
+  priority: string;
+  inTaper: boolean;
+  readinessState: string;
+}): string[] {
+  const prompts: string[] = [];
+  const { proximity, raceName, raceType, daysUntil, priority, inTaper, readinessState } = raceWeek;
+
+  if (proximity === "post_race") {
+    const daysSince = Math.abs(daysUntil);
+    prompts.push(
+      `RECOVERY MODE: The athlete completed ${raceName} (${raceType}) ${daysSince} day${daysSince === 1 ? "" : "s"} ago. ` +
+      `Shift to recovery coaching: celebrate the achievement, recommend rest and easy movement only, ` +
+      `suppress Training Score concerns (it will naturally drop during recovery). ` +
+      `Do NOT suggest resuming normal training for at least 5-7 days post-race.`
+    );
+    return prompts;
+  }
+
+  prompts.push(
+    `RACE WEEK: The athlete is ${daysUntil} day${daysUntil === 1 ? "" : "s"} from ${raceName} (${raceType}, ${priority}-race). ` +
+    `Your coaching priorities shift: REASSURANCE over optimisation; TAPER MANAGEMENT; PRACTICAL GUIDANCE.`
+  );
+
+  if (inTaper) {
+    prompts.push(
+      "TAPER ACTIVE: Do NOT suggest adding training sessions. Volume reduction is intentional. " +
+      "If the athlete feels flat, restless, or anxious, normalise it — fitness takes 10-14 days to dissipate. " +
+      "A 1-2 week taper only sharpens performance."
+    );
+  }
+
+  if (proximity === "day_before") {
+    prompts.push(
+      "RACE EVE: Focus on practical preparation (gear, nutrition, sleep, logistics). " +
+      "No training changes. Build confidence. Keep advice brief and warm."
+    );
+  } else if (proximity === "race_day") {
+    prompts.push(
+      "RACE DAY: Be brief, warm, and focused. No training advice. " +
+      "Just confidence and a pacing reminder. Trust the preparation."
+    );
+  }
+
+  if (readinessState === "fresh") {
+    prompts.push("The athlete is fresh (TSB positive). This is ideal for race day. Reinforce this.");
+  } else if (readinessState === "absorbing") {
+    prompts.push("The athlete is absorbing. TSB is rising — they should be fresh by race day if the taper continues.");
+  }
+
+  prompts.push(
+    "Do NOT suggest major changes to nutrition, equipment, or strategy this close to race day. " +
+    "Do NOT undermine confidence. If their training has been solid, say so directly."
+  );
+
+  return prompts;
+}
+
 export const COACH_STRUCTURING_INSTRUCTIONS = `Transform the draft coaching reply into strict JSON for UI rendering.
 Return only valid JSON with fields:
 - headline (string)

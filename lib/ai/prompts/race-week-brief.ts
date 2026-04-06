@@ -1,0 +1,213 @@
+/**
+ * Race-week morning brief prompt generation.
+ *
+ * When the athlete is within 14 days of a race, the standard morning brief
+ * is replaced with a race-week-specific variant that shifts coaching priorities
+ * toward reassurance, taper management, and practical race-day preparation.
+ */
+
+import { z } from "zod";
+import { zodTextFormat } from "openai/helpers/zod";
+import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
+import type { RaceWeekContext } from "@/lib/training/race-week";
+import { formatRaceDistance, getConfidenceStatement } from "@/lib/training/race-week";
+
+export const RACE_WEEK_BRIEF_PROMPT_VERSION = "v1";
+
+export const raceWeekBriefOutputSchema = z.object({
+  session_preview: z.string().max(300).nullable(),
+  readiness_context: z.string().max(300).nullable(),
+  week_context: z.string().min(1).max(200),
+  pending_actions: z.array(z.string().max(120)).max(4),
+  brief_text: z.string().min(1).max(800),
+  race_guidance: z.string().max(400).nullable(),
+  readiness_summary: z.string().max(200).nullable(),
+});
+
+export type RaceWeekBriefOutput = z.infer<typeof raceWeekBriefOutputSchema>;
+
+type TodaySessionInfo = {
+  sport: string;
+  type: string;
+  sessionName: string | null;
+  durationMinutes: number;
+  target: string | null;
+  isKey: boolean;
+  notes: string | null;
+} | null;
+
+function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
+  const lines: string[] = [
+    "You are a calm, experienced triathlon coach providing a race-week morning brief.",
+    "Your athlete is approaching a race. Your coaching priorities have shifted:",
+    "",
+    "1. REASSURANCE over optimisation. The training is done. Build confidence.",
+    "2. TAPER MANAGEMENT. Normalise flat feelings, restlessness, or anxiety.",
+    "3. PRACTICAL GUIDANCE. Logistics, nutrition, pacing, sleep, gear.",
+    "4. EMOTIONAL INTELLIGENCE. Read the feel data and adapt your tone.",
+    "",
+    "Generate a JSON object with:",
+    "- session_preview: Today's session context (null if rest day)",
+    "- readiness_context: Recovery/readiness with race-week framing (null if insufficient data)",
+    "- week_context: Race countdown and taper/race-week status",
+    "- pending_actions: Actionable items for today (logistics, prep, session)",
+    "- brief_text: The full assembled brief (4-6 lines)",
+    "- race_guidance: Race-specific coaching cue for today (null if not applicable)",
+    "- readiness_summary: One-line readiness verdict grounded in data (null if insufficient)",
+    "",
+    "Guidelines:",
+    "- Sound like a human coach, not a notification system.",
+    "- Be reassuring but not patronising. Acknowledge nerves, don't dismiss them.",
+    "- Ground every statement in the athlete's actual data.",
+    "- Never use emojis.",
+    "- Keep it warm but professional. No forced enthusiasm.",
+    "- Do NOT suggest adding training sessions during taper.",
+    "- Do NOT suggest major changes to nutrition, equipment, or strategy.",
+    "- Do NOT undermine confidence. If their data supports it, say so directly.",
+  ];
+
+  if (raceCtx.proximity === "day_before") {
+    lines.push(
+      "",
+      "This is the DAY BEFORE the race. Include:",
+      "- A practical checklist for tonight (gear, nutrition, sleep) — 3-4 bullet points.",
+      "- A warm, confident race-eve message.",
+      "- No training advice beyond a shakeout if one is planned."
+    );
+  }
+
+  if (raceCtx.proximity === "race_day") {
+    lines.push(
+      "",
+      "This is RACE DAY. Be brief, warm, and focused.",
+      "- No training advice. Just confidence and a pacing reminder.",
+      "- Keep the brief to 2-3 lines maximum.",
+      "- Remind them of their pacing plan if data is available."
+    );
+  }
+
+  if (raceCtx.proximity === "post_race") {
+    const daysSince = Math.abs(raceCtx.race.daysUntil);
+    lines.push(
+      "",
+      `This is ${daysSince} day${daysSince === 1 ? "" : "s"} AFTER the race. Shift to recovery mode:`,
+      "- Day 1: Complete rest. Walk, stretch, eat well.",
+      "- Day 2-3: Easy movement only if it feels good. No running.",
+      "- Day 4-5: Light swimming is fine. No intensity.",
+      "- Day 6-7: Easy sessions can resume. Rebuild gradually.",
+      "- Celebrate the achievement. Be warm and encouraging."
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function buildRaceWeekInput(
+  raceCtx: RaceWeekContext,
+  todaySession: TodaySessionInfo,
+  isRestDay: boolean
+): string {
+  const lines: string[] = [];
+  const absdays = Math.abs(raceCtx.race.daysUntil);
+
+  lines.push("## Race Context");
+  if (raceCtx.proximity === "post_race") {
+    lines.push(`Race: ${raceCtx.race.name} (${raceCtx.race.type}, ${raceCtx.race.priority}-race)`);
+    lines.push(`Completed: ${absdays} day${absdays === 1 ? "" : "s"} ago`);
+  } else {
+    lines.push(`Race: ${raceCtx.race.name} (${raceCtx.race.type}, ${raceCtx.race.priority}-race)`);
+    lines.push(`Days until race: ${raceCtx.race.daysUntil}`);
+    lines.push(`Proximity: ${raceCtx.proximity}`);
+  }
+  lines.push(`Distance: ${formatRaceDistance(raceCtx)}`);
+  if (raceCtx.race.courseType) lines.push(`Course: ${raceCtx.race.courseType}`);
+  if (raceCtx.race.expectedConditions) lines.push(`Expected conditions: ${raceCtx.race.expectedConditions}`);
+
+  lines.push("");
+  lines.push("## Athlete Readiness");
+  lines.push(`TSB: ${raceCtx.readiness.tsb} (${raceCtx.readiness.readinessState})`);
+  lines.push(`CTL trend: ${raceCtx.readiness.ctlTrend}`);
+
+  if (raceCtx.recentExecution.lastWeekScore !== null) {
+    lines.push(`Training score: ${raceCtx.recentExecution.lastWeekScore}/100`);
+  }
+  if (raceCtx.recentExecution.keySessionsTotal > 0) {
+    lines.push(`Key sessions hit: ${raceCtx.recentExecution.keySessionsHit}/${raceCtx.recentExecution.keySessionsTotal}`);
+  }
+  if (raceCtx.recentExecution.feelTrend.length > 0) {
+    lines.push(`Recent feel scores: ${raceCtx.recentExecution.feelTrend.join(", ")} (avg: ${raceCtx.recentExecution.averageFeel})`);
+  }
+
+  if (raceCtx.taperStatus.inTaper) {
+    lines.push("");
+    lines.push("## Taper Status");
+    lines.push(`In taper: week ${raceCtx.taperStatus.taperWeek}`);
+    if (raceCtx.taperStatus.volumeReductionPct) {
+      lines.push(`Volume reduced: ~${raceCtx.taperStatus.volumeReductionPct}%`);
+    }
+  }
+
+  if (todaySession) {
+    lines.push("");
+    lines.push("## Today's Session");
+    lines.push(`${todaySession.sport} — ${todaySession.sessionName ?? todaySession.type} (${todaySession.durationMinutes} min)${todaySession.isKey ? " [KEY]" : ""}`);
+    if (todaySession.target) lines.push(`Target: ${todaySession.target}`);
+    if (todaySession.notes) lines.push(`Notes: ${todaySession.notes.slice(0, 200)}`);
+  } else {
+    lines.push("");
+    lines.push("## Today");
+    lines.push(isRestDay ? "Rest day — no session planned." : "No planned session remaining.");
+  }
+
+  return lines.join("\n");
+}
+
+export async function generateRaceWeekBriefAI(
+  raceCtx: RaceWeekContext,
+  todaySession: TodaySessionInfo,
+  isRestDay: boolean
+): Promise<RaceWeekBriefOutput> {
+  const confidenceStatement = getConfidenceStatement(raceCtx);
+  const distanceStr = formatRaceDistance(raceCtx);
+
+  const fallbackBrief = raceCtx.proximity === "post_race"
+    ? `Recovery mode — ${Math.abs(raceCtx.race.daysUntil)} days since ${raceCtx.race.name}. Take it easy and let your body recover.`
+    : raceCtx.proximity === "race_day"
+      ? `Race day. ${confidenceStatement}`
+      : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} days. ${confidenceStatement}`;
+
+  const fallback: RaceWeekBriefOutput = {
+    session_preview: todaySession
+      ? `${todaySession.sessionName ?? todaySession.type} (${todaySession.durationMinutes} min ${todaySession.sport})`
+      : null,
+    readiness_context: `TSB: ${raceCtx.readiness.tsb} — ${raceCtx.readiness.readinessState}`,
+    week_context: raceCtx.proximity === "post_race"
+      ? `Recovery: ${Math.abs(raceCtx.race.daysUntil)} days post-race`
+      : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} day${raceCtx.race.daysUntil === 1 ? "" : "s"}`,
+    pending_actions: [],
+    brief_text: fallbackBrief,
+    race_guidance: confidenceStatement,
+    readiness_summary: `${raceCtx.readiness.readinessState} — TSB ${raceCtx.readiness.tsb}`,
+  };
+
+  const result = await callOpenAIWithFallback({
+    logTag: "race-week-brief",
+    fallback,
+    schema: raceWeekBriefOutputSchema,
+    buildRequest: () => ({
+      instructions: buildRaceWeekInstructions(raceCtx),
+      input: buildRaceWeekInput(raceCtx, todaySession, isRestDay),
+      text: {
+        format: zodTextFormat(raceWeekBriefOutputSchema, "race_week_brief"),
+      },
+    }),
+    logContext: {
+      proximity: raceCtx.proximity,
+      raceName: raceCtx.race.name,
+      daysUntil: raceCtx.race.daysUntil,
+      priority: raceCtx.race.priority,
+    },
+  });
+
+  return result.value;
+}

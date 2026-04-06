@@ -7,11 +7,12 @@
  */
 
 import { z } from "zod";
-import { buildContextualPrompts, COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
+import { buildContextualPrompts, buildRaceWeekPrompts, COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
 import { executeCoachTool } from "@/lib/coach/tool-handlers";
 import { coachToolSchemas, coachTools, type CoachToolName } from "@/lib/coach/tools";
 import { getLatestFitness, getTsbTrend, getReadinessState } from "@/lib/training/fitness-model";
 import { detectCrossDisciplineFatigue } from "@/lib/training/fatigue-detection";
+import { getRaceWeekContext } from "@/lib/training/race-week";
 import { coachStructuredResponseSchema, type CoachStructuredResponse } from "@/lib/coach/types";
 import { getCoachModel, getOpenAIClient } from "@/lib/openai";
 import { logCoachAudit } from "@/lib/coach/audit";
@@ -241,6 +242,23 @@ export async function runCoachResponseFlow(params: {
   // Build contextual prompts from current training state
   const trainingState = await buildContextualState(params.toolDeps);
   const contextualPrompts = trainingState ? buildContextualPrompts(trainingState) : [];
+
+  // Add race-week coaching directives when the athlete is near a race
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const raceWeekCtx = await getRaceWeekContext(params.toolDeps.supabase, params.toolDeps.ctx.userId, todayIso).catch(() => null);
+  if (raceWeekCtx && raceWeekCtx.proximity !== "normal") {
+    const raceWeekPrompts = buildRaceWeekPrompts({
+      proximity: raceWeekCtx.proximity,
+      raceName: raceWeekCtx.race.name,
+      raceType: raceWeekCtx.race.type,
+      daysUntil: raceWeekCtx.race.daysUntil,
+      priority: raceWeekCtx.race.priority,
+      inTaper: raceWeekCtx.taperStatus.inTaper,
+      readinessState: raceWeekCtx.readiness.readinessState,
+    });
+    contextualPrompts.push(...raceWeekPrompts);
+  }
+
   const contextBlock = contextualPrompts.length > 0
     ? `\n\nCoaching directives for this conversation:\n${contextualPrompts.map((p) => `- ${p}`).join("\n")}`
     : "";
