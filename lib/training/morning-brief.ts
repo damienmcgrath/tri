@@ -4,6 +4,11 @@ import {
   MORNING_BRIEF_PROMPT_VERSION,
   type MorningBriefContext
 } from "@/lib/ai/prompts/morning-brief";
+import {
+  generateRaceWeekBriefAI,
+  RACE_WEEK_BRIEF_PROMPT_VERSION,
+} from "@/lib/ai/prompts/race-week-brief";
+import { getRaceWeekContext, type RaceWeekContext } from "@/lib/training/race-week";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getCoachModel } from "@/lib/openai";
 
@@ -184,6 +189,13 @@ export async function generateMorningBrief(
     .eq("user_id", athleteId)
     .eq("status", "ready");
 
+  // Check for race-week context — if active, use race-week-specific brief
+  const raceWeekCtx = await getRaceWeekContext(supabase, athleteId, date).catch(() => null);
+
+  if (raceWeekCtx && raceWeekCtx.proximity !== "normal") {
+    return generateRaceWeekMorningBrief(supabase, athleteId, date, raceWeekCtx, todaySession, isRestDay);
+  }
+
   // Training block context (simplified)
   const trainingBlock: MorningBriefContext["trainingBlock"] = {
     currentBlock: "Build",
@@ -266,5 +278,79 @@ export async function generateMorningBrief(
     briefText: stored!.brief_text,
     viewedAt: stored!.viewed_at,
     createdAt: stored!.created_at
+  };
+}
+
+/**
+ * Generate a race-week-specific morning brief.
+ * Called when the athlete is within 14 days of a race (or 7 days post-race).
+ */
+async function generateRaceWeekMorningBrief(
+  supabase: SupabaseClient,
+  athleteId: string,
+  date: string,
+  raceWeekCtx: RaceWeekContext,
+  todaySessionRow: MorningBriefContext["todaySession"],
+  isRestDay: boolean
+): Promise<MorningBrief> {
+  const aiOutput = await generateRaceWeekBriefAI(raceWeekCtx, todaySessionRow, isRestDay);
+
+  const inputData = {
+    race_week: true,
+    proximity: raceWeekCtx.proximity,
+    race_name: raceWeekCtx.race.name,
+    days_until: raceWeekCtx.race.daysUntil,
+    race_priority: raceWeekCtx.race.priority,
+    in_taper: raceWeekCtx.taperStatus.inTaper,
+    planned_session: Boolean(todaySessionRow),
+    is_rest_day: isRestDay,
+  };
+
+  const { data: stored, error } = await supabase
+    .from("morning_briefs")
+    .upsert(
+      {
+        user_id: athleteId,
+        athlete_id: athleteId,
+        brief_date: date,
+        session_preview: aiOutput.session_preview,
+        readiness_context: aiOutput.readiness_context ?? aiOutput.readiness_summary,
+        week_context: aiOutput.week_context,
+        pending_actions: aiOutput.pending_actions,
+        brief_text: aiOutput.brief_text,
+        input_data: inputData,
+        ai_model_used: getCoachModel(),
+        ai_prompt_version: RACE_WEEK_BRIEF_PROMPT_VERSION,
+      },
+      { onConflict: "user_id,brief_date" }
+    )
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[morning-brief] Failed to store race-week brief:", error.message);
+    return {
+      id: "transient",
+      briefDate: date,
+      sessionPreview: aiOutput.session_preview,
+      readinessContext: aiOutput.readiness_context ?? aiOutput.readiness_summary,
+      weekContext: aiOutput.week_context,
+      pendingActions: aiOutput.pending_actions,
+      briefText: aiOutput.brief_text,
+      viewedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  return {
+    id: stored!.id,
+    briefDate: stored!.brief_date,
+    sessionPreview: stored!.session_preview,
+    readinessContext: stored!.readiness_context,
+    weekContext: stored!.week_context,
+    pendingActions: (stored!.pending_actions ?? []) as string[],
+    briefText: stored!.brief_text,
+    viewedAt: stored!.viewed_at,
+    createdAt: stored!.created_at,
   };
 }

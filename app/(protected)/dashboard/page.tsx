@@ -30,6 +30,7 @@ import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib
 import { getOrGenerateMorningBrief, type MorningBrief } from "@/lib/training/morning-brief";
 import { MondayTransitionFlow } from "./components/monday-transition-flow";
 import { getOrComputeTrainingScore } from "@/lib/training/scoring";
+import { getRaceWeekContext, formatRaceDistance, getConfidenceStatement, type RaceWeekContext } from "@/lib/training/race-week";
 
 type Session = {
   id: string;
@@ -632,8 +633,13 @@ export default async function DashboardPage({
 
   const hasActivePlan = Boolean(activePlanId);
 
+  // Race-week context — fetched early so it can influence moment detection and card ordering
+  const raceWeekCtx = isCurrentWeek
+    ? await getRaceWeekContext(supabase, user.id, todayIso).catch(() => null)
+    : null;
+
   // Dashboard moment detection — determines the athlete's current context
-  type DashboardMoment = "just_uploaded" | "monday_transition" | "end_of_week" | "session_today" | "rest_day" | "default";
+  type DashboardMoment = "race_day" | "race_eve" | "race_week" | "post_race" | "just_uploaded" | "monday_transition" | "end_of_week" | "session_today" | "rest_day" | "default";
 
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const pendingTodaySessions = todaySessions.filter((session) => session.status === "planned");
@@ -678,10 +684,19 @@ export default async function DashboardPage({
   const statusChip = getStatusChip(completionPct, expectedByTodayPct);
 
   // Determine the dashboard moment for context-aware ordering
+  // Race-week states take priority over standard moments
   const hasPendingToday = todaySessions.some((s) => s.status === "planned");
   let dashboardMoment: DashboardMoment = "default";
   if (!isCurrentWeek) {
     dashboardMoment = "default";
+  } else if (raceWeekCtx?.proximity === "race_day") {
+    dashboardMoment = "race_day";
+  } else if (raceWeekCtx?.proximity === "day_before") {
+    dashboardMoment = "race_eve";
+  } else if (raceWeekCtx?.proximity === "race_week" || raceWeekCtx?.proximity === "pre_race_week") {
+    dashboardMoment = "race_week";
+  } else if (raceWeekCtx?.proximity === "post_race") {
+    dashboardMoment = "post_race";
   } else if (todayDayOfWeek === 1 || (todayDayOfWeek === 2 && hourOfDay < 12)) {
     dashboardMoment = "monday_transition";
   } else if ((todayDayOfWeek === 6 || todayDayOfWeek === 0) && completionPct > 60) {
@@ -833,11 +848,19 @@ export default async function DashboardPage({
   const todayCue = diagnosisAwareSignal.todayCue;
   const nextImportantSession = getNextImportantSession(sessions, todayIso);
 
+  // During race week taper or post-race, suppress volume-deficit and balance warnings
+  // — reduced volume is intentional, not a problem
+  const isRaceWeekSuppressed = raceWeekCtx?.taperStatus.inTaper ||
+    dashboardMoment === "race_day" || dashboardMoment === "race_eve" || dashboardMoment === "post_race";
+
   // Show at most one signal. Attention takes priority; focus only shows when there is no attention item,
   // or when attention is about a missed key session (structural) while focus is about a different sport gap.
   const attentionIsAboutKeySession = attentionItem?.title.startsWith("Missed key session");
-  const showFocusItem = resolvedFocusItem && (!attentionItem || attentionIsAboutKeySession);
-  const contextualItems = [attentionItem, showFocusItem ? resolvedFocusItem : null].filter((item): item is ContextualItem => Boolean(item));
+  const showFocusItem = !isRaceWeekSuppressed && resolvedFocusItem && (!attentionItem || attentionIsAboutKeySession);
+  const contextualItems = [
+    isRaceWeekSuppressed ? null : attentionItem,
+    showFocusItem ? resolvedFocusItem : null
+  ].filter((item): item is ContextualItem => Boolean(item));
 
   if (!hasActivePlan && !hasAnyPlan) {
     return (
@@ -868,6 +891,58 @@ export default async function DashboardPage({
           blockLabel={currentBlockLabel}
           weekNumber={currentWeekNumber}
         />
+      ) : null}
+
+      {/* Race-week hero cards — take priority over everything else */}
+      {dashboardMoment === "race_day" && raceWeekCtx ? (
+        <article className="rounded-xl border border-[rgba(251,191,36,0.5)] bg-[rgba(251,191,36,0.08)] px-5 py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-400">Race day</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white">{raceWeekCtx.race.name}</h2>
+          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
+          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
+          {raceWeekCtx.readiness.readinessState === "fresh" ? (
+            <p className="mt-2 text-xs text-emerald-400">Readiness: Fresh (TSB +{Math.round(raceWeekCtx.readiness.tsb)})</p>
+          ) : null}
+        </article>
+      ) : dashboardMoment === "race_eve" && raceWeekCtx ? (
+        <article className="rounded-xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.06)] px-5 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-400">Tomorrow is race day</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">{raceWeekCtx.race.name}</h2>
+          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
+          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">You have done the work. Trust your training.</p>
+          <div className="mt-3 space-y-1 text-xs text-[rgba(255,255,255,0.68)]">
+            <p>Lay out all race gear tonight. Pin your number. Charge your watch.</p>
+            <p>Eat a familiar dinner. Hydrate well. Set two alarms.</p>
+          </div>
+        </article>
+      ) : dashboardMoment === "race_week" && raceWeekCtx ? (
+        <article className="rounded-xl border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.06)] px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-400">
+                {raceWeekCtx.race.name} in {raceWeekCtx.race.daysUntil} day{raceWeekCtx.race.daysUntil === 1 ? "" : "s"}
+              </p>
+              <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{raceWeekCtx.race.priority} Race · {formatRaceDistance(raceWeekCtx)}</p>
+            </div>
+            {raceWeekCtx.taperStatus.inTaper ? (
+              <span className="rounded-full border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.1)] px-2.5 py-1 text-[11px] font-medium text-cyan-400">Taper</span>
+            ) : null}
+          </div>
+          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
+        </article>
+      ) : dashboardMoment === "post_race" && raceWeekCtx ? (
+        <article className="rounded-xl border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.06)] px-5 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Recovery mode</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">{raceWeekCtx.race.name} — completed</h2>
+          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{Math.abs(raceWeekCtx.race.daysUntil)} day{Math.abs(raceWeekCtx.race.daysUntil) === 1 ? "" : "s"} since race</p>
+          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">
+            {Math.abs(raceWeekCtx.race.daysUntil) <= 2
+              ? "Take it easy. Walk, stretch, eat well. Your body needs rest."
+              : Math.abs(raceWeekCtx.race.daysUntil) <= 4
+                ? "Easy movement only if it feels good. No intensity."
+                : "Easy sessions can resume. Rebuild gradually."}
+          </p>
+        </article>
       ) : null}
 
       {/* Recent Upload Card — actionable, not a text wall, stays above grid */}
