@@ -13,6 +13,7 @@ const baseActivity: StravaActivitySummary = {
   max_heartrate: 172,
   average_watts: 250.3,
   max_watts: 400,
+  weighted_average_watts: 265,
   average_cadence: 88.2,
   calories: 520
 };
@@ -68,6 +69,32 @@ describe("normalizeStravaActivity", () => {
     expect(result.activity_vendor).toBe("strava");
     expect(result.schedule_status).toBe("unscheduled");
     expect(result.is_unplanned).toBe(false);
+  });
+
+  it("computes end_time_utc from start + elapsed", () => {
+    const result = normalizeStravaActivity(baseActivity, "user-abc");
+    expect(result.end_time_utc).toBe("2026-03-01T08:00:00.000Z");
+  });
+
+  it("populates elapsed_duration_sec", () => {
+    const result = normalizeStravaActivity(baseActivity, "user-abc");
+    expect(result.elapsed_duration_sec).toBe(3600);
+  });
+
+  it("computes avg_pace_per_100m_sec for runs", () => {
+    const result = normalizeStravaActivity(baseActivity, "user-abc");
+    // 3500 moving seconds / (10000m / 100) = 35 sec/100m
+    expect(result.avg_pace_per_100m_sec).toBe(35);
+  });
+
+  it("returns null avg_pace_per_100m_sec for bike", () => {
+    const result = normalizeStravaActivity({ ...baseActivity, sport_type: "Ride" }, "user-abc");
+    expect(result.avg_pace_per_100m_sec).toBeNull();
+  });
+
+  it("stores activity_type_raw", () => {
+    const result = normalizeStravaActivity(baseActivity, "user-abc");
+    expect(result.activity_type_raw).toBe("Run");
   });
 
   it("maps a ride activity correctly", () => {
@@ -127,5 +154,166 @@ describe("normalizeStravaActivity", () => {
     const result = normalizeStravaActivity({ ...baseActivity, id: 987654321 }, "user-abc");
     expect(typeof result.external_activity_id).toBe("string");
     expect(result.external_activity_id).toBe("987654321");
+  });
+
+  describe("metrics_v2", () => {
+    it("includes schemaVersion and sourceFormat", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      expect(result.metrics_v2.schemaVersion).toBe(1);
+      expect(result.metrics_v2.sourceFormat).toBe("strava");
+    });
+
+    it("populates power section with normalized power from weighted_average_watts", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      const power = result.metrics_v2.power as Record<string, unknown>;
+      expect(power.avgPower).toBe(250);
+      expect(power.normalizedPower).toBe(265);
+      expect(power.maxPower).toBe(400);
+      // totalWorkKj = avgPower * movingTimeSec / 1000 = 250 * 3500 / 1000 = 875
+      expect(power.totalWorkKj).toBe(875);
+      // variabilityIndex = normalizedPower / avgPower = 265 / 250 = 1.06
+      expect(power.variabilityIndex).toBe(1.06);
+    });
+
+    it("populates heart rate section", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      const hr = result.metrics_v2.heartRate as Record<string, unknown>;
+      expect(hr.avgHr).toBe(146);
+      expect(hr.maxHr).toBe(172);
+    });
+
+    it("populates elevation section", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      const elev = result.metrics_v2.elevation as Record<string, unknown>;
+      expect(elev.gainM).toBe(50);
+      expect(elev.lossM).toBeNull(); // not available from Strava
+    });
+
+    it("populates pace section for runs", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      const pace = result.metrics_v2.pace as Record<string, unknown>;
+      expect(pace.avgPacePer100mSec).toBe(35);
+      expect(pace.avgPaceSecPerKm).toBe(350);
+    });
+
+    it("populates environment temperature when available", () => {
+      const result = normalizeStravaActivity({ ...baseActivity, average_temp: 22 }, "user-abc");
+      const env = result.metrics_v2.environment as Record<string, unknown>;
+      expect(env.temperature).toBe(22);
+      expect(env.avgTemperature).toBe(22);
+    });
+
+    it("populates suffer_score in load section", () => {
+      const result = normalizeStravaActivity({ ...baseActivity, suffer_score: 87 }, "user-abc");
+      const load = result.metrics_v2.load as Record<string, unknown>;
+      expect(load.sufferScore).toBe(87);
+    });
+
+    it("populates pause info from elapsed vs moving time", () => {
+      const result = normalizeStravaActivity(baseActivity, "user-abc");
+      const pauses = result.metrics_v2.pauses as Record<string, unknown>;
+      // elapsed 3600 - moving 3500 = 100s paused
+      expect(pauses.totalPausedSec).toBe(100);
+      expect(pauses.count).toBe(1);
+    });
+
+    it("builds lap summaries from detailed activity laps", () => {
+      const withLaps: StravaActivitySummary = {
+        ...baseActivity,
+        laps: [
+          { lap_index: 0, elapsed_time: 600, moving_time: 590, distance: 1600, average_heartrate: 140, max_heartrate: 155, average_watts: 240, average_cadence: 86 },
+          { lap_index: 1, elapsed_time: 600, moving_time: 595, distance: 1650, average_heartrate: 148, max_heartrate: 165, average_watts: 255, average_cadence: 90 }
+        ]
+      };
+      const result = normalizeStravaActivity(withLaps, "user-abc");
+      expect(result.laps_count).toBe(2);
+
+      const laps = result.metrics_v2.laps as Record<string, unknown>[];
+      expect(laps).toHaveLength(2);
+      expect(laps[0]).toMatchObject({
+        index: 0,
+        durationSec: 600,
+        distanceM: 1600,
+        avgHr: 140,
+        avgPower: 240
+      });
+    });
+
+    it("computes HR drift and pace fade from splits", () => {
+      const withSplits: StravaActivitySummary = {
+        ...baseActivity,
+        splits_metric: [
+          { split: 1, distance: 1000, elapsed_time: 350, moving_time: 345, average_heartrate: 140, average_speed: 2.9 },
+          { split: 2, distance: 1000, elapsed_time: 348, moving_time: 345, average_heartrate: 142, average_speed: 2.88 },
+          { split: 3, distance: 1000, elapsed_time: 355, moving_time: 350, average_heartrate: 150, average_speed: 2.85 },
+          { split: 4, distance: 1000, elapsed_time: 360, moving_time: 355, average_heartrate: 155, average_speed: 2.8 },
+          { split: 5, distance: 1000, elapsed_time: 365, moving_time: 360, average_heartrate: 158, average_speed: 2.75 },
+          { split: 6, distance: 1000, elapsed_time: 370, moving_time: 365, average_heartrate: 160, average_speed: 2.7 }
+        ]
+      };
+      const result = normalizeStravaActivity(withSplits, "user-abc");
+      const splits = result.metrics_v2.splits as Record<string, unknown>;
+      expect(splits).not.toBeNull();
+      expect(typeof splits.hrDriftPct).toBe("number");
+      expect((splits.hrDriftPct as number)).toBeGreaterThan(0); // HR went up
+      expect(typeof splits.paceFadePct).toBe("number");
+      expect((splits.paceFadePct as number)).toBeGreaterThan(0); // speed dropped
+    });
+
+    it("swim activity puts cadence into stroke section", () => {
+      const swim: StravaActivitySummary = {
+        ...baseActivity,
+        sport_type: "Swim",
+        average_cadence: 28, // strokes per minute
+        distance: 2000,
+        moving_time: 2400
+      };
+      const result = normalizeStravaActivity(swim, "user-abc");
+      // Swim cadence goes to stroke, not top-level avg_cadence
+      expect(result.avg_cadence).toBeNull();
+
+      const stroke = result.metrics_v2.stroke as Record<string, unknown>;
+      expect(stroke).not.toBeNull();
+      expect(stroke.avgStrokeRateSpm).toBe(28);
+    });
+
+    it("tracks missing fields for quality reporting", () => {
+      const minimal: StravaActivitySummary = {
+        id: 1,
+        name: "Walk",
+        sport_type: "Run",
+        start_date: "2026-03-01T07:00:00Z",
+        elapsed_time: 1800,
+        moving_time: 1800,
+        distance: 3000
+      };
+      const result = normalizeStravaActivity(minimal, "user-abc");
+      const quality = result.metrics_v2.quality as { missing: string[] };
+      expect(quality.missing).toContain("heartRate");
+      expect(quality.missing).toContain("power");
+      expect(quality.missing).toContain("cadence");
+      expect(quality.missing).toContain("elevation");
+      expect(quality.missing).toContain("temperature");
+      expect(quality.missing).toContain("zones");
+    });
+
+    it("returns null metrics_v2 sections when data not available", () => {
+      const minimal: StravaActivitySummary = {
+        id: 1,
+        name: "Easy Run",
+        sport_type: "Run",
+        start_date: "2026-03-01T07:00:00Z",
+        elapsed_time: 1800,
+        moving_time: 1800,
+        distance: 5000
+      };
+      const result = normalizeStravaActivity(minimal, "user-abc");
+      const power = result.metrics_v2.power as Record<string, unknown>;
+      expect(power.normalizedPower).toBeNull();
+      expect(power.totalWorkKj).toBeNull();
+      expect(power.variabilityIndex).toBeNull();
+      expect(result.metrics_v2.laps).toBeNull();
+      expect(result.metrics_v2.splits).toBeNull();
+    });
   });
 });
