@@ -333,6 +333,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       const confirmedLink = data.find((row) => {
         if (!("completed_activity_id" in row) || !row.completed_activity_id) return false;
         if (!("confirmation_status" in row)) return true;
+        if (isPostUpload && row.confirmation_status === "suggested") return true;
         return row.confirmation_status === "confirmed" || row.confirmation_status === null;
       });
       hasLinkedActivity = Boolean(confirmedLink);
@@ -453,19 +454,25 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const weekStartIso = sessionMonday.toISOString().slice(0, 10);
 
   // Query for next session in the same week for forward navigation
+  // Uses gte + neq to include same-day sessions, filters out skipped, and
+  // orders by date then created_at so double-session days resolve correctly.
   let nextSession: { id: string; session_name: string | null; type: string; date: string } | null = null;
   if (!activityId) {
     const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
-    const { data: nextData } = await supabase
+    const { data: nextCandidates } = await supabase
       .from("sessions")
-      .select("id,session_name,type,date")
+      .select("id,session_name,type,date,created_at")
       .eq("user_id", user.id)
-      .gt("date", session.date)
+      .gte("date", session.date)
       .lte("date", weekEndIso)
+      .in("status", ["planned", "completed"])
+      .neq("id", session.id)
       .order("date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    nextSession = nextData as typeof nextSession;
+      .order("created_at", { ascending: true })
+      .limit(5);
+    // The query already excludes the current session (neq) and orders by date + created_at,
+    // so the first candidate is the correct next session, even for same-day doubles.
+    nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
   }
 
   // Week completion stats for post-upload flow

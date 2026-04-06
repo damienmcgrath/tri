@@ -483,8 +483,17 @@ export default async function DashboardPage({
   const isCurrentWeek = weekStart === currentWeekStart;
   const showWeeklyDebriefCard = isCurrentWeek;
 
-  const todayDayOfWeek = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`).getUTCDay();
-  const hourOfDay = new Date().getUTCHours();
+  const nowForMoment = new Date();
+  const localParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(nowForMoment);
+  const weekdayStr = localParts.find((p) => p.type === "weekday")?.value ?? "";
+  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const todayDayOfWeek = weekdayMap[weekdayStr] ?? nowForMoment.getUTCDay();
+  const hourOfDay = Number(localParts.find((p) => p.type === "hour")?.value ?? nowForMoment.getUTCHours());
 
   // Moment detection broadens time restrictions — transition briefing and week ahead
   // are available beyond their original Mon/Tue windows, controlled by the detected moment

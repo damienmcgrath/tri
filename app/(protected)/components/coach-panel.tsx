@@ -85,6 +85,7 @@ export function CoachPanel() {
 
       const decoder = new TextDecoder();
       let assistantContent = "";
+      let buffer = "";
       const assistantId = `assistant-${Date.now()}`;
 
       setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
@@ -93,33 +94,49 @@ export function CoachPanel() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
+        for (const frame of frames) {
+          const eventLine = frame.split("\n").find((l) => l.startsWith("event:"));
+          const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
+          if (!eventLine || !dataLine) continue;
 
+          const eventName = eventLine.slice(6).trim();
           try {
-            const parsed = JSON.parse(data);
-            if (parsed.conversationId) {
-              setConversationId(parsed.conversationId);
+            const data = JSON.parse(dataLine.slice(5).trim()) as Record<string, unknown>;
+
+            if (eventName === "message_start" && typeof data.conversationId === "string") {
+              setConversationId(data.conversationId);
             }
-            if (parsed.content) {
-              assistantContent += parsed.content;
+
+            if (eventName === "message_delta" && typeof data.chunk === "string") {
+              assistantContent += data.chunk;
               setMessages((prev) =>
                 prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
               );
             }
-            if (parsed.fullContent) {
-              assistantContent = parsed.fullContent;
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
-              );
+
+            if (eventName === "message_complete") {
+              const structured = data.structured as { answer?: string } | undefined;
+              if (structured?.answer) {
+                assistantContent = structured.answer;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
+                );
+              }
+              if (typeof data.conversationId === "string") {
+                setConversationId(data.conversationId);
+              }
             }
-          } catch {
-            // Skip malformed JSON lines
+
+            if (eventName === "error") {
+              throw new Error(typeof data.error === "string" ? data.error : "Something went wrong");
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof SyntaxError) continue; // skip malformed JSON
+            throw parseErr;
           }
         }
       }

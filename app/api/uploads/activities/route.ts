@@ -256,7 +256,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, suggested, matchedSessionId: best?.plannedSessionId ?? null }, {
+    return NextResponse.json({ uploadId: upload.id, completedActivityId: createdActivity.id, suggested, matchedSessionId: (best && best.confidence >= 0.85) ? best.plannedSessionId : null }, {
       headers: rateLimitHeaders(userRateLimit)
     });
   } catch (error) {
