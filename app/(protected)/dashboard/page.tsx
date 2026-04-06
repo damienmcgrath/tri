@@ -834,20 +834,6 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      {/* Morning Brief — hidden for now, will re-address later */}
-      {/* {isCurrentWeek ? (
-        <Suspense fallback={null}>
-          <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
-        </Suspense>
-      ) : null} */}
-
-      {/* Transition Briefing — shows Mon/Tue of current week */}
-      {showTransitionBriefing ? (
-        <Suspense fallback={null}>
-          <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
-        </Suspense>
-      ) : null}
-
       <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1020,6 +1006,13 @@ export default async function DashboardPage({
           )}
         </article>
       </div>
+
+      {/* Narrative cards — collapsed by default so the grid stays above the fold */}
+      {showTransitionBriefing ? (
+        <Suspense fallback={null}>
+          <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
+        </Suspense>
+      ) : null}
 
       {showWeekAheadCard ? (
         <Suspense fallback={null}>
