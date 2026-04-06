@@ -870,32 +870,13 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      {/* Recent Upload Card */}
+      {/* Recent Upload Card — actionable, not a text wall, stays above grid */}
       {isCurrentWeek ? (
         <Suspense fallback={null}>
           <DashboardRecentUpload supabase={supabase} userId={user.id} />
         </Suspense>
       ) : null}
 
-      {/* Morning Brief */}
-      {isCurrentWeek ? (
-        <Suspense fallback={null}>
-          <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
-        </Suspense>
-      ) : null}
-
-      {/* Transition Briefing / Monday Unified Flow */}
-      {showTransitionBriefing ? (
-        dashboardMoment === "monday_transition" ? (
-          <Suspense fallback={null}>
-            <DashboardMondayTransition supabase={supabase} userId={user.id} weekStart={weekStart} todayIso={todayIso} />
-          </Suspense>
-        ) : (
-          <Suspense fallback={null}>
-            <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
-          </Suspense>
-        )
-      ) : null}
 
       <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
@@ -1069,6 +1050,27 @@ export default async function DashboardPage({
           )}
         </article>
       </div>
+
+      {/* Narrative cards — collapsed by default so the grid stays above the fold */}
+      {/* Morning Brief */}
+      {isCurrentWeek ? (
+        <Suspense fallback={null}>
+          <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
+        </Suspense>
+      ) : null}
+
+      {/* Transition Briefing / Monday Unified Flow */}
+      {showTransitionBriefing ? (
+        dashboardMoment === "monday_transition" ? (
+          <Suspense fallback={null}>
+            <DashboardMondayTransition supabase={supabase} userId={user.id} weekStart={weekStart} todayIso={todayIso} />
+          </Suspense>
+        ) : (
+          <Suspense fallback={null}>
+            <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
+          </Suspense>
+        )
+      ) : null}
 
       {/* Context-aware section: end_of_week promotes debrief before week ahead */}
       {dashboardMoment === "end_of_week" ? (
