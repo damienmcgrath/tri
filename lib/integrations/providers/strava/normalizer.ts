@@ -366,7 +366,7 @@ export function normalizeStravaActivity(
     avg_power: avgPower,
     max_power: maxPower,
     avg_cadence: normalizedSport === "swim" ? null : avgCadence, // swim cadence → stroke rate in metrics_v2
-    avg_pace_per_100m_sec: avgPacePer100mSec,
+    avg_pace_per_100m_sec: avgPacePer100mSec != null ? Math.round(avgPacePer100mSec) : null,
     laps_count: lapsCount,
     calories: nullIfZero(raw.calories),
     activity_type_raw: rawSportType,
