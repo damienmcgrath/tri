@@ -3,6 +3,7 @@ import { isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { signOutAction } from "./actions";
 import { GlobalHeader } from "./global-header";
 import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
+import { CoachPanelWrapper } from "./components/coach-panel-wrapper";
 
 export const revalidate = 0;
 
@@ -42,50 +43,52 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const previewMode = isAgentPreviewEnabled() && user?.email === "preview@tri.ai";
 
   return (
-    <div className="app-shell">
-      <GlobalHeader
-        raceName={raceName}
-        daysToRace={daysToRace}
-        previewMode={previewMode}
-        account={{
-          avatarUrl: profile?.avatar_url ?? null,
-          initials,
-          displayName,
-          email,
-          signOutAction
-        }}
-      />
+    <CoachPanelWrapper>
+      <div className="app-shell">
+        <GlobalHeader
+          raceName={raceName}
+          daysToRace={daysToRace}
+          previewMode={previewMode}
+          account={{
+            avatarUrl: profile?.avatar_url ?? null,
+            initials,
+            displayName,
+            email,
+            signOutAction
+          }}
+        />
 
-      <div className="shell-content-grid mx-auto grid min-h-[calc(100vh-61px)] w-full max-w-[1280px] gap-4 px-4 pt-6 md:px-6 lg:grid-cols-[72px_1fr] lg:gap-6 xl:grid-cols-[220px_1fr]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-[84px] border-r border-[var(--border-subtle)] bg-transparent pr-4 xl:pr-6">
-            <div className="xl:hidden">
-              <ShellNavRail compact />
-            </div>
-            <div className="hidden xl:block">
-              <ShellNavRail />
-            </div>
-          </div>
-        </aside>
-
-        <main className="min-w-0 space-y-4">
-          {previewMode ? (
-            <div className="surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <p className="label">Agent Preview</p>
-                <p className="mt-1 text-sm text-muted">You are browsing seeded local data. Reset the workspace whenever you want a clean UI state.</p>
+        <div className="shell-content-grid mx-auto grid min-h-[calc(100vh-61px)] w-full max-w-[1280px] gap-4 px-4 pt-6 md:px-6 lg:grid-cols-[72px_1fr] lg:gap-6 xl:grid-cols-[220px_1fr]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-[84px] border-r border-[var(--border-subtle)] bg-transparent pr-4 xl:pr-6">
+              <div className="xl:hidden">
+                <ShellNavRail compact />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <a href="/dev/agent-reset" className="btn-secondary px-3 py-1.5 text-xs">Reset data</a>
-                <a href="/dev/agent-preview" className="btn-secondary px-3 py-1.5 text-xs">Preview guide</a>
+              <div className="hidden xl:block">
+                <ShellNavRail />
               </div>
             </div>
-          ) : null}
-          {children}
-        </main>
+          </aside>
+
+          <main className="min-w-0 space-y-4">
+            {previewMode ? (
+              <div className="surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="label">Agent Preview</p>
+                  <p className="mt-1 text-sm text-muted">You are browsing seeded local data. Reset the workspace whenever you want a clean UI state.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a href="/dev/agent-reset" className="btn-secondary px-3 py-1.5 text-xs">Reset data</a>
+                  <a href="/dev/agent-preview" className="btn-secondary px-3 py-1.5 text-xs">Preview guide</a>
+                </div>
+              </div>
+            ) : null}
+            {children}
+          </main>
+        </div>
+
+        <MobileBottomTabs />
       </div>
-
-      <MobileBottomTabs />
-    </div>
+    </CoachPanelWrapper>
   );
 }

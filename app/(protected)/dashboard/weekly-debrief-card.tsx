@@ -1,5 +1,6 @@
 import type { WeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { DebriefRefreshButton } from "@/app/(protected)/debrief/debrief-refresh-button";
+import { ShareSummaryButton } from "@/app/(protected)/debrief/components/share-summary-button";
 
 const weekDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 function formatWeekDate(iso: string) {
@@ -15,9 +16,10 @@ function formatDuration(minutes: number) {
 
 type Props = {
   snapshot: WeeklyDebriefSnapshot;
+  displayName?: string | null;
 };
 
-export function WeeklyDebriefCard({ snapshot }: Props) {
+export function WeeklyDebriefCard({ snapshot, displayName = null }: Props) {
   const artifact = snapshot.artifact;
 
   if (!snapshot.readiness.isReady) {
@@ -84,6 +86,15 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
         </span>
       </div>
 
+      {artifact.narrative?.executiveSummary ? (
+        <div className="mt-3">
+          <p className="line-clamp-3 text-sm leading-relaxed text-[rgba(255,255,255,0.78)]">{artifact.narrative.executiveSummary}</p>
+          <a href={`/debrief?weekStart=${artifact.weekStart}`} className="mt-1 inline-block text-xs text-cyan-400 hover:text-cyan-300">
+            Read more →
+          </a>
+        </div>
+      ) : null}
+
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {artifact.facts.factualBullets.slice(0, 3).map((fact) => (
           <div key={fact} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
@@ -96,6 +107,7 @@ export function WeeklyDebriefCard({ snapshot }: Props) {
         <a href={`/debrief?weekStart=${artifact.weekStart}`} className="btn-primary px-3 text-xs">
           Open debrief
         </a>
+        <ShareSummaryButton weekOf={artifact.weekStart} displayName={displayName ?? null} />
         {snapshot.stale ? <DebriefRefreshButton weekStart={artifact.weekStart} /> : null}
       </div>
     </article>

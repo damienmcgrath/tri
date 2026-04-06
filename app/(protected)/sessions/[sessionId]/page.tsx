@@ -12,6 +12,7 @@ import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionVerdictCard } from "./components/session-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { DetailsAccordion } from "../../details-accordion";
+import { getMonday } from "../../week-context";
 
 type SessionRow = SessionReviewRow;
 
@@ -155,7 +156,8 @@ async function loadActivityReviewRow(params: {
   return null;
 }
 
-export default async function SessionReviewPage({ params }: { params: { sessionId: string } }) {
+export default async function SessionReviewPage({ params, searchParams }: { params: { sessionId: string }; searchParams?: { postUpload?: string } }) {
+  const isPostUpload = searchParams?.postUpload === "true";
   const supabase = await createClient();
   const {
     data: { user }
@@ -446,6 +448,43 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
     storedComparisons = storedResult.status === "fulfilled" ? storedResult.value : [];
   }
 
+  // Compute week start for breadcrumb links
+  const sessionMonday = getMonday(new Date(`${session.date}T00:00:00.000Z`));
+  const weekStartIso = sessionMonday.toISOString().slice(0, 10);
+
+  // Query for next session in the same week for forward navigation
+  let nextSession: { id: string; session_name: string | null; type: string; date: string } | null = null;
+  if (!activityId) {
+    const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const { data: nextData } = await supabase
+      .from("sessions")
+      .select("id,session_name,type,date")
+      .eq("user_id", user.id)
+      .gt("date", session.date)
+      .lte("date", weekEndIso)
+      .order("date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    nextSession = nextData as typeof nextSession;
+  }
+
+  // Week completion stats for post-upload flow
+  let weekCompletedCount = 0;
+  let weekTotalCount = 0;
+  if (isPostUpload && !activityId) {
+    const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const { data: weekSessions } = await supabase
+      .from("sessions")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .gte("date", weekStartIso)
+      .lte("date", weekEndIso);
+    if (weekSessions) {
+      weekTotalCount = weekSessions.length;
+      weekCompletedCount = weekSessions.filter((s) => s.status === "completed").length;
+    }
+  }
+
   const reviewVm = createReviewViewModel(session);
 
   const sessionTitle = getSessionDisplayName({
@@ -474,7 +513,14 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
 
   return (
     <section className="space-y-4">
-      <Link href="/calendar" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-cyan-300 underline-offset-2 hover:underline lg:min-h-0">← Back to Calendar</Link>
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm text-tertiary" aria-label="Breadcrumb">
+        <Link href="/dashboard" className="text-cyan-400 hover:text-cyan-300">Dashboard</Link>
+        <span className="text-[rgba(255,255,255,0.3)]">/</span>
+        <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">Calendar</Link>
+        <span className="text-[rgba(255,255,255,0.3)]">/</span>
+        <span className="truncate text-[rgba(255,255,255,0.6)]">{sessionTitle}</span>
+      </nav>
 
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -571,6 +617,29 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
           sessionCompleted={true}
         />
+      ) : null}
+
+      {/* Post-upload: Impact on your week */}
+      {isPostUpload && weekTotalCount > 0 ? (
+        <article className="surface p-4 md:p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">Impact on your week</p>
+          <p className="mt-2 text-sm text-white">
+            {weekCompletedCount} of {weekTotalCount} session{weekTotalCount === 1 ? "" : "s"} complete this week
+          </p>
+          {existingVerdictData?.adaptation_type === "modify" || existingVerdictData?.adaptation_type === "redistribute" ? (
+            <p className="mt-2 text-sm text-[hsl(var(--warning))]">
+              This session has triggered an adjustment to your upcoming training.{" "}
+              <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">View adaptation →</Link>
+            </p>
+          ) : existingVerdictData?.adaptation_type === "proceed" ? (
+            <p className="mt-2 text-sm text-muted">No changes needed — your plan continues as prescribed.</p>
+          ) : null}
+          {nextSession ? (
+            <p className="mt-2 text-sm text-muted">
+              Next up: <Link href={`/sessions/${nextSession.id}`} className="text-cyan-400 hover:text-cyan-300">{nextSession.session_name ?? nextSession.type}</Link> on {new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${nextSession.date}T00:00:00Z`))}
+            </p>
+          ) : null}
+        </article>
       ) : null}
 
       <section className="surface p-4 md:p-5">
@@ -756,6 +825,49 @@ export default async function SessionReviewPage({ params }: { params: { sessionI
           ))}
         </div>
       </section>
+
+      {/* Navigation footer */}
+      <nav className="flex flex-wrap items-center gap-3 border-t border-[hsl(var(--border))] pt-4">
+        {isPostUpload ? (
+          <>
+            <Link
+              href="/dashboard"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
+            >
+              Back to Dashboard
+            </Link>
+            <Link
+              href={`/calendar?weekStart=${weekStartIso}`}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+            >
+              View Calendar
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href={`/calendar?weekStart=${weekStartIso}`}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
+            >
+              ← Back to Calendar
+            </Link>
+            {nextSession ? (
+              <Link
+                href={`/sessions/${nextSession.id}`}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+              >
+                Next: {nextSession.session_name ?? nextSession.type} →
+              </Link>
+            ) : null}
+          </>
+        )}
+        <Link
+          href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: What should I focus on for my next session?`)}`}
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 lg:min-h-0"
+        >
+          Ask Coach about this
+        </Link>
+      </nav>
     </section>
   );
 }

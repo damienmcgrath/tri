@@ -18,11 +18,17 @@ import { WeekAheadCard } from "./components/week-ahead-card";
 import { WeekNavigator } from "./components/week-navigator";
 import { TransitionBriefingCard } from "./components/transition-briefing-card";
 import { TrendCards } from "./trend-cards";
-// import { MorningBriefCard } from "./components/morning-brief-card";
+import { MorningBriefCard } from "./components/morning-brief-card";
 import { TrainingScoreCard } from "./components/training-score-card";
+import { ReadinessIndicator } from "./components/readiness-indicator";
+import { RecentUploadCard } from "./components/recent-upload-card";
+import { DisciplineBalanceCompact } from "./components/discipline-balance-compact";
+import { getLatestFitness, getReadinessState, getTsbTrend } from "@/lib/training/fitness-model";
+import { computeWeeklyDisciplineBalance, detectDisciplineImbalance } from "@/lib/training/discipline-balance";
 import { detectTrends } from "@/lib/training/trends";
 import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib/training/week-transition";
-// import { getOrGenerateMorningBrief } from "@/lib/training/morning-brief";
+import { getOrGenerateMorningBrief, type MorningBrief } from "@/lib/training/morning-brief";
+import { MondayTransitionFlow } from "./components/monday-transition-flow";
 import { getOrComputeTrainingScore } from "@/lib/training/scoring";
 
 type Session = {
@@ -477,11 +483,12 @@ export default async function DashboardPage({
   const isCurrentWeek = weekStart === currentWeekStart;
   const showWeeklyDebriefCard = isCurrentWeek;
 
-  // Show Week Ahead card on Sunday (UTC day 0) or Monday (UTC day 1) of the current week
   const todayDayOfWeek = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`).getUTCDay();
-  const showWeekAheadCard = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1);
+  const hourOfDay = new Date().getUTCHours();
 
-  // Show transition briefing on Monday/Tuesday of current week
+  // Moment detection broadens time restrictions — transition briefing and week ahead
+  // are available beyond their original Mon/Tue windows, controlled by the detected moment
+  const showWeekAheadCard = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
   const showTransitionBriefing = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
 
   const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
@@ -614,6 +621,10 @@ export default async function DashboardPage({
   }));
 
   const hasActivePlan = Boolean(activePlanId);
+
+  // Dashboard moment detection — determines the athlete's current context
+  type DashboardMoment = "just_uploaded" | "monday_transition" | "end_of_week" | "session_today" | "rest_day" | "default";
+
   const todaySessions = sessions.filter((session) => session.date === todayIso);
   const pendingTodaySessions = todaySessions.filter((session) => session.status === "planned");
   const completedTodaySessions = todaySessions.filter((session) => session.status === "completed");
@@ -655,6 +666,21 @@ export default async function DashboardPage({
   const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
   const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
   const statusChip = getStatusChip(completionPct, expectedByTodayPct);
+
+  // Determine the dashboard moment for context-aware ordering
+  const hasPendingToday = todaySessions.some((s) => s.status === "planned");
+  let dashboardMoment: DashboardMoment = "default";
+  if (!isCurrentWeek) {
+    dashboardMoment = "default";
+  } else if (todayDayOfWeek === 1 || (todayDayOfWeek === 2 && hourOfDay < 12)) {
+    dashboardMoment = "monday_transition";
+  } else if ((todayDayOfWeek === 6 || todayDayOfWeek === 0) && completionPct > 60) {
+    dashboardMoment = "end_of_week";
+  } else if (hasPendingToday) {
+    dashboardMoment = "session_today";
+  } else if (!hasPendingToday) {
+    dashboardMoment = "rest_day";
+  }
 
   const dailyStates = Array.from({ length: 7 }).map((_, index) => {
     const iso = addDays(weekStart, index);
@@ -834,18 +860,31 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      {/* Morning Brief — hidden for now, will re-address later */}
-      {/* {isCurrentWeek ? (
+      {/* Recent Upload Card */}
+      {isCurrentWeek ? (
+        <Suspense fallback={null}>
+          <DashboardRecentUpload supabase={supabase} userId={user.id} />
+        </Suspense>
+      ) : null}
+
+      {/* Morning Brief */}
+      {isCurrentWeek ? (
         <Suspense fallback={null}>
           <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
         </Suspense>
-      ) : null} */}
+      ) : null}
 
-      {/* Transition Briefing — shows Mon/Tue of current week */}
+      {/* Transition Briefing / Monday Unified Flow */}
       {showTransitionBriefing ? (
-        <Suspense fallback={null}>
-          <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
-        </Suspense>
+        dashboardMoment === "monday_transition" ? (
+          <Suspense fallback={null}>
+            <DashboardMondayTransition supabase={supabase} userId={user.id} weekStart={weekStart} todayIso={todayIso} />
+          </Suspense>
+        ) : (
+          <Suspense fallback={null}>
+            <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
+          </Suspense>
+        )
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
@@ -1021,22 +1060,44 @@ export default async function DashboardPage({
         </article>
       </div>
 
-      {showWeekAheadCard ? (
-        <Suspense fallback={null}>
-          <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
-        </Suspense>
-      ) : null}
+      {/* Context-aware section: end_of_week promotes debrief before week ahead */}
+      {dashboardMoment === "end_of_week" ? (
+        <>
+          <Suspense fallback={null}>
+            <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
+          </Suspense>
+          {showWeekAheadCard ? (
+            <Suspense fallback={null}>
+              <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
+            </Suspense>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {showWeekAheadCard ? (
+            <Suspense fallback={null}>
+              <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
+            </Suspense>
+          ) : null}
+          <Suspense fallback={null}>
+            <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
+          </Suspense>
+        </>
+      )}
 
-      {/* Show debrief for current week or for historical week views */}
-      <Suspense fallback={null}>
-        <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
-      </Suspense>
-
-      {/* Training Score */}
+      {/* Training Score + Readiness + Balance */}
       {isCurrentWeek ? (
-        <Suspense fallback={null}>
-          <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
-        </Suspense>
+        <>
+          <Suspense fallback={null}>
+            <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <DashboardReadiness supabase={supabase} userId={user.id} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <DashboardDisciplineBalance supabase={supabase} userId={user.id} weekStart={weekStart} />
+          </Suspense>
+        </>
       ) : null}
 
       <Suspense fallback={null}>
@@ -1078,6 +1139,60 @@ async function DashboardTrends(props: {
   return <TrendCards trends={trends} />;
 }
 
+async function DashboardMondayTransition(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+  todayIso: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart, todayIso } = props;
+  try {
+    const briefing = await generateWeekTransitionBriefing(supabase, userId, weekStart);
+    if (!briefing || briefing.dismissedAt) return null;
+
+    // Fetch morning brief for "today" section
+    let morningBrief: MorningBrief | null = null;
+    try {
+      morningBrief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
+    } catch {
+      // Non-critical
+    }
+
+    // Fetch debrief summary for "last week" enrichment
+    let debriefSummary: string | null = null;
+    const prevWeekStart = addDays(weekStart, -7);
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    try {
+      const snapshot = await getWeeklyDebriefSnapshot({ supabase, athleteId: userId, weekStart: prevWeekStart, timeZone, todayIso });
+      if (snapshot?.artifact?.narrative?.executiveSummary) {
+        debriefSummary = snapshot.artifact.narrative.executiveSummary;
+      }
+    } catch {
+      // Non-critical
+    }
+
+    // Count pending rationales
+    const { count } = await supabase
+      .from("adaptation_rationales")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+
+    return (
+      <MondayTransitionFlow
+        briefing={briefing}
+        morningBrief={morningBrief}
+        debriefSummary={debriefSummary}
+        pendingRationaleCount={count ?? 0}
+        weekStart={prevWeekStart}
+      />
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function DashboardWeekAhead(props: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -1114,21 +1229,83 @@ async function DashboardTransitionBriefing(props: {
   }
 }
 
-// Hidden for now — will re-address later
-// async function DashboardMorningBrief(props: {
-//   supabase: Awaited<ReturnType<typeof createClient>>;
-//   userId: string;
-//   todayIso: string;
-// }) {
-//   if (!props?.supabase) return null;
-//   const { supabase, userId, todayIso } = props;
-//   try {
-//     const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
-//     return <MorningBriefCard brief={brief} />;
-//   } catch {
-//     return null;
-//   }
-// }
+async function DashboardRecentUpload(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId } = props;
+  try {
+    // Find recently-synced activities (last 4 hours) that haven't been reviewed via feel capture
+    const { data: recentActivity } = await supabase
+      .from("completed_activities")
+      .select("id,sport_type,duration_sec")
+      .eq("user_id", userId)
+      .gte("created_at", new Date(Date.now() - 4 * 3600 * 1000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!recentActivity) return null;
+
+    // Check if there's a linked session
+    const { data: link } = await supabase
+      .from("session_activity_links")
+      .select("planned_session_id")
+      .eq("completed_activity_id", recentActivity.id)
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!link?.planned_session_id) return null;
+
+    // Check if feel already captured
+    const { data: existingFeel } = await supabase
+      .from("session_feels")
+      .select("id")
+      .eq("session_id", link.planned_session_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingFeel) return null;
+
+    // Get session details
+    const { data: session } = await supabase
+      .from("sessions")
+      .select("id,session_name,type,sport")
+      .eq("id", link.planned_session_id)
+      .maybeSingle();
+
+    if (!session) return null;
+
+    const durationMinutes = recentActivity.duration_sec ? Math.round(recentActivity.duration_sec / 60) : 0;
+    return (
+      <RecentUploadCard
+        sessionId={session.id}
+        sessionName={session.session_name ?? session.type}
+        sport={session.sport}
+        durationMinutes={durationMinutes}
+      />
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardMorningBrief(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  todayIso: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, todayIso } = props;
+  try {
+    const brief = await getOrGenerateMorningBrief(supabase, userId, todayIso);
+    return <MorningBriefCard brief={brief} />;
+  } catch {
+    return null;
+  }
+}
 
 async function DashboardTrainingScore(props: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -1140,6 +1317,43 @@ async function DashboardTrainingScore(props: {
   try {
     const score = await getOrComputeTrainingScore(supabase, userId, todayIso);
     return <TrainingScoreCard score={score} />;
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardReadiness(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId } = props;
+  try {
+    const [fitness, tsbTrend] = await Promise.all([
+      getLatestFitness(supabase, userId),
+      getTsbTrend(supabase, userId),
+    ]);
+    if (!fitness?.total) return null;
+    const readiness = getReadinessState(fitness.total.tsb, tsbTrend);
+    return <ReadinessIndicator readiness={readiness} tsb={fitness.total.tsb} />;
+  } catch {
+    return null;
+  }
+}
+
+async function DashboardDisciplineBalance(props: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  weekStart: string;
+}) {
+  if (!props?.supabase) return null;
+  const { supabase, userId, weekStart } = props;
+  try {
+    const balance = await computeWeeklyDisciplineBalance(supabase, userId, weekStart);
+    const imbalances = detectDisciplineImbalance(balance);
+    // Only show if there's actual data
+    if (balance.totalActualTss === 0 && balance.totalPlannedTss === 0) return null;
+    return <DisciplineBalanceCompact balance={balance} imbalances={imbalances} />;
   } catch {
     return null;
   }

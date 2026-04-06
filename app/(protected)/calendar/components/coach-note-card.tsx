@@ -142,7 +142,7 @@ function SingleCoachNote({ rationale }: { rationale: AdaptationRationale }) {
           {acknowledging ? "..." : "Got it"}
         </button>
         <Link
-          href={`/coach?prompt=${encodeURIComponent(`About the plan adjustment: ${rationale.rationale_text.slice(0, 120)}`)}`}
+          href={`/coach?prompt=${encodeURIComponent(`I want to discuss this adaptation: ${rationale.rationale_text}`)}`}
           className="text-xs text-tertiary hover:text-white"
         >
           Let&apos;s discuss
