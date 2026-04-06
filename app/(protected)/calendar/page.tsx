@@ -330,7 +330,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     .order("date", { ascending: true })
     .limit(3);
 
-  const raceThisWeek = (upcomingRaces ?? []).find((r) => r.date >= weekStart && r.date <= addDays(weekStart, 6));
+  const raceThisWeek = (upcomingRaces ?? []).find((r: { date: string }) => r.date >= weekStart && r.date <= addDays(weekStart, 6));
   const nextRace = (upcomingRaces ?? [])[0];
 
   if (nextRace && !raceThisWeek) {

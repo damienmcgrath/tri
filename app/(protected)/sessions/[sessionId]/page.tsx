@@ -415,7 +415,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const showFeelCapture = session.status === "completed" && !activityId;
 
   // Fetch existing session verdict for completed sessions (skip for activity-route synthetic sessions)
-  let existingVerdictData: {
+  type VerdictData = {
     purpose_statement: string;
     training_block_context: string | null;
     execution_summary: string;
@@ -424,7 +424,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     key_deviations: unknown[] | null;
     adaptation_signal: string;
     adaptation_type: string | null;
-  } | null = null;
+  } | null;
+  let existingVerdictData: VerdictData = null as VerdictData;
   if (session.status === "completed" && !activityId) {
     const { data: existingVerdict } = await supabase
       .from("session_verdicts")
@@ -456,7 +457,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // Query for next session in the same week for forward navigation
   // Uses gte + neq to include same-day sessions, filters out skipped, and
   // orders by date then created_at so double-session days resolve correctly.
-  let nextSession: { id: string; session_name: string | null; type: string; date: string } | null = null;
+  type NextSessionInfo = { id: string; session_name: string | null; type: string; date: string } | null;
+  let nextSession: NextSessionInfo = null as NextSessionInfo;
   if (!activityId) {
     const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
     const { data: nextCandidates } = await supabase
@@ -488,7 +490,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       .lte("date", weekEndIso);
     if (weekSessions) {
       weekTotalCount = weekSessions.length;
-      weekCompletedCount = weekSessions.filter((s) => s.status === "completed").length;
+      weekCompletedCount = weekSessions.filter((s: { status?: string }) => s.status === "completed").length;
     }
   }
 
@@ -502,6 +504,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     intentCategory: session.intent_category
   });
 
+  const verdictAdaptationType = existingVerdictData?.adaptation_type ?? null;
   const disciplineLabel = getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
@@ -633,12 +636,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           <p className="mt-2 text-sm text-white">
             {weekCompletedCount} of {weekTotalCount} session{weekTotalCount === 1 ? "" : "s"} complete this week
           </p>
-          {existingVerdictData?.adaptation_type === "modify" || existingVerdictData?.adaptation_type === "redistribute" ? (
+          {verdictAdaptationType === "modify" || verdictAdaptationType === "redistribute" ? (
             <p className="mt-2 text-sm text-[hsl(var(--warning))]">
               This session has triggered an adjustment to your upcoming training.{" "}
               <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">View adaptation →</Link>
             </p>
-          ) : existingVerdictData?.adaptation_type === "proceed" ? (
+          ) : verdictAdaptationType === "proceed" ? (
             <p className="mt-2 text-sm text-muted">No changes needed — your plan continues as prescribed.</p>
           ) : null}
           {nextSession ? (
