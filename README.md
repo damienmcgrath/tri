@@ -1,434 +1,143 @@
-# TriCoach AI 2.0 — Product Requirements Document
+# TriCoach AI
 
-## Local development quickstart
+A web app for amateur triathletes that combines training plan management, Garmin activity tracking, and an AI coaching assistant.
 
-### 1) Install dependencies
+## Overview
+
+TriCoach AI helps self-coached triathletes manage their training with tools that would normally require a human coach:
+
+- **Training plan management** — Create and edit multi-week plans organized by sport (swim, bike, run, strength). View plans by week or on a calendar.
+- **Activity uploads** — Import Garmin `.fit` and `.tcx` files. Activities are automatically matched to planned sessions using a scoring algorithm based on time proximity, sport, duration, and distance.
+- **AI coach** — Chat with an AI assistant that has full context of your plan and recent activities. It can reschedule sessions, adjust plans for missed workouts or fatigue, and answer training questions.
+- **Session reviews** — AI-generated analysis comparing how you executed a workout versus what was planned.
+- **Weekly debriefs** — Automated weekly summaries of training load, adherence, and recommendations.
+
+## Technical Overview
+
+### Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router), React 18, TypeScript |
+| Database & Auth | Supabase (Postgres + Row Level Security + Email auth) |
+| AI | OpenAI API — `gpt-5-mini` (default), `gpt-5.4` (deep reasoning) |
+| Styling | Tailwind CSS, Geist fonts, dark mode |
+| File Parsing | `fit-file-parser` (FIT), `fast-xml-parser` (TCX) |
+| Caching | Upstash Redis (rate limiting + caching) |
+| Testing | Jest + React Testing Library |
+| Deployment | Vercel |
+
+### Architecture
+
+```
+Browser → Middleware (auth gate) → Protected Routes
+       → Server Actions / API Routes
+       → lib/* (domain logic)
+       → Supabase (Postgres + Auth + RLS) / OpenAI API
+```
+
+**Key directories:**
+
+- `/app/(protected)/` — Auth-gated pages: dashboard, plan, calendar, coach, sessions, activities, settings
+- `/app/api/` — API routes for AI chat (streaming), file uploads, session reviews, weekly debriefs
+- `/app/auth/` — Sign-in/sign-up/password flows
+- `/lib/` — All business logic (never imports from `/app/`)
+  - `lib/workouts/` — FIT/TCX parsing and activity-to-session matching
+  - `lib/coach/` — AI coach system prompt, tool definitions, and tool execution
+  - `lib/athlete-context.ts` — Builds context injected into every AI request
+  - `lib/security/` — Rate limiting and request validation (Zod)
+- `/supabase/migrations/` — SQL migrations (apply with `supabase db push`)
+
+### Database
+
+Supabase Postgres with RLS on all user-owned tables. Core tables:
+
+- `training_plans` → `training_weeks` → `sessions` (planned workouts)
+- `completed_sessions` — Parsed activity files (SHA256 dedup per user)
+- `activity_uploads` — Upload metadata
+- `profiles` — User profile and active plan reference
+- `ai_conversations` → `ai_messages` — Coach chat history
+- `session_reviews`, `weekly_debriefs` — AI-generated content
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm
+- A [Supabase](https://supabase.com) project
+- An [OpenAI](https://platform.openai.com) API key
+
+### 1. Install dependencies
 
 ```bash
 npm ci
 ```
 
-### 2) Configure environment variables
+### 2. Configure environment variables
 
-Create `.env.local` in the repo root and copy values from `.env.example`.
+Copy `.env.example` to `.env.local`:
 
-Required to run app auth + data flows:
+```bash
+cp .env.example .env.local
+```
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (preferred)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback)
+**Required:**
 
-Optional for upcoming features:
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (migrations only) |
+| `OPENAI_API_KEY` | OpenAI API key |
 
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-- `WEATHER_API_KEY`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
+**Optional:**
 
-### 3) Run Supabase migrations
+| Variable | Description |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis URL (rate limiting) |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
+| `WEATHER_API_KEY` | Weather API key |
+| `STRAVA_CLIENT_ID` | Strava integration |
+| `STRAVA_CLIENT_SECRET` | Strava integration |
 
-Use either the Supabase dashboard SQL editor or the CLI against your project.
+### 3. Set up the database
 
-If using CLI:
+Link your Supabase project and apply migrations:
 
 ```bash
 supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-This provisions `training_plans`, `planned_sessions`, `completed_sessions`, and `ingestion_events` with RLS policies used by the app.
+Then enable email/password auth in your Supabase dashboard under **Authentication → Providers → Email**.
 
-
-If you see this error on `supabase db push`:
-
-```
-Remote migration versions not found in local migrations directory.
-```
-
-use this remote-only recovery flow (no local DB required):
-
-```bash
-# 1) Inspect mismatch
-supabase migration list
-
-# 2) Mark the missing remote version(s) as reverted in history
-# Replace <version> with the exact value from migration list
-supabase migration repair --status reverted <version>
-
-# 3) Pull current remote schema into a new local migration file
-supabase db pull
-
-# 4) Push local migrations again
-supabase db push
-```
-
-Tip: if your team already has the missing migration SQL in git, prefer pulling latest git changes first instead of repairing history.
-
-### 4) Enable Supabase email/password auth
-
-In your Supabase project:
-
-- Go to **Authentication → Providers → Email**
-- Enable email/password sign-in
-- (Optional) disable email confirmation during local development for faster onboarding
-
-### 5) Run checks
-
-```bash
-npm run lint
-npm run typecheck
-npm run build
-```
-
-### 6) Start local app
+### 4. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-### 7) Agent preview mode for UI inspection
-
-When you want coding agents to view protected UI pages without real Supabase sign-in, enable the local preview workspace:
+### Available Scripts
 
 ```bash
-# in .env.local
-AGENT_PREVIEW=true
+npm run dev            # Start dev server (localhost:3000)
+npm run build          # Production build
+npm run lint           # ESLint
+npm run typecheck      # TypeScript strict check
+npm run test           # Run all tests
+npm run test:watch     # Jest watch mode
+npm run test:coverage  # Jest with coverage report
 ```
 
-Then:
+Run a single test file:
 
 ```bash
-npm run dev
+npx jest path/to/file.test.ts
 ```
 
-Open [http://localhost:3000/dev/agent-preview](http://localhost:3000/dev/agent-preview) and use:
+### Agent Preview Mode
 
-- `Enter preview mode` to create a local seeded session
-- `Reset preview data` to restore the sample workspace
-- direct links to `/dashboard`, `/plan`, `/calendar`, `/coach`, `/settings`, `/activities/...`, and `/sessions/...`
-
-Notes:
-
-- preview mode is local-only and disabled in production
-- it uses seeded in-memory data, so it is ideal for screenshots, layout review, and navigation checks
-- resetting preview mode restores the original sample state for repeatable agent runs
-
-### Notes
-
-- Protected routes (`/dashboard`, `/plan`, `/calendar`, `/coach`) require an authenticated user.
-- Garmin manual TCX upload now lives under **Settings → Integrations** as a temporary bridge until direct Garmin API sync.
-
-## 📌 Overview
-TriCoach AI is a web-based training companion for amateur triathletes. It automates personalized training-plan management by integrating with Garmin Connect, analyzing workout data, and offering an AI coach for plan adaptation and guidance.
-
-The product is designed first for solo athletes who want expert-level coaching support without the ongoing cost of a human coach, with a path to broader user adoption over time.
-
----
-
-## 🎯 Goals
-- Provide athletes with a smart, interactive training-plan experience.
-- Automatically track and compare completed Garmin workouts against a planned schedule.
-- Allow users to chat with an AI coach for plan adjustments, questions, and advice.
-- Visualize performance trends and recovery metrics.
-- Enable faster, data-informed training decisions.
-
----
-
-## 🧑‍🎯 Target Users
-- Amateur triathletes training for Sprint, Olympic, 70.3, or Ironman races.
-- Self-coached athletes or athletes looking to reduce coaching costs.
-- Initial launch: single-user focused (founder usage), then expand to broader users.
-- Future expansion: single-sport athletes (runners, cyclists, swimmers).
-
----
-
-## 🧩 MVP Scope (Core Features)
-
-### 1) Training Plan Management
-- Manually upload or create a multi-week triathlon training plan.
-- View the plan by week and sport.
-- Edit planned sessions (type, duration, intensity, notes).
-- Include a workout template library with common sessions by sport.
-
-### 2) Garmin Connect Integration
-- Sync completed workouts via Garmin Health API.
-- Match completed sessions to planned sessions by date and sport.
-- Show completion status per session (completed, missed, over/under target).
-- Add automated data validation for inconsistent Garmin data (HR spikes, GPS drops).
-
-### 3) AI Coach Chat
-- Chat interface powered by OpenAI GPT-4o.
-- Support:
-  - Rescheduling and moving sessions.
-  - Adjusting plans based on missed sessions, fatigue, or schedule changes.
-  - Answering common triathlon coaching questions.
-- Add prompt-layer guardrails for consistent coaching style.
-- Add response caching for common questions to reduce API cost.
-
-### 4) PB + FTP Tracker
-- Store and visualize key performance markers:
-  - 5K and 10K run PBs.
-  - 20-minute power and FTP tests.
-  - Swim time-trial benchmarks.
-- Highlight newly achieved PBs.
-- Add automated PB detection from Garmin data.
-
-### 5) Performance Trends
-- Chart weekly training volume by sport.
-- Compare planned vs completed training load.
-- Visualize FTP changes over time.
-- Include recovery metrics overlays.
-
-### 6) Recovery Tracking
-- Daily check-in for:
-  - Sleep quality and duration.
-  - Perceived fatigue (1–5).
-  - Muscle soreness areas.
-- Show trends and workout correlation.
-- Generate AI recommendations based on recovery status.
-
-### 7) Weather Integration
-- Integrate weather API for athlete training locations.
-- Suggest indoor alternatives when outdoor conditions are poor.
-- Trigger proactive weather-based schedule adjustment notifications.
-
----
-
-## 📦 Out of Scope (MVP)
-- Multi-user/team support (future roadmap).
-- Dedicated mobile app (responsive web only for MVP).
-- Advanced analytics modeling (CTL/ATL/TSB).
-- Race-specific taper plan generator.
-- Nutrition and weight tracking.
-- Social sharing features.
-
----
-
-## 🔌 Integrations
-- **Garmin Health API**: pull completed workouts.
-- **OpenAI GPT-4o**: chat-based coaching and adaptation support.
-- **Supabase**: authentication, PostgreSQL, storage, serverless functions.
-- **Weather API**: local conditions and workout adjustment inputs.
-
----
-
-## 🧱 Proposed Tech Stack
-- **Frontend**: Next.js 14, Tailwind CSS, shadcn/ui.
-- **Backend/Data**: Supabase (PostgreSQL, Auth, Edge Functions).
-- **AI**: OpenAI GPT-4o API.
-- **Deployment**: Vercel.
-- **Caching**: Redis (AI response caching and high-frequency reads).
-
----
-
-## ✅ Recommended Stack for Fast + Cheap Launch (based on React/TypeScript experience)
-- **App framework**: Next.js (App Router) on Vercel.
-- **UI**: Tailwind CSS + shadcn/ui.
-- **Database/Auth/Storage**: Supabase (Postgres + Auth + Storage).
-- **Background jobs**: Trigger.dev or Supabase scheduled Edge Functions.
-- **AI**: OpenAI API (`gpt-4o-mini` for most chats, `gpt-4o` only for harder coaching reasoning).
-- **Caching/rate limiting**: Upstash Redis (start with generous free tier).
-- **Observability**: Sentry + PostHog (free tiers).
-
-### Why this is the best fit for speed + low cost
-1. **Minimal infrastructure overhead**: no custom server ops needed early.
-2. **TypeScript end-to-end**: fastest dev loop with your existing React skills.
-3. **Cheap to start**: all major services have free/low-cost entry tiers.
-4. **Easy to scale incrementally**: you can add queues/workers only when usage grows.
-
-### Suggested cost controls from day one
-- Default AI requests to `gpt-4o-mini`; escalate to `gpt-4o` only when needed.
-- Cache repeated AI questions and Garmin-derived summaries.
-- Use on-demand data refresh over frequent polling where possible.
-- Keep Garmin raw files in low-cost object storage; normalize only required fields.
-
----
-
-## 🛠️ Week 1 Build Checklist (start coding immediately)
-
-### Day 1 — Project Scaffold
-- [ ] Create Next.js 14 app with TypeScript and App Router.
-- [ ] Install Tailwind CSS + shadcn/ui base components.
-- [ ] Configure ESLint/Prettier + strict TypeScript settings.
-- [ ] Set up environment variable handling for local/dev/prod.
-
-### Day 2 — Supabase Foundation
-- [ ] Create Supabase project and connect app.
-- [ ] Enable auth (email + OAuth provider if needed).
-- [ ] Create initial tables:
-  - `users`
-  - `training_plans`
-  - `planned_sessions`
-  - `completed_sessions`
-  - `recovery_logs`
-- [ ] Add Row Level Security (RLS) policies for user-owned data.
-
-### Day 3 — Core App Shell
-- [ ] Build app shell (sidebar/top nav) with protected routes.
-- [ ] Create pages: Dashboard, Plan, Calendar, AI Coach.
-- [ ] Add onboarding form for athlete profile and race goal.
-
-### Day 4 — Plan Management MVP
-- [ ] Implement training plan CRUD (create/edit/delete/list).
-- [ ] Add planned session editor (sport, date, duration, intensity, notes).
-- [ ] Create weekly plan view grouped by sport.
-
-### Day 5 — Garmin Integration Stub
-- [ ] Implement Garmin connect/disconnect flow placeholder.
-- [ ] Build ingestion endpoint/interface for incoming workout payloads.
-- [ ] Store normalized sample workout records into `completed_sessions`.
-- [ ] Add basic deduplication key strategy (`user_id + garmin_id`).
-
-### Day 6 — Dashboard v1
-- [ ] Show planned vs completed sessions for current week.
-- [ ] Add weekly training volume summary by sport.
-- [ ] Add simple completion-status indicators (completed/missed/partial).
-
-### Day 7 — AI Coach v1 + Hardening
-- [ ] Build chat UI and server action/API route.
-- [ ] Add coaching system prompt + guardrails.
-- [ ] Default model to `gpt-4o-mini`.
-- [ ] Add Redis caching for repeated prompts/questions.
-- [ ] Add error tracking (Sentry) and product analytics (PostHog).
-
-### Week 1 Definition of Done
-- [ ] User can sign in, create a plan, and view weekly sessions.
-- [ ] System can store completed sessions through ingestion endpoint (even before full Garmin production integration).
-- [ ] Dashboard compares planned vs completed for the week.
-- [ ] User can chat with AI coach and receive plan-adjustment guidance.
-
----
-
-## 🗂️ Data Model (High-Level)
-
-### User
-- `id`, `email`, `garmin_token`, `preferences`, `locations`
-
-### TrainingPlan
-- `id`, `user_id`, `name`, `start_date`, `duration_weeks`
-
-### PlannedSession
-- `id`, `plan_id`, `date`, `sport`, `type`, `duration`, `notes`, `template_id`
-
-### CompletedSession
-- `id`, `user_id`, `garmin_id`, `date`, `sport`, `metrics` (pace/hr/power)
-
-### PersonalBest
-- `id`, `user_id`, `metric`, `value`, `date`
-
-### FTPTest
-- `id`, `user_id`, `power`, `date`
-
-### WorkoutTemplate
-- `id`, `name`, `sport`, `description`, `target_metrics`
-
-### RecoveryLog
-- `id`, `user_id`, `date`, `sleep_hours`, `fatigue_level`, `soreness_areas`
-
-### AIConversation
-- `id`, `user_id`, `messages`, `summary`, `plan_changes`
-
----
-
-## 🚀 Implementation Plan
-
-### Phase 1 (Weeks 1–2)
-- Basic auth setup.
-- Training plan creation/import.
-- Garmin connection + initial sync.
-- Simple plan-vs-actual visualization.
-
-### Phase 2 (Weeks 3–4)
-- Enhanced Garmin integration and matching quality.
-- Basic AI coach for plan adjustments.
-- Workout template library.
-- PB and FTP tracking.
-
-### Phase 3 (Weeks 5–6)
-- Recovery tracking.
-- Weather integration.
-- Performance trends visualization.
-- AI coaching enhancements.
-
-### Polish (Week 7)
-- UI refinement.
-- Testing and bug fixes.
-- Performance optimization.
-
----
-
-## 📈 Success Metrics
-
-### Personal Use Metrics
-- Training adherence rate (% planned sessions completed).
-- % sessions adjusted via AI coach.
-- Number of detected PBs per month.
-- Training-to-recovery ratio quality.
-
-### Growth Metrics
-- % of users syncing Garmin data weekly.
-- Average AI chat sessions per user per week.
-- 4-week retention.
-- Average weekly time spent in app.
-
----
-
-## 🚀 Roadmap (Post-MVP)
-
-### Near-Term
-- Multi-user support with tiered pricing.
-- Mobile companion app.
-- Enhanced analytics (CTL/ATL/TSB).
-- Nutrition tracking integration.
-
-### Mid-Term
-- Coach collaboration workspace.
-- Race-specific taper planning.
-- Community features (shared workouts, challenges).
-- Additional integrations (Wahoo, Polar, etc.).
-
-### Long-Term
-- AI video analysis for technique improvement.
-- Race prediction modeling.
-- White-label solution for professional coaches.
-- Expanded sports beyond triathlon.
-
----
-
-## 💰 Monetization (Draft)
-- **Free tier**: basic plan tracking + limited Garmin sync.
-- **Premium ($10–15/month)**: full AI coaching, unlimited history, advanced analytics.
-- **Coach tier ($30–50/month)**: multi-athlete tooling for professional coaches.
-
----
-
-## 🔑 Critical Success Factors
-- Garmin API reliability and data quality.
-- AI coach usefulness, trust, and recommendation quality.
-- Simple, intuitive UX for non-technical athletes.
-- Strong performance and reliable sync behavior.
-- Clear differentiation versus established training platforms.
-
-## TCX Import MVP (Temporary Garmin Bridge)
-- Upload Garmin `.tcx` exports from the Dashboard.
-- The app parses activities and stores normalized records in `completed_sessions`.
-- Imports are idempotent via `user_id + garmin_id` and logged in `ingestion_events`.
-- This path is intentionally adapter-based so Garmin Health API payloads can later map into the same normalized model.
-
-## Garmin file uploads (.fit / .tcx)
-
-TriCoach AI supports manual Garmin activity uploads from **Settings → Integrations / Uploads**.
-
-- Supported formats: `.fit` (preferred) and `.tcx`.
-- Max upload size: **20MB**.
-- Upload deduping: file SHA256 hash is computed per user; duplicate files are ignored.
-- Parsing extracts: start/end UTC time, sport, duration, distance, avg HR, avg power (FIT when available), calories.
-- Auto-matching to planned sessions runs after parse:
-  - candidate window: approximately start time ± 6h / same day list
-  - score factors: time proximity, sport match, duration similarity, distance similarity
-  - auto-link rule: best score `>= 0.85` and at least `0.15` above second best
-- If ambiguous, activities remain **Unassigned** and can be manually attached.
-- Uploads can be deleted from Integrations; deleting an upload removes its parsed activity and any links so plan/calendar progress reverts accordingly.
+For local UI testing without a Supabase account, set `AGENT_PREVIEW=true` in `.env.local`, start the dev server, and visit [http://localhost:3000/dev/agent-preview](http://localhost:3000/dev/agent-preview) to seed test data and access protected routes without authentication.
