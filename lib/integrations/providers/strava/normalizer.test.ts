@@ -83,7 +83,7 @@ describe("normalizeStravaActivity", () => {
 
   it("computes avg_pace_per_100m_sec for runs", () => {
     const result = normalizeStravaActivity(baseActivity, "user-abc");
-    // 3500 moving seconds / (10000m / 100) = 35 sec/100m
+    // 3500 moving seconds / (10000m / 100) = 35 sec/100m (rounded to integer for DB column)
     expect(result.avg_pace_per_100m_sec).toBe(35);
   });
 
