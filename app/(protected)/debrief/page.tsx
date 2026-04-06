@@ -279,6 +279,12 @@ export default async function DebriefPage({
               <DebriefRefreshButton weekStart={artifact.weekStart} />
             </div>
             <ShareSummaryButton weekOf={artifact.weekStart} displayName={athleteDisplayName} />
+            <a
+              href={`/coach?prompt=${encodeURIComponent(`Let's discuss my week of ${artifact.facts.weekRange}. ${artifact.narrative.executiveSummary.split(".")[0]}.`)}`}
+              className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
+            >
+              Discuss with Coach
+            </a>
           </div>
         </div>
 

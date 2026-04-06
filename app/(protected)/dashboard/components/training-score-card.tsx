@@ -84,13 +84,21 @@ export function TrainingScoreCard({ score }: Props) {
         </div>
       </div>
 
-      {/* Dimension breakdown */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="mt-3 w-full text-left text-[11px] font-medium text-tertiary transition hover:text-white"
-      >
-        {expanded ? "Hide details" : "What affects this?"}
-      </button>
+      {/* Actions */}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[11px] font-medium text-tertiary transition hover:text-white"
+        >
+          {expanded ? "Hide details" : "What affects this?"}
+        </button>
+        <a
+          href={`/coach?prompt=${encodeURIComponent(`Explain my training score of ${Math.round(score.compositeScore)}. What's driving each dimension and what should I focus on to improve it?`)}`}
+          className="text-[11px] font-medium text-cyan-400 transition hover:text-cyan-300"
+        >
+          Explain my score
+        </a>
+      </div>
 
       {expanded ? (
         <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.08)] pt-3">

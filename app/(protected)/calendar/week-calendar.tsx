@@ -89,6 +89,37 @@ function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
 }
 
+const INTENT_LABELS: Record<string, string> = {
+  aerobic_base: "Base",
+  threshold: "Threshold",
+  vo2max: "VO2max",
+  recovery: "Recovery",
+  race_specific: "Race Pace",
+  strength: "Strength",
+  speed: "Speed",
+  endurance: "Endurance",
+  tempo: "Tempo",
+};
+
+function getIntentLabel(intentCategory: string): string {
+  return INTENT_LABELS[intentCategory] ?? intentCategory.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getIntentPillClass(intentCategory: string): string {
+  const classes: Record<string, string> = {
+    aerobic_base: "border border-[rgba(99,179,237,0.3)] bg-[rgba(99,179,237,0.1)] text-[rgb(99,179,237)]",
+    threshold: "border border-[rgba(251,146,60,0.3)] bg-[rgba(251,146,60,0.1)] text-[rgb(251,146,60)]",
+    vo2max: "border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] text-[rgb(248,113,113)]",
+    recovery: "border border-[rgba(148,163,184,0.3)] bg-[rgba(148,163,184,0.1)] text-[rgb(148,163,184)]",
+    race_specific: "border border-[rgba(251,191,36,0.3)] bg-[rgba(251,191,36,0.1)] text-[rgb(251,191,36)]",
+    strength: "border border-[rgba(167,139,250,0.3)] bg-[rgba(167,139,250,0.1)] text-[rgb(167,139,250)]",
+    speed: "border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] text-[rgb(248,113,113)]",
+    tempo: "border border-[rgba(251,146,60,0.3)] bg-[rgba(251,146,60,0.1)] text-[rgb(251,146,60)]",
+    endurance: "border border-[rgba(99,179,237,0.3)] bg-[rgba(99,179,237,0.1)] text-[rgb(99,179,237)]",
+  };
+  return classes[intentCategory] ?? "border border-[rgba(148,163,184,0.3)] bg-[rgba(148,163,184,0.1)] text-[rgb(148,163,184)]";
+}
+
 function getMovedFromDate(notes: string | null) {
   const match = (notes ?? "").match(MOVE_TAG_PATTERN);
   return match?.[1] ?? null;
@@ -852,7 +883,14 @@ export function WeekCalendar({
                         />
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
-                      <p className="mt-0 text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</p>
+                      <div className="mt-0 flex flex-wrap items-center gap-1">
+                        <span className="text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</span>
+                        {session.intentCategory && state !== "unmatched_upload" ? (
+                          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${getIntentPillClass(session.intentCategory)}`}>
+                            {getIntentLabel(session.intentCategory)}
+                          </span>
+                        ) : null}
+                      </div>
                       {isNeedsAttentionCard && !showCompletedFooter ? (
                         <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[var(--color-warning)]">
                           <span aria-hidden="true" className="h-[6px] w-[6px] rounded-full bg-[var(--color-warning)]" />

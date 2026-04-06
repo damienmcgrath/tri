@@ -63,7 +63,7 @@ function RecommendationItem({ rec }: { rec: Recommendation }) {
               {expanded ? "Less" : "Why?"}
             </button>
             <Link
-              href={`/coach?context=rebalancing&sport=${rec.sport}`}
+              href={`/coach?prompt=${encodeURIComponent(`I'd like to discuss the rebalancing recommendation for ${rec.sport}: ${rec.summary}`)}`}
               className="text-xs text-cyan-400 underline underline-offset-2"
             >
               Discuss with Coach

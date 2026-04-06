@@ -285,8 +285,86 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   type RationaleRow = { id: string; trigger_type: string; rationale_text: string; changes_summary: ChangeItem[]; preserved_elements: string[] | null; training_block: string | null; week_number: number | null; status: string; created_at: string };
   const pendingRationales = (pendingRationalesData ?? []) as RationaleRow[];
 
+  // Block context + race proximity
+  let blockContextLine: string | null = null;
+  let raceProximityLine: string | null = null;
+
+  // Fetch active plan for block context
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("active_plan_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile?.active_plan_id) {
+    const { data: weekRow } = await supabase
+      .from("training_weeks")
+      .select("week_index,focus,training_block_id")
+      .eq("plan_id", profile.active_plan_id)
+      .lte("week_start_date", weekStart)
+      .gte("week_start_date", addDays(weekStart, -6))
+      .order("week_start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (weekRow?.training_block_id) {
+      const { data: block } = await supabase
+        .from("training_blocks")
+        .select("block_type,emphasis")
+        .eq("id", weekRow.training_block_id)
+        .maybeSingle();
+
+      if (block) {
+        const weekNum = (weekRow.week_index ?? 0) + 1;
+        blockContextLine = `Week ${weekNum} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
+      }
+    }
+  }
+
+  // Race proximity
+  const { data: upcomingRaces } = await supabase
+    .from("race_profiles")
+    .select("name,date,distance_type,priority")
+    .eq("user_id", user.id)
+    .gte("date", weekStart)
+    .order("date", { ascending: true })
+    .limit(3);
+
+  const raceThisWeek = (upcomingRaces ?? []).find((r: { date: string }) => r.date >= weekStart && r.date <= addDays(weekStart, 6));
+  const nextRace = (upcomingRaces ?? [])[0];
+
+  if (nextRace && !raceThisWeek) {
+    const daysToRace = Math.round((new Date(`${nextRace.date}T00:00:00Z`).getTime() - new Date(`${weekStart}T00:00:00Z`).getTime()) / 86400000);
+    const weeksToRace = Math.round(daysToRace / 7);
+    if (weeksToRace > 0 && weeksToRace <= 16) {
+      raceProximityLine = `${weeksToRace} week${weeksToRace === 1 ? "" : "s"} to ${nextRace.name}`;
+    }
+  }
+
   return (
     <section className="space-y-3">
+      {/* Block context header */}
+      {(blockContextLine || raceProximityLine || raceThisWeek) ? (
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-[rgba(255,255,255,0.6)]">
+          {blockContextLine ? <span>{blockContextLine}</span> : null}
+          {blockContextLine && raceProximityLine ? <span className="text-[rgba(255,255,255,0.2)]">·</span> : null}
+          {raceProximityLine ? <span className="text-cyan-400">{raceProximityLine}</span> : null}
+        </div>
+      ) : null}
+
+      {/* Race marker for this week */}
+      {raceThisWeek ? (
+        <article className="rounded-xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.06)] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏁</span>
+            <div>
+              <p className="text-sm font-semibold text-white">{raceThisWeek.name}</p>
+              <p className="text-[11px] text-muted">{raceThisWeek.date} · {raceThisWeek.priority ?? "A"} Race{raceThisWeek.distance_type ? ` · ${raceThisWeek.distance_type}` : ""}</p>
+            </div>
+          </div>
+        </article>
+      ) : null}
+
       <CoachNoteCards rationales={pendingRationales} />
       <WeekCalendar
         weekDays={weekDays}
