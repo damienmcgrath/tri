@@ -133,8 +133,8 @@ function inferPhase(startDate: string | null, durationWeeks: number | null, toda
   if (diffDays < 0) return "pre_plan";
   const weekIndex = Math.floor(diffDays / 7) + 1;
   if (weekIndex <= 2) return "base";
-  if (weekIndex >= durationWeeks - 1) return "taper";
-  if (weekIndex >= Math.max(3, durationWeeks - 3)) return "peak";
+  if (weekIndex >= durationWeeks) return "taper";
+  if (weekIndex >= Math.max(3, durationWeeks - 2)) return "peak";
   return "build";
 }
 

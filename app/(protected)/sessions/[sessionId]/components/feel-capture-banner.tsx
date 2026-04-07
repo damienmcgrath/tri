@@ -120,31 +120,30 @@ function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["exist
   if (!option) return null;
 
   return (
-    <article className="surface border border-[hsl(var(--border))] p-4">
-      {/* Primary feel — visually dominant */}
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full text-lg" style={{ backgroundColor: option.color.bg }}>
-          {option.icon}
-        </span>
-        <span className="text-sm font-semibold" style={{ color: option.color.text }}>{option.label}</span>
-      </div>
-
-      {/* Secondary attributes — 2-column grid */}
-      {secondaryItems.length > 0 && (
-        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-          {secondaryItems.map((item) => (
-            <div key={item.label} className="flex items-baseline gap-1.5">
-              <span className="text-xs text-tertiary">{item.label}</span>
-              <span className="text-xs font-medium text-muted">{item.value}</span>
-            </div>
-          ))}
+    <article className="surface border border-[hsl(var(--border))] px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {/* Primary feel */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-base" aria-hidden="true">{option.icon}</span>
+          <span className="text-sm font-semibold" style={{ color: option.color.text }}>{option.label}</span>
         </div>
-      )}
 
-      {/* Note */}
-      {feel.note && (
-        <p className="mt-2.5 border-t border-[hsl(var(--border))] pt-2.5 text-xs text-muted italic">{feel.note}</p>
-      )}
+        {/* Secondary attributes — inline */}
+        {secondaryItems.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            {secondaryItems.map((item) => (
+              <span key={item.label} className="text-xs text-tertiary">
+                {item.label} <span className="font-medium text-muted">{item.value}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Note — inline after attributes */}
+        {feel.note && (
+          <p className="text-xs text-muted italic">{feel.note}</p>
+        )}
+      </div>
     </article>
   );
 }
