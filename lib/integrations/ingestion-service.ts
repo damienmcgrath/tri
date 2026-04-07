@@ -12,7 +12,7 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { insertActivityWithCompat } from "@/lib/supabase/schema-compat";
 import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/strava/client";
-import { shouldThrottle } from "./providers/strava/rate-limiter";
+import { shouldThrottle, type RateLimitInfo } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
 import { refreshIfExpired, updateSyncStatus, type ExternalConnection } from "./token-service";
 import { syncSessionLoad } from "@/lib/training/load-sync";
@@ -331,14 +331,16 @@ export async function backfillRecentActivities(
   while (true) {
     let activities;
     let throttled = false;
+    let rateLimit: RateLimitInfo | null = null;
 
     try {
-      const { data, rateLimit } = await fetchRecentActivitiesWithRateLimit(freshConnection.accessToken, {
+      const result = await fetchRecentActivitiesWithRateLimit(freshConnection.accessToken, {
         after: afterSec,
         page,
         perPage
       });
-      activities = data;
+      activities = result.data;
+      rateLimit = result.rateLimit;
 
       if (rateLimit && shouldThrottle(rateLimit)) {
         console.log(`[INGEST] BACKFILL THROTTLED — 15min usage ${rateLimit.usage15min}/${rateLimit.limit15min}`);
@@ -352,6 +354,12 @@ export async function backfillRecentActivities(
     }
 
     if (activities.length === 0) break;
+
+    // Budget for enrichment calls — each enrich is one additional GET /activities/{id}.
+    // Reserve 20% headroom from the 15-min limit so enrichment can't blow the budget.
+    let enrichBudget = rateLimit
+      ? Math.max(0, Math.floor(rateLimit.limit15min * 0.8) - rateLimit.usage15min - 1)
+      : 10; // conservative default when rate limit headers are missing
 
     for (const activity of activities) {
       try {
@@ -408,9 +416,11 @@ export async function backfillRecentActivities(
 
         result.imported++;
 
-        // Enrich with detailed data (laps, splits, halves) — non-blocking on failure
-        if (!throttled) {
+        // Enrich with detailed data (laps, splits, halves) — non-blocking on failure.
+        // Each call costs 1 API request; stop enriching when budget is exhausted.
+        if (!throttled && enrichBudget > 0) {
           await enrichWithDetailedFetch(supabase, created.id, externalId, freshConnection.accessToken, userId);
+          enrichBudget--;
         }
 
         const matched = await matchActivity(supabase, userId, created);

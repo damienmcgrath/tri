@@ -307,12 +307,27 @@ export async function getSessionComparison(
     if (!activity) return {};
 
     const base = parseActivityMetrics(activity.metrics_v2 as Record<string, unknown> | null);
+    const durationSec = base.durationSec ?? (activity.duration_sec as number | null);
+    const distanceM = activity.distance_m as number | null;
+
+    // Derive pace from distance + duration when metrics_v2 doesn't have it
+    let avgPaceSecPerKm = base.avgPaceSecPerKm;
+    if (avgPaceSecPerKm == null && distanceM && distanceM > 0 && durationSec && durationSec > 0) {
+      avgPaceSecPerKm = durationSec / (distanceM / 1000);
+    }
+
+    let avgPacePer100mSec = base.avgPacePer100mSec ?? (activity.avg_pace_per_100m_sec as number | null);
+    if (avgPacePer100mSec == null && distanceM && distanceM > 0 && durationSec && durationSec > 0) {
+      avgPacePer100mSec = durationSec / (distanceM / 100);
+    }
+
     return {
       ...base,
       avgHr: base.avgHr ?? (activity.avg_hr as number | null),
       avgPower: base.avgPower ?? (activity.avg_power as number | null),
-      avgPacePer100mSec: base.avgPacePer100mSec ?? (activity.avg_pace_per_100m_sec as number | null),
-      durationSec: base.durationSec ?? (activity.duration_sec as number | null)
+      avgPaceSecPerKm,
+      avgPacePer100mSec,
+      durationSec
     };
   }
 

@@ -639,6 +639,24 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       <section className="surface p-4 md:p-5">
         {reviewVm.isReviewable ? (
           <div className="space-y-4">
+            {/* Execution diagnosis — shown for reviewable sessions without a verdict card (skipped, planned-sync) */}
+            {session.status !== "completed" ? (
+              <>
+                {reviewVm.actualExecutionSummary ? (
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
+                    <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
+                  </div>
+                ) : null}
+                {reviewVm.mainGap ? (
+                  <div className="border-t border-[hsl(var(--border))] pt-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
+                    <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+
             {/* One thing to change / Keep doing */}
             {reviewVm.oneThingToChange ? (
               <div className={`rounded-xl border p-4 ${isKeepDoingAdvice
