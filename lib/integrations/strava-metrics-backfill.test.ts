@@ -161,7 +161,7 @@ describe("backfillStravaMetrics", () => {
       { id: "act-1", external_activity_id: "100", sport_type: "run", start_time_utc: "2026-03-15T07:00:00Z", duration_sec: 3600, distance_m: 10000 }
     ];
     mockMetricsRows = [
-      { id: "act-1", metrics_v2: { schemaVersion: 1, sourceFormat: "strava" } }
+      { id: "act-1", metrics_v2: { schemaVersion: 1, sourceFormat: "strava", laps: null } }
     ];
 
     const result = await backfillStravaMetrics("user-1", baseConnection);

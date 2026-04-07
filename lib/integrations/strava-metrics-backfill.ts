@@ -94,7 +94,9 @@ export async function backfillStravaMetrics(
   if (withMetrics) {
     for (const row of withMetrics) {
       const mv2 = row.metrics_v2 as Record<string, unknown> | null;
-      if (mv2 && mv2.schemaVersion != null) {
+      // Only consider fully enriched if laps key exists (even if null) —
+      // summary-only imports set schemaVersion but lack detail-endpoint fields.
+      if (mv2 && mv2.schemaVersion != null && "laps" in mv2) {
         alreadyBackfilled.add(row.id);
       }
     }
