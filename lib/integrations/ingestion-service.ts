@@ -12,7 +12,7 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { insertActivityWithCompat } from "@/lib/supabase/schema-compat";
 import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/strava/client";
-import { shouldThrottle } from "./providers/strava/rate-limiter";
+import { shouldThrottle, type RateLimitInfo } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
 import { refreshIfExpired, updateSyncStatus, type ExternalConnection } from "./token-service";
 import { syncSessionLoad } from "@/lib/training/load-sync";
@@ -155,6 +155,56 @@ async function matchActivity(
   return true;
 }
 
+/**
+ * Enrich an already-inserted activity with detailed Strava data (laps, splits, halves).
+ *
+ * The list endpoint (GET /athlete/activities) returns summaries without laps or splits.
+ * This fetches from the detailed endpoint (GET /activities/{id}) and updates the row.
+ */
+async function enrichWithDetailedFetch(
+  supabase: SupabaseClient,
+  activityDbId: string,
+  externalId: string,
+  accessToken: string,
+  userId: string
+): Promise<boolean> {
+  try {
+    const detailed = await fetchActivity(accessToken, externalId);
+    const enriched = normalizeStravaActivity(detailed, userId);
+
+    const { error: updateError } = await supabase
+      .from("completed_activities")
+      .update({
+        end_time_utc: enriched.end_time_utc,
+        elapsed_duration_sec: enriched.elapsed_duration_sec,
+        moving_duration_sec: enriched.moving_duration_sec,
+        avg_pace_per_100m_sec: enriched.avg_pace_per_100m_sec,
+        laps_count: enriched.laps_count,
+        avg_cadence: enriched.avg_cadence,
+        avg_hr: enriched.avg_hr,
+        max_hr: enriched.max_hr,
+        avg_power: enriched.avg_power,
+        max_power: enriched.max_power,
+        elevation_gain_m: enriched.elevation_gain_m,
+        activity_type_raw: enriched.activity_type_raw,
+        metrics_v2: enriched.metrics_v2
+      })
+      .eq("id", activityDbId)
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(`[INGEST] ENRICH_UPDATE_ERROR activityId=${externalId}:`, updateError.message);
+      return false;
+    }
+    console.log(`[INGEST] ENRICHED activityId=${externalId} with detailed data`);
+    return true;
+  } catch (err) {
+    // Non-fatal — the summary data is already inserted
+    console.warn(`[INGEST] ENRICH_FETCH_WARN activityId=${externalId}:`, err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // ─── Core ingest ──────────────────────────────────────────────────────────────
 
 /**
@@ -281,14 +331,16 @@ export async function backfillRecentActivities(
   while (true) {
     let activities;
     let throttled = false;
+    let rateLimit: RateLimitInfo | null = null;
 
     try {
-      const { data, rateLimit } = await fetchRecentActivitiesWithRateLimit(freshConnection.accessToken, {
+      const result = await fetchRecentActivitiesWithRateLimit(freshConnection.accessToken, {
         after: afterSec,
         page,
         perPage
       });
-      activities = data;
+      activities = result.data;
+      rateLimit = result.rateLimit;
 
       if (rateLimit && shouldThrottle(rateLimit)) {
         console.log(`[INGEST] BACKFILL THROTTLED — 15min usage ${rateLimit.usage15min}/${rateLimit.limit15min}`);
@@ -302,6 +354,12 @@ export async function backfillRecentActivities(
     }
 
     if (activities.length === 0) break;
+
+    // Budget for enrichment calls — each enrich is one additional GET /activities/{id}.
+    // Reserve 20% headroom from the 15-min limit so enrichment can't blow the budget.
+    let enrichBudget = rateLimit
+      ? Math.max(0, Math.floor(rateLimit.limit15min * 0.8) - rateLimit.usage15min - 1)
+      : 10; // conservative default when rate limit headers are missing
 
     for (const activity of activities) {
       try {
@@ -357,6 +415,13 @@ export async function backfillRecentActivities(
         }
 
         result.imported++;
+
+        // Enrich with detailed data (laps, splits, halves) — non-blocking on failure.
+        // Each call costs 1 API request; stop enriching when budget is exhausted.
+        if (!throttled && enrichBudget > 0) {
+          await enrichWithDetailedFetch(supabase, created.id, externalId, freshConnection.accessToken, userId);
+          enrichBudget--;
+        }
 
         const matched = await matchActivity(supabase, userId, created);
         if (matched) result.matched++;

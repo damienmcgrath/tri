@@ -32,7 +32,7 @@ export const sessionVerdictOutputSchema = z.object({
   verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
   metric_comparisons: z.array(metricComparisonSchema).max(6),
   key_deviations: z.array(deviationSchema).max(5),
-  adaptation_signal: z.string().min(1).max(400),
+  adaptation_signal: z.string().min(1).max(800),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
   affected_session_ids: z.array(z.string()).max(5)
 });
@@ -280,6 +280,8 @@ function buildVerdictInstructions(): string {
     "- If warning signs: flag specific sessions for potential modification.",
     "- If missed/off-target: explain redistribution or recovery implications.",
     "- If feel data contradicts objective metrics, acknowledge the mismatch explicitly.",
+    "- Reference upcoming sessions by weekday name and sport, NOT by ISO date (e.g. 'Wednesday's bike' not '2026-04-09 bike').",
+    "- Keep adaptation_signal to 2-3 sentences. Be direct, not exhaustive.",
     "",
     "Rules:",
     "- Use only provided evidence. Do not invent metrics or facts.",
@@ -407,6 +409,16 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
 
 // --- Post-process AI output to remove raw seconds ---
 
+/** Trim text to the last complete sentence if it looks truncated (ends mid-word or with open paren). */
+function trimToLastSentence(text: string): string {
+  const trimmed = text.trim();
+  if (/[.!?]$/.test(trimmed)) return trimmed;
+  // Find the last sentence-ending punctuation
+  const lastPeriod = Math.max(trimmed.lastIndexOf(". "), trimmed.lastIndexOf(".\n"), trimmed.lastIndexOf("."));
+  if (lastPeriod > trimmed.length * 0.5) return trimmed.slice(0, lastPeriod + 1);
+  return trimmed;
+}
+
 function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVerdictOutput {
   const n = normalizeUnitString;
   return {
@@ -416,7 +428,7 @@ function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVer
     intended_zones: n(verdict.intended_zones),
     intended_metrics: n(verdict.intended_metrics),
     execution_summary: n(verdict.execution_summary),
-    adaptation_signal: n(verdict.adaptation_signal),
+    adaptation_signal: trimToLastSentence(n(verdict.adaptation_signal)),
     metric_comparisons: verdict.metric_comparisons.map(mc => ({
       ...mc,
       target: n(mc.target),
@@ -458,7 +470,7 @@ export async function generateSessionVerdict(
     buildRequest: () => ({
       instructions: buildVerdictInstructions(),
       reasoning: { effort: "low" },
-      max_output_tokens: 3000,
+      max_output_tokens: 6000,
       text: {
         format: zodTextFormat(sessionVerdictOutputSchema, "session_verdict", {
           description: "Structured three-part session verdict."

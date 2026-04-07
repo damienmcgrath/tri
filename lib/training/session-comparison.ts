@@ -36,14 +36,22 @@ type ActivityMetrics = {
 
 function parseActivityMetrics(metricsV2: Record<string, unknown> | null | undefined): ActivityMetrics {
   if (!metricsV2) return {};
+
+  // metrics_v2 can be flat (legacy) or nested (Strava normalizer stores pace/power/heartRate/summary as sub-objects)
+  const pace = metricsV2.pace as Record<string, unknown> | undefined;
+  const power = metricsV2.power as Record<string, unknown> | undefined;
+  const heartRate = metricsV2.heartRate as Record<string, unknown> | undefined;
+  const summary = metricsV2.summary as Record<string, unknown> | undefined;
+  const stroke = metricsV2.stroke as Record<string, unknown> | undefined;
+
   return {
-    avgHr: metricsV2.avg_hr as number | null,
-    avgPower: metricsV2.avg_power as number | null,
-    normalizedPower: metricsV2.normalized_power as number | null,
-    avgPaceSecPerKm: metricsV2.avg_pace_sec_per_km as number | null,
-    avgPacePer100mSec: metricsV2.avg_pace_per_100m_sec as number | null,
-    avgSwolf: metricsV2.avg_swolf as number | null,
-    durationSec: metricsV2.duration_sec as number | null
+    avgHr: (heartRate?.avgHr ?? metricsV2.avg_hr) as number | null,
+    avgPower: (power?.avgPower ?? metricsV2.avg_power) as number | null,
+    normalizedPower: (power?.normalizedPower ?? metricsV2.normalized_power) as number | null,
+    avgPaceSecPerKm: (pace?.avgPaceSecPerKm ?? pace?.avgPaceSecPerKm ?? metricsV2.avg_pace_sec_per_km) as number | null,
+    avgPacePer100mSec: (pace?.avgPacePer100mSec ?? metricsV2.avg_pace_per_100m_sec) as number | null,
+    avgSwolf: (stroke?.avgSwolf ?? metricsV2.avg_swolf) as number | null,
+    durationSec: (summary?.durationSec ?? metricsV2.duration_sec) as number | null
   };
 }
 
@@ -292,19 +300,34 @@ export async function getSessionComparison(
 
     const { data: activity } = await supabase
       .from("completed_activities")
-      .select("avg_hr,avg_power,avg_pace_per_100m_sec,duration_sec,metrics_v2")
+      .select("avg_hr,avg_power,avg_pace_per_100m_sec,duration_sec,distance_m,metrics_v2")
       .eq("id", link.completed_activity_id)
       .maybeSingle();
 
     if (!activity) return {};
 
     const base = parseActivityMetrics(activity.metrics_v2 as Record<string, unknown> | null);
+    const durationSec = base.durationSec ?? (activity.duration_sec as number | null);
+    const distanceM = activity.distance_m as number | null;
+
+    // Derive pace from distance + duration when metrics_v2 doesn't have it
+    let avgPaceSecPerKm = base.avgPaceSecPerKm;
+    if (avgPaceSecPerKm == null && distanceM && distanceM > 0 && durationSec && durationSec > 0) {
+      avgPaceSecPerKm = durationSec / (distanceM / 1000);
+    }
+
+    let avgPacePer100mSec = base.avgPacePer100mSec ?? (activity.avg_pace_per_100m_sec as number | null);
+    if (avgPacePer100mSec == null && distanceM && distanceM > 0 && durationSec && durationSec > 0) {
+      avgPacePer100mSec = durationSec / (distanceM / 100);
+    }
+
     return {
       ...base,
       avgHr: base.avgHr ?? (activity.avg_hr as number | null),
       avgPower: base.avgPower ?? (activity.avg_power as number | null),
-      avgPacePer100mSec: base.avgPacePer100mSec ?? (activity.avg_pace_per_100m_sec as number | null),
-      durationSec: base.durationSec ?? null
+      avgPaceSecPerKm,
+      avgPacePer100mSec,
+      durationSec
     };
   }
 
