@@ -15,9 +15,20 @@ type Props = {
   aiComparisons?: StoredComparison[];
 };
 
-function trendBadge(direction: string) {
-  if (direction === "improving") return { label: "Improving", className: "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.1)] text-success" };
-  if (direction === "declining") return { label: "Declining", className: "border-[rgba(255,90,40,0.3)] bg-[rgba(255,90,40,0.1)] text-danger" };
+function trendBadge(direction: string, confidence?: string) {
+  const isLowConfidence = confidence === "low";
+  if (direction === "improving") return {
+    label: isLowConfidence ? "Possibly improving" : "Improving",
+    className: isLowConfidence
+      ? "border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.06)] text-tertiary"
+      : "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.1)] text-success"
+  };
+  if (direction === "declining") return {
+    label: isLowConfidence ? "Possible decline" : "Declining",
+    className: isLowConfidence
+      ? "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] text-tertiary"
+      : "border-[rgba(255,90,40,0.3)] bg-[rgba(255,90,40,0.1)] text-danger"
+  };
   return { label: "Stable", className: "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] text-tertiary" };
 }
 
@@ -42,8 +53,8 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
           <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
         </div>
         {bestAiComparison ? (
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] ${trendBadge(bestAiComparison.trendDirection).className}`}>
-            {trendBadge(bestAiComparison.trendDirection).label}
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] ${trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).className}`}>
+            {trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).label}
           </span>
         ) : null}
       </div>

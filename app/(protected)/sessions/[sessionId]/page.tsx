@@ -460,21 +460,25 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   type NextSessionInfo = { id: string; session_name: string | null; type: string; date: string } | null;
   let nextSession: NextSessionInfo = null as NextSessionInfo;
   if (!activityId) {
-    const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
-    const { data: nextCandidates } = await supabase
-      .from("sessions")
-      .select("id,session_name,type,date,created_at")
-      .eq("user_id", user.id)
-      .gte("date", session.date)
-      .lte("date", weekEndIso)
-      .in("status", ["planned", "completed"])
-      .neq("id", session.id)
-      .order("date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(5);
-    // The query already excludes the current session (neq) and orders by date + created_at,
-    // so the first candidate is the correct next session, even for same-day doubles.
-    nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
+    try {
+      const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+      const { data: nextCandidates } = await supabase
+        .from("sessions")
+        .select("id,session_name,type,date,created_at")
+        .eq("user_id", user.id)
+        .gte("date", session.date)
+        .lte("date", weekEndIso)
+        .in("status", ["planned", "completed"])
+        .neq("id", session.id)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(5);
+      // The query already excludes the current session (neq) and orders by date + created_at,
+      // so the first candidate is the correct next session, even for same-day doubles.
+      nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
+    } catch {
+      // Agent preview mock client may not support .neq() — degrade gracefully
+    }
   }
 
   // Week completion stats for post-upload flow
@@ -508,10 +512,31 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const disciplineLabel = getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
-  const plannedColumnLabel = session.is_extra ? "Weekly context" : "Planned";
-  const ghostPillClass =
-    "rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[11px] font-medium text-[rgba(255,255,255,0.6)]";
   const quietLabelClass = "card-kicker";
+
+  // Use actual duration from execution_result when available, fall back to planned
+  const execReview = session.execution_result ? parsePersistedExecutionReview(session.execution_result) : null;
+  const actualDurationSec = execReview?.deterministic?.actual?.durationSec ?? null;
+  const actualDurationLabel = actualDurationSec
+    ? durationLabel(Math.round(actualDurationSec / 60))
+    : durationLabel(session.duration_minutes);
+
+  // Training block context from verdict (e.g. "Week 8 of an 8-week Build block, 61 days to Warsaw 70.3")
+  const blockContext = existingVerdictData?.training_block_context ?? null;
+
+  // Score confidence qualifier for inline display
+  const confidenceQualifier =
+    reviewVm.confidenceLabel === "low" ? "early read"
+    : reviewVm.confidenceLabel === "medium" ? "moderate confidence"
+    : null;
+
+  // Determine the one-thing callout label — don't say "change" when the advice is "keep doing this"
+  const isKeepDoingAdvice = reviewVm.oneThingToChange
+    ? /maintain|keep|same|continue|no change/i.test(reviewVm.oneThingToChange)
+    : false;
+  const oneThingLabel = isKeepDoingAdvice ? "Keep doing" : "One thing to change";
+
+  // Badge classes
   const sessionStatusBadgeClass =
     reviewVm.sessionStatusLabel.toLowerCase() === "completed"
       ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-success"
@@ -532,95 +557,53 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         <span className="truncate text-[rgba(255,255,255,0.6)]">{sessionTitle}</span>
       </nav>
 
+      {/* ── Section 1: Header ── */}
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="label">Session review</p>
-            <h1 className="mt-1 text-2xl font-semibold">{sessionTitle}</h1>
-            <p className="mt-2 text-sm text-muted">{disciplineLabel} · {sessionDateLabel} · {durationLabel(session.duration_minutes)}</p>
+            <h1 className="text-2xl font-semibold">{sessionTitle}</h1>
+            <p className="mt-1.5 text-sm text-muted">
+              {disciplineLabel} · {sessionDateLabel} · {actualDurationLabel}
+            </p>
+            {blockContext ? (
+              <p className="mt-1 text-xs text-tertiary">{blockContext}</p>
+            ) : null}
           </div>
           <div className="flex flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-            <div className={`rounded-full border px-3 py-1 text-xs font-medium ${toneToBadgeClass(reviewVm.isReviewable ? reviewVm.intent.tone : "muted")}`}>
-              {reviewVm.reviewModeLabel}
-            </div>
             {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
           </div>
         </div>
 
-        <div className="mt-4 border-t border-[hsl(var(--border))] pt-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={sessionStatusBadgeClass}>
-              {reviewVm.sessionStatusLabel}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className={sessionStatusBadgeClass}>{reviewVm.sessionStatusLabel}</span>
+          <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
+          {reviewVm.isReviewable ? (
+            <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
+              {narrativeSourceLabel(reviewVm.narrativeSource)}
             </span>
-            <span className={intentBadgeClass}>
-              {reviewVm.intent.label}
-            </span>
-            {reviewVm.isReviewable ? (
-              <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
-                {narrativeSourceLabel(reviewVm.narrativeSource)}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="mt-5">
-            <h2 className={`text-lg font-medium leading-tight sm:text-[22px] ${toneToTextClass(reviewVm.isReviewable ? reviewVm.scoreTone : reviewVm.intent.tone)}`}>
-              {reviewVm.isReviewable ? reviewVm.scoreHeadline : reviewVm.intent.label}
-            </h2>
-            {reviewVm.oneThingToChange ? (
-              <div className="mt-4 rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[hsl(var(--accent))]">One thing to change</p>
-                <p className="mt-2 text-sm font-medium text-white">{reviewVm.oneThingToChange}</p>
-              </div>
-            ) : (
-              <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-                <p className={quietLabelClass}>What to do next</p>
-                <p className="mt-2 text-sm text-white">{reviewVm.nextAction}</p>
-              </div>
-            )}
-            <div className="mt-4 grid gap-5 sm:grid-cols-2 border-t border-[hsl(var(--border))] pt-4">
-              <div>
-                <p className={quietLabelClass}>This week</p>
-                <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
-              </div>
-              {reviewVm.loadContribution?.sessionTss != null ? (
-                <div className="sm:border-l sm:border-[hsl(var(--border))] sm:pl-5">
-                  <p className={quietLabelClass}>Load contribution</p>
-                  <p className="mt-2 text-sm text-muted">
-                    {Math.round(reviewVm.loadContribution.sessionTss)} TSS
-                    {reviewVm.loadContribution.weekTssPct != null
-                      ? ` · ${Math.round(reviewVm.loadContribution.weekTssPct * 100)}% of weekly target`
-                      : ""}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className={ghostPillClass}>
-              {reviewVm.intent.label}
-            </span>
-            {reviewVm.isReviewable && reviewVm.scoreConfidenceNote ? (
-              <span className={ghostPillClass}>
-                Limited data
-              </span>
-            ) : null}
-            {reviewVm.isReviewable ? (
-              <span className={ghostPillClass}>
-                Cost: {reviewVm.executionCostLabel ?? "Unknown"}
-              </span>
-            ) : null}
-            {reviewVm.confidenceLabel ? (
-              <span className={ghostPillClass}>
-                Confidence: {reviewVm.confidenceLabel}
-              </span>
-            ) : null}
-          </div>
+          ) : null}
         </div>
+
+        {reviewVm.isReviewable && reviewVm.score !== null ? (
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className={`font-mono text-3xl font-semibold ${toneToTextClass(reviewVm.scoreTone)}`}>
+              {reviewVm.score}
+            </span>
+            <span className={`text-base font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
+              {reviewVm.scoreBand}
+            </span>
+            {confidenceQualifier ? (
+              <span className="rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-0.5 text-[10px] text-tertiary">
+                {confidenceQualifier}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </article>
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
 
+      {/* ── Section 2: The Numbers (promoted to hero position) ── */}
       {session.status === "completed" && !activityId ? (
         <SessionVerdictCard
           sessionId={session.id}
@@ -652,53 +635,58 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </article>
       ) : null}
 
+      {/* ── Section 3: Coach's Take (consolidated narrative) ── */}
       <section className="surface p-4 md:p-5">
         {reviewVm.isReviewable ? (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-5">
-              {hasSpecificPlannedIntent || session.notes ? (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{plannedColumnLabel}</p>
-                  {hasSpecificPlannedIntent ? <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p> : null}
-                  {session.notes ? <p className="mt-1.5 text-sm text-muted italic">{session.notes}</p> : null}
-                </div>
-              ) : null}
-              <div className={hasSpecificPlannedIntent ? "border-t border-[hsl(var(--border))] pt-5" : ""}>
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
-                <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
+          <div className="space-y-4">
+            {/* One thing to change / Keep doing */}
+            {reviewVm.oneThingToChange ? (
+              <div className={`rounded-xl border p-4 ${isKeepDoingAdvice
+                ? "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.06)]"
+                : "border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)]"
+              }`}>
+                <p className={`text-xs uppercase tracking-[0.14em] ${isKeepDoingAdvice ? "text-success" : "text-[hsl(var(--accent))]"}`}>
+                  {oneThingLabel}
+                </p>
+                <p className="mt-2 text-sm font-medium text-white">{reviewVm.oneThingToChange}</p>
               </div>
-              <div className="border-t border-[hsl(var(--border))] pt-5">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
-                <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
-              </div>
-              <div className="border-t border-[hsl(var(--border))] pt-5">
+            ) : null}
+
+            {/* Why it matters */}
+            {reviewVm.whyItMatters ? (
+              <div>
                 <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
                 <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
               </div>
+            ) : null}
+
+            {/* This week — consolidated from old "This week" + "What this means for your plan" */}
+            <div className="border-t border-[hsl(var(--border))] pt-4">
+              <p className={quietLabelClass}>This week</p>
+              <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
+              {reviewVm.loadContribution?.sessionTss != null ? (
+                <p className="mt-1.5 text-xs text-tertiary">
+                  {Math.round(reviewVm.loadContribution.sessionTss)} TSS
+                  {reviewVm.loadContribution.weekTssPct != null
+                    ? ` · ${Math.round(reviewVm.loadContribution.weekTssPct * 100)}% of weekly target`
+                    : ""}
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-5 border-t border-[hsl(var(--border))] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-              {reviewVm.usefulMetrics.length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
+            {/* Metrics grid — pulled from right sidebar to be inline */}
+            {reviewVm.usefulMetrics.length > 0 ? (
+              <div className="border-t border-[hsl(var(--border))] pt-4">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {reviewVm.usefulMetrics.map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3 sm:p-4">
+                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
                       <p className="text-xs text-muted">{metric.label}</p>
-                      <p
-                        className={`mt-1 ${metric.label === "Duration completed" ? "font-mono text-[28px] font-medium text-success" : "text-base font-semibold text-white"}`}
-                        style={metric.label === "Duration completed" ? undefined : { color: "hsl(var(--text-white))" }}
-                      >
-                        {metric.value}
-                      </p>
+                      <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Available evidence</p>
-                  <p className="mt-2 text-sm text-muted">{reviewVm.unlockDetail}</p>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
@@ -713,6 +701,11 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           </div>
         )}
       </section>
+
+      {/* ── Section 4: Compared to Previous ── */}
+      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} /> : null}
+
+      {/* ── Section 5: Details + Follow-up (progressive disclosure) ── */}
 
       {reviewVm.uncertaintyDetail ? (
         <DetailsAccordion title="Data confidence" summaryDetail={
@@ -771,22 +764,6 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                 session delivered the intended training stimulus.
               </p>
             )}
-            {reviewVm.usefulMetrics.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {reviewVm.usefulMetrics.map((metric) => (
-                  <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">{metric.label}</p>
-                    <p className="mt-0.5 text-sm font-semibold text-white">{metric.value}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {reviewVm.missingEvidence.length > 0 ? (
-              <div className="rounded-xl border border-[rgba(255,179,60,0.20)] bg-[rgba(255,179,60,0.06)] px-3 py-2">
-                <p className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Missing evidence</p>
-                <p className="mt-0.5 text-xs text-muted">{reviewVm.missingEvidence.join(" · ")}</p>
-              </div>
-            ) : null}
             <div className="flex flex-wrap gap-2">
               {reviewVm.scoreBand ? (
                 <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
@@ -798,18 +775,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                   Execution cost: {reviewVm.executionCostLabel}
                 </span>
               ) : null}
-              {reviewVm.confidenceLabel ? (
-                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
-                  Confidence: {reviewVm.confidenceLabel}
-                </span>
-              ) : null}
             </div>
           </div>
         </DetailsAccordion>
       ) : null}
 
-      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} /> : null}
-
+      {/* Ask coach follow-up */}
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

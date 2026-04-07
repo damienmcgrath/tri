@@ -458,7 +458,7 @@ export async function generateSessionVerdict(
     buildRequest: () => ({
       instructions: buildVerdictInstructions(),
       reasoning: { effort: "low" },
-      max_output_tokens: 3000,
+      max_output_tokens: 4500,
       text: {
         format: zodTextFormat(sessionVerdictOutputSchema, "session_verdict", {
           description: "Structured three-part session verdict."

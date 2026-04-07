@@ -155,6 +155,56 @@ async function matchActivity(
   return true;
 }
 
+/**
+ * Enrich an already-inserted activity with detailed Strava data (laps, splits, halves).
+ *
+ * The list endpoint (GET /athlete/activities) returns summaries without laps or splits.
+ * This fetches from the detailed endpoint (GET /activities/{id}) and updates the row.
+ */
+async function enrichWithDetailedFetch(
+  supabase: SupabaseClient,
+  activityDbId: string,
+  externalId: string,
+  accessToken: string,
+  userId: string
+): Promise<boolean> {
+  try {
+    const detailed = await fetchActivity(accessToken, externalId);
+    const enriched = normalizeStravaActivity(detailed, userId);
+
+    const { error: updateError } = await supabase
+      .from("completed_activities")
+      .update({
+        end_time_utc: enriched.end_time_utc,
+        elapsed_duration_sec: enriched.elapsed_duration_sec,
+        moving_duration_sec: enriched.moving_duration_sec,
+        avg_pace_per_100m_sec: enriched.avg_pace_per_100m_sec,
+        laps_count: enriched.laps_count,
+        avg_cadence: enriched.avg_cadence,
+        avg_hr: enriched.avg_hr,
+        max_hr: enriched.max_hr,
+        avg_power: enriched.avg_power,
+        max_power: enriched.max_power,
+        elevation_gain_m: enriched.elevation_gain_m,
+        activity_type_raw: enriched.activity_type_raw,
+        metrics_v2: enriched.metrics_v2
+      })
+      .eq("id", activityDbId)
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(`[INGEST] ENRICH_UPDATE_ERROR activityId=${externalId}:`, updateError.message);
+      return false;
+    }
+    console.log(`[INGEST] ENRICHED activityId=${externalId} with detailed data`);
+    return true;
+  } catch (err) {
+    // Non-fatal — the summary data is already inserted
+    console.warn(`[INGEST] ENRICH_FETCH_WARN activityId=${externalId}:`, err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // ─── Core ingest ──────────────────────────────────────────────────────────────
 
 /**
@@ -357,6 +407,11 @@ export async function backfillRecentActivities(
         }
 
         result.imported++;
+
+        // Enrich with detailed data (laps, splits, halves) — non-blocking on failure
+        if (!throttled) {
+          await enrichWithDetailedFetch(supabase, created.id, externalId, freshConnection.accessToken, userId);
+        }
 
         const matched = await matchActivity(supabase, userId, created);
         if (matched) result.matched++;
