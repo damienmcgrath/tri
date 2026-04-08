@@ -194,7 +194,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
       ) : null}
 
       {attachFor ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="surface w-full max-w-xl p-4">
             <h3 className="text-lg font-semibold">Attach to planned session</h3>
             <ul className="mt-3 max-h-72 space-y-2 overflow-auto">

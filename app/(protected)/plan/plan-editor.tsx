@@ -776,7 +776,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       </details>
 
       {quickAddDay ? (
-        <div className="fixed inset-0 z-20 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
+        <div className="fixed inset-0 z-50 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 text-xs">Close</button></div>
           <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
           <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
@@ -794,7 +794,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
       ) : null}
 
       {activeSession ? (
-        <div className="fixed inset-0 z-20 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
+        <div className="fixed inset-0 z-50 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
           <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 text-xs">Close</button></div>
           <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
