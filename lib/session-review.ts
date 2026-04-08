@@ -106,6 +106,47 @@ function pct(value: number | null) {
   return `${Math.round(value * 100)}%`;
 }
 
+/** Format interval completion ratio as a human-readable string. */
+function formatIntervalCompletion(value: number): string {
+  const pctVal = Math.round(value * 100);
+  if (pctVal >= 100) return "All completed";
+  return `${pctVal}%`;
+}
+
+/** Sanitize raw camelCase field names that may appear in AI-generated text. */
+function sanitizeFieldNames(text: string): string {
+  let result = text;
+  // intervalCompletionPct or intervalCompletion with comparison operators and values
+  // Match both "intervalCompletionPct" and "intervalCompletion" (with or without Pct suffix)
+  // ≥ 1.0 → "all planned intervals completed"
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
+  // ≥ 0.66 or < 0.9 etc → "66% of planned intervals completed"
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
+  });
+  // = or : with value
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
+  });
+  // Bare field name without value
+  result = result.replace(/\bintervalCompletion(?:Pct)?\b/gi, "interval completion");
+  result = result.replace(/\btimeAboveTargetPct\b/gi, "time above target");
+  result = result.replace(/\bavgPower\b/gi, "avg power");
+  result = result.replace(/\bavgHr\b/gi, "avg heart rate");
+  result = result.replace(/\bnormalizedPower\b/gi, "normalized power");
+  result = result.replace(/\bvariabilityIndex\b/gi, "variability index");
+  result = result.replace(/\btrainingStressScore\b/gi, "training stress score");
+  result = result.replace(/\btotalWorkKj\b/gi, "total work");
+  // Expand "NP" abbreviation — match when used as a standalone term (not inside a word)
+  // but only in metric contexts (followed by space + word/number, or at end after possessive)
+  result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
+  result = result.replace(/today's NP\b/g, "today's normalized power");
+  result = result.replace(/\bVI\b(?=\s+(?:of|was|is|at|\d))/g, "variability index");
+  return result;
+}
+
 export function durationLabel(minutes: number | null | undefined) {
   if (!minutes || minutes <= 0) return "—";
   const wholeMinutes = Math.round(minutes);
@@ -190,8 +231,12 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
 function deriveOneThingToChange(
   componentScores: ComponentScores | null,
   scoreBand: ScoreBand | null,
-  aiNextAction: string | null
+  aiNextAction: string | null,
+  verdictAdaptationType?: string | null
 ): string | null {
+  // If the verdict says modifications/redistribution are needed, prefer the AI action over "keep doing"
+  const verdictSuggestsChange = verdictAdaptationType && verdictAdaptationType !== "proceed";
+
   if (componentScores) {
     const components = [
       { key: "intentMatch" as const, label: "intensity target", score: componentScores.intentMatch.score, detail: componentScores.intentMatch.detail },
@@ -201,13 +246,13 @@ function deriveOneThingToChange(
     ];
     const worst = components.reduce((a, b) => (a.score <= b.score ? a : b));
     if (worst.score < 80) {
-      return `NEXT ${worst.label}: ${worst.detail}`;
+      return sanitizeFieldNames(`NEXT ${worst.label}: ${worst.detail}`);
     }
   }
-  if (scoreBand === "On target" || scoreBand === "Solid") {
+  if ((scoreBand === "On target" || scoreBand === "Solid") && !verdictSuggestsChange) {
     return "Maintain this approach. Same targets next time.";
   }
-  return aiNextAction || null;
+  return aiNextAction ? sanitizeFieldNames(aiNextAction) : null;
 }
 
 function toExtraReviewState(hasDiagnosticSignals: boolean) {
@@ -400,7 +445,7 @@ export function toneToBadgeClass(tone: Tone) {
   return "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-muted";
 }
 
-export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null }): ReviewViewModel {
+export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null; verdictAdaptationType?: string | null }): ReviewViewModel {
   const diagnosis = session.execution_result;
   const v2Review = parsePersistedExecutionReview(diagnosis);
   const hasLinkedActivity = session.has_linked_activity === true;
@@ -593,7 +638,7 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} ${cadenceUnit}` } : null,
     elevationGainM !== null ? { label: "Elevation gain", value: `${Math.round(elevationGainM)} m` } : null,
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null
   ];
   const swimMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
@@ -601,12 +646,12 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     bestPacePer100mSec !== null ? { label: "Best pace /100m", value: formatPace100(bestPacePer100mSec) } : null,
     avgStrokeRateSpm !== null ? { label: "Average stroke rate", value: `${Math.round(avgStrokeRateSpm)} spm` } : null,
     avgSwolf !== null ? { label: "Average SWOLF", value: `${Math.round(avgSwolf)}` } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null,
     swimPaceFade !== null ? { label: "Late pace fade", value: pct(swimPaceFade - 1) } : null
   ];
   const defaultMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null,
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
     hrDrift !== null && bucket !== "threshold" ? { label: "Late HR drift", value: pct(hrDrift - 1) } : null,
     paceFade !== null && bucket === "long" ? { label: "Late pace fade", value: pct(paceFade - 1) } : null,
@@ -701,13 +746,13 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     executionCostLabel,
     confidenceLabel,
     plannedIntent,
-    actualExecutionSummary,
+    actualExecutionSummary: sanitizeFieldNames(actualExecutionSummary),
     mainGapLabel,
-    mainGap,
+    mainGap: sanitizeFieldNames(mainGap),
     usefulMetrics,
-    whyItMatters,
-    nextAction,
-    weekAction,
+    whyItMatters: sanitizeFieldNames(whyItMatters),
+    nextAction: sanitizeFieldNames(nextAction),
+    weekAction: sanitizeFieldNames(weekAction),
     uncertaintyTitle,
     uncertaintyDetail,
     missingEvidence,
@@ -722,7 +767,8 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
           scoreBand,
           v2Review?.verdict?.explanation.oneThingToChange
             ?? v2Review?.verdict?.explanation.whatToDoNextTime
-            ?? null
+            ?? null,
+          options?.verdictAdaptationType
         )
       : null,
     loadContribution: trainingStressScore !== null

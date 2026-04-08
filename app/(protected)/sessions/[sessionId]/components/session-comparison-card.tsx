@@ -47,16 +47,16 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
 
   return (
     <article className="surface p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div>
+        <div className="flex items-center gap-2.5">
           <p className="label">Compared to previous</p>
-          <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
+          {bestAiComparison ? (
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em] leading-none ${trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).className}`}>
+              {trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).label}
+            </span>
+          ) : null}
         </div>
-        {bestAiComparison ? (
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] ${trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).className}`}>
-            {trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).label}
-          </span>
-        ) : null}
+        <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
       </div>
 
       {/* AI narrative */}
@@ -90,22 +90,34 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
 
       {matchedTrends.length > 0 ? (
         <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-tertiary">Multi-week trend</p>
-          {matchedTrends.map((trend) => (
-            <div key={trend.metric} className="flex items-start justify-between gap-3 text-xs">
-              <span className="text-muted">{trend.metric}</span>
-              <div className="flex items-center gap-2">
-                <span className="flex gap-1">
-                  {trend.dataPoints.slice(-4).map((pt) => (
-                    <span key={pt.weekStart} className="rounded border border-[hsl(var(--border))] px-1.5 py-0.5 text-[10px] text-tertiary">{pt.label}</span>
-                  ))}
-                </span>
-                <span className={`font-medium ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
-                  {trend.direction === "improving" ? "▲" : trend.direction === "declining" ? "▼" : "—"}
-                </span>
+          <p className="mb-3 text-[10px] uppercase tracking-[0.08em] text-tertiary">Multi-week trend</p>
+          <div className="space-y-2.5">
+            {matchedTrends.map((trend) => (
+              <div key={trend.metric} className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted whitespace-nowrap">{trend.metric}</span>
+                <div className="flex items-center gap-1.5">
+                  {trend.dataPoints.slice(-4).map((pt, idx) => {
+                    const isLatest = idx === trend.dataPoints.slice(-4).length - 1;
+                    return (
+                      <span
+                        key={pt.weekStart}
+                        className={`rounded border px-2 py-1 text-xs tabular-nums ${
+                          isLatest
+                            ? "border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] text-white font-medium"
+                            : "border-[hsl(var(--border))] text-tertiary"
+                        }`}
+                      >
+                        {pt.label}
+                      </span>
+                    );
+                  })}
+                  <span className={`ml-0.5 text-sm font-medium ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
+                    {trend.direction === "improving" ? "▲" : trend.direction === "declining" ? "▼" : "—"}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : null}
     </article>
