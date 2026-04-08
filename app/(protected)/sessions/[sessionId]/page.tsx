@@ -531,8 +531,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     : null;
 
   // Determine the one-thing callout label — don't say "change" when the advice is "keep doing this"
-  const isKeepDoingAdvice = reviewVm.oneThingToChange
-    ? /maintain|keep|same|continue|no change/i.test(reviewVm.oneThingToChange)
+  // Only treat as "keep doing" when the advice STARTS with maintenance language, not when those
+  // words appear incidentally in change advice (e.g. "at the same effort" in a change recommendation).
+  // Also override to "change" when the verdict explicitly suggests modifications.
+  const verdictSuggestsChange = verdictAdaptationType && verdictAdaptationType !== "proceed";
+  const isKeepDoingAdvice = !verdictSuggestsChange && reviewVm.oneThingToChange
+    ? /^(maintain|keep doing|keep this|same targets|continue|no change)/i.test(reviewVm.oneThingToChange.trim())
     : false;
   const oneThingLabel = isKeepDoingAdvice ? "Keep doing" : "One thing to change";
 
