@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="22" fill="#0a0a0b"/>
+  <polygon points="90,28 56,90 124,90" fill="none" stroke="#beff00" stroke-width="4" stroke-linejoin="round"/>
+  <text x="90" y="126" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="45" fill="#beff00">Tri</text>
+  <text x="90" y="167" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="15" fill="rgba(255,255,255,0.65)">.AI</text>
+</svg>

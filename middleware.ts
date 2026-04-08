@@ -25,7 +25,7 @@ function applySecurityHeaders(response: NextResponse) {
     : "'self' 'unsafe-inline' 'unsafe-eval'";
   response.headers.set(
     "Content-Security-Policy",
-    `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://api.openai.com; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
+    `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://api.openai.com; font-src 'self' data:; worker-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
   );
 
   if (process.env.NODE_ENV === "production") {

@@ -14,3 +14,9 @@ tsconfig.tsbuildinfo
 .vercel
 output/
 .claude/worktrees/
+
+# Generated service worker (built by @serwist/next)
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+public/swe-worker-*.js.map
