@@ -226,10 +226,10 @@ function getDayChipContent(day: { tone: DayTone; stateLabel: string; microLabel:
 
 function getDayChipTitleClass(day: { tone: DayTone; stateLabel: string }) {
   if (day.tone === "upcoming" && day.stateLabel.length > 8) {
-    return "mt-1 text-[12px] font-medium leading-tight text-white";
+    return "mt-1 line-clamp-2 text-[12px] font-medium leading-tight text-white";
   }
 
-  return "mt-1 text-[13px] font-medium leading-tight text-white";
+  return "mt-1 line-clamp-2 text-[13px] font-medium leading-tight text-white";
 }
 
 function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
@@ -1172,17 +1172,19 @@ export default async function DashboardPage({
         </>
       )}
 
-      {/* Training Score + Readiness + Balance */}
+      {/* Training Score + Balance (side by side) + Readiness */}
       {isCurrentWeek ? (
         <>
-          <Suspense fallback={null}>
-            <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
-          </Suspense>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Suspense fallback={null}>
+              <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <DashboardDisciplineBalance supabase={supabase} userId={user.id} weekStart={weekStart} />
+            </Suspense>
+          </div>
           <Suspense fallback={null}>
             <DashboardReadiness supabase={supabase} userId={user.id} />
-          </Suspense>
-          <Suspense fallback={null}>
-            <DashboardDisciplineBalance supabase={supabase} userId={user.id} weekStart={weekStart} />
           </Suspense>
         </>
       ) : null}
