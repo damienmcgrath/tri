@@ -106,6 +106,13 @@ function pct(value: number | null) {
   return `${Math.round(value * 100)}%`;
 }
 
+/** Format interval completion ratio as a human-readable string. */
+function formatIntervalCompletion(value: number): string {
+  const pctVal = Math.round(value * 100);
+  if (pctVal >= 100) return "All completed";
+  return `${pctVal}%`;
+}
+
 export function durationLabel(minutes: number | null | undefined) {
   if (!minutes || minutes <= 0) return "—";
   const wholeMinutes = Math.round(minutes);
@@ -190,8 +197,12 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
 function deriveOneThingToChange(
   componentScores: ComponentScores | null,
   scoreBand: ScoreBand | null,
-  aiNextAction: string | null
+  aiNextAction: string | null,
+  verdictAdaptationType?: string | null
 ): string | null {
+  // If the verdict says modifications/redistribution are needed, prefer the AI action over "keep doing"
+  const verdictSuggestsChange = verdictAdaptationType && verdictAdaptationType !== "proceed";
+
   if (componentScores) {
     const components = [
       { key: "intentMatch" as const, label: "intensity target", score: componentScores.intentMatch.score, detail: componentScores.intentMatch.detail },
@@ -204,10 +215,10 @@ function deriveOneThingToChange(
       return `NEXT ${worst.label}: ${worst.detail}`;
     }
   }
-  if (scoreBand === "On target" || scoreBand === "Solid") {
+  if ((scoreBand === "On target" || scoreBand === "Solid") && !verdictSuggestsChange) {
     return "Maintain this approach. Same targets next time.";
   }
-  return aiNextAction || null;
+  return aiNextAction || (verdictSuggestsChange ? null : null);
 }
 
 function toExtraReviewState(hasDiagnosticSignals: boolean) {
@@ -400,7 +411,7 @@ export function toneToBadgeClass(tone: Tone) {
   return "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-muted";
 }
 
-export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null }): ReviewViewModel {
+export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null; verdictAdaptationType?: string | null }): ReviewViewModel {
   const diagnosis = session.execution_result;
   const v2Review = parsePersistedExecutionReview(diagnosis);
   const hasLinkedActivity = session.has_linked_activity === true;
@@ -593,7 +604,7 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     avgCadence !== null ? { label: "Average cadence", value: `${Math.round(avgCadence)} ${cadenceUnit}` } : null,
     elevationGainM !== null ? { label: "Elevation gain", value: `${Math.round(elevationGainM)} m` } : null,
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null
   ];
   const swimMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
@@ -601,12 +612,12 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     bestPacePer100mSec !== null ? { label: "Best pace /100m", value: formatPace100(bestPacePer100mSec) } : null,
     avgStrokeRateSpm !== null ? { label: "Average stroke rate", value: `${Math.round(avgStrokeRateSpm)} spm` } : null,
     avgSwolf !== null ? { label: "Average SWOLF", value: `${Math.round(avgSwolf)}` } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null,
     swimPaceFade !== null ? { label: "Late pace fade", value: pct(swimPaceFade - 1) } : null
   ];
   const defaultMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
-    intervalCompletion !== null ? { label: "Key reps completed", value: pct(intervalCompletion) } : null,
+    intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null,
     timeAbove !== null ? { label: "Time above target", value: pct(timeAbove) } : null,
     hrDrift !== null && bucket !== "threshold" ? { label: "Late HR drift", value: pct(hrDrift - 1) } : null,
     paceFade !== null && bucket === "long" ? { label: "Late pace fade", value: pct(paceFade - 1) } : null,
@@ -722,7 +733,8 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
           scoreBand,
           v2Review?.verdict?.explanation.oneThingToChange
             ?? v2Review?.verdict?.explanation.whatToDoNextTime
-            ?? null
+            ?? null,
+          options?.verdictAdaptationType
         )
       : null,
     loadContribution: trainingStressScore !== null

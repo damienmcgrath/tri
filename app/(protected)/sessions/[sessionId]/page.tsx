@@ -498,7 +498,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     }
   }
 
-  const reviewVm = createReviewViewModel(session);
+  const reviewVm = createReviewViewModel(session, { verdictAdaptationType: existingVerdictData?.adaptation_type ?? null });
 
   const sessionTitle = getSessionDisplayName({
     sessionName: session.session_name ?? session.type,
@@ -609,6 +609,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           sessionId={session.id}
           existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
           sessionCompleted={true}
+          discipline={session.discipline ?? session.sport}
         />
       ) : null}
 

@@ -290,7 +290,15 @@ function buildVerdictInstructions(): string {
     "- Keep key_deviations only for meaningful deviations (not minor noise).",
     "- If evidence is limited, reflect that by keeping recommendations conservative.",
     "- Be concise. Each field should use the minimum words needed to convey the insight.",
-    "- Return exactly one JSON object matching the required schema."
+    "- Return exactly one JSON object matching the required schema.",
+    "",
+    "Language rules (CRITICAL — violations make the output unreadable to athletes):",
+    "- NEVER use camelCase field names in any text field (e.g. do NOT write 'intervalCompletionPct', 'avgPower', 'timeAboveTargetPct', 'avgHr', 'normalizedPower').",
+    "- Use plain English instead: 'interval completion', 'average power', 'time above target', 'average heart rate', 'normalized power'.",
+    "- NEVER reference the internal execution score or score band in execution_summary or any text field. The score is displayed separately in the UI.",
+    "- Express interval completion as a count when possible (e.g. '3 of 5 intervals completed' or 'all 5 intervals completed'), not as a decimal or percentage of 'intervalCompletionPct'.",
+    "- Express abbreviations in full on first use: 'NP' → 'normalized power', 'VI' → 'variability index', 'TSS' → 'training stress score'. After first use, abbreviations are fine.",
+    "- In execution_summary, write ONE clear sentence about whether the session achieved its purpose. Move specific metrics to metric_comparisons."
   ].join("\n");
 }
 
@@ -407,6 +415,108 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
   };
 }
 
+// --- Humanize execution result before sending to AI ---
+
+function formatPacePerKm(sec: number): string {
+  const totalSec = Math.round(sec);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}/km`;
+}
+
+/**
+ * Translates raw execution_result JSONB into human-readable key-value pairs
+ * so the AI never sees camelCase field names like intervalCompletionPct.
+ */
+function humanizeExecutionResult(raw: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!raw) return null;
+
+  const result: Record<string, unknown> = {};
+
+  // Interval completion: 0-1 ratio → "X% of planned intervals completed" or "all planned intervals completed"
+  const intervalPct = typeof raw.intervalCompletionPct === "number" ? raw.intervalCompletionPct : null;
+  if (intervalPct !== null) {
+    const pctRounded = Math.round(intervalPct * 100);
+    result["interval_completion"] = pctRounded >= 100
+      ? "all planned intervals completed (100%)"
+      : `${pctRounded}% of planned intervals completed`;
+  }
+
+  // Time above target
+  const timeAbove = typeof raw.timeAboveTargetPct === "number" ? raw.timeAboveTargetPct : null;
+  if (timeAbove !== null) {
+    result["time_above_target_zone"] = `${Math.round(timeAbove * 100)}%`;
+  }
+
+  // Duration completion
+  const durCompletion = typeof raw.durationCompletion === "number" ? raw.durationCompletion : null;
+  if (durCompletion !== null) {
+    result["duration_completion"] = `${Math.round(durCompletion * 100)}%`;
+  }
+
+  // Heart rate
+  if (typeof raw.avgHr === "number") result["avg_heart_rate"] = `${Math.round(raw.avgHr)} bpm`;
+  if (typeof raw.maxHr === "number") result["max_heart_rate"] = `${Math.round(raw.maxHr)} bpm`;
+
+  // Power
+  if (typeof raw.avgPower === "number") result["avg_power"] = `${Math.round(raw.avgPower)} W`;
+  if (typeof raw.normalizedPower === "number") result["normalized_power"] = `${Math.round(raw.normalizedPower)} W`;
+  if (typeof raw.maxPower === "number") result["max_power"] = `${Math.round(raw.maxPower)} W`;
+
+  // Variability
+  if (typeof raw.variabilityIndex === "number") result["variability_index"] = Number(raw.variabilityIndex).toFixed(2);
+
+  // TSS / work
+  if (typeof raw.trainingStressScore === "number") result["training_stress_score"] = `${Math.round(raw.trainingStressScore)} TSS`;
+  if (typeof raw.totalWorkKj === "number") result["total_work"] = `${Math.round(raw.totalWorkKj)} kJ`;
+
+  // Cadence
+  if (typeof raw.avgCadence === "number") result["avg_cadence"] = `${Math.round(raw.avgCadence)}`;
+
+  // Swim metrics
+  if (typeof raw.avgPacePer100mSec === "number") result["avg_pace_per_100m"] = formatPace100m(raw.avgPacePer100mSec);
+  if (typeof raw.bestPacePer100mSec === "number") result["best_pace_per_100m"] = formatPace100m(raw.bestPacePer100mSec);
+  if (typeof raw.avgStrokeRateSpm === "number") result["avg_stroke_rate"] = `${Math.round(raw.avgStrokeRateSpm)} spm`;
+  if (typeof raw.avgSwolf === "number") result["avg_swolf"] = `${Math.round(raw.avgSwolf)}`;
+
+  // Elevation
+  if (typeof raw.elevationGainM === "number") result["elevation_gain"] = `${Math.round(raw.elevationGainM)} m`;
+
+  // Split metrics (HR drift, pace fade)
+  if (typeof raw.firstHalfAvgHr === "number" && typeof raw.lastHalfAvgHr === "number") {
+    const drift = ((raw.lastHalfAvgHr - raw.firstHalfAvgHr) / raw.firstHalfAvgHr * 100).toFixed(1);
+    result["hr_drift_first_to_second_half"] = `${drift}% (${Math.round(raw.firstHalfAvgHr)} → ${Math.round(raw.lastHalfAvgHr)} bpm)`;
+  }
+  if (typeof raw.firstHalfPaceSPerKm === "number" && typeof raw.lastHalfPaceSPerKm === "number") {
+    result["pace_fade_first_to_second_half"] = `${formatPacePerKm(raw.firstHalfPaceSPerKm)} → ${formatPacePerKm(raw.lastHalfPaceSPerKm)}`;
+  }
+
+  // Scoring (keep as context but use human names)
+  if (typeof raw.executionScore === "number") result["execution_score"] = raw.executionScore;
+  if (typeof raw.executionScoreBand === "string") result["execution_score_band"] = raw.executionScoreBand;
+  if (typeof raw.diagnosisConfidence === "string") result["confidence"] = raw.diagnosisConfidence;
+  if (typeof raw.executionCost === "string") result["execution_cost"] = raw.executionCost;
+  if (typeof raw.intentMatchStatus === "string") {
+    const statusMap: Record<string, string> = {
+      matched_intent: "matched",
+      partial_intent: "partial",
+      missed_intent: "missed"
+    };
+    result["intent_match"] = statusMap[raw.intentMatchStatus] ?? raw.intentMatchStatus;
+  }
+
+  // Pass through narrative fields (already human-readable)
+  if (typeof raw.executionSummary === "string") result["execution_summary"] = raw.executionSummary;
+  if (typeof raw.summary === "string") result["summary"] = raw.summary;
+  if (Array.isArray(raw.evidence)) result["evidence"] = raw.evidence;
+  if (Array.isArray(raw.missingEvidence)) result["missing_evidence"] = raw.missingEvidence;
+
+  // Pass through the verdict sub-object if present (it's already structured)
+  if (raw.verdict && typeof raw.verdict === "object") result["verdict"] = raw.verdict;
+
+  return result;
+}
+
 // --- Post-process AI output to remove raw seconds ---
 
 /** Trim text to the last complete sentence if it looks truncated (ends mid-word or with open paren). */
@@ -419,8 +529,52 @@ function trimToLastSentence(text: string): string {
   return trimmed;
 }
 
+/** Replace raw camelCase field names that the AI may echo despite instructions. */
+function sanitizeRawFieldNames(text: string): string {
+  let result = text;
+  // Replace camelCase metric names with human-readable equivalents
+  const fieldMap: Array<[RegExp, string]> = [
+    [/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m: string, v: string) => {
+      const pct = Math.round(parseFloat(v) * 100);
+      return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
+    }] as unknown as [RegExp, string],
+    [/\bintervalCompletionPct\b/gi, "interval completion"],
+    [/\btimeAboveTargetPct\b/gi, "time above target"],
+    [/\bavgPower\b/gi, "average power"],
+    [/\bavgHr\b/gi, "average heart rate"],
+    [/\bavgHR\b/g, "average HR"],
+    [/\bnormalizedPower\b/gi, "normalized power"],
+    [/\bvariabilityIndex\b/gi, "variability index"],
+    [/\btrainingStressScore\b/gi, "training stress score"],
+    [/\bavgCadence\b/gi, "average cadence"],
+    [/\bavgPacePer100mSec\b/gi, "average pace per 100m"],
+    [/\bavgStrokeRateSpm\b/gi, "average stroke rate"],
+    [/\bavgSwolf\b/gi, "average SWOLF"],
+    [/\belevationGainM\b/gi, "elevation gain"],
+    [/\bdurationCompletion\b/gi, "duration completion"],
+    [/\bexecutionScore\b/gi, "execution score"],
+    [/\bexecutionScoreBand\b/gi, "score band"],
+    [/\btotalWorkKj\b/gi, "total work"],
+    [/\bmaxHr\b/gi, "max heart rate"],
+    [/\bmaxPower\b/gi, "max power"],
+  ];
+  for (const [pattern, replacement] of fieldMap) {
+    if (typeof replacement === "function") {
+      result = result.replace(pattern, replacement as unknown as (...args: string[]) => string);
+    } else {
+      result = result.replace(pattern, replacement);
+    }
+  }
+  // Handle intervalCompletionPct = 1 pattern specifically (with equals sign)
+  result = result.replace(/interval completion\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
+  });
+  return result;
+}
+
 function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVerdictOutput {
-  const n = normalizeUnitString;
+  const n = (text: string) => sanitizeRawFieldNames(normalizeUnitString(text));
   return {
     ...verdict,
     purpose_statement: n(verdict.purpose_statement),
@@ -431,11 +585,13 @@ function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVer
     adaptation_signal: trimToLastSentence(n(verdict.adaptation_signal)),
     metric_comparisons: verdict.metric_comparisons.map(mc => ({
       ...mc,
+      metric: sanitizeRawFieldNames(mc.metric),
       target: n(mc.target),
       actual: n(mc.actual),
     })),
     key_deviations: verdict.key_deviations.map(d => ({
       ...d,
+      metric: sanitizeRawFieldNames(d.metric),
       description: n(d.description),
     })),
   };
@@ -484,6 +640,7 @@ export async function generateSessionVerdict(
               type: "input_text" as const,
               text: JSON.stringify({
                 ...ctx,
+                executionResult: humanizeExecutionResult(ctx.executionResult),
                 activity: ctx.activity ? {
                   ...ctx.activity,
                   durationSec: undefined,

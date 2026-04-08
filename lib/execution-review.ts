@@ -794,7 +794,7 @@ function buildEvidenceSummary(evidence: ExecutionEvidence) {
     points.push(`normalized power ${Math.round(evidence.actual.normalizedPower)} w`);
   }
   if (typeof evidence.actual.variabilityIndex === "number") {
-    points.push(`VI ${evidence.actual.variabilityIndex.toFixed(2)}`);
+    points.push(`variability index ${evidence.actual.variabilityIndex.toFixed(2)}`);
   }
   if (typeof evidence.actual.trainingStressScore === "number") {
     points.push(`TSS ${Math.round(evidence.actual.trainingStressScore)}`);

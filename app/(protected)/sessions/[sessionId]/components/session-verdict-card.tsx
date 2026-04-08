@@ -2,6 +2,49 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+/** Sanitize raw camelCase field names that may exist in stored verdict text. */
+function sanitizeText(text: string): string {
+  let result = text;
+  // Handle intervalCompletionPct = <value> pattern first (with = or :)
+  result = result.replace(/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
+  });
+  // Handle (intervalCompletionPct <value>) pattern in parentheses
+  result = result.replace(/\(intervalCompletionPct\s+([\d.]+)\)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "(all planned intervals completed)" : `(${pct}% of planned intervals completed)`;
+  });
+  // Replace remaining raw field names
+  const fieldMap: [RegExp, string][] = [
+    [/\bintervalCompletionPct\b/gi, "interval completion"],
+    [/\btimeAboveTargetPct\b/gi, "time above target"],
+    [/\bavgPower\b/gi, "avg power"],
+    [/\bavgHr\b/gi, "avg heart rate"],
+    [/\bavgHR\b/g, "avg HR"],
+    [/\bnormalizedPower\b/gi, "normalized power"],
+    [/\bvariabilityIndex\b/gi, "variability index"],
+    [/\btrainingStressScore\b/gi, "training stress score"],
+    [/\bavgCadence\b/gi, "avg cadence"],
+    [/\bavgPacePer100mSec\b/gi, "avg pace per 100m"],
+    [/\bavgStrokeRateSpm\b/gi, "avg stroke rate"],
+    [/\bavgSwolf\b/gi, "avg SWOLF"],
+    [/\belevationGainM\b/gi, "elevation gain"],
+    [/\bdurationCompletion\b/gi, "duration completion"],
+    [/\btotalWorkKj\b/gi, "total work"],
+    [/\bmaxHr\b/gi, "max heart rate"],
+    [/\bmaxPower\b/gi, "max power"],
+  ];
+  for (const [pattern, replacement] of fieldMap) {
+    result = result.replace(pattern, replacement);
+  }
+  // Expand common abbreviations in metric dumps: "NP " → "normalized power "
+  // Only when preceded by comma/space and followed by a number (to avoid false matches in prose)
+  result = result.replace(/\bNP\s+(\d)/g, "normalized power $1");
+  result = result.replace(/\bVI\s+([\d.])/g, "variability index $1");
+  return result;
+}
+
 type VerdictStatus = "achieved" | "partial" | "missed" | "off_target";
 type AdaptationType = "proceed" | "flag_review" | "modify" | "redistribute";
 
@@ -34,6 +77,7 @@ type Props = {
   sessionId: string;
   existingVerdict?: SessionVerdict | null;
   sessionCompleted: boolean;
+  discipline?: string | null;
 };
 
 const STATUS_CONFIG: Record<VerdictStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -114,7 +158,36 @@ const ADAPTATION_LABELS: Record<string, string> = {
   redistribute: "Redistribution suggested"
 };
 
-export function SessionVerdictCard({ sessionId, existingVerdict, sessionCompleted }: Props) {
+function getContextualExplanation(verdictStatus: VerdictStatus, discipline: string | null | undefined, deviations: Deviation[] | null): string {
+  const statusExplanation: Record<VerdictStatus, string> = {
+    achieved: "The session delivered its intended physiological stimulus — the training effect you planned for landed.",
+    partial: "Some of the intended training stimulus landed, but meaningful gaps reduce the session's effectiveness.",
+    missed: "The session did not deliver its intended stimulus — the planned training effect was largely missed.",
+    off_target: "Execution diverged significantly from the plan — the session delivered a different stimulus than intended."
+  };
+
+  let explanation = statusExplanation[verdictStatus];
+
+  // Add sport-specific context about what deviations mean
+  if (deviations && deviations.length > 0) {
+    const sport = (discipline ?? "").toLowerCase();
+    const deviationTopics = deviations.map(d => d.metric.toLowerCase()).join(", ");
+
+    if (sport === "swim" && /interval|block|set/.test(deviationTopics)) {
+      explanation += " For swim, completing the full set structure matters more than raw pace — missing blocks reduces the volume of specific stimulus your body adapts to.";
+    } else if (sport === "bike" && /power|block|interval/.test(deviationTopics)) {
+      explanation += " For cycling, completing sustained power blocks at the intended intensity is the primary adaptation driver — cutting blocks short reduces the time-at-intensity your body needs to improve.";
+    } else if (sport === "run" && /pace|hr|drift/.test(deviationTopics)) {
+      explanation += " For running, the combination of pace control and cardiac response tells you whether the effort was sustainable or pushed into fatigue territory.";
+    } else if (/completion|interval|block|rep/.test(deviationTopics)) {
+      explanation += " Completing planned work blocks matters because each rep or block contributes a specific dose of training stimulus — cutting them short reduces the intended adaptation.";
+    }
+  }
+
+  return explanation;
+}
+
+export function SessionVerdictCard({ sessionId, existingVerdict, sessionCompleted, discipline }: Props) {
   const [verdict, setVerdict] = useState<SessionVerdict | null>(existingVerdict ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,9 +277,9 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       <div className="divide-y divide-[hsl(var(--border))]">
         {/* Part 1: Purpose Statement */}
         <div className="px-5 py-4">
-          <p className="text-sm text-muted">{verdict.purpose_statement}</p>
+          <p className="text-sm text-muted">{sanitizeText(verdict.purpose_statement)}</p>
           {verdict.training_block_context && (
-            <p className="mt-1 text-xs text-tertiary">{verdict.training_block_context}</p>
+            <p className="mt-1 text-xs text-tertiary">{sanitizeText(verdict.training_block_context)}</p>
           )}
         </div>
 
@@ -227,7 +300,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                 {status.label}
               </p>
             </div>
-            <p className="mt-3 text-sm text-white leading-relaxed">{verdict.execution_summary}</p>
+            <p className="mt-3 text-sm text-white leading-relaxed">{sanitizeText(verdict.execution_summary)}</p>
           </div>
 
           {/* Metric comparisons */}
@@ -245,13 +318,13 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                   <tbody className="divide-y divide-[hsl(var(--border))]">
                     {visibleMetrics.map((mc, i) => (
                       <tr key={i}>
-                        <td className="px-3 py-2 text-muted">{mc.metric}</td>
-                        <td className="px-3 py-2 text-right text-tertiary">{mc.target}</td>
+                        <td className="px-3 py-2 text-muted">{sanitizeText(mc.metric)}</td>
+                        <td className="px-3 py-2 text-right text-tertiary">{sanitizeText(mc.target)}</td>
                         <td className={`px-3 py-2 text-right font-medium ${
                           mc.assessment === "on_target" ? "text-success" :
                           mc.assessment === "missing" ? "text-tertiary" : "text-warning"
                         }`}>
-                          {mc.actual}
+                          {sanitizeText(mc.actual)}
                         </td>
                       </tr>
                     ))}
@@ -276,7 +349,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
               {verdict.key_deviations.map((dev, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <DeviationIcon severity={dev.severity} />
-                  <span className="text-muted leading-relaxed">{dev.description}</span>
+                  <span className="text-muted leading-relaxed">{sanitizeText(dev.description)}</span>
                 </div>
               ))}
             </div>
@@ -293,11 +366,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
           {showExplanation && (
             <div className="mt-2 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
               <p className="text-sm text-muted leading-relaxed">
-                The verdict status reflects how well the actual execution matched the session&apos;s intended physiological stimulus.
-                &quot;Achieved&quot; means the session delivered its intended training effect.
-                &quot;Partial&quot; means some but not all targets were met.
-                &quot;Missed&quot; means the session did not deliver its intended stimulus.
-                Key deviations highlight specific metrics that diverged meaningfully from the plan.
+                {getContextualExplanation(verdict.verdict_status, discipline, verdict.key_deviations)}
               </p>
             </div>
           )}
@@ -306,7 +375,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
         {/* Part 3: Adaptation Signal */}
         <div className="px-5 py-4">
           <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What this means for your plan</p>
-          <p className="mt-2 text-sm text-white leading-relaxed">{verdict.adaptation_signal}</p>
+          <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.adaptation_signal)}</p>
           {verdict.adaptation_type && verdict.adaptation_type !== "proceed" && (
             <div
               className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs"
