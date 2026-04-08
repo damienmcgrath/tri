@@ -48,7 +48,7 @@ export async function computeWeeklyDisciplineBalance(
   // Fetch planned sessions for the same week
   const { data: planned } = await supabase
     .from("sessions")
-    .select("sport, duration_minutes")
+    .select("sport, duration_minutes, status")
     .eq("user_id", userId)
     .gte("date", weekStart)
     .lte("date", weekEnd);
@@ -56,16 +56,33 @@ export async function computeWeeklyDisciplineBalance(
   const actual: Record<string, DisciplineVolume> = {};
   let totalActualTss = 0;
 
-  for (const row of loads ?? []) {
-    const sport = row.sport ?? "other";
-    const tss = Number(row.tss) || 0;
-    const durMin = row.duration_sec ? Math.round(Number(row.duration_sec) / 60) : 0;
+  if (loads && loads.length > 0) {
+    // Use session_load data when available (activity files uploaded)
+    for (const row of loads) {
+      const sport = row.sport ?? "other";
+      const tss = Number(row.tss) || 0;
+      const durMin = row.duration_sec ? Math.round(Number(row.duration_sec) / 60) : 0;
 
-    if (!actual[sport]) actual[sport] = { tss: 0, durationMinutes: 0, sessionCount: 0 };
-    actual[sport].tss += tss;
-    actual[sport].durationMinutes += durMin;
-    actual[sport].sessionCount += 1;
-    totalActualTss += tss;
+      if (!actual[sport]) actual[sport] = { tss: 0, durationMinutes: 0, sessionCount: 0 };
+      actual[sport].tss += tss;
+      actual[sport].durationMinutes += durMin;
+      actual[sport].sessionCount += 1;
+      totalActualTss += tss;
+    }
+  } else {
+    // Fallback: derive actuals from completed sessions (duration as TSS proxy)
+    for (const row of planned ?? []) {
+      if (row.status !== "completed") continue;
+      const sport = row.sport ?? "other";
+      const durMin = row.duration_minutes ?? 0;
+      const estimatedTss = durMin; // same heuristic as planned TSS
+
+      if (!actual[sport]) actual[sport] = { tss: 0, durationMinutes: 0, sessionCount: 0 };
+      actual[sport].tss += estimatedTss;
+      actual[sport].durationMinutes += durMin;
+      actual[sport].sessionCount += 1;
+      totalActualTss += estimatedTss;
+    }
   }
 
   const plannedAgg: Record<string, DisciplineVolume> = {};

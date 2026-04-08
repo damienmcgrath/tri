@@ -39,9 +39,19 @@ export function TrainingScoreCard({ score }: Props) {
 
   return (
     <article className="surface p-4 md:p-5">
-      <div className="flex items-center gap-4">
-        {/* Score ring */}
-        <div className="relative h-20 w-20 shrink-0">
+      {/* Header row: label + delta */}
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Training score</p>
+        {delta7d ? (
+          <span className={`text-[11px] font-medium ${getDeltaClass(score.scoreDelta7d)}`}>
+            {score.scoreDelta7d! > 0 ? "↑" : score.scoreDelta7d! < 0 ? "↓" : ""}{delta7d} this week
+          </span>
+        ) : null}
+      </div>
+
+      {/* Score ring — centered */}
+      <div className="mt-3 flex flex-col items-center">
+        <div className="relative h-24 w-24">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
             <circle
               cx="50" cy="50" r="40"
@@ -60,32 +70,19 @@ export function TrainingScoreCard({ score }: Props) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-xl font-bold ${getScoreColour(score.compositeScore)}`}>
-              {Math.round(score.compositeScore)}
-            </span>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Training score</p>
-          <div className="mt-1 flex items-baseline gap-2">
             <span className={`text-2xl font-bold ${getScoreColour(score.compositeScore)}`}>
               {Math.round(score.compositeScore)}
             </span>
-            {delta7d ? (
-              <span className={`text-sm font-medium ${getDeltaClass(score.scoreDelta7d)}`}>
-                {score.scoreDelta7d! > 0 ? "↑" : score.scoreDelta7d! < 0 ? "↓" : ""}{delta7d} this week
-              </span>
-            ) : null}
           </div>
-          {!score.progressionActive ? (
-            <p className="mt-0.5 text-[11px] text-tertiary">Progression tracking builds with 2+ weeks of data</p>
-          ) : null}
         </div>
+
+        {!score.progressionActive ? (
+          <p className="mt-2 text-center text-[11px] text-tertiary">Progression tracking builds with 2+ weeks of data</p>
+        ) : null}
       </div>
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex items-center justify-center gap-3">
         <button
           onClick={() => setExpanded(!expanded)}
           className="text-[11px] font-medium text-tertiary transition hover:text-white"

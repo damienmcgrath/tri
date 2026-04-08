@@ -17,6 +17,21 @@ const PREVIEW_LINK_EXTRA_RUN_ID = "66666666-6666-4666-8666-666666666663";
 const PREVIEW_LINK_SWIM_ID = "66666666-6666-4666-8666-666666666664";
 const PREVIEW_LINK_LONG_RUN_ID = "66666666-6666-4666-8666-666666666665";
 const PREVIEW_WEEK_FOUR_ID = "33333333-3333-4333-8333-333333333334";
+const PREVIEW_WEEK_FIVE_ID = "33333333-3333-4333-8333-333333333335";
+
+function previewMonday(): string {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const dist = day === 0 ? 6 : day - 1;
+  const mon = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - dist));
+  return mon.toISOString().slice(0, 10);
+}
+
+function previewDateOffset(mondayIso: string, offset: number): string {
+  const d = new Date(`${mondayIso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
 
 type PreviewTableName =
   | "profiles"
@@ -41,7 +56,8 @@ type PreviewTableName =
   | "week_transition_briefings"
   | "session_comparisons"
   | "session_intensity_profiles"
-  | "weekly_intensity_summaries";
+  | "weekly_intensity_summaries"
+  | "session_load";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -121,6 +137,16 @@ export function createPreviewDatabase(): PreviewDatabase {
         notes: "Ramp back up after recovery. Two key sessions anchor the week.",
         target_minutes: 540,
         target_tss: 450
+      },
+      {
+        id: PREVIEW_WEEK_FIVE_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        week_index: 5,
+        week_start_date: previewMonday(),
+        focus: "Build",
+        notes: "Continue build phase with balanced discipline work.",
+        target_minutes: 520,
+        target_tss: 440
       }
     ],
     sessions: [
@@ -489,7 +515,123 @@ export function createPreviewDatabase(): PreviewDatabase {
         created_at: "2026-03-29T18:05:00.000Z",
         is_key: true,
         execution_result: null
-      }
+      },
+      // ── Week 5 sessions (current week — dynamically dated) ──
+      ...(() => {
+        const mon = previewMonday();
+        return [
+          {
+            id: "77777777-7777-4777-8777-777777777790",
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 0),
+            sport: "swim",
+            discipline: "swim",
+            type: "Endurance Swim",
+            session_name: "Endurance Swim",
+            target: "2000m continuous aerobic",
+            duration_minutes: 45,
+            intent_category: "easy",
+            session_role: "supporting",
+            status: "completed",
+            day_order: 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+            is_key: false,
+            execution_result: { status: "matched_intent", executionScore: 88, executionScoreBand: "On target", executionScoreSummary: "Solid aerobic swim.", whyItMatters: "Builds aerobic base.", recommendedNextAction: "Maintain." }
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777791",
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 1),
+            sport: "bike",
+            discipline: "bike",
+            type: "Sweet Spot Intervals",
+            session_name: "Sweet Spot Intervals",
+            target: "3 x 15 min @ 88-93% FTP",
+            duration_minutes: 75,
+            intent_category: "threshold",
+            session_role: "key",
+            status: "completed",
+            day_order: 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+            is_key: true,
+            execution_result: { status: "matched_intent", executionScore: 82, executionScoreBand: "On target", executionScoreSummary: "Intervals clean.", whyItMatters: "Sweet spot builds FTP.", recommendedNextAction: "Hold same targets." }
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777792",
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 2),
+            sport: "run",
+            discipline: "run",
+            type: "Easy Run",
+            session_name: "Easy Run",
+            target: "35 min easy aerobic",
+            duration_minutes: 35,
+            intent_category: "easy",
+            session_role: "recovery",
+            status: "completed",
+            day_order: 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+            is_key: false,
+            execution_result: { status: "matched_intent", executionScore: 90, executionScoreBand: "On target", executionScoreSummary: "Controlled easy run.", whyItMatters: "Recovery between key sessions.", recommendedNextAction: "Keep easy." }
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777793",
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 4),
+            sport: "bike",
+            discipline: "bike",
+            type: "Endurance Ride",
+            session_name: "Endurance Ride",
+            target: "90 min aerobic with cadence drills",
+            duration_minutes: 90,
+            intent_category: "easy",
+            session_role: "supporting",
+            status: "planned",
+            day_order: 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+            is_key: false,
+            execution_result: null
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777794",
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 5),
+            sport: "run",
+            discipline: "run",
+            type: "Tempo Run",
+            session_name: "Tempo Run",
+            target: "50 min with 3 x 10 min @ threshold",
+            duration_minutes: 50,
+            intent_category: "threshold",
+            session_role: "key",
+            status: "planned",
+            day_order: 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+            is_key: true,
+            execution_result: null
+          }
+        ];
+      })()
     ],
     planned_sessions: [],
     completed_sessions: [
@@ -1434,14 +1576,55 @@ export function createPreviewDatabase(): PreviewDatabase {
       }
     ],
     session_intensity_profiles: [],
-    weekly_intensity_summaries: []
+    weekly_intensity_summaries: [],
+    session_load: (() => {
+      const mon = previewMonday();
+      return [
+        {
+          id: "ff000001-0000-4000-8000-000000000001",
+          user_id: PREVIEW_USER_ID,
+          activity_id: PREVIEW_ACTIVITY_SWIM_ID,
+          session_id: "77777777-7777-4777-8777-777777777790",
+          sport: "swim",
+          date: previewDateOffset(mon, 0),
+          tss: 48,
+          tss_source: "hr",
+          duration_sec: 2700,
+          intensity_factor: null
+        },
+        {
+          id: "ff000002-0000-4000-8000-000000000002",
+          user_id: PREVIEW_USER_ID,
+          activity_id: PREVIEW_ACTIVITY_ONE_ID,
+          session_id: "77777777-7777-4777-8777-777777777791",
+          sport: "bike",
+          date: previewDateOffset(mon, 1),
+          tss: 82,
+          tss_source: "power",
+          duration_sec: 4500,
+          intensity_factor: 0.88
+        },
+        {
+          id: "ff000003-0000-4000-8000-000000000003",
+          user_id: PREVIEW_USER_ID,
+          activity_id: PREVIEW_ACTIVITY_TWO_ID,
+          session_id: "77777777-7777-4777-8777-777777777792",
+          sport: "run",
+          date: previewDateOffset(mon, 2),
+          tss: 32,
+          tss_source: "hr",
+          duration_sec: 2100,
+          intensity_factor: null
+        }
+      ];
+    })()
   };
 }
 
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 4;
+const PREVIEW_DATABASE_VERSION = 5;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
