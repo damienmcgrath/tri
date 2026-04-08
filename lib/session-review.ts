@@ -113,6 +113,31 @@ function formatIntervalCompletion(value: number): string {
   return `${pctVal}%`;
 }
 
+/** Sanitize raw camelCase field names that may appear in AI-generated text. */
+function sanitizeFieldNames(text: string): string {
+  let result = text;
+  // intervalCompletionPct ≥ 1.0 → "all planned intervals completed"
+  result = result.replace(/\bintervalCompletionPct\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
+  // intervalCompletionPct = 0.33 → "33% of planned intervals completed"
+  result = result.replace(/\bintervalCompletionPct\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return `${pct}% of planned intervals completed`;
+  });
+  result = result.replace(/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
+  });
+  result = result.replace(/\bintervalCompletionPct\b/gi, "interval completion");
+  result = result.replace(/\btimeAboveTargetPct\b/gi, "time above target");
+  result = result.replace(/\bavgPower\b/gi, "avg power");
+  result = result.replace(/\bavgHr\b/gi, "avg heart rate");
+  result = result.replace(/\bnormalizedPower\b/gi, "normalized power");
+  result = result.replace(/\bvariabilityIndex\b/gi, "variability index");
+  result = result.replace(/\btrainingStressScore\b/gi, "training stress score");
+  result = result.replace(/\btotalWorkKj\b/gi, "total work");
+  return result;
+}
+
 export function durationLabel(minutes: number | null | undefined) {
   if (!minutes || minutes <= 0) return "—";
   const wholeMinutes = Math.round(minutes);
@@ -212,13 +237,13 @@ function deriveOneThingToChange(
     ];
     const worst = components.reduce((a, b) => (a.score <= b.score ? a : b));
     if (worst.score < 80) {
-      return `NEXT ${worst.label}: ${worst.detail}`;
+      return sanitizeFieldNames(`NEXT ${worst.label}: ${worst.detail}`);
     }
   }
   if ((scoreBand === "On target" || scoreBand === "Solid") && !verdictSuggestsChange) {
     return "Maintain this approach. Same targets next time.";
   }
-  return aiNextAction || (verdictSuggestsChange ? null : null);
+  return aiNextAction ? sanitizeFieldNames(aiNextAction) : null;
 }
 
 function toExtraReviewState(hasDiagnosticSignals: boolean) {
@@ -712,13 +737,13 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     executionCostLabel,
     confidenceLabel,
     plannedIntent,
-    actualExecutionSummary,
+    actualExecutionSummary: sanitizeFieldNames(actualExecutionSummary),
     mainGapLabel,
-    mainGap,
+    mainGap: sanitizeFieldNames(mainGap),
     usefulMetrics,
-    whyItMatters,
-    nextAction,
-    weekAction,
+    whyItMatters: sanitizeFieldNames(whyItMatters),
+    nextAction: sanitizeFieldNames(nextAction),
+    weekAction: sanitizeFieldNames(weekAction),
     uncertaintyTitle,
     uncertaintyDetail,
     missingEvidence,
