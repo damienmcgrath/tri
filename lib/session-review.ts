@@ -116,18 +116,22 @@ function formatIntervalCompletion(value: number): string {
 /** Sanitize raw camelCase field names that may appear in AI-generated text. */
 function sanitizeFieldNames(text: string): string {
   let result = text;
-  // intervalCompletionPct ≥ 1.0 → "all planned intervals completed"
-  result = result.replace(/\bintervalCompletionPct\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
-  // intervalCompletionPct = 0.33 → "33% of planned intervals completed"
-  result = result.replace(/\bintervalCompletionPct\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+  // intervalCompletionPct or intervalCompletion with comparison operators and values
+  // Match both "intervalCompletionPct" and "intervalCompletion" (with or without Pct suffix)
+  // ≥ 1.0 → "all planned intervals completed"
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
+  // ≥ 0.66 or < 0.9 etc → "66% of planned intervals completed"
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
     const pct = Math.round(parseFloat(v) * 100);
-    return `${pct}% of planned intervals completed`;
+    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
   });
-  result = result.replace(/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+  // = or : with value
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
     const pct = Math.round(parseFloat(v) * 100);
     return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
   });
-  result = result.replace(/\bintervalCompletionPct\b/gi, "interval completion");
+  // Bare field name without value
+  result = result.replace(/\bintervalCompletion(?:Pct)?\b/gi, "interval completion");
   result = result.replace(/\btimeAboveTargetPct\b/gi, "time above target");
   result = result.replace(/\bavgPower\b/gi, "avg power");
   result = result.replace(/\bavgHr\b/gi, "avg heart rate");
@@ -135,6 +139,11 @@ function sanitizeFieldNames(text: string): string {
   result = result.replace(/\bvariabilityIndex\b/gi, "variability index");
   result = result.replace(/\btrainingStressScore\b/gi, "training stress score");
   result = result.replace(/\btotalWorkKj\b/gi, "total work");
+  // Expand "NP" abbreviation — match when used as a standalone term (not inside a word)
+  // but only in metric contexts (followed by space + word/number, or at end after possessive)
+  result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
+  result = result.replace(/today's NP\b/g, "today's normalized power");
+  result = result.replace(/\bVI\b(?=\s+(?:of|was|is|at|\d))/g, "variability index");
   return result;
 }
 

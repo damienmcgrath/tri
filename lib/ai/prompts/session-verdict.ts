@@ -534,11 +534,11 @@ function sanitizeRawFieldNames(text: string): string {
   let result = text;
   // Replace camelCase metric names with human-readable equivalents
   const fieldMap: Array<[RegExp, string]> = [
-    [/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m: string, v: string) => {
+    [/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m: string, v: string) => {
       const pct = Math.round(parseFloat(v) * 100);
       return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
     }] as unknown as [RegExp, string],
-    [/\bintervalCompletionPct\b/gi, "interval completion"],
+    [/\bintervalCompletion(?:Pct)?\b/gi, "interval completion"],
     [/\btimeAboveTargetPct\b/gi, "time above target"],
     [/\bavgPower\b/gi, "average power"],
     [/\bavgHr\b/gi, "average heart rate"],
@@ -565,11 +565,20 @@ function sanitizeRawFieldNames(text: string): string {
       result = result.replace(pattern, replacement);
     }
   }
-  // Handle intervalCompletionPct = 1 pattern specifically (with equals sign)
+  // Handle "interval completion = 1" pattern (already partially replaced)
   result = result.replace(/interval completion\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
     const pct = Math.round(parseFloat(v) * 100);
     return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
   });
+  // Handle comparison operators (≥, >=, etc.)
+  result = result.replace(/interval completion\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
+  });
+  // Expand NP/VI abbreviations in metric contexts
+  result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
+  result = result.replace(/today's NP\b/g, "today's normalized power");
+  result = result.replace(/\bVI\b(?=\s+(?:of|was|is|at|\d))/g, "variability index");
   return result;
 }
 

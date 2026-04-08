@@ -5,19 +5,24 @@ import { useState, useEffect, useCallback } from "react";
 /** Sanitize raw camelCase field names that may exist in stored verdict text. */
 function sanitizeText(text: string): string {
   let result = text;
-  // Handle intervalCompletionPct = <value> pattern first (with = or :)
-  result = result.replace(/\bintervalCompletionPct\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
+  // Handle intervalCompletion(Pct) with comparison operators and values
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+    const pct = Math.round(parseFloat(v) * 100);
+    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
+  });
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
     const pct = Math.round(parseFloat(v) * 100);
     return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
   });
   // Handle (intervalCompletionPct <value>) pattern in parentheses
-  result = result.replace(/\(intervalCompletionPct\s+([\d.]+)\)/gi, (_m, v) => {
+  result = result.replace(/\(intervalCompletion(?:Pct)?\s+([\d.]+)\)/gi, (_m, v) => {
     const pct = Math.round(parseFloat(v) * 100);
     return pct >= 100 ? "(all planned intervals completed)" : `(${pct}% of planned intervals completed)`;
   });
   // Replace remaining raw field names
   const fieldMap: [RegExp, string][] = [
-    [/\bintervalCompletionPct\b/gi, "interval completion"],
+    [/\bintervalCompletion(?:Pct)?\b/gi, "interval completion"],
     [/\btimeAboveTargetPct\b/gi, "time above target"],
     [/\bavgPower\b/gi, "avg power"],
     [/\bavgHr\b/gi, "avg heart rate"],
@@ -38,10 +43,10 @@ function sanitizeText(text: string): string {
   for (const [pattern, replacement] of fieldMap) {
     result = result.replace(pattern, replacement);
   }
-  // Expand common abbreviations in metric dumps: "NP " → "normalized power "
-  // Only when preceded by comma/space and followed by a number (to avoid false matches in prose)
-  result = result.replace(/\bNP\s+(\d)/g, "normalized power $1");
-  result = result.replace(/\bVI\s+([\d.])/g, "variability index $1");
+  // Expand "NP" and "VI" abbreviations in metric contexts
+  result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
+  result = result.replace(/today's NP\b/g, "today's normalized power");
+  result = result.replace(/\bVI\b(?=\s+(?:of|was|is|at|\d))/g, "variability index");
   return result;
 }
 
