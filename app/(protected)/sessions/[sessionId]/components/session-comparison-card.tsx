@@ -13,7 +13,13 @@ type Props = {
   comparison: SessionComparison;
   trends?: WeeklyTrend[];
   aiComparisons?: StoredComparison[];
+  sport?: string;
 };
+
+function normalizeSport(s: string): string {
+  const lower = s.toLowerCase();
+  return lower === "cycling" ? "bike" : lower;
+}
 
 function trendBadge(direction: string, confidence?: string) {
   const isLowConfidence = confidence === "low";
@@ -32,15 +38,13 @@ function trendBadge(direction: string, confidence?: string) {
   return { label: "Stable", className: "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] text-tertiary" };
 }
 
-export function SessionComparisonCard({ comparison, trends = [], aiComparisons = [] }: Props) {
+export function SessionComparisonCard({ comparison, trends = [], aiComparisons = [], sport }: Props) {
   const previousDateLabel = comparisonDateFormatter.format(new Date(`${comparison.previousDate}T00:00:00.000Z`));
 
-  // Match trends to metrics in this comparison
-  const matchedTrends = trends.filter((trend) =>
-    comparison.metrics.some((m) =>
-      m.metric.toLowerCase().includes(trend.metric.toLowerCase().split(" ").pop() ?? "")
-    )
-  );
+  // Filter trends to only show metrics for the current sport
+  const matchedTrends = sport
+    ? trends.filter((trend) => normalizeSport(trend.sport) === normalizeSport(sport))
+    : trends;
 
   // Get best AI narrative (prefer recent range)
   const bestAiComparison = aiComparisons.find((c) => c.comparisonRange === "recent") ?? aiComparisons[0];

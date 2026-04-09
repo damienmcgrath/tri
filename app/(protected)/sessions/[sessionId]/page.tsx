@@ -726,7 +726,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       </section>
 
       {/* ── Section 4: Compared to Previous ── */}
-      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} /> : null}
+      {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} sport={session.sport} /> : null}
 
       {/* ── Section 5: Details + Follow-up (progressive disclosure) ── */}
 
