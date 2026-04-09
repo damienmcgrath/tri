@@ -43,7 +43,7 @@ async function loadWeeklyDebriefInputs(args: {
   const activityRangeStart = `${addDays(args.weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(args.weekEnd, 2)}T00:00:00.000Z`;
 
-  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }] = await Promise.all([
+  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }, { data: feelsData }] = await Promise.all([
     args.supabase
       .from("sessions")
       .select("id,athlete_id,user_id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
@@ -68,7 +68,12 @@ async function loadWeeklyDebriefInputs(args: {
       .select("fatigue_score,stress_score,motivation_score,week_notes")
       .eq("user_id", args.athleteId)
       .eq("week_start", args.weekStart)
-      .maybeSingle()
+      .maybeSingle(),
+    args.supabase
+      .from("session_feels")
+      .select("session_id,overall_feel,energy_level,legs_feel,motivation,sleep_quality,life_stress,note")
+      .eq("user_id", args.athleteId)
+      .not("overall_feel", "is", null)
   ]);
 
   if (sessionsError) {
@@ -87,10 +92,22 @@ async function loadWeeklyDebriefInputs(args: {
       }
     : null;
 
+  const sessionFeels = (feelsData ?? []).map((f) => ({
+    sessionId: f.session_id as string,
+    overallFeel: f.overall_feel as number,
+    energyLevel: (f.energy_level as string) ?? null,
+    legsFeel: (f.legs_feel as string) ?? null,
+    motivation: (f.motivation as string) ?? null,
+    sleepQuality: (f.sleep_quality as string) ?? null,
+    lifeStress: (f.life_stress as string) ?? null,
+    note: (f.note as string) ?? null
+  }));
+
   return {
     sessions: (sessionsData ?? []) as WeeklyDebriefSession[],
     activities: activities as WeeklyDebriefActivity[],
     links: (linksData ?? []) as WeeklyDebriefLink[],
+    sessionFeels,
     athleteContext,
     checkIn,
     timeZone: args.timeZone,
