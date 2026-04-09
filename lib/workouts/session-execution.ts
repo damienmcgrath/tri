@@ -107,8 +107,10 @@ export function deriveWorkIntervalAvgPower(args: {
     workLaps = lapsWithPower.filter((lap) => lap.avgPower! >= maxLapPower * 0.70);
   }
 
-  // Need at least 2 work laps to be confident this is an interval session
-  if (workLaps.length < 2) return null;
+  // Need at least 1 work lap that is a strict subset of all laps.
+  // Allow a single work lap when the plan calls for exactly 1 interval (e.g. 1x20min).
+  const minWorkLaps = args.plannedIntervals === 1 ? 1 : 2;
+  if (workLaps.length < minWorkLaps) return null;
 
   // Work laps should be a subset (not all laps) — otherwise it's a steady session
   if (workLaps.length === lapsWithPower.length) return null;
@@ -305,6 +307,15 @@ export function shouldRefreshExecutionResultFromActivity(
   }
 
   if (activity.sport_type === "swim" && hasLapStructure && getNumber(current, ["lengthCount", "length_count"]) === null) {
+    return true;
+  }
+
+  // If the activity has laps with power data but the result has no avgIntervalPower,
+  // refresh so we can derive work-interval power for threshold sessions.
+  const lapsWithPower = getMetricsV2Laps(activity.metrics_v2).filter(
+    (lap) => lap.avgPower != null && lap.avgPower > 0 && lap.durationSec != null && lap.durationSec > 0
+  );
+  if (lapsWithPower.length >= 2 && getNumber(current, ["avgIntervalPower", "avg_interval_power"]) === null) {
     return true;
   }
 

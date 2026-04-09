@@ -358,6 +358,54 @@ describe("shouldRefreshExecutionResultFromActivity", () => {
       }
     )).toBe(true);
   });
+
+  test("returns true when activity has laps with power but result lacks avgIntervalPower", () => {
+    expect(shouldRefreshExecutionResultFromActivity(
+      { normalizedPower: 177, avgPower: 166 },
+      {
+        id: "a1",
+        sport_type: "bike",
+        duration_sec: 3120,
+        distance_m: 25000,
+        avg_hr: 145,
+        avg_power: 166,
+        parse_summary: {},
+        metrics_v2: {
+          power: { normalizedPower: 177 },
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210 },
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 215 },
+          ]
+        }
+      }
+    )).toBe(true);
+  });
+
+  test("returns false when result already has avgIntervalPower", () => {
+    expect(shouldRefreshExecutionResultFromActivity(
+      { normalizedPower: 177, avgPower: 166, avgIntervalPower: 213 },
+      {
+        id: "a1",
+        sport_type: "bike",
+        duration_sec: 3120,
+        distance_m: 25000,
+        avg_hr: 145,
+        avg_power: 166,
+        parse_summary: {},
+        metrics_v2: {
+          power: { normalizedPower: 177 },
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210 },
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 215 },
+          ]
+        }
+      }
+    )).toBe(false);
+  });
 });
 
 describe("deriveWorkIntervalAvgPower", () => {
@@ -478,6 +526,45 @@ describe("deriveWorkIntervalAvgPower", () => {
       plannedIntervals: 2,
     });
     // Only 1 lap at >=160W (200*0.80) → fewer than 2 work laps → null
+    expect(result).toBeNull();
+  });
+
+  test("allows single work lap when plannedIntervals is 1", () => {
+    // 1x20min at ~205W with warm-up and cool-down
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 1200, distanceM: 12000, avgPower: 205 },
+            { index: 2, durationSec: 600, distanceM: 5000, avgPower: 110 },
+          ]
+        }
+      },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 1,
+    });
+    // 1 work lap at 205W, allowed because plannedIntervals === 1
+    expect(result).toBe(205);
+  });
+
+  test("still requires 2 work laps when plannedIntervals is not 1", () => {
+    // Same data but plannedIntervals is 2 — only 1 qualifying lap, so null
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 1200, distanceM: 12000, avgPower: 205 },
+            { index: 2, durationSec: 600, distanceM: 5000, avgPower: 110 },
+          ]
+        }
+      },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 2,
+    });
     expect(result).toBeNull();
   });
 
