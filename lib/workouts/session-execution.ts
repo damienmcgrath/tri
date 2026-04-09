@@ -167,7 +167,7 @@ function parsePlannedIntervals(text: string | null | undefined) {
   return null;
 }
 
-function parseTargetBands(text: string | null | undefined): PlannedTargetBand | null {
+export function parseTargetBands(text: string | null | undefined): PlannedTargetBand | null {
   if (!text) return null;
   const targetBands: PlannedTargetBand = {};
   const normalized = text.toLowerCase();
@@ -180,6 +180,15 @@ function parseTargetBands(text: string | null | undefined): PlannedTargetBand | 
   const powerRange = normalized.match(/(\d{2,4})\s*[-–]\s*(\d{2,4})\s*w\b/i);
   if (powerRange) {
     targetBands.power = { min: Number(powerRange[1]), max: Number(powerRange[2]) };
+  }
+
+  // Single power value: "at 210W", "@ 210W", "~210W"
+  if (!targetBands.power) {
+    const singlePower = normalized.match(/(?:[@≈~]|at|around)\s*(\d{2,4})\s*w\b/i);
+    if (singlePower) {
+      const value = Number(singlePower[1]);
+      targetBands.power = { min: value, max: value };
+    }
   }
 
   // Swim pace: "1:50-2:00/100m", "1:50–2:00 per 100m", "1:50-2:00 /100"
