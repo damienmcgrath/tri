@@ -203,4 +203,72 @@ describe("diagnoseCompletedSession", () => {
     expect(diagnosis.componentScores!.recoveryCompliance.score).toBeLessThan(85);
     expect(diagnosis.componentScores!.recoveryCompliance.detail).toMatch(/TSS too high/);
   });
+
+  test("threshold evaluation uses avgIntervalPower when available", () => {
+    // Session avg is 166W (below target) but interval avg is 210W (on target)
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Sweet spot intervals",
+        plannedDurationSec: 3120,
+        plannedIntervals: 2,
+        targetBands: { power: { min: 200, max: 220 } }
+      },
+      actual: {
+        durationSec: 3060,
+        avgPower: 166,
+        avgIntervalPower: 210,
+        completedIntervals: 2,
+        variabilityIndex: 1.08
+      }
+    });
+
+    // Should NOT flag under_target because interval power (210W) is within range
+    expect(diagnosis.detectedIssues).not.toContain("under_target");
+    expect(diagnosis.intentMatchStatus).not.toBe("missed_intent");
+  });
+
+  test("threshold evaluation falls back to avgPower when avgIntervalPower is null", () => {
+    // No interval power available, session avg 166W is well below 200W target
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Sweet spot intervals",
+        plannedDurationSec: 3120,
+        plannedIntervals: 2,
+        targetBands: { power: { min: 200, max: 220 } }
+      },
+      actual: {
+        durationSec: 3060,
+        avgPower: 166,
+        avgIntervalPower: null,
+        completedIntervals: 2,
+        variabilityIndex: 1.08
+      }
+    });
+
+    // Should flag under_target because session power (166W) < 200*0.92 = 184W
+    expect(diagnosis.detectedIssues).toContain("under_target");
+  });
+
+  test("threshold evaluation detects over_target using interval power", () => {
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Threshold intervals",
+        plannedDurationSec: 3600,
+        plannedIntervals: 3,
+        targetBands: { power: { min: 200, max: 220 } }
+      },
+      actual: {
+        durationSec: 3500,
+        avgPower: 200,
+        avgIntervalPower: 245,
+        completedIntervals: 3,
+      }
+    });
+
+    // 245 > 220*1.06 = 233.2 → should flag over_target
+    expect(diagnosis.detectedIssues).toContain("over_target");
+  });
 });

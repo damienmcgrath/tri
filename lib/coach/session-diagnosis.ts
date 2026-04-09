@@ -31,6 +31,8 @@ type CompletedSessionDiagnosisInput = {
   durationSec?: number | null;
   avgHr?: number | null;
   avgPower?: number | null;
+  /** Duration-weighted average power from work-interval laps only (excludes warm-up/cool-down/recovery). */
+  avgIntervalPower?: number | null;
   avgPaceSPerKm?: number | null;
   variabilityIndex?: number | null;
   timeAboveTargetPct?: number | null;
@@ -178,7 +180,9 @@ function evaluateThreshold(input: SessionDiagnosisInput): DiagnosisDraft {
   const issues: IssueKey[] = [];
   let evidenceCount = 0;
   const avgHr = input.actual.avgHr ?? getMetric(input.actual, "avg_hr");
-  const avgPower = input.actual.avgPower ?? getMetric(input.actual, "avg_power");
+  const sessionAvgPower = input.actual.avgPower ?? getMetric(input.actual, "avg_power");
+  // Prefer interval-only power for threshold evaluation (excludes warm-up/cool-down/recovery)
+  const avgPower = input.actual.avgIntervalPower ?? sessionAvgPower;
   const targetHr = input.planned.targetBands?.hr;
   const targetPower = input.planned.targetBands?.power;
   const completion =

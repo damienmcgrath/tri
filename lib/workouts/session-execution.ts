@@ -78,6 +78,50 @@ function deriveCompletedIntervals(activity: SessionExecutionActivityRow) {
   return activity.laps_count ?? null;
 }
 
+/**
+ * For interval sessions, compute duration-weighted average power from work
+ * laps only (excluding warm-up, cool-down, recovery). Returns null when
+ * lap data is unavailable or the session doesn't look like an interval workout.
+ */
+export function deriveWorkIntervalAvgPower(args: {
+  activity: SessionExecutionActivityRow;
+  targetBands: PlannedTargetBand | null;
+  plannedIntervals: number | null;
+}): number | null {
+  const lapMetrics = getMetricsV2Laps(args.activity.metrics_v2);
+  // Need at least 2 laps with power to distinguish work from recovery
+  const lapsWithPower = lapMetrics.filter(
+    (lap) => lap.avgPower != null && lap.avgPower > 0 && lap.durationSec != null && lap.durationSec > 0
+  );
+  if (lapsWithPower.length < 2) return null;
+
+  let workLaps: typeof lapsWithPower;
+
+  const targetPowerMin = args.targetBands?.power?.min;
+  if (targetPowerMin) {
+    // Strategy 1: use target power to identify work laps (within 20% of target floor)
+    workLaps = lapsWithPower.filter((lap) => lap.avgPower! >= targetPowerMin * 0.80);
+  } else {
+    // Strategy 2: relative power clustering — work laps are in the top power cluster
+    const maxLapPower = Math.max(...lapsWithPower.map((lap) => lap.avgPower!));
+    workLaps = lapsWithPower.filter((lap) => lap.avgPower! >= maxLapPower * 0.70);
+  }
+
+  // Need at least 1 work lap that is a strict subset of all laps.
+  // Allow a single work lap when the plan calls for exactly 1 interval (e.g. 1x20min).
+  const minWorkLaps = args.plannedIntervals === 1 ? 1 : 2;
+  if (workLaps.length < minWorkLaps) return null;
+
+  // Work laps should be a subset (not all laps) — otherwise it's a steady session
+  if (workLaps.length === lapsWithPower.length) return null;
+
+  const totalDuration = workLaps.reduce((sum, lap) => sum + lap.durationSec!, 0);
+  if (totalDuration <= 0) return null;
+
+  const weightedPower = workLaps.reduce((sum, lap) => sum + lap.avgPower! * lap.durationSec!, 0);
+  return Math.round(weightedPower / totalDuration);
+}
+
 function deriveTimeAboveTargetPct(args: {
   targetBands: PlannedTargetBand | null;
   activity: SessionExecutionActivityRow;
@@ -266,6 +310,15 @@ export function shouldRefreshExecutionResultFromActivity(
     return true;
   }
 
+  // If the activity has laps with power data but the result has no avgIntervalPower,
+  // refresh so we can derive work-interval power for threshold sessions.
+  const lapsWithPower = getMetricsV2Laps(activity.metrics_v2).filter(
+    (lap) => lap.avgPower != null && lap.avgPower > 0 && lap.durationSec != null && lap.durationSec > 0
+  );
+  if (lapsWithPower.length >= 2 && getNumber(current, ["avgIntervalPower", "avg_interval_power"]) === null) {
+    return true;
+  }
+
   return false;
 }
 
@@ -282,6 +335,7 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
     (plannedIntervals && completedIntervals ? Number((Math.min(1, completedIntervals / plannedIntervals)).toFixed(2)) : null);
 
   const timeAboveTargetPct = deriveTimeAboveTargetPct({ targetBands, activity });
+  const avgIntervalPower = deriveWorkIntervalAvgPower({ activity, targetBands, plannedIntervals });
 
   const variabilityIndex =
     getNumber(metrics, ["variabilityIndex", "variability_index"]) ??
@@ -352,6 +406,7 @@ function buildDiagnosisInput(session: SessionExecutionSessionRow, activity: Sess
       durationSec: activity.duration_sec,
       avgHr: activity.avg_hr,
       avgPower: activity.avg_power,
+      avgIntervalPower,
       avgPaceSPerKm: deriveAvgPaceSecPerKm(activity),
       variabilityIndex,
       timeAboveTargetPct,

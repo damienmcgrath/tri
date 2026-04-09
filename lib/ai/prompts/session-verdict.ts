@@ -59,6 +59,8 @@ export type SessionVerdictContext = {
     distanceM: number | null;
     avgHr: number | null;
     avgPower: number | null;
+    /** Duration-weighted average power from work-interval laps only. */
+    avgIntervalPower: number | null;
     avgPacePer100mSec: number | null;
     metrics: Record<string, unknown> | null;
   } | null;
@@ -125,11 +127,14 @@ export async function buildSessionVerdictContext(
       .eq("id", activityId)
       .maybeSingle();
     if (act) {
+      const execResult = act.execution_result as Record<string, unknown> | null | undefined;
+      const intervalPower = execResult?.avgIntervalPower;
       activity = {
         durationSec: act.duration_sec,
         distanceM: act.distance_m,
         avgHr: act.avg_hr,
         avgPower: act.avg_power,
+        avgIntervalPower: typeof intervalPower === "number" ? intervalPower : null,
         avgPacePer100mSec: act.avg_pace_per_100m_sec ?? null,
         metrics: (act.metrics_v2 as Record<string, unknown>) ?? null
       };
@@ -345,9 +350,17 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
         assessment: "on_target"
       });
     }
+    if (act.avgIntervalPower) {
+      metricComparisons.push({
+        metric: "Avg Interval Power",
+        target: "—",
+        actual: `${act.avgIntervalPower}W`,
+        assessment: "on_target"
+      });
+    }
     if (act.avgPower) {
       metricComparisons.push({
-        metric: "Avg Power",
+        metric: act.avgIntervalPower ? "Avg Power (session)" : "Avg Power",
         target: "—",
         actual: `${act.avgPower}W`,
         assessment: "on_target"
@@ -459,6 +472,7 @@ export function humanizeExecutionResult(raw: Record<string, unknown> | null): Re
   if (typeof raw.maxHr === "number") result["max_heart_rate"] = `${Math.round(raw.maxHr)} bpm`;
 
   // Power
+  if (typeof raw.avgIntervalPower === "number") result["avg_interval_power"] = `${Math.round(raw.avgIntervalPower)} W`;
   if (typeof raw.avgPower === "number") result["avg_power"] = `${Math.round(raw.avgPower)} W`;
   if (typeof raw.normalizedPower === "number") result["normalized_power"] = `${Math.round(raw.normalizedPower)} W`;
   if (typeof raw.maxPower === "number") result["max_power"] = `${Math.round(raw.maxPower)} W`;
