@@ -260,6 +260,62 @@ describe("normalizeStravaActivity", () => {
       expect((splits.paceFadePct as number)).toBeGreaterThan(0); // speed dropped
     });
 
+    it("swim laps include per-lap pace, stroke rate, and rest detection", () => {
+      const swimWithLaps: StravaActivitySummary = {
+        ...baseActivity,
+        sport_type: "Swim",
+        distance: 2000,
+        moving_time: 2400,
+        laps: [
+          { lap_index: 0, elapsed_time: 240, moving_time: 235, distance: 400, average_heartrate: 130, max_heartrate: 140, average_cadence: 26 },
+          { lap_index: 1, elapsed_time: 30, moving_time: 5, distance: 0, average_heartrate: 110, max_heartrate: 115 },  // rest lap
+          { lap_index: 2, elapsed_time: 180, moving_time: 175, distance: 300, average_heartrate: 140, max_heartrate: 150, average_cadence: 28 },
+        ]
+      };
+      const result = normalizeStravaActivity(swimWithLaps, "user-abc");
+      const laps = result.metrics_v2.laps as Record<string, unknown>[];
+      expect(laps).toHaveLength(3);
+
+      // Work lap: should have avgPacePer100mSec and avgStrokeRateSpm, no avgCadence
+      expect(laps[0]).toMatchObject({
+        index: 0,
+        durationSec: 240,
+        distanceM: 400,
+        avgPacePer100mSec: 60,  // 240s / (400/100) = 60s per 100m
+        avgStrokeRateSpm: 26,
+      });
+      expect(laps[0]).not.toHaveProperty("avgCadence");
+
+      // Rest lap: distance 0, flagged as rest
+      expect(laps[1]).toMatchObject({
+        isRest: true,
+        restSec: 30,
+        distanceM: 0,
+      });
+      expect(laps[1]).not.toHaveProperty("avgPacePer100mSec");
+
+      // Another work lap
+      expect(laps[2]).toMatchObject({
+        avgPacePer100mSec: 60,  // 180s / (300/100) = 60s per 100m
+        avgStrokeRateSpm: 28,
+      });
+    });
+
+    it("non-swim laps use avgCadence (not avgStrokeRateSpm)", () => {
+      const runWithLaps: StravaActivitySummary = {
+        ...baseActivity,
+        sport_type: "Run",
+        laps: [
+          { lap_index: 0, elapsed_time: 600, moving_time: 590, distance: 1600, average_cadence: 86 },
+        ]
+      };
+      const result = normalizeStravaActivity(runWithLaps, "user-abc");
+      const laps = result.metrics_v2.laps as Record<string, unknown>[];
+      expect(laps[0]).toMatchObject({ avgCadence: 86 });
+      expect(laps[0]).not.toHaveProperty("avgStrokeRateSpm");
+      expect(laps[0]).not.toHaveProperty("avgPacePer100mSec");
+    });
+
     it("swim activity puts cadence into stroke section", () => {
       const swim: StravaActivitySummary = {
         ...baseActivity,

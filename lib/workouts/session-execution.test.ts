@@ -214,6 +214,91 @@ describe("buildExecutionResultForSession", () => {
     expect(result.avgCadence).toBe(90);
     expect(result.elevationGainM).toBe(250);
   });
+
+  test("parses swim pace range from target into targetBands.pace100m", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-swim-pace",
+        user_id: "user-1",
+        sport: "swim",
+        type: "CSS Intervals",
+        duration_minutes: 50,
+        target: "12 x 100m @ 1:50-2:00/100m with 20s rest",
+        status: "planned"
+      },
+      {
+        id: "activity-swim-pace",
+        sport_type: "swim",
+        duration_sec: 3000,
+        distance_m: 1800,
+        avg_hr: 140,
+        avg_power: null,
+        avg_pace_per_100m_sec: 115,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    expect(targetBands).not.toBeNull();
+    expect(targetBands?.pace100m).toEqual({ min: 110, max: 120 }); // 1:50=110s, 2:00=120s
+  });
+
+  test("parses single swim pace target with @ prefix", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-swim-single",
+        user_id: "user-1",
+        sport: "swim",
+        type: "Endurance swim",
+        duration_minutes: 60,
+        target: "3 x 400m @ 1:55/100m",
+        status: "planned"
+      },
+      {
+        id: "activity-swim-single",
+        sport_type: "swim",
+        duration_sec: 3600,
+        distance_m: 2400,
+        avg_hr: null,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    expect(targetBands).not.toBeNull();
+    expect(targetBands?.pace100m).toEqual({ max: 115 }); // 1:55=115s
+  });
+
+  test("does not confuse swim pace text with HR target", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-no-hr-confusion",
+        user_id: "user-1",
+        sport: "swim",
+        type: "Endurance swim",
+        duration_minutes: 60,
+        target: "Steady aerobic pace, low to mid 2 min/100m",
+        status: "planned"
+      },
+      {
+        id: "activity-no-hr-confusion",
+        sport_type: "swim",
+        duration_sec: 3600,
+        distance_m: 2400,
+        avg_hr: 134,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    // Should NOT have an HR target — "low to mid 2 min" is pace, not HR
+    expect(targetBands?.hr).toBeUndefined();
+  });
 });
 
 describe("shouldRefreshExecutionResultFromActivity", () => {
