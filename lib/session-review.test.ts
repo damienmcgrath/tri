@@ -1,4 +1,4 @@
-import { createReviewViewModel } from "./session-review";
+import { createReviewViewModel, sanitizeFieldNames } from "./session-review";
 
 describe("createReviewViewModel", () => {
   test("treats a completed session as a post-execution review with a scored summary", () => {
@@ -299,5 +299,55 @@ describe("createReviewViewModel", () => {
     expect(vm.unlockTitle).toBe("Weekly context");
     expect(vm.followUpIntro).toMatch(/extra session/i);
     expect(vm.followUpPrompts[0]).toMatch(/help or hurt the week/i);
+  });
+});
+
+describe("sanitizeFieldNames", () => {
+  test("maps >= to 'at least'", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct >= 0.9")).toBe(
+      "at least 90% of planned intervals completed"
+    );
+  });
+
+  test("maps > to 'more than'", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct > 0.9")).toBe(
+      "more than 90% of planned intervals completed"
+    );
+  });
+
+  test("maps < to 'less than'", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct < 0.9")).toBe(
+      "less than 90% of planned intervals completed"
+    );
+  });
+
+  test("maps <= to 'at most'", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct <= 0.9")).toBe(
+      "at most 90% of planned intervals completed"
+    );
+  });
+
+  test("maps ≥ to 'at least'", () => {
+    expect(sanitizeFieldNames("intervalCompletion ≥ 0.66")).toBe(
+      "at least 66% of planned intervals completed"
+    );
+  });
+
+  test("maps ≤ to 'at most'", () => {
+    expect(sanitizeFieldNames("intervalCompletion ≤ 0.5")).toBe(
+      "at most 50% of planned intervals completed"
+    );
+  });
+
+  test("maps >= 1.0 to 'all planned intervals completed'", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct >= 1.0")).toBe(
+      "all planned intervals completed"
+    );
+  });
+
+  test("maps = with value (no comparator)", () => {
+    expect(sanitizeFieldNames("intervalCompletionPct = 0.8")).toBe(
+      "80% of planned intervals completed"
+    );
   });
 });

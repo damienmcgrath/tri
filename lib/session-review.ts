@@ -114,16 +114,26 @@ function formatIntervalCompletion(value: number): string {
 }
 
 /** Sanitize raw camelCase field names that may appear in AI-generated text. */
-function sanitizeFieldNames(text: string): string {
+export function sanitizeFieldNames(text: string): string {
   let result = text;
   // intervalCompletionPct or intervalCompletion with comparison operators and values
   // Match both "intervalCompletionPct" and "intervalCompletion" (with or without Pct suffix)
   // ≥ 1.0 → "all planned intervals completed"
   result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
-  // ≥ 0.66 or < 0.9 etc → "66% of planned intervals completed"
-  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+  // Comparator + value → operator-aware phrasing
+  result = result.replace(/\bintervalCompletion(?:Pct)?\s*([≥≤]|>=|<=|>|<)\s*([\d.]+)/gi, (_m, op, v) => {
     const pct = Math.round(parseFloat(v) * 100);
-    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
+    if (pct >= 100) return "all planned intervals completed";
+    const isLessThan = /[<≤]/.test(op);
+    const isStrict = op === "<" || op === ">";
+    if (isLessThan) {
+      return isStrict
+        ? `less than ${pct}% of planned intervals completed`
+        : `at most ${pct}% of planned intervals completed`;
+    }
+    return isStrict
+      ? `more than ${pct}% of planned intervals completed`
+      : `at least ${pct}% of planned intervals completed`;
   });
   // = or : with value
   result = result.replace(/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
