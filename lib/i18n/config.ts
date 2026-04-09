@@ -7,11 +7,11 @@
 
 export const defaultLocale = "en" as const;
 
-export const supportedLocales = ["en", "de", "fr"] as const;
+const supportedLocales = ["en", "de", "fr"] as const;
 
 export type SupportedLocale = (typeof supportedLocales)[number];
 
-export function isSupportedLocale(value: string): value is SupportedLocale {
+function isSupportedLocale(value: string): value is SupportedLocale {
   return (supportedLocales as readonly string[]).includes(value);
 }
 
@@ -28,7 +28,7 @@ export function resolveLocale(profileLocale?: string | null): SupportedLocale {
 /**
  * Map locale codes to their display labels (in their own language).
  */
-export const localeLabels: Record<SupportedLocale, string> = {
+const localeLabels: Record<SupportedLocale, string> = {
   en: "English",
   de: "Deutsch",
   fr: "Fran\u00e7ais",

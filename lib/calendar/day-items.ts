@@ -3,7 +3,7 @@ import { normalizeSessionModel } from "@/lib/training/session";
 import { hasConfirmedPlannedSessionLink, localIsoDate } from "@/lib/activities/completed-activities";
 import { classifyActivityStatus } from "@/lib/activities/activity-status";
 
-export type CalendarSessionRecord = {
+type CalendarSessionRecord = {
   id: string;
   date: string;
   sport: string;
@@ -23,7 +23,7 @@ export type CalendarSessionRecord = {
   is_key?: boolean | null;
 };
 
-export type CalendarActivityRecord = {
+type CalendarActivityRecord = {
   id: string;
   upload_id: string | null;
   upload_status?: "uploaded" | "parsed" | "matched" | "error" | null;
@@ -38,13 +38,13 @@ export type CalendarActivityRecord = {
   notes?: string | null;
 };
 
-export type CalendarLinkRecord = {
+type CalendarLinkRecord = {
   planned_session_id: string | null;
   completed_activity_id: string;
   confirmation_status?: "suggested" | "confirmed" | "rejected" | null;
 };
 
-export type LegacyCompletedRecord = {
+type LegacyCompletedRecord = {
   date: string;
   sport: string;
 };

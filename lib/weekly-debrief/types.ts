@@ -184,7 +184,7 @@ export type WeeklyDebriefCheckIn = {
   weekNotes: string | null;
 };
 
-export type WeeklyDebriefSessionFeel = {
+type WeeklyDebriefSessionFeel = {
   sessionId: string;
   overallFeel: number;
   energyLevel: string | null;

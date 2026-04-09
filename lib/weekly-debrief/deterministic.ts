@@ -191,7 +191,7 @@ export function buildCoachShare(args: { facts: WeeklyDebriefFacts; narrative: We
   });
 }
 
-export function coerceNarrativeString(value: unknown, maxLength: number) {
+function coerceNarrativeString(value: unknown, maxLength: number) {
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed.slice(0, maxLength) : null;
@@ -219,7 +219,7 @@ export function coerceNarrativeString(value: unknown, maxLength: number) {
   return null;
 }
 
-export function coerceNarrativeList(value: unknown, maxItems: number, maxItemLength: number) {
+function coerceNarrativeList(value: unknown, maxItems: number, maxItemLength: number) {
   if (!Array.isArray(value)) return [];
   const items = value
     .map((entry) => coerceNarrativeString(entry, maxItemLength))
@@ -260,7 +260,7 @@ export function getSourceUpdatedAt(values: Array<string | null | undefined>) {
     .at(-1) ?? new Date().toISOString();
 }
 
-export function normalizeTimestamp(value: string | null | undefined) {
+function normalizeTimestamp(value: string | null | undefined) {
   if (!value) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -269,7 +269,7 @@ export function normalizeTimestamp(value: string | null | undefined) {
   return parsed.toISOString();
 }
 
-export function normalizePersistedFacts(rawFacts: unknown): Record<string, unknown> {
+function normalizePersistedFacts(rawFacts: unknown): Record<string, unknown> {
   const facts = (rawFacts && typeof rawFacts === "object" ? rawFacts : {}) as Record<string, unknown>;
   const legacyStateLabel = facts.artifactStateLabel;
   const keySessionStatus = typeof facts.keySessionStatus === "string" ? facts.keySessionStatus : "";
