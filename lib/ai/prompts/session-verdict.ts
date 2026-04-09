@@ -428,7 +428,7 @@ function formatPacePerKm(sec: number): string {
  * Translates raw execution_result JSONB into human-readable key-value pairs
  * so the AI never sees camelCase field names like intervalCompletionPct.
  */
-function humanizeExecutionResult(raw: Record<string, unknown> | null): Record<string, unknown> | null {
+export function humanizeExecutionResult(raw: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!raw) return null;
 
   const result: Record<string, unknown> = {};
@@ -491,9 +491,8 @@ function humanizeExecutionResult(raw: Record<string, unknown> | null): Record<st
     result["pace_fade_first_to_second_half"] = `${formatPacePerKm(raw.firstHalfPaceSPerKm)} → ${formatPacePerKm(raw.lastHalfPaceSPerKm)}`;
   }
 
-  // Scoring (keep as context but use human names)
-  if (typeof raw.executionScore === "number") result["execution_score"] = raw.executionScore;
-  if (typeof raw.executionScoreBand === "string") result["execution_score_band"] = raw.executionScoreBand;
+  // Scoring — omit execution_score and execution_score_band from model input;
+  // the score is displayed separately in the UI and the prompt forbids mentioning it.
   if (typeof raw.diagnosisConfidence === "string") result["confidence"] = raw.diagnosisConfidence;
   if (typeof raw.executionCost === "string") result["execution_cost"] = raw.executionCost;
   if (typeof raw.intentMatchStatus === "string") {
@@ -530,7 +529,7 @@ function trimToLastSentence(text: string): string {
 }
 
 /** Replace raw camelCase field names that the AI may echo despite instructions. */
-function sanitizeRawFieldNames(text: string): string {
+export function sanitizeRawFieldNames(text: string): string {
   let result = text;
   // Replace camelCase metric names with human-readable equivalents
   const fieldMap: Array<[RegExp, string]> = [
@@ -570,11 +569,28 @@ function sanitizeRawFieldNames(text: string): string {
     const pct = Math.round(parseFloat(v) * 100);
     return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
   });
-  // Handle comparison operators (≥, >=, etc.)
-  result = result.replace(/interval completion\s*[≥>=<≤]+\s*([\d.]+)/gi, (_m, v) => {
+  // Handle comparison operators (≥, >=, <, ≤, etc.) — operator-aware phrasing
+  result = result.replace(/interval completion\s*([≥≤]|>=|<=|>|<)\s*([\d.]+)/gi, (_m, op, v) => {
     const pct = Math.round(parseFloat(v) * 100);
-    return pct >= 100 ? "all planned intervals completed" : `at least ${pct}% of planned intervals completed`;
+    if (pct >= 100) return "all planned intervals completed";
+    const isLessThan = /[<≤]/.test(op);
+    const isStrict = op === "<" || op === ">";
+    if (isLessThan) {
+      return isStrict
+        ? `less than ${pct}% of planned intervals completed`
+        : `at most ${pct}% of planned intervals completed`;
+    }
+    return isStrict
+      ? `more than ${pct}% of planned intervals completed`
+      : `at least ${pct}% of planned intervals completed`;
   });
+  // Strip any remaining execution score / score band references (camelCase already
+  // humanised above; catch snake_case and plain English forms as a safety net).
+  result = result.replace(/\bexecution[_ ]score\b(?:\s*(?:of|:|is|was|=)\s*[\d.]+%?)?/gi, "");
+  result = result.replace(/\b(?:execution[_ ])?score[_ ]band\b(?:\s*(?:of|:|is|was|=)\s*\S+)?/gi, "");
+  // Clean up leftover double spaces / orphan punctuation from stripping
+  result = result.replace(/ {2,}/g, " ");
+
   // Expand NP/VI abbreviations in metric contexts
   result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
   result = result.replace(/today's NP\b/g, "today's normalized power");
