@@ -213,6 +213,7 @@ export type WeeklyDebriefSourceInputs = {
   activities: WeeklyDebriefActivity[];
   links: WeeklyDebriefLink[];
   weeklyCheckinUpdatedAt: string | null;
+  latestFeelUpdatedAt: string | null;
   timeZone: string;
   weekStart: string;
   weekEnd: string;
