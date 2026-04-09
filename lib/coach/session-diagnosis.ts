@@ -8,6 +8,8 @@ export type PlannedTargetBand = {
   hr?: { min?: number; max?: number };
   power?: { min?: number; max?: number };
   pace?: { min?: number; max?: number };
+  /** Swim pace target in seconds per 100 m (e.g. 115 = 1:55/100m) */
+  pace100m?: { min?: number; max?: number };
 };
 
 type PlannedSessionDiagnosisInput = {
