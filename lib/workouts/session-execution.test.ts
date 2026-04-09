@@ -1,4 +1,4 @@
-import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity } from "./session-execution";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, deriveWorkIntervalAvgPower } from "./session-execution";
 
 describe("buildExecutionResultForSession", () => {
   test("builds a persisted execution result with aliases the session review expects", () => {
@@ -357,5 +357,162 @@ describe("shouldRefreshExecutionResultFromActivity", () => {
         }
       }
     )).toBe(true);
+  });
+});
+
+describe("deriveWorkIntervalAvgPower", () => {
+  const baseActivity = {
+    id: "a1",
+    sport_type: "bike",
+    duration_sec: 3120,
+    distance_m: 25000,
+    avg_hr: 145,
+    avg_power: 166,
+  };
+
+  test("returns duration-weighted average of work laps when target power is set", () => {
+    // 2x10min at ~210W, with warm-up and recovery laps at ~120W
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120, avgHr: 125 },   // warm-up
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 165 },   // interval 1
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100, avgHr: 130 },   // recovery
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 215, avgHr: 168 },   // interval 2
+            { index: 4, durationSec: 600, distanceM: 5000, avgPower: 110, avgHr: 120 },   // cool-down
+          ]
+        }
+      },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 2,
+    });
+    // Work laps: 600s@210W + 600s@215W → (126000+129000)/1200 = 212.5 → 213
+    expect(result).toBe(213);
+  });
+
+  test("returns null when no laps available", () => {
+    const result = deriveWorkIntervalAvgPower({
+      activity: { ...baseActivity, metrics_v2: {} },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 2,
+    });
+    expect(result).toBeNull();
+  });
+
+  test("returns null when laps have no power data", () => {
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: null },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: null },
+          ]
+        }
+      },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 2,
+    });
+    expect(result).toBeNull();
+  });
+
+  test("returns null when all laps have similar power (steady ride)", () => {
+    // All laps at ~170W — no clear work/recovery split
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 168 },
+            { index: 1, durationSec: 600, distanceM: 5000, avgPower: 172 },
+            { index: 2, durationSec: 600, distanceM: 5000, avgPower: 170 },
+            { index: 3, durationSec: 600, distanceM: 5000, avgPower: 165 },
+          ]
+        }
+      },
+      targetBands: { power: { min: 160, max: 180 } },
+      plannedIntervals: 2,
+    });
+    // All laps are above min*0.80 = 128W, so all qualify → workLaps === lapsWithPower → null
+    expect(result).toBeNull();
+  });
+
+  test("uses relative clustering when no target bands are set", () => {
+    // 2 high-power laps + 3 low-power laps, no target
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210 },
+            { index: 2, durationSec: 300, distanceM: 2000, avgPower: 100 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 205 },
+            { index: 4, durationSec: 600, distanceM: 5000, avgPower: 110 },
+          ]
+        }
+      },
+      targetBands: null,
+      plannedIntervals: 2,
+    });
+    // Max lap power = 210, threshold = 210*0.70 = 147
+    // Work laps: 600s@210W + 600s@205W → (126000+123000)/1200 = 207.5 → 208
+    expect(result).toBe(208);
+  });
+
+  test("returns null when fewer than 2 work laps found", () => {
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210 },
+            { index: 2, durationSec: 600, distanceM: 5000, avgPower: 110 },
+          ]
+        }
+      },
+      targetBands: { power: { min: 200, max: 220 } },
+      plannedIntervals: 2,
+    });
+    // Only 1 lap at >=160W (200*0.80) → fewer than 2 work laps → null
+    expect(result).toBeNull();
+  });
+
+  test("buildExecutionResultForSession includes avgIntervalPower in result", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-1",
+        user_id: "user-1",
+        sport: "bike",
+        type: "Sweet spot intervals",
+        duration_minutes: 52,
+        target: "2x10min at 200-220 W",
+        intent_category: "Sweet spot intervals",
+        status: "planned"
+      },
+      {
+        id: "activity-1",
+        sport_type: "bike",
+        duration_sec: 3120,
+        distance_m: 25000,
+        avg_hr: 145,
+        avg_power: 166,
+        parse_summary: {},
+        metrics_v2: {
+          power: { normalizedPower: 177 },
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 120, avgHr: 125 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 165 },
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100, avgHr: 130 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 215, avgHr: 168 },
+            { index: 4, durationSec: 600, distanceM: 5000, avgPower: 110, avgHr: 120 },
+          ]
+        }
+      }
+    );
+    expect(result.avgIntervalPower).toBe(213);
   });
 });

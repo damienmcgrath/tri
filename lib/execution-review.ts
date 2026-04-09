@@ -28,6 +28,8 @@ export type ExecutionEvidence = {
     durationSec: number | null;
     avgHr: number | null;
     avgPower: number | null;
+    /** Duration-weighted average power from work-interval laps only. */
+    avgIntervalPower?: number | null;
     avgPaceSPerKm: number | null;
     timeAboveTargetPct: number | null;
     intervalCompletionPct: number | null;
@@ -227,6 +229,7 @@ export type PersistedExecutionReview = {
   timeAboveTargetPct: number | null;
   avgHr: number | null;
   avgPower: number | null;
+  avgIntervalPower?: number | null;
   normalizedPower: number | null;
   trainingStressScore: number | null;
   intensityFactor: number | null;
@@ -440,6 +443,7 @@ function buildActualEvidence(input: SessionDiagnosisInput): ExecutionEvidence["a
     durationSec: input.actual.durationSec ?? null,
     avgHr: input.actual.avgHr ?? null,
     avgPower: input.actual.avgPower ?? null,
+    avgIntervalPower: input.actual.avgIntervalPower ?? null,
     avgPaceSPerKm: input.actual.avgPaceSPerKm ?? null,
     timeAboveTargetPct: input.actual.timeAboveTargetPct ?? null,
     intervalCompletionPct: input.actual.intervalCompletionPct ?? null,
@@ -787,8 +791,12 @@ function buildEvidenceSummary(evidence: ExecutionEvidence) {
   if (evidence.actual.avgHr !== null) {
     points.push(`average HR ${Math.round(evidence.actual.avgHr)} bpm`);
   }
+  if (typeof evidence.actual.avgIntervalPower === "number") {
+    points.push(`average interval power ${Math.round(evidence.actual.avgIntervalPower)} w`);
+  }
   if (evidence.actual.avgPower !== null) {
-    points.push(`average power ${Math.round(evidence.actual.avgPower)} w`);
+    const label = evidence.actual.avgIntervalPower != null ? "average power (session)" : "average power";
+    points.push(`${label} ${Math.round(evidence.actual.avgPower)} w`);
   }
   if (typeof evidence.actual.normalizedPower === "number") {
     points.push(`normalized power ${Math.round(evidence.actual.normalizedPower)} w`);
@@ -1092,6 +1100,7 @@ export function toPersistedExecutionReview(args: {
     timeAboveTargetPct: args.evidence.actual.timeAboveTargetPct,
     avgHr: args.evidence.actual.avgHr,
     avgPower: args.evidence.actual.avgPower,
+    avgIntervalPower: args.evidence.actual.avgIntervalPower ?? null,
     normalizedPower: args.evidence.actual.normalizedPower ?? null,
     trainingStressScore: args.evidence.actual.trainingStressScore ?? null,
     intensityFactor: args.evidence.actual.intensityFactor ?? null,
