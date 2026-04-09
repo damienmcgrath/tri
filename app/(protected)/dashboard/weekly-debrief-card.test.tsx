@@ -84,7 +84,8 @@ describe("WeeklyDebriefCard", () => {
               artifactStateNote: null,
               provisionalReviewCount: 0,
               weekShape: "normal",
-              reflectionsSparse: false
+              reflectionsSparse: false,
+              feelsSnapshot: null
             },
             narrative: {
               executiveSummary: "Strong week.",

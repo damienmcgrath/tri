@@ -43,7 +43,7 @@ async function loadWeeklyDebriefInputs(args: {
   const activityRangeStart = `${addDays(args.weekStart, -1)}T00:00:00.000Z`;
   const activityRangeEnd = `${addDays(args.weekEnd, 2)}T00:00:00.000Z`;
 
-  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }] = await Promise.all([
+  const [{ data: sessionsData, error: sessionsError }, activities, { data: linksData, error: linksError }, athleteContext, { data: checkInData }, { data: feelsData }] = await Promise.all([
     args.supabase
       .from("sessions")
       .select("id,athlete_id,user_id,date,sport,type,session_name,subtype,workout_type,intent_category,session_role,notes,status,duration_minutes,updated_at,created_at,execution_result,is_key")
@@ -68,7 +68,12 @@ async function loadWeeklyDebriefInputs(args: {
       .select("fatigue_score,stress_score,motivation_score,week_notes")
       .eq("user_id", args.athleteId)
       .eq("week_start", args.weekStart)
-      .maybeSingle()
+      .maybeSingle(),
+    args.supabase
+      .from("session_feels")
+      .select("session_id,overall_feel,energy_level,legs_feel,motivation,sleep_quality,life_stress,note")
+      .eq("user_id", args.athleteId)
+      .not("overall_feel", "is", null)
   ]);
 
   if (sessionsError) {
@@ -87,10 +92,22 @@ async function loadWeeklyDebriefInputs(args: {
       }
     : null;
 
+  const sessionFeels = (feelsData ?? []).map((f) => ({
+    sessionId: f.session_id as string,
+    overallFeel: f.overall_feel as number,
+    energyLevel: (f.energy_level as string) ?? null,
+    legsFeel: (f.legs_feel as string) ?? null,
+    motivation: (f.motivation as string) ?? null,
+    sleepQuality: (f.sleep_quality as string) ?? null,
+    lifeStress: (f.life_stress as string) ?? null,
+    note: (f.note as string) ?? null
+  }));
+
   return {
     sessions: (sessionsData ?? []) as WeeklyDebriefSession[],
     activities: activities as WeeklyDebriefActivity[],
     links: (linksData ?? []) as WeeklyDebriefLink[],
+    sessionFeels,
     athleteContext,
     checkIn,
     timeZone: args.timeZone,
@@ -115,7 +132,8 @@ async function loadWeeklyDebriefSourceInputs(args: {
     { data: sessionsData, error: sessionsError },
     activities,
     { data: linksData, error: linksError },
-    { data: checkinData, error: checkinError }
+    { data: checkinData, error: checkinError },
+    { data: latestFeelData }
   ] = await Promise.all([
     args.supabase
       .from("sessions")
@@ -140,6 +158,14 @@ async function loadWeeklyDebriefSourceInputs(args: {
       .select("updated_at")
       .eq("athlete_id", args.athleteId)
       .eq("week_start", args.weekStart)
+      .maybeSingle(),
+    args.supabase
+      .from("session_feels")
+      .select("created_at")
+      .eq("user_id", args.athleteId)
+      .not("overall_feel", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle()
   ]);
 
@@ -158,6 +184,7 @@ async function loadWeeklyDebriefSourceInputs(args: {
     activities: activities as WeeklyDebriefActivity[],
     links: (linksData ?? []) as WeeklyDebriefLink[],
     weeklyCheckinUpdatedAt: checkinData?.updated_at ?? null,
+    latestFeelUpdatedAt: latestFeelData?.created_at ?? null,
     timeZone: args.timeZone,
     weekStart: args.weekStart,
     weekEnd: args.weekEnd,
@@ -235,7 +262,8 @@ function computeWeeklyDebriefSourceState(input: WeeklyDebriefSourceInputs) {
       ...input.sessions.map((session) => session.updated_at ?? session.created_at),
       ...input.activities.map((activity) => activity.updated_at ?? activity.created_at ?? activity.start_time_utc),
       ...input.links.map((link) => link.created_at ?? null),
-      input.weeklyCheckinUpdatedAt
+      input.weeklyCheckinUpdatedAt,
+      input.latestFeelUpdatedAt
     ])
   } satisfies WeeklyDebriefSourceState;
 }

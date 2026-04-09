@@ -103,6 +103,16 @@ export type AthleteContextSnapshot = {
     formattedValue: string;
     date: string;
   }>;
+  recentSessionFeels?: Array<{
+    date: string;
+    sport: string;
+    sessionName: string | null;
+    overallFeel: number;
+    energyLevel: string | null;
+    legsFeel: string | null;
+    motivation: string | null;
+    note: string | null;
+  }>;
   locale: {
     language: string;
     units: "metric" | "imperial";
@@ -249,7 +259,8 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
       ? { value: latestFtp.value, source: latestFtp.source, recordedAt: latestFtp.recorded_at }
       : null,
     ...(await (async () => {
-      const [fitnessResult, benchmarkResult] = await Promise.all([
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000).toISOString();
+      const [fitnessResult, benchmarkResult, feelsResult] = await Promise.all([
         import("@/lib/training/fitness-model")
           .then(async ({ getLatestFitness, getTsbTrend, getReadinessState }) => {
             const fitness = await getLatestFitness(supabase, athleteId);
@@ -270,9 +281,42 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
         import("@/lib/training/benchmarks")
           .then(({ deriveBenchmarks }) => deriveBenchmarks(supabase, athleteId, weekStart, weekEnd))
           .then((bests) => bests.slice(0, 3).map((b) => ({ sport: b.sport, label: b.label, formattedValue: b.formattedValue, date: b.activityDate })))
-          .catch(() => [] as Array<{ sport: string; label: string; formattedValue: string; date: string }>)
+          .catch(() => [] as Array<{ sport: string; label: string; formattedValue: string; date: string }>),
+        (async () => {
+          const { data: feels } = await supabase
+            .from("session_feels")
+            .select("session_id,overall_feel,energy_level,legs_feel,motivation,note,completed_at")
+            .or(`athlete_id.eq.${athleteId},user_id.eq.${athleteId}`)
+            .not("overall_feel", "is", null)
+            .gte("completed_at", fourteenDaysAgo)
+            .order("completed_at", { ascending: false })
+            .limit(10);
+          if (!feels || feels.length === 0) return [];
+          const sessionIds = feels.map((f) => f.session_id);
+          const { data: sessions } = await supabase
+            .from("sessions")
+            .select("id,date,sport,session_name")
+            .in("id", sessionIds);
+          const sessionMap = new Map((sessions ?? []).map((s) => [s.id, s]));
+          return feels
+            .map((f) => {
+              const s = sessionMap.get(f.session_id);
+              if (!s) return null;
+              return {
+                date: s.date as string,
+                sport: s.sport as string,
+                sessionName: (s.session_name as string) ?? null,
+                overallFeel: f.overall_feel as number,
+                energyLevel: (f.energy_level as string) ?? null,
+                legsFeel: (f.legs_feel as string) ?? null,
+                motivation: (f.motivation as string) ?? null,
+                note: (f.note as string) ?? null,
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null);
+        })().catch(() => [] as AthleteContextSnapshot["recentSessionFeels"] & unknown[])
       ]);
-      return { fitness: fitnessResult, recentBests: benchmarkResult };
+      return { fitness: fitnessResult, recentBests: benchmarkResult, recentSessionFeels: feelsResult.length > 0 ? feelsResult : undefined };
     })()),
     locale: {
       language: (profile?.locale as string) ?? "en",

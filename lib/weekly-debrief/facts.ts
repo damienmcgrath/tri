@@ -523,6 +523,8 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
     }
   }
 
+  const feelsIndex = new Map((input.sessionFeels ?? []).map((f) => [f.sessionId, f]));
+
   const sessionSummaries: WeeklyDebriefSessionSummary[] = input.sessions
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at))
     .map((session) => {
@@ -567,6 +569,7 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
           )
         : session.execution_result ?? null;
       const review = parsePersistedExecutionReview(refreshedExecutionResult);
+      const feel = feelsIndex.get(session.id);
       return {
         id: session.id,
         label,
@@ -576,7 +579,16 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
         status,
         isKey: Boolean(session.is_key) || session.session_role?.toLowerCase() === "key",
         review,
-        completedMinutes: status === "completed" ? Math.max(0, session.duration_minutes ?? 0) : 0
+        completedMinutes: status === "completed" ? Math.max(0, session.duration_minutes ?? 0) : 0,
+        feels: feel
+          ? {
+              overallFeel: feel.overallFeel,
+              energyLevel: feel.energyLevel,
+              legsFeel: feel.legsFeel,
+              motivation: feel.motivation,
+              note: feel.note,
+            }
+          : null
       };
     });
   const linkedActivityIds = new Set(confirmedLinks.map((link) => link.completed_activity_id));
@@ -623,7 +635,30 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
   const resolvedMinutes = completedMinutes + skippedMinutes;
   const extraMinutes = extraActivities.reduce((sum, activity) => sum + activity.durationMinutes, 0);
   const completionPct = plannedMinutes === 0 ? 0 : Math.round((resolvedMinutes / plannedMinutes) * 100);
-  const reflectionsSparse = !input.athleteContext?.weeklyState.note?.trim();
+  const sessionsWithFeels = sessionSummaries.filter((s) => s.feels !== null);
+  const hasWeeklyNote = !!input.athleteContext?.weeklyState.note?.trim();
+  const hasSessionFeels = sessionsWithFeels.length > 0;
+  const reflectionsSparse = !hasWeeklyNote && !hasSessionFeels;
+
+  // Build feels aggregate for LLM narrative
+  const feelsSnapshot = hasSessionFeels
+    ? (() => {
+        const feels = sessionsWithFeels.map((s) => s.feels!);
+        const avgOverallFeel = Math.round((feels.reduce((sum, f) => sum + f.overallFeel, 0) / feels.length) * 10) / 10;
+        const patterns: string[] = [];
+        const heavyLegs = feels.filter((f) => f.legsFeel === "heavy").length;
+        if (heavyLegs >= 2) patterns.push(`${heavyLegs} sessions with heavy legs`);
+        const lowEnergy = feels.filter((f) => f.energyLevel === "low").length;
+        if (lowEnergy >= 2) patterns.push(`${lowEnergy} sessions with low energy`);
+        const struggled = feels.filter((f) => f.motivation === "struggled").length;
+        if (struggled >= 2) patterns.push(`motivation struggled in ${struggled} sessions`);
+        const lowFeel = feels.filter((f) => f.overallFeel <= 2).length;
+        if (lowFeel >= 2) patterns.push(`${lowFeel} sessions felt hard or terrible`);
+        const highFeel = feels.filter((f) => f.overallFeel >= 4).length;
+        if (highFeel >= 2 && highFeel >= feels.length * 0.6) patterns.push(`${highFeel} of ${feels.length} sessions felt good or amazing`);
+        return { sessionsWithFeels: feels.length, avgOverallFeel, notablePatterns: patterns };
+      })()
+    : null;
   const weekShape = classifyWeeklyDebriefWeekShape({
     plannedSessions,
     completedSessions,
@@ -862,7 +897,8 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
       artifactStateNote: artifactState.note,
       provisionalReviewCount,
       weekShape,
-      reflectionsSparse
+      reflectionsSparse,
+      feelsSnapshot
     });
 
   const deterministicNarrative = buildDeterministicNarrative({

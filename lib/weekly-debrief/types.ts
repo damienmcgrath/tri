@@ -70,7 +70,12 @@ export const weeklyDebriefFactsSchema = z.object({
   artifactStateNote: z.string().min(1).max(200).nullable().default(null),
   provisionalReviewCount: z.number().int().min(0).default(0),
   weekShape: z.enum(["normal", "partial_reflection", "disrupted"]),
-  reflectionsSparse: z.boolean()
+  reflectionsSparse: z.boolean(),
+  feelsSnapshot: z.object({
+    sessionsWithFeels: z.number().int().min(0),
+    avgOverallFeel: z.number().min(1).max(5).nullable(),
+    notablePatterns: z.array(z.string().min(1).max(120))
+  }).nullable().default(null)
 });
 
 export type WeeklyDebriefFacts = z.infer<typeof weeklyDebriefFactsSchema>;
@@ -179,10 +184,22 @@ export type WeeklyDebriefCheckIn = {
   weekNotes: string | null;
 };
 
+export type WeeklyDebriefSessionFeel = {
+  sessionId: string;
+  overallFeel: number;
+  energyLevel: string | null;
+  legsFeel: string | null;
+  motivation: string | null;
+  sleepQuality: string | null;
+  lifeStress: string | null;
+  note: string | null;
+};
+
 export type WeeklyDebriefInputs = {
   sessions: WeeklyDebriefSession[];
   activities: WeeklyDebriefActivity[];
   links: WeeklyDebriefLink[];
+  sessionFeels: WeeklyDebriefSessionFeel[];
   athleteContext: AthleteContextSnapshot | null;
   checkIn: WeeklyDebriefCheckIn | null;
   timeZone: string;
@@ -196,6 +213,7 @@ export type WeeklyDebriefSourceInputs = {
   activities: WeeklyDebriefActivity[];
   links: WeeklyDebriefLink[];
   weeklyCheckinUpdatedAt: string | null;
+  latestFeelUpdatedAt: string | null;
   timeZone: string;
   weekStart: string;
   weekEnd: string;
@@ -217,6 +235,13 @@ export type WeeklyDebriefSessionSummary = {
   isKey: boolean;
   review: PersistedExecutionReview | null;
   completedMinutes: number;
+  feels: {
+    overallFeel: number;
+    energyLevel: string | null;
+    legsFeel: string | null;
+    motivation: string | null;
+    note: string | null;
+  } | null;
 };
 
 export type WeeklyDebriefComputed = {

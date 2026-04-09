@@ -290,6 +290,7 @@ describe("weekly debrief helpers", () => {
         fitness: null,
         locale: { language: "en", units: "metric", timezone: "UTC", weekStartDay: 1 }
       },
+      sessionFeels: [],
       timeZone: "UTC",
       weekStart: "2026-03-09",
       weekEnd: "2026-03-15",
