@@ -613,7 +613,7 @@ describe("detectTrends — confidence classification", () => {
     }
 
     const trends = await detectTrends(makeSupabase([...runHrRows, ...extraRows]) as never, "athlete-1");
-    expect(trends.length).toBeLessThanOrEqual(3);
+    expect(trends.length).toBeLessThanOrEqual(5);
   });
 
   it("sorts trends so high-confidence appears before lower-confidence", async () => {
@@ -810,5 +810,63 @@ describe("detectTrends — intra-week averaging", () => {
     expect(hrTrend).toBeDefined();
     // Oldest data point (week 4) must be the average: (150 + 160) / 2 = 155
     expect(hrTrend!.dataPoints[0].value).toBe(155);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectTrends — sport field on returned trends
+// ---------------------------------------------------------------------------
+
+describe("detectTrends — sport field", () => {
+  it("includes the correct sport field on run trends", async () => {
+    const rows = makeRunHrRows(NOW, [
+      { weeksAgo: 4, hr: 160 },
+      { weeksAgo: 3, hr: 155 },
+      { weeksAgo: 2, hr: 150 },
+      { weeksAgo: 1, hr: 145 },
+      { weeksAgo: 0, hr: 140 }
+    ]);
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
+    const hrTrend = trends.find((t) => t.metric === "Run avg HR");
+    expect(hrTrend).toBeDefined();
+    expect(hrTrend!.sport).toBe("run");
+  });
+
+  it("includes the correct sport field on swim trends", async () => {
+    const rows: ActivityRow[] = [
+      { weeksAgo: 4, pace: 110 },
+      { weeksAgo: 3, pace: 107 },
+      { weeksAgo: 2, pace: 104 },
+      { weeksAgo: 1, pace: 101 },
+      { weeksAgo: 0, pace: 98 }
+    ].map(({ weeksAgo, pace }) => ({
+      start_time_utc: wednesdayOf(mondayOf(NOW, weeksAgo)),
+      sport_type: "swim",
+      avg_hr: null,
+      avg_power: null,
+      avg_pace_per_100m_sec: pace,
+      duration_sec: 3600,
+      distance_m: 2000,
+      metrics_v2: null
+    }));
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
+    const swimTrend = trends.find((t) => t.metric === "Swim pace");
+    expect(swimTrend).toBeDefined();
+    expect(swimTrend!.sport).toBe("swim");
+  });
+
+  it("every returned trend has a sport field", async () => {
+    const rows = makeRunHrRows(NOW, [
+      { weeksAgo: 4, hr: 160 },
+      { weeksAgo: 3, hr: 155 },
+      { weeksAgo: 2, hr: 150 },
+      { weeksAgo: 1, hr: 145 },
+      { weeksAgo: 0, hr: 140 }
+    ]);
+    const trends = await detectTrends(makeSupabase(rows) as never, "athlete-1");
+    for (const trend of trends) {
+      expect(typeof trend.sport).toBe("string");
+      expect(trend.sport.length).toBeGreaterThan(0);
+    }
   });
 });

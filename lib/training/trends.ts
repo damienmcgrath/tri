@@ -5,6 +5,7 @@ export type TrendConfidence = "low" | "medium" | "high";
 
 export type WeeklyTrend = {
   metric: string;
+  sport: string;
   direction: TrendDirection;
   dataPoints: Array<{ weekStart: string; value: number; label: string }>;
   detail: string;
@@ -74,6 +75,7 @@ function countConsistentDirections(values: number[]): number {
 
 function buildTrend(params: {
   metric: string;
+  sport: string;
   lowerIsBetter: boolean;
   dataPoints: Array<{ weekStart: string; value: number; label: string }>;
   detail: (direction: TrendDirection, values: number[]) => string;
@@ -91,6 +93,7 @@ function buildTrend(params: {
 
   return {
     metric,
+    sport: params.sport,
     direction,
     dataPoints,
     detail: params.detail(direction, values),
@@ -142,6 +145,7 @@ export async function detectTrends(
 
   const runHrTrend = buildTrend({
     metric: "Run avg HR",
+    sport: "run",
     lowerIsBetter: true,
     dataPoints: runHrPoints,
     detail: (dir) =>
@@ -169,6 +173,7 @@ export async function detectTrends(
 
   const runPaceTrend = buildTrend({
     metric: "Run pace",
+    sport: "run",
     lowerIsBetter: true,
     dataPoints: runPacePoints,
     detail: (dir) =>
@@ -191,6 +196,7 @@ export async function detectTrends(
 
   const bikePowerTrend = buildTrend({
     metric: "Bike avg power",
+    sport: "bike",
     lowerIsBetter: false,
     dataPoints: bikePowerPoints,
     detail: (dir) =>
@@ -215,6 +221,7 @@ export async function detectTrends(
 
   const swimPaceTrend = buildTrend({
     metric: "Swim pace",
+    sport: "swim",
     lowerIsBetter: true,
     dataPoints: swimPacePoints,
     detail: (dir) =>
@@ -238,6 +245,7 @@ export async function detectTrends(
 
   const strengthDurTrend = buildTrend({
     metric: "Strength duration",
+    sport: "strength",
     lowerIsBetter: false,
     dataPoints: strengthDurPoints,
     detail: (dir) =>
@@ -256,5 +264,5 @@ export async function detectTrends(
       const dirOrder = { improving: 2, declining: 2, stable: 1 };
       return order[b.confidence] - order[a.confidence] || dirOrder[b.direction] - dirOrder[a.direction];
     })
-    .slice(0, 3);
+    .slice(0, 5);
 }
