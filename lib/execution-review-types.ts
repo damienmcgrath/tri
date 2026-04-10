@@ -13,6 +13,7 @@ export type ExecutionEvidence = {
       hr?: { min?: number; max?: number };
       power?: { min?: number; max?: number };
       pace?: { min?: number; max?: number };
+      pace100m?: { min?: number; max?: number };
     } | null;
     plannedIntervals: number | null;
     plannedStructure: string | null;

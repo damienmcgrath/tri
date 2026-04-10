@@ -164,19 +164,50 @@ function computeEndTimeUtc(startDate: string, elapsedTimeSec: number): string {
   return new Date(startMs + elapsedTimeSec * 1000).toISOString();
 }
 
-function buildLapSummaries(laps: StravaLap[] | undefined): Record<string, unknown>[] | null {
+function buildLapSummaries(laps: StravaLap[] | undefined, sport: string): Record<string, unknown>[] | null {
   if (!laps || laps.length === 0) return null;
-  return laps.map((lap) => ({
-    index: lap.lap_index,
-    durationSec: lap.elapsed_time,
-    movingDurationSec: lap.moving_time,
-    distanceM: lap.distance,
-    avgHr: roundOrNull(lap.average_heartrate),
-    maxHr: roundOrNull(lap.max_heartrate),
-    avgPower: roundOrNull(lap.average_watts),
-    avgCadence: roundOrNull(lap.average_cadence),
-    elevationGainM: nullIfZero(lap.total_elevation_gain),
-  }));
+  const isSwim = sport === "swim";
+
+  // For swim: compute median distance to detect rest laps (distance = 0 or < 20% of median)
+  let medianDistance = 0;
+  if (isSwim) {
+    const distances = laps.map((l) => l.distance).filter((d) => d > 0).sort((a, b) => a - b);
+    if (distances.length > 0) {
+      medianDistance = distances[Math.floor(distances.length / 2)];
+    }
+  }
+
+  return laps.map((lap) => {
+    const base: Record<string, unknown> = {
+      index: lap.lap_index,
+      durationSec: lap.elapsed_time,
+      movingDurationSec: lap.moving_time,
+      distanceM: lap.distance,
+      avgHr: roundOrNull(lap.average_heartrate),
+      maxHr: roundOrNull(lap.max_heartrate),
+      avgPower: roundOrNull(lap.average_watts),
+      elevationGainM: nullIfZero(lap.total_elevation_gain),
+    };
+
+    if (isSwim) {
+      // Map cadence → stroke rate for swim (Strava reports strokes/min as cadence)
+      base.avgStrokeRateSpm = roundOrNull(lap.average_cadence);
+      // Derive per-lap pace
+      if (lap.distance > 0 && lap.elapsed_time > 0) {
+        base.avgPacePer100mSec = Math.round(lap.elapsed_time / (lap.distance / 100));
+      }
+      // Infer rest laps: distance is 0 or very small relative to other laps
+      const isRest = lap.distance === 0 || (medianDistance > 0 && lap.distance < medianDistance * 0.2);
+      if (isRest) {
+        base.isRest = true;
+        base.restSec = lap.elapsed_time;
+      }
+    } else {
+      base.avgCadence = roundOrNull(lap.average_cadence);
+    }
+
+    return base;
+  });
 }
 
 function buildSplitSummaries(
@@ -243,7 +274,7 @@ export function normalizeStravaActivity(
     : null;
 
   const lapsCount = raw.laps?.length ?? null;
-  const lapSummaries = buildLapSummaries(raw.laps);
+  const lapSummaries = buildLapSummaries(raw.laps, normalizedSport);
   const { hrDriftPct, paceFadePct } = buildSplitSummaries(raw.splits_metric, normalizedSport);
 
   // Pause duration from elapsed vs moving time

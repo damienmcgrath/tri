@@ -1,4 +1,4 @@
-import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, deriveWorkIntervalAvgPower } from "./session-execution";
+import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, deriveWorkIntervalAvgPower, parseTargetBands } from "./session-execution";
 
 describe("buildExecutionResultForSession", () => {
   test("builds a persisted execution result with aliases the session review expects", () => {
@@ -213,6 +213,91 @@ describe("buildExecutionResultForSession", () => {
 
     expect(result.avgCadence).toBe(90);
     expect(result.elevationGainM).toBe(250);
+  });
+
+  test("parses swim pace range from target into targetBands.pace100m", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-swim-pace",
+        user_id: "user-1",
+        sport: "swim",
+        type: "CSS Intervals",
+        duration_minutes: 50,
+        target: "12 x 100m @ 1:50-2:00/100m with 20s rest",
+        status: "planned"
+      },
+      {
+        id: "activity-swim-pace",
+        sport_type: "swim",
+        duration_sec: 3000,
+        distance_m: 1800,
+        avg_hr: 140,
+        avg_power: null,
+        avg_pace_per_100m_sec: 115,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    expect(targetBands).not.toBeNull();
+    expect(targetBands?.pace100m).toEqual({ min: 110, max: 120 }); // 1:50=110s, 2:00=120s
+  });
+
+  test("parses single swim pace target with @ prefix", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-swim-single",
+        user_id: "user-1",
+        sport: "swim",
+        type: "Endurance swim",
+        duration_minutes: 60,
+        target: "3 x 400m @ 1:55/100m",
+        status: "planned"
+      },
+      {
+        id: "activity-swim-single",
+        sport_type: "swim",
+        duration_sec: 3600,
+        distance_m: 2400,
+        avg_hr: null,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    expect(targetBands).not.toBeNull();
+    expect(targetBands?.pace100m).toEqual({ max: 115 }); // 1:55=115s
+  });
+
+  test("does not confuse swim pace text with HR target", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-no-hr-confusion",
+        user_id: "user-1",
+        sport: "swim",
+        type: "Endurance swim",
+        duration_minutes: 60,
+        target: "Steady aerobic pace, low to mid 2 min/100m",
+        status: "planned"
+      },
+      {
+        id: "activity-no-hr-confusion",
+        sport_type: "swim",
+        duration_sec: 3600,
+        distance_m: 2400,
+        avg_hr: 134,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    const targetBands = result.deterministic.planned.targetBands;
+    // Should NOT have an HR target — "low to mid 2 min" is pace, not HR
+    expect(targetBands?.hr).toBeUndefined();
   });
 });
 
@@ -601,5 +686,135 @@ describe("deriveWorkIntervalAvgPower", () => {
       }
     );
     expect(result.avgIntervalPower).toBe(213);
+  });
+});
+
+describe("parseTargetBands", () => {
+  test("parses power range", () => {
+    const result = parseTargetBands("2x10min at 200-220 W");
+    expect(result?.power).toEqual({ min: 200, max: 220 });
+  });
+
+  test("parses single power value with 'at'", () => {
+    const result = parseTargetBands("2x10min at 210W");
+    expect(result?.power).toEqual({ min: 210, max: 210 });
+  });
+
+  test("parses single power value with '@'", () => {
+    const result = parseTargetBands("3 x 8 min @ 250w");
+    expect(result?.power).toEqual({ min: 250, max: 250 });
+  });
+
+  test("parses single power value with '~'", () => {
+    const result = parseTargetBands("intervals ~200W");
+    expect(result?.power).toEqual({ min: 200, max: 200 });
+  });
+
+  test("prefers range over single value", () => {
+    const result = parseTargetBands("at 200-220W");
+    expect(result?.power).toEqual({ min: 200, max: 220 });
+  });
+
+  test("returns null for no target text", () => {
+    expect(parseTargetBands(null)).toBeNull();
+    expect(parseTargetBands(undefined)).toBeNull();
+    expect(parseTargetBands("")).toBeNull();
+  });
+
+  test("returns null when no recognizable bands", () => {
+    expect(parseTargetBands("easy spin")).toBeNull();
+  });
+});
+
+describe("deriveWorkIntervalAvgPower with single power target", () => {
+  const baseActivity = {
+    id: "a1",
+    sport_type: "bike",
+    duration_sec: 3120,
+    distance_m: 25000,
+    avg_hr: 145,
+    avg_power: 190,
+  };
+
+  test("correctly excludes warmup lap when single power target is parsed", () => {
+    // Without a target, Strategy 2 would include the 160W warmup (>= 210*0.70=147)
+    // With target min=210, Strategy 1 threshold is 210*0.80=168, excluding the warmup
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 160, avgHr: 130 },   // warmup
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 165 },   // interval 1
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100, avgHr: 125 },   // recovery
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 168 },   // interval 2
+            { index: 4, durationSec: 1020, distanceM: 5000, avgPower: 140, avgHr: 120 },  // cooldown
+          ]
+        }
+      },
+      targetBands: { power: { min: 210, max: 210 } },
+      plannedIntervals: 2,
+    });
+    expect(result).toBe(210);
+  });
+
+  test("Strategy 2 incorrectly includes warmup when no target is set", () => {
+    // Same laps as above but no target — demonstrates the bug being fixed
+    const result = deriveWorkIntervalAvgPower({
+      activity: {
+        ...baseActivity,
+        metrics_v2: {
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 160, avgHr: 130 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 165 },
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100, avgHr: 125 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 168 },
+            { index: 4, durationSec: 1020, distanceM: 5000, avgPower: 140, avgHr: 120 },
+          ]
+        }
+      },
+      targetBands: null,
+      plannedIntervals: 2,
+    });
+    // With no target, threshold = 210*0.70 = 147W
+    // Work laps: warmup (160W) + interval1 (210W) + interval2 (210W) = 3 laps
+    // Weighted avg: (160*600 + 210*600 + 210*600) / 1800 = 193
+    expect(result).toBe(193);
+  });
+
+  test("buildExecutionResultForSession uses single power target from session", () => {
+    const result = buildExecutionResultForSession(
+      {
+        id: "session-1",
+        user_id: "user-1",
+        sport: "bike",
+        type: "Sweet spot intervals",
+        duration_minutes: 52,
+        target: "2x10min at 210W",
+        intent_category: "Sweet spot intervals",
+        status: "planned"
+      },
+      {
+        id: "activity-1",
+        sport_type: "bike",
+        duration_sec: 3120,
+        distance_m: 25000,
+        avg_hr: 145,
+        avg_power: 190,
+        parse_summary: {},
+        metrics_v2: {
+          power: { normalizedPower: 177 },
+          laps: [
+            { index: 0, durationSec: 600, distanceM: 5000, avgPower: 160, avgHr: 130 },
+            { index: 1, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 165 },
+            { index: 2, durationSec: 300, distanceM: 2500, avgPower: 100, avgHr: 125 },
+            { index: 3, durationSec: 600, distanceM: 6000, avgPower: 210, avgHr: 168 },
+            { index: 4, durationSec: 1020, distanceM: 5000, avgPower: 140, avgHr: 120 },
+          ]
+        }
+      }
+    );
+    // With target "at 210W" parsed → min=210, threshold=168 → excludes warmup (160W)
+    expect(result.avgIntervalPower).toBe(210);
   });
 });
