@@ -204,7 +204,9 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           user_id: user.id,
           sport: activity.sport_type,
           type: "Extra workout",
-          duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+          // Extras have no planned duration — passing the actual duration
+          // here would self-compare and falsely flag the session as matched.
+          duration_minutes: null,
           target: null,
           intent_category: "extra workout",
           status: "completed"

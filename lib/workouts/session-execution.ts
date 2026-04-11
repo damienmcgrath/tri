@@ -820,12 +820,16 @@ export async function syncExtraActivityExecution(args: {
   if (activityError) throw new Error(activityError.message);
   if (!activity) throw new Error("Activity not found.");
 
+  // Extras have no planned duration, so leave `duration_minutes` null.
+  // Passing the actual activity duration here would be a self-comparison — it
+  // makes `evaluateUnknown` trivially return `matched_intent` regardless of
+  // how the session was actually executed.
   const syntheticSession: SessionExecutionSessionRow = {
     id: `activity:${activity.id}`,
     user_id: args.userId,
     sport: activity.sport_type,
     type: "Extra workout",
-    duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+    duration_minutes: null,
     target: null,
     intent_category: "extra workout",
     session_name: "Extra workout",
