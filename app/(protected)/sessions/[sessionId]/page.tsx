@@ -426,12 +426,13 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     key_deviations: unknown[] | null;
     adaptation_signal: string;
     adaptation_type: string | null;
+    stale_reason: string | null;
   } | null;
   let existingVerdictData: VerdictData = null as VerdictData;
   if (session.status === "completed" && !activityId) {
     const { data: existingVerdict } = await supabase
       .from("session_verdicts")
-      .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type")
+      .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type, stale_reason")
       .eq("session_id", session.id)
       .maybeSingle();
     existingVerdictData = existingVerdict as typeof existingVerdictData;

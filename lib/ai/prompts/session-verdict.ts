@@ -6,7 +6,7 @@ import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
 
-export const SESSION_VERDICT_PROMPT_VERSION = "v1";
+export const SESSION_VERDICT_PROMPT_VERSION = "v2";
 
 // --- Zod schema for AI output ---
 
@@ -260,7 +260,7 @@ export async function buildSessionVerdictContext(
 
 // --- AI prompt instructions ---
 
-function buildVerdictInstructions(): string {
+export function buildVerdictInstructions(): string {
   return [
     "You are an expert triathlon coach generating a structured session verdict.",
     "The verdict has three parts: Purpose Statement, Execution Assessment, and Adaptation Signal.",
@@ -291,9 +291,15 @@ function buildVerdictInstructions(): string {
     "- If well-executed: confirm the plan proceeds. Reference specific upcoming sessions.",
     "- If warning signs: flag specific sessions for potential modification.",
     "- If missed/off-target: explain redistribution or recovery implications.",
-    "- If feel data contradicts objective metrics, acknowledge the mismatch explicitly.",
     "- Reference upcoming sessions by weekday name and sport, NOT by ISO date (e.g. 'Wednesday's bike' not '2026-04-09 bike').",
     "- Keep adaptation_signal to 2-3 sentences. Be direct, not exhaustive.",
+    "",
+    "FEEL DATA — CRITICAL:",
+    "- When `feel` is present in the input, you MUST reference it in execution_summary. Name the overall feel label (e.g. 'Terrible', 'Good') and any legs, energy, or life-stress signal the athlete reported.",
+    "- Contradiction rule: if objective metrics landed on target BUT overall feel is 'Terrible' or 'Hard' (1-2/5), set verdict_status to at most 'partial' and adaptation_type to 'flag_review' or 'modify'. Next week's plan should be conservative. Do not call the session 'achieved'.",
+    "- Inverse rule: if metrics look off-target BUT overall feel is 'Good' or 'Amazing' (4-5/5) AND execution was not reckless (no excessive time above target, no incomplete intervals on a key session), verdict_status may remain 'achieved' or 'partial' with adaptation_type 'proceed'.",
+    "- If the feel `note` is present, read it as primary context — it may contain the 'why' the metrics alone cannot show (illness, weather, emotional load). Reference the note briefly if it changes your interpretation.",
+    "- If no feel is present, do not speculate about how the athlete felt. Proceed on metrics alone and keep the tone neutral.",
     "",
     "Rules:",
     "- Use only provided evidence. Do not invent metrics or facts.",
@@ -314,6 +320,51 @@ function buildVerdictInstructions(): string {
   ].join("\n");
 }
 
+// --- Feel humanization ---
+
+/**
+ * 5-point overall feel labels. Kept in sync with FeelCaptureBanner's UI copy
+ * so the LLM input mirrors what the athlete actually selected.
+ */
+const OVERALL_FEEL_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: "Terrible",
+  2: "Hard",
+  3: "OK",
+  4: "Good",
+  5: "Amazing"
+};
+
+/**
+ * Converts the raw `session_feels` projection on `SessionVerdictContext` into
+ * a compact, human-readable record that is safer for the LLM to read than raw
+ * integers and enum strings. Returns null when no feel fields are populated.
+ *
+ * This is also what we persist into `session_verdicts.feel_data` so downstream
+ * consumers (weekly debrief, analytics) see consistent labels.
+ */
+export function humanizeFeel(
+  feel: SessionVerdictContext["feel"]
+): Record<string, string> | null {
+  if (!feel) return null;
+  const out: Record<string, string> = {};
+  if (feel.overallFeel !== null && feel.overallFeel !== undefined) {
+    const key = feel.overallFeel as 1 | 2 | 3 | 4 | 5;
+    const label = OVERALL_FEEL_LABELS[key] ?? "Unknown";
+    out.overall = `${label} (${feel.overallFeel}/5)`;
+  }
+  if (feel.energyLevel) out.energy = feel.energyLevel;
+  if (feel.legsFeel) out.legs = feel.legsFeel;
+  if (feel.motivation) out.motivation = feel.motivation;
+  if (feel.sleepQuality) out.sleep = feel.sleepQuality;
+  if (feel.lifeStress) out.lifeStress = feel.lifeStress;
+  if (feel.note) {
+    // DB already caps at 280; defensive slice in case schema changes later.
+    // Note is going to the LLM, not the DOM — do NOT HTML-escape.
+    out.note = feel.note.slice(0, 280);
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 // --- Deterministic fallback ---
 
 function formatDuration(sec: number): string {
@@ -327,7 +378,7 @@ function formatPace100m(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}/100m`;
 }
 
-function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput {
+export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput {
   const sport = ctx.session.sport;
   const intentCategory = ctx.session.intentCategory ?? "general";
   const blockCtx = `Week ${ctx.trainingBlock.blockWeek} of ${ctx.trainingBlock.blockTotalWeeks}-week ${ctx.trainingBlock.currentBlock.toLowerCase()} block`;
@@ -414,9 +465,25 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
     }
   }
 
-  const adaptationSignal = hasActivity
+  let adaptationSignal = hasActivity
     ? "AI-generated adaptation analysis unavailable. The metrics above provide a baseline for manual review."
     : "No activity data to assess. If this session was missed, consider how to redistribute its training load.";
+
+  let adaptationType: SessionVerdictOutput["adaptation_type"] = hasActivity ? "proceed" : "flag_review";
+
+  // Feel override: if the athlete rated this session as Terrible or Hard
+  // (1-2/5), never claim the session was "achieved" — even when metrics look
+  // fine. Mirrors the FEEL DATA rule in buildVerdictInstructions so the
+  // deterministic fallback stays consistent with the LLM's required behavior.
+  const overallFeel = ctx.feel?.overallFeel ?? null;
+  if (hasActivity && overallFeel !== null && overallFeel <= 2) {
+    const feelLabel = OVERALL_FEEL_LABELS[overallFeel as 1 | 2] ?? "Hard";
+    const notePart = ctx.feel?.note ? ` Note: "${ctx.feel.note.slice(0, 140)}".` : "";
+    status = status === "achieved" ? "partial" : status;
+    executionSummary = `Athlete rated this session ${feelLabel} (${overallFeel}/5).${notePart} Flagging for review despite linked activity data.`;
+    adaptationSignal = "Feel was poor — hold the next key session conservatively and check in on recovery before pushing load.";
+    adaptationType = "flag_review";
+  }
 
   return {
     purpose_statement: ctx.session.target
@@ -430,7 +497,7 @@ function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput 
     metric_comparisons: metricComparisons,
     key_deviations: [],
     adaptation_signal: adaptationSignal,
-    adaptation_type: hasActivity ? "proceed" : "flag_review",
+    adaptation_type: adaptationType,
     affected_session_ids: []
   };
 }
@@ -649,7 +716,17 @@ export async function generateSessionVerdict(
   supabase: SupabaseClient,
   userId: string,
   sessionId: string
-): Promise<{ verdict: SessionVerdictOutput; source: "ai" | "fallback"; activityId: string | null }> {
+): Promise<{
+  verdict: SessionVerdictOutput;
+  source: "ai" | "fallback";
+  activityId: string | null;
+  /**
+   * Humanized feel snapshot from the context, mirroring what the LLM saw.
+   * Persisted to `session_verdicts.feel_data` so downstream consumers read a
+   * consistent label shape rather than the raw enum projection.
+   */
+  feel: Record<string, string> | null;
+}> {
   const ctx = await buildSessionVerdictContext(supabase, userId, sessionId);
   if (!ctx) {
     throw new Error("Session not found or not accessible.");
@@ -686,6 +763,7 @@ export async function generateSessionVerdict(
               type: "input_text" as const,
               text: JSON.stringify({
                 ...ctx,
+                feel: humanizeFeel(ctx.feel),
                 executionResult: humanizeExecutionResult(ctx.executionResult),
                 activity: ctx.activity ? {
                   ...ctx.activity,
@@ -704,5 +782,10 @@ export async function generateSessionVerdict(
     postProcess: normalizeSessionVerdictUnits
   });
 
-  return { verdict: result.value, source: result.source, activityId };
+  return {
+    verdict: result.value,
+    source: result.source,
+    activityId,
+    feel: humanizeFeel(ctx.feel)
+  };
 }
