@@ -6,6 +6,7 @@ import { refreshWeeklyDebrief } from "@/lib/weekly-debrief";
 import { getCurrentWeekStart } from "@/lib/athlete-context";
 import { localIsoDate } from "@/lib/activities/completed-activities";
 import { getCoachModel } from "@/lib/openai";
+import { syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 
 /**
  * Computes the Monday-based ISO week start for a given date string (YYYY-MM-DD).
@@ -44,17 +45,36 @@ export async function postSessionSyncSideEffects(args: {
 }
 
 /**
- * Variant for "extra" (unplanned) activities — only refreshes the weekly debrief
- * since extra activities don't have a planned session to verdict against.
+ * Variant for "extra" (unplanned) activities. Generates the execution review
+ * eagerly so the session detail page renders finished content on first visit
+ * instead of triggering a cold AI call in the request path. Also refreshes
+ * the weekly debrief so the extra activity is included in the weekly brief.
+ *
+ * Both effects are awaited with Promise.allSettled — a failure in one should
+ * not block the other, and neither should propagate back to the caller
+ * (which is typically a fire-and-forget from a server action).
  */
 export async function postExtraSyncSideEffects(args: {
   supabase: SupabaseClient;
   userId: string;
+  activityId?: string | null;
   activityDate?: string | null;
 }): Promise<void> {
-  await refreshDebriefForSession(args.supabase, args.userId, args.activityDate ?? null).catch((e) => {
-    console.error("[post-sync] Debrief refresh after extra activity failed:", e);
-  });
+  const effects: Promise<void>[] = [
+    refreshDebriefForSession(args.supabase, args.userId, args.activityDate ?? null).catch((e) => {
+      console.error("[post-sync] Debrief refresh after extra activity failed:", e);
+    }),
+  ];
+
+  if (args.activityId) {
+    effects.push(
+      generateExtraExecutionReview(args.supabase, args.userId, args.activityId).catch((e) => {
+        console.error("[post-sync] Extra execution review generation failed:", e);
+      }),
+    );
+  }
+
+  await Promise.allSettled(effects);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +159,14 @@ async function generateVerdictChain(
   } catch (e) {
     console.error("[post-sync] Verdict chain failed for session", sessionId, e);
   }
+}
+
+async function generateExtraExecutionReview(
+  supabase: SupabaseClient,
+  userId: string,
+  activityId: string,
+): Promise<void> {
+  await syncExtraActivityExecution({ supabase, userId, activityId });
 }
 
 async function refreshDebriefForSession(

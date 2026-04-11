@@ -3,6 +3,7 @@ import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
 import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
+import { inferExtraIntent } from "@/lib/workouts/infer-extra-intent";
 
 type SessionExecutionSessionRow = {
   id: string;
@@ -820,14 +821,28 @@ export async function syncExtraActivityExecution(args: {
   if (activityError) throw new Error(activityError.message);
   if (!activity) throw new Error("Activity not found.");
 
+  // Classify the workout from its own metrics so the downstream evaluator
+  // picks a real intent bucket (easy_endurance, threshold_quality, etc.)
+  // instead of the catch-all unknown bucket. The classifier label also flows
+  // into the AI prompt as the inferred intent.
+  const inferredIntent = inferExtraIntent({
+    sport_type: activity.sport_type,
+    duration_sec: activity.duration_sec,
+    metrics_v2: activity.metrics_v2 ?? null,
+  });
+
+  // Extras have no planned duration, so leave `duration_minutes` null.
+  // Passing the actual activity duration here would be a self-comparison — it
+  // makes `evaluateUnknown` trivially return `matched_intent` regardless of
+  // how the session was actually executed.
   const syntheticSession: SessionExecutionSessionRow = {
     id: `activity:${activity.id}`,
     user_id: args.userId,
     sport: activity.sport_type,
     type: "Extra workout",
-    duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+    duration_minutes: null,
     target: null,
-    intent_category: "extra workout",
+    intent_category: inferredIntent.intentCategory,
     session_name: "Extra workout",
     session_role: null,
     status: "completed"
@@ -847,6 +862,7 @@ export async function syncExtraActivityExecution(args: {
     sessionId: syntheticSession.id,
     sessionTitle: "Extra workout",
     sessionRole: null,
+    plannedStructure: `Inferred intent: ${inferredIntent.intentCategory} (${inferredIntent.rationale})`,
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });

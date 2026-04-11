@@ -534,10 +534,12 @@ export async function markActivityExtraAction(input: { activityId: string }) {
     .maybeSingle();
   const activityDate = activity?.start_time_utc ? activity.start_time_utc.slice(0, 10) : null;
 
-  // Fire-and-forget: refresh weekly debrief to include the extra activity
+  // Fire-and-forget: generate the execution review eagerly and refresh
+  // the weekly debrief to include the extra activity.
   postExtraSyncSideEffects({
     supabase,
     userId: user.id,
+    activityId: parsed.activityId,
     activityDate,
   }).catch((e) => console.error("[post-sync] Extra activity side effects failed:", e));
 

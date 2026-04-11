@@ -272,6 +272,42 @@ describe("buildExecutionResultForSession", () => {
     expect(targetBands?.pace100m).toEqual({ max: 115 }); // 1:55=115s
   });
 
+  test("does not trivially match an extras-shaped session (no planned duration, no targets)", () => {
+    // Regression test for the self-comparison bug: previously the extras sync
+    // built a synthetic session with `duration_minutes` set to the actual
+    // activity duration, which made `evaluateUnknown` trivially return
+    // `matched_intent` regardless of the real execution quality. Extras must
+    // use `duration_minutes: null` so the deterministic diagnosis stays
+    // honest (partial with sparse evidence) until richer signals are added.
+    const result = buildExecutionResultForSession(
+      {
+        id: "extra-1",
+        user_id: "user-1",
+        sport: "run",
+        type: "Extra workout",
+        duration_minutes: null,
+        target: null,
+        intent_category: "extra workout",
+        status: "completed"
+      },
+      {
+        id: "activity-extra-1",
+        sport_type: "run",
+        duration_sec: 3600,
+        distance_m: 10000,
+        avg_hr: 154,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {}
+      }
+    );
+
+    // No planned duration means no trivial 100% completion match.
+    expect(result.status).not.toBe("matched_intent");
+    expect(result.durationCompletion).toBeNull();
+    expect(result.diagnosisConfidence).toBe("low");
+  });
+
   test("does not confuse swim pace text with HR target", () => {
     const result = buildExecutionResultForSession(
       {
