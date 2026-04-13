@@ -6,7 +6,7 @@ import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass
 import { getSessionDisplayName } from "@/lib/training/session";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
-import { buildExecutionResultForSession } from "@/lib/workouts/session-execution";
+import { buildExecutionResultForSession, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 import { RegenerateReviewButton } from "@/app/(protected)/sessions/[sessionId]/regenerate-review-button";
 import { ExtrasVerdictCard } from "@/app/(protected)/sessions/[sessionId]/components/extras-verdict-card";
 
@@ -111,7 +111,20 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
   const activity = await loadActivityReviewRow({ supabase, userId: user.id, activityId: params.activityId });
   if (!activity) notFound();
 
-  const storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
+  let storedExecutionResult = parsePersistedExecutionReview(activity.execution_result ?? null);
+
+  // Auto-generate AI review for extra sessions that don't have one yet,
+  // mirroring the logic in the sibling activity-{id} route.
+  if (!storedExecutionResult) {
+    try {
+      const generated = await syncExtraActivityExecution({ supabase, userId: user.id, activityId: params.activityId });
+      storedExecutionResult = parsePersistedExecutionReview(generated);
+    } catch {
+      // Fall back to local review if AI generation fails
+      storedExecutionResult = null;
+    }
+  }
+
   const session: SessionReviewRow = {
     id: `activity-${activity.id}`,
     user_id: user.id,
@@ -130,7 +143,9 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
         user_id: user.id,
         sport: activity.sport_type,
         type: "Extra workout",
-        duration_minutes: activity.duration_sec ? Math.round(activity.duration_sec / 60) : null,
+        // Extras have no planned duration — passing the actual duration
+        // here would self-compare and falsely flag the session as matched.
+        duration_minutes: null,
         target: null,
         intent_category: "extra workout",
         status: "completed"
