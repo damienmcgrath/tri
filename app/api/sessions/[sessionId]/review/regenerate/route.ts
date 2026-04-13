@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { isSameOrigin } from "@/lib/security/request";
 import { createClient } from "@/lib/supabase/server";
 import { syncExtraActivityExecution, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
+import { EXTRA_INTENT_OPTIONS } from "@/lib/workouts/infer-extra-intent";
+
+const VALID_INTENT_VALUES = new Set(EXTRA_INTENT_OPTIONS.map((o) => o.value));
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
   if (!isSameOrigin(request)) {
@@ -23,9 +26,25 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   const activityIdMatch = sessionId.match(/^activity-(.+)$/);
   if (activityIdMatch) {
     const activityId = activityIdMatch[1];
+
+    // Parse optional intent override from request body
+    let intentOverride: string | undefined;
     try {
-      const executionResult = await syncExtraActivityExecution({ supabase, userId: user.id, activityId });
+      const body = await request.json();
+      if (body && typeof body.intentOverride === "string" && body.intentOverride) {
+        if (!VALID_INTENT_VALUES.has(body.intentOverride)) {
+          return NextResponse.json({ error: "Invalid intent category." }, { status: 400 });
+        }
+        intentOverride = body.intentOverride;
+      }
+    } catch {
+      // No body or invalid JSON — proceed without override
+    }
+
+    try {
+      const executionResult = await syncExtraActivityExecution({ supabase, userId: user.id, activityId, intentOverride });
       revalidatePath(`/sessions/${sessionId}`);
+      revalidatePath(`/sessions/activity/${activityId}`);
       revalidatePath(`/sessions/activity-${activityId}`);
       revalidatePath("/dashboard");
       return NextResponse.json({ ok: true, narrativeSource: executionResult.narrativeSource });

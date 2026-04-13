@@ -247,6 +247,8 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
           verdict={execReview.verdict}
           intentCategory={execReview.deterministic?.planned?.intentCategory ?? null}
           narrativeSource={execReview.narrativeSource}
+          sessionId={session.id}
+          sport={session.sport}
         />
       ) : null}
 
