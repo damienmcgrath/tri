@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CoachVerdict } from "@/lib/execution-review-types";
+import { ReclassifyIntentSelector } from "./reclassify-intent-selector";
 
 /** Sanitize camelCase field names that may leak from stored verdict text. */
 function sanitizeText(text: string): string {
@@ -89,9 +90,13 @@ type Props = {
   verdict: CoachVerdict;
   intentCategory: string | null;
   narrativeSource: "ai" | "fallback" | "legacy_unknown";
+  /** Synthetic session ID (e.g. "activity-{uuid}") for the regenerate endpoint. */
+  sessionId?: string;
+  /** Sport type used to filter the reclassify intent options. */
+  sport?: string;
 };
 
-export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource }: Props) {
+export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, sessionId, sport }: Props) {
   const [showEvidence, setShowEvidence] = useState(false);
 
   const match = INTENT_MATCH_CONFIG[verdict.sessionVerdict.intentMatch];
@@ -121,10 +126,17 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource }: 
       <div className="divide-y divide-[hsl(var(--border))]">
         {/* Part 1: What this session was */}
         <div className="px-5 py-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-0.5 text-[11px] font-medium text-muted">
               {intentLabel}
             </span>
+            {sessionId && sport ? (
+              <ReclassifyIntentSelector
+                sessionId={sessionId}
+                currentIntent={intentCategory}
+                sport={sport}
+              />
+            ) : null}
           </div>
           {verdict.explanation.sessionIntent ? (
             <p className="mt-2 text-sm text-muted">{sanitizeText(verdict.explanation.sessionIntent)}</p>

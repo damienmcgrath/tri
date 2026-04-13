@@ -2,6 +2,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ExtrasVerdictCard } from "./extras-verdict-card";
 import type { CoachVerdict } from "@/lib/execution-review-types";
 
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: jest.fn() }),
+}));
+
 function makeVerdict(overrides: Partial<CoachVerdict> = {}): CoachVerdict {
   return {
     sessionVerdict: {
@@ -203,5 +207,77 @@ describe("ExtrasVerdictCard", () => {
     expect(
       screen.queryByText(/maintain aerobic base/)
     ).not.toBeInTheDocument();
+  });
+
+  test("renders reclassify button when sessionId and sport are provided", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict()}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+        sessionId="activity-abc123"
+        sport="run"
+      />
+    );
+
+    expect(screen.getByText("Reclassify")).toBeInTheDocument();
+  });
+
+  test("does not render reclassify button when sessionId is missing", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict()}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+      />
+    );
+
+    expect(screen.queryByText("Reclassify")).not.toBeInTheDocument();
+  });
+
+  test("shows reclassify dropdown with sport-filtered options on click", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict()}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+        sessionId="activity-abc123"
+        sport="run"
+      />
+    );
+
+    fireEvent.click(screen.getByText("Reclassify"));
+
+    // Run+bike options should be visible for a run sport
+    expect(screen.getByText("Recovery")).toBeInTheDocument();
+    expect(screen.getByText("Easy endurance")).toBeInTheDocument();
+    expect(screen.getByText("Threshold / intervals")).toBeInTheDocument();
+
+    // Run-specific option should be visible
+    expect(screen.getByText("Long endurance run")).toBeInTheDocument();
+
+    // Bike/swim/strength-specific options should NOT be visible
+    expect(screen.queryByText("Long endurance ride")).not.toBeInTheDocument();
+    expect(screen.queryByText("Swim session")).not.toBeInTheDocument();
+    expect(screen.queryByText("Strength session")).not.toBeInTheDocument();
+  });
+
+  test("marks current intent as disabled in dropdown", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict()}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+        sessionId="activity-abc123"
+        sport="run"
+      />
+    );
+
+    fireEvent.click(screen.getByText("Reclassify"));
+
+    // The "Easy endurance" option should show "(current)" and be disabled
+    expect(screen.getByText("(current)")).toBeInTheDocument();
+    const easyEnduranceButton = screen.getByText("Easy endurance").closest("button");
+    expect(easyEnduranceButton).toBeDisabled();
   });
 });

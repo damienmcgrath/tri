@@ -1,4 +1,4 @@
-import { inferExtraIntent } from "./infer-extra-intent";
+import { inferExtraIntent, EXTRA_INTENT_OPTIONS } from "./infer-extra-intent";
 
 const baseZone = (zone: number, durationSec: number) => ({
   zone,
@@ -206,5 +206,61 @@ describe("inferExtraIntent", () => {
     });
 
     expect(result.intentCategory).toBe("easy endurance");
+  });
+});
+
+describe("EXTRA_INTENT_OPTIONS", () => {
+  test("covers every intent category that inferExtraIntent can return", () => {
+    const optionValues = new Set(EXTRA_INTENT_OPTIONS.map((o) => o.value));
+    const knownCategories = [
+      "recovery",
+      "easy endurance",
+      "long endurance run",
+      "long endurance ride",
+      "threshold intervals",
+      "extra swim",
+      "extra strength",
+    ];
+    for (const cat of knownCategories) {
+      expect(optionValues).toContain(cat);
+    }
+  });
+
+  test("each option has a non-empty label", () => {
+    for (const opt of EXTRA_INTENT_OPTIONS) {
+      expect(opt.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("sport-specific options have correct sport filters", () => {
+    const runOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "long endurance run");
+    expect(runOpt?.sports).toEqual(["run"]);
+
+    const bikeOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "long endurance ride");
+    expect(bikeOpt?.sports).toEqual(["bike"]);
+
+    const swimOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "extra swim");
+    expect(swimOpt?.sports).toEqual(["swim"]);
+
+    const recoveryOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "recovery");
+    expect(recoveryOpt?.sports).toEqual(["run", "bike"]);
+
+    const easyOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "easy endurance");
+    expect(easyOpt?.sports).toEqual(["run", "bike"]);
+
+    const thresholdOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "threshold intervals");
+    expect(thresholdOpt?.sports).toEqual(["run", "bike"]);
+  });
+
+  test("swim and strength only see their own options", () => {
+    const swimOptions = EXTRA_INTENT_OPTIONS.filter(
+      (o) => o.sports === null || o.sports.includes("swim")
+    );
+    expect(swimOptions.map((o) => o.value)).toEqual(["extra swim"]);
+
+    const strengthOptions = EXTRA_INTENT_OPTIONS.filter(
+      (o) => o.sports === null || o.sports.includes("strength")
+    );
+    expect(strengthOptions.map((o) => o.value)).toEqual(["extra strength"]);
   });
 });

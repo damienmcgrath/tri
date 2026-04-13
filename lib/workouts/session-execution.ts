@@ -810,10 +810,13 @@ export async function syncExtraActivityExecution(args: {
   supabase: SupabaseClient;
   userId: string;
   activityId: string;
+  /** When set, overrides the auto-inferred intent category. Persisted to
+   *  `completed_activities.intent_override` so it survives regeneration. */
+  intentOverride?: string;
 }): Promise<PersistedExecutionReview> {
   const { data: activity, error: activityError } = await args.supabase
     .from("completed_activities")
-    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override")
     .eq("id", args.activityId)
     .eq("user_id", args.userId)
     .maybeSingle();
@@ -821,15 +824,17 @@ export async function syncExtraActivityExecution(args: {
   if (activityError) throw new Error(activityError.message);
   if (!activity) throw new Error("Activity not found.");
 
-  // Classify the workout from its own metrics so the downstream evaluator
-  // picks a real intent bucket (easy_endurance, threshold_quality, etc.)
-  // instead of the catch-all unknown bucket. The classifier label also flows
-  // into the AI prompt as the inferred intent.
-  const inferredIntent = inferExtraIntent({
-    sport_type: activity.sport_type,
-    duration_sec: activity.duration_sec,
-    metrics_v2: activity.metrics_v2 ?? null,
-  });
+  // Use the caller's explicit override first, then fall back to a previously
+  // stored override from the DB, and only auto-classify as a last resort.
+  // This ensures a user's reclassification survives plain regenerations.
+  const effectiveOverride = args.intentOverride ?? (activity as Record<string, unknown>).intent_override as string | null;
+  const intentResult = effectiveOverride
+    ? { intentCategory: effectiveOverride, rationale: "User override" }
+    : inferExtraIntent({
+        sport_type: activity.sport_type,
+        duration_sec: activity.duration_sec,
+        metrics_v2: activity.metrics_v2 ?? null,
+      });
 
   // Extras have no planned duration, so leave `duration_minutes` null.
   // Passing the actual activity duration here would be a self-comparison — it
@@ -842,7 +847,7 @@ export async function syncExtraActivityExecution(args: {
     type: "Extra workout",
     duration_minutes: null,
     target: null,
-    intent_category: inferredIntent.intentCategory,
+    intent_category: intentResult.intentCategory,
     session_name: "Extra workout",
     session_role: null,
     status: "completed"
@@ -857,12 +862,13 @@ export async function syncExtraActivityExecution(args: {
     athleteContext = null;
   }
 
+  const intentSource = args.intentOverride ? "User override" : "Inferred intent";
   const { evidence } = buildExecutionEvidence({
     athleteId: args.userId,
     sessionId: syntheticSession.id,
     sessionTitle: "Extra workout",
     sessionRole: null,
-    plannedStructure: `Inferred intent: ${inferredIntent.intentCategory} (${inferredIntent.rationale})`,
+    plannedStructure: `${intentSource}: ${intentResult.intentCategory} (${intentResult.rationale})`,
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });
@@ -875,9 +881,16 @@ export async function syncExtraActivityExecution(args: {
     narrativeSource: generated.source
   });
 
+  const updatePayload: Record<string, unknown> = { execution_result: executionResult };
+  // Persist the override so it survives future regenerations. Clear it when
+  // no override is provided (user could have removed a previous override).
+  if (args.intentOverride !== undefined) {
+    updatePayload.intent_override = args.intentOverride || null;
+  }
+
   const { error: saveError } = await args.supabase
     .from("completed_activities")
-    .update({ execution_result: executionResult })
+    .update(updatePayload)
     .eq("id", activity.id)
     .eq("user_id", args.userId);
 
