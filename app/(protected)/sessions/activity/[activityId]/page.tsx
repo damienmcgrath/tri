@@ -8,6 +8,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { buildExecutionResultForSession } from "@/lib/workouts/session-execution";
 import { RegenerateReviewButton } from "@/app/(protected)/sessions/[sessionId]/regenerate-review-button";
+import { ExtrasVerdictCard } from "@/app/(protected)/sessions/[sessionId]/components/extras-verdict-card";
 
 type ActivityReviewRow = {
   id: string;
@@ -151,6 +152,7 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
   };
 
   const reviewVm = createReviewViewModel(session);
+  const execReview = parsePersistedExecutionReview(session.execution_result ?? null);
   const sessionTitle = getSessionDisplayName({
     sessionName: session.session_name ?? session.type,
     discipline: session.discipline ?? session.sport,
@@ -223,6 +225,15 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
           </div>
         </div>
       </article>
+
+      {/* Extras verdict card — reads from the CoachVerdict in execution_result */}
+      {execReview?.verdict ? (
+        <ExtrasVerdictCard
+          verdict={execReview.verdict}
+          intentCategory={execReview.deterministic?.planned?.intentCategory ?? null}
+          narrativeSource={execReview.narrativeSource}
+        />
+      ) : null}
 
       <article className="surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
