@@ -84,15 +84,14 @@ export async function POST(request: Request) {
     // available" chip. We do not auto-regenerate — the user decides. Only
     // flag rows that are not already stale to preserve the earliest reason.
     // Non-blocking: a failure here should not fail the feel upsert.
-    try {
-      await supabase
-        .from("session_verdicts")
-        .update({ stale_reason: "feel_updated" })
-        .eq("session_id", body.sessionId)
-        .eq("user_id", user.id)
-        .is("stale_reason", null);
-    } catch (staleError) {
-      console.error("[SESSION_FEELS] Failed to mark verdict stale:", staleError);
+    const { error: staleError } = await supabase
+      .from("session_verdicts")
+      .update({ stale_reason: "feel_updated" })
+      .eq("session_id", body.sessionId)
+      .eq("user_id", user.id)
+      .is("stale_reason", null);
+    if (staleError) {
+      console.error("[SESSION_FEELS] Failed to mark verdict stale:", staleError.message);
     }
 
     return NextResponse.json({ ok: true });

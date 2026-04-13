@@ -475,12 +475,19 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
   // (1-2/5), never claim the session was "achieved" — even when metrics look
   // fine. Mirrors the FEEL DATA rule in buildVerdictInstructions so the
   // deterministic fallback stays consistent with the LLM's required behavior.
+  //
+  // Only replace execution_summary for the contradiction case (metrics said
+  // "achieved" but feel was poor). For already-partial/missed fallbacks the
+  // original execution explanation is more informative; we just reinforce the
+  // conservative adaptation signal.
   const overallFeel = ctx.feel?.overallFeel ?? null;
   if (hasActivity && overallFeel !== null && overallFeel <= 2) {
     const feelLabel = OVERALL_FEEL_LABELS[overallFeel as 1 | 2] ?? "Hard";
     const notePart = ctx.feel?.note ? ` Note: "${ctx.feel.note.slice(0, 140)}".` : "";
-    status = status === "achieved" ? "partial" : status;
-    executionSummary = `Athlete rated this session ${feelLabel} (${overallFeel}/5).${notePart} Flagging for review despite linked activity data.`;
+    if (status === "achieved") {
+      status = "partial";
+      executionSummary = `Athlete rated this session ${feelLabel} (${overallFeel}/5).${notePart} Flagging for review despite linked activity data.`;
+    }
     adaptationSignal = "Feel was poor — hold the next key session conservatively and check in on recovery before pushing load.";
     adaptationType = "flag_review";
   }

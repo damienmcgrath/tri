@@ -296,7 +296,7 @@ describe("buildFallbackVerdict", () => {
     expect(verdict.execution_summary).not.toMatch(/athlete rated/i);
   });
 
-  test("includes the note in the summary when feel is poor and note is present", () => {
+  test("includes the note in the summary when feel is poor and status was achieved", () => {
     const verdict = buildFallbackVerdict(
       makeCtx({
         feel: {
@@ -310,7 +310,51 @@ describe("buildFallbackVerdict", () => {
         }
       })
     );
+    // Status was achieved (matched_intent) → contradiction override fires
     expect(verdict.execution_summary).toMatch(/Woke up with a cold/);
+  });
+
+  test("preserves original summary for already-partial status when feel is poor", () => {
+    const verdict = buildFallbackVerdict(
+      makeCtx({
+        executionResult: { intentMatchStatus: "partial_intent" },
+        feel: {
+          overallFeel: 1,
+          energyLevel: null,
+          legsFeel: null,
+          motivation: null,
+          sleepQuality: null,
+          lifeStress: null,
+          note: null
+        }
+      })
+    );
+    // Status was already partial → don't replace execution_summary
+    expect(verdict.verdict_status).toBe("partial");
+    expect(verdict.adaptation_type).toBe("flag_review");
+    expect(verdict.execution_summary).not.toMatch(/Terrible/);
+    expect(verdict.execution_summary).toMatch(/partially matched/i);
+  });
+
+  test("preserves original summary for missed status when feel is poor", () => {
+    const verdict = buildFallbackVerdict(
+      makeCtx({
+        executionResult: { intentMatchStatus: "missed_intent" },
+        feel: {
+          overallFeel: 2,
+          energyLevel: null,
+          legsFeel: null,
+          motivation: null,
+          sleepQuality: null,
+          lifeStress: null,
+          note: null
+        }
+      })
+    );
+    expect(verdict.verdict_status).toBe("missed");
+    expect(verdict.adaptation_type).toBe("flag_review");
+    expect(verdict.execution_summary).not.toMatch(/Hard/);
+    expect(verdict.adaptation_signal).toMatch(/conservatively|recovery/i);
   });
 
   test("leaves status 'missed' untouched when there is no linked activity, even with poor feel", () => {
