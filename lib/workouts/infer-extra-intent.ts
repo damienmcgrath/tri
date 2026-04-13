@@ -36,14 +36,17 @@ export type InferredExtraIntent = {
  * Valid intent categories for extra sessions, used by the reclassify UI.
  * Each entry's `value` matches what `inferExtraIntent` returns and what
  * `toIntentBucket` in `lib/coach/session-diagnosis.ts` consumes.
- * `sports` restricts which options appear for a given sport (null = all).
+ * `sports` restricts which options appear for a given sport — swim and
+ * strength are always routed to the `swim_strength` evaluator bucket by
+ * sport, so showing recovery/easy/threshold for those sports would route
+ * them to the wrong evaluator.
  */
 export const EXTRA_INTENT_OPTIONS = [
-  { value: "recovery", label: "Recovery", sports: null },
-  { value: "easy endurance", label: "Easy endurance", sports: null },
+  { value: "recovery", label: "Recovery", sports: ["run", "bike"] as string[] },
+  { value: "easy endurance", label: "Easy endurance", sports: ["run", "bike"] as string[] },
   { value: "long endurance run", label: "Long endurance run", sports: ["run"] as string[] },
   { value: "long endurance ride", label: "Long endurance ride", sports: ["bike"] as string[] },
-  { value: "threshold intervals", label: "Threshold / intervals", sports: null },
+  { value: "threshold intervals", label: "Threshold / intervals", sports: ["run", "bike"] as string[] },
   { value: "extra swim", label: "Swim session", sports: ["swim"] as string[] },
   { value: "extra strength", label: "Strength session", sports: ["strength"] as string[] },
 ] as const;

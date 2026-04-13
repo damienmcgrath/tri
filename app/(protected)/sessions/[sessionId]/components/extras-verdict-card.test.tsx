@@ -248,7 +248,7 @@ describe("ExtrasVerdictCard", () => {
 
     fireEvent.click(screen.getByText("Reclassify"));
 
-    // Universal options should be visible
+    // Run+bike options should be visible for a run sport
     expect(screen.getByText("Recovery")).toBeInTheDocument();
     expect(screen.getByText("Easy endurance")).toBeInTheDocument();
     expect(screen.getByText("Threshold / intervals")).toBeInTheDocument();

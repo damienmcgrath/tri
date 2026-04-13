@@ -816,7 +816,7 @@ export async function syncExtraActivityExecution(args: {
 }): Promise<PersistedExecutionReview> {
   const { data: activity, error: activityError } = await args.supabase
     .from("completed_activities")
-    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override")
     .eq("id", args.activityId)
     .eq("user_id", args.userId)
     .maybeSingle();
@@ -824,9 +824,12 @@ export async function syncExtraActivityExecution(args: {
   if (activityError) throw new Error(activityError.message);
   if (!activity) throw new Error("Activity not found.");
 
-  // Use the user's override when available; otherwise classify automatically.
-  const intentResult = args.intentOverride
-    ? { intentCategory: args.intentOverride, rationale: "User override" }
+  // Use the caller's explicit override first, then fall back to a previously
+  // stored override from the DB, and only auto-classify as a last resort.
+  // This ensures a user's reclassification survives plain regenerations.
+  const effectiveOverride = args.intentOverride ?? (activity as Record<string, unknown>).intent_override as string | null;
+  const intentResult = effectiveOverride
+    ? { intentCategory: effectiveOverride, rationale: "User override" }
     : inferExtraIntent({
         sport_type: activity.sport_type,
         duration_sec: activity.duration_sec,

@@ -242,7 +242,25 @@ describe("EXTRA_INTENT_OPTIONS", () => {
     const swimOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "extra swim");
     expect(swimOpt?.sports).toEqual(["swim"]);
 
-    const universalOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "recovery");
-    expect(universalOpt?.sports).toBeNull();
+    const recoveryOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "recovery");
+    expect(recoveryOpt?.sports).toEqual(["run", "bike"]);
+
+    const easyOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "easy endurance");
+    expect(easyOpt?.sports).toEqual(["run", "bike"]);
+
+    const thresholdOpt = EXTRA_INTENT_OPTIONS.find((o) => o.value === "threshold intervals");
+    expect(thresholdOpt?.sports).toEqual(["run", "bike"]);
+  });
+
+  test("swim and strength only see their own options", () => {
+    const swimOptions = EXTRA_INTENT_OPTIONS.filter(
+      (o) => o.sports === null || o.sports.includes("swim")
+    );
+    expect(swimOptions.map((o) => o.value)).toEqual(["extra swim"]);
+
+    const strengthOptions = EXTRA_INTENT_OPTIONS.filter(
+      (o) => o.sports === null || o.sports.includes("strength")
+    );
+    expect(strengthOptions.map((o) => o.value)).toEqual(["extra strength"]);
   });
 });
