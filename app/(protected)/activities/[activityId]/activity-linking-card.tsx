@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { SessionCandidate } from "@/lib/workouts/activity-details";
-import { linkActivityAction, markUnplannedAction, toggleRaceAction, unlinkActivityAction, updateActivityNotesAction } from "./actions";
+import { deleteActivityAction, linkActivityAction, markUnplannedAction, toggleRaceAction, unlinkActivityAction, updateActivityNotesAction } from "./actions";
 
 export function ActivityLinkingCard({
   activityId,
@@ -10,7 +11,9 @@ export function ActivityLinkingCard({
   candidates,
   isRace,
   initialNotes,
-  isUnplanned
+  isUnplanned,
+  source,
+  externalProvider
 }: {
   activityId: string;
   linkedSession: SessionCandidate | null;
@@ -18,7 +21,10 @@ export function ActivityLinkingCard({
   isRace: boolean;
   initialNotes: string | null;
   isUnplanned: boolean;
+  source: string;
+  externalProvider: string | null;
 }) {
+  const router = useRouter();
   const [selectedSessionId, setSelectedSessionId] = useState(candidates[0]?.id ?? "");
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [message, setMessage] = useState("");
@@ -106,6 +112,28 @@ export function ActivityLinkingCard({
           {isRace ? "Unmark race" : "Mark as race"}
         </button>
         {message ? <p className="mt-2 text-xs text-muted">{message}</p> : null}
+        <div className="mt-4 border-t border-white/10 pt-3">
+          <button
+            className="btn-secondary text-xs text-rose-400"
+            disabled={pending}
+            onClick={() => {
+              const msg = externalProvider === "strava"
+                ? "Delete this activity? It may be re-imported on the next Strava sync."
+                : "Delete this activity? This cannot be undone.";
+              if (!window.confirm(msg)) return;
+              startTransition(async () => {
+                const result = await deleteActivityAction(activityId);
+                if (result?.error) {
+                  setMessage(result.error);
+                } else {
+                  router.push("/dashboard");
+                }
+              });
+            }}
+          >
+            Delete activity
+          </button>
+        </div>
       </article>
     </div>
   );

@@ -112,7 +112,7 @@ export async function syncSessionLoad(
 /**
  * Rebuild daily_load rows for a specific date by summing session_load.
  */
-async function rebuildDailyLoad(
+export async function rebuildDailyLoad(
   supabase: SupabaseClient,
   userId: string,
   date: string
@@ -179,7 +179,7 @@ async function rebuildDailyLoad(
  * Update athlete_fitness from a specific date forward.
  * Only recomputes from the affected date — not the full history.
  */
-async function updateFitnessFromDate(
+export async function updateFitnessFromDate(
   supabase: SupabaseClient,
   userId: string,
   fromDate: string

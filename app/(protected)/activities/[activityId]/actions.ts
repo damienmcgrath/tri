@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { syncSessionLoad } from "@/lib/training/load-sync";
+import { syncSessionLoad, rebuildDailyLoad, updateFitnessFromDate } from "@/lib/training/load-sync";
 import { syncSessionExecutionAfterUnlink, syncSessionExecutionFromActivityLink } from "@/lib/workouts/session-execution";
 import { postSessionSyncSideEffects } from "@/lib/workouts/post-sync-effects";
 import { updateUploadStatusForActivity } from "@/lib/workouts/upload-status";
@@ -169,5 +169,75 @@ export async function toggleRaceAction(activityId: string, isRace: boolean) {
   if (error) return { error: error.message };
 
   revalidatePath(`/activities/${activityId}`);
+  return { ok: true };
+}
+
+export async function deleteActivityAction(activityId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // 1. Fetch the activity
+  const { data: activity } = await supabase
+    .from("completed_activities")
+    .select("id, upload_id, source, external_provider, start_time_utc")
+    .eq("id", activityId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!activity) return { error: "Activity not found" };
+
+  const activityDate = activity.start_time_utc
+    ? activity.start_time_utc.slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  // 2. Gather affected session IDs before cascade deletes them
+  const { data: existingLinks } = await supabase
+    .from("session_activity_links")
+    .select("planned_session_id,confirmation_status")
+    .eq("user_id", user.id)
+    .eq("completed_activity_id", activityId)
+    .limit(5);
+
+  const affectedSessionIds = (existingLinks ?? [])
+    .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+    .map((link: any) => link.planned_session_id as string);
+
+  // 3. Delete the activity (cascades to session_activity_links, session_load, session_verdicts)
+  if (activity.upload_id) {
+    // File-uploaded: delete the upload row, which cascades to completed_activities
+    const { error } = await supabase
+      .from("activity_uploads")
+      .delete()
+      .eq("id", activity.upload_id)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+  } else {
+    // Strava or other source: delete directly from completed_activities
+    const { error } = await supabase
+      .from("completed_activities")
+      .delete()
+      .eq("id", activityId)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+  }
+
+  // 4. Reset execution state on any sessions that were linked
+  for (const sessionId of affectedSessionIds) {
+    await syncSessionExecutionAfterUnlink({ supabase, userId: user.id, sessionId });
+    revalidatePath(`/sessions/${sessionId}`);
+  }
+
+  // 5. Rebuild stale aggregation tables (daily_load, athlete_fitness)
+  try {
+    await rebuildDailyLoad(supabase, user.id, activityDate);
+    await updateFitnessFromDate(supabase, user.id, activityDate);
+  } catch (syncError) {
+    console.error("[training-load] Failed to rebuild load after activity deletion:", syncError);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  revalidatePath("/debrief");
   return { ok: true };
 }

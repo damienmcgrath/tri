@@ -263,6 +263,8 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           isRace={activity.is_race}
           initialNotes={activity.notes}
           isUnplanned={activity.is_unplanned}
+          source={activity.source}
+          externalProvider={activity.external_provider}
         />
       </div>
     </section>
