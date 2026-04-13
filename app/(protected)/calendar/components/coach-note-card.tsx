@@ -153,13 +153,34 @@ function SingleCoachNote({ rationale }: { rationale: AdaptationRationale }) {
 }
 
 export function CoachNoteCards({ rationales }: Props) {
+  const [showAll, setShowAll] = useState(false);
+
   if (rationales.length === 0) return null;
+
+  const firstNote = rationales[0];
+  const restNotes = rationales.slice(1);
 
   return (
     <div className="space-y-3">
-      {rationales.map((r) => (
-        <SingleCoachNote key={r.id} rationale={r} />
-      ))}
+      <SingleCoachNote key={firstNote.id} rationale={firstNote} />
+
+      {restNotes.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((prev) => !prev)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-xs text-tertiary transition hover:border-[rgba(255,255,255,0.16)] hover:text-white"
+        >
+          {showAll
+            ? "Hide older notes"
+            : `${restNotes.length} more coach note${restNotes.length > 1 ? "s" : ""}`}
+          <span className="text-[10px]">{showAll ? "\u25B2" : "\u25BC"}</span>
+        </button>
+      )}
+
+      {showAll &&
+        restNotes.map((r) => (
+          <SingleCoachNote key={r.id} rationale={r} />
+        ))}
     </div>
   );
 }

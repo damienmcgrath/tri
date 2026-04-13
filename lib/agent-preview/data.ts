@@ -1471,6 +1471,54 @@ export function createPreviewDatabase(): PreviewDatabase {
         athlete_response: null,
         created_at: "2026-03-15T10:06:00.000Z",
         acknowledged_at: null
+      },
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab",
+        user_id: PREVIEW_USER_ID,
+        trigger_type: "load_rebalance",
+        trigger_data: {
+          sourceSessionId: "77777777-7777-4777-8777-777777777775",
+          sourceSessionName: "Wednesday Swim",
+          verdictStatus: "achieved",
+          verdictSummary: "Session executed well but weekly swim volume trending low."
+        },
+        rationale_text: "I've added 10 minutes to Saturday's swim to rebalance weekly volume. Your Wednesday swim was solid but total swim minutes are 20% below target for this build block. The extra time is easy aerobic pull sets — no intensity change.",
+        changes_summary: [
+          { session_id: "77777777-7777-4777-8777-777777777776", session_label: "Saturday Endurance Swim", change_type: "duration_increased", before: "45 min", after: "55 min" }
+        ],
+        preserved_elements: ["Saturday's main set unchanged", "Sunday long ride unaffected"],
+        week_number: 2,
+        training_block: "Build",
+        affected_sessions: ["77777777-7777-4777-8777-777777777776"],
+        source_verdict_id: "99999999-9999-4999-8999-999999999993",
+        status: "pending",
+        athlete_response: null,
+        created_at: "2026-03-15T09:30:00.000Z",
+        acknowledged_at: null
+      },
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac",
+        user_id: PREVIEW_USER_ID,
+        trigger_type: "feel_based",
+        trigger_data: {
+          sourceSessionId: "77777777-7777-4777-8777-777777777773",
+          sourceSessionName: "Thursday Bike Intervals",
+          verdictStatus: "partial",
+          verdictSummary: "RPE reported as 9/10 when target was 7/10."
+        },
+        rationale_text: "Thursday's bike intervals felt harder than planned (RPE 9 vs target 7). I'm swapping Friday's tempo run for an easy recovery jog to give your legs a chance to absorb the bike load before the weekend.",
+        changes_summary: [
+          { session_id: "77777777-7777-4777-8777-777777777778", session_label: "Friday Tempo Run", change_type: "intensity_reduced", before: "40 min with 20 min @ tempo", after: "30 min easy recovery jog" }
+        ],
+        preserved_elements: ["Saturday's long ride preserved — key weekend session"],
+        week_number: 2,
+        training_block: "Build",
+        affected_sessions: ["77777777-7777-4777-8777-777777777778"],
+        source_verdict_id: "99999999-9999-4999-8999-999999999994",
+        status: "pending",
+        athlete_response: null,
+        created_at: "2026-03-15T08:15:00.000Z",
+        acknowledged_at: null
       }
     ],
     morning_briefs: [
