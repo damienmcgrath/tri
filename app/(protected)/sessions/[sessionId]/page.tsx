@@ -10,6 +10,7 @@ import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivit
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionVerdictCard } from "./components/session-verdict-card";
+import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { DetailsAccordion } from "../../details-accordion";
 import { getMonday } from "../../week-context";
@@ -617,6 +618,15 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
           sessionCompleted={true}
           discipline={session.discipline ?? session.sport}
+        />
+      ) : null}
+
+      {/* Extras verdict card — reads from the CoachVerdict stored in execution_result */}
+      {activityId && execReview?.verdict ? (
+        <ExtrasVerdictCard
+          verdict={execReview.verdict}
+          intentCategory={execReview.deterministic?.planned?.intentCategory ?? session.intent_category ?? null}
+          narrativeSource={execReview.narrativeSource}
         />
       ) : null}
 
