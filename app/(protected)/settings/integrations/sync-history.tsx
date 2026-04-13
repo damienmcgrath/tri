@@ -20,6 +20,7 @@ function eventLabel(eventType: string): string {
     case "activity_imported": return "Imported";
     case "activity_skipped": return "Skipped";
     case "activity_merged": return "Merged";
+    case "activity_filtered": return "Filtered (non-triathlon)";
     case "activity_fetched": return "Fetched";
     case "activity_fetch_error": return "Fetch error";
     case "activity_insert_error": return "Insert error";

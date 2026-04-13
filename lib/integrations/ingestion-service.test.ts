@@ -135,6 +135,61 @@ describe("ingestStravaActivity", () => {
     }
   });
 
+  it("skips non-triathlon activity (golf)", async () => {
+    const golfActivity = { ...rawActivity, sport_type: "Golf", name: "Morning Golf" };
+    mockFetchActivity.mockResolvedValue(golfActivity);
+
+    const calls: string[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      calls.push(table);
+      const chain = makeChain({ data: null, error: null });
+      if (table === "completed_activities") {
+        // Dedup check: not found
+        (chain as { maybeSingle: () => Promise<unknown> }).maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+      }
+      return chain;
+    });
+
+    const result = await ingestStravaActivity("user-1", "999", connection);
+
+    expect(result.status).toBe("skipped");
+    // Should log the filter event
+    expect(calls).toContain("external_sync_log");
+    // Should NOT attempt to insert into completed_activities (only dedup check + sync log)
+    const completedActivityCalls = calls.filter(c => c === "completed_activities");
+    expect(completedActivityCalls.length).toBe(1); // only the dedup check
+  });
+
+  it("imports strength activities (not filtered)", async () => {
+    const strengthActivity = { ...rawActivity, sport_type: "WeightTraining", name: "Gym Session" };
+    mockFetchActivity.mockResolvedValue(strengthActivity);
+
+    const calls: unknown[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      calls.push(table);
+      const chain = makeChain({ data: null, error: null });
+
+      if (table === "completed_activities") {
+        if (calls.filter(c => c === "completed_activities").length === 1) {
+          (chain as { maybeSingle: () => Promise<unknown> }).maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+        } else {
+          (chain as { single: () => Promise<unknown> }).single = jest.fn().mockResolvedValue({
+            data: { ...createdActivity, sport_type: "strength" },
+            error: null
+          });
+        }
+      } else if (table === "sessions") {
+        (chain as { then: (resolve: (v: unknown) => void) => Promise<unknown> }).then = (resolve) =>
+          Promise.resolve({ data: [], error: null }).then(resolve);
+      }
+      return chain;
+    });
+
+    const result = await ingestStravaActivity("user-1", "999", connection);
+
+    expect(result.status).toBe("imported");
+  });
+
   it("returns skipped on uniqueness constraint violation (23505)", async () => {
     mockFetchActivity.mockResolvedValue(rawActivity);
 
@@ -190,6 +245,40 @@ describe("backfillRecentActivities", () => {
 
     expect(result.skipped).toBe(1);
     expect(result.imported).toBe(0);
+  });
+
+  it("skips non-triathlon activities during backfill", async () => {
+    const golfActivity = { ...rawActivity, id: 1000, sport_type: "Golf", name: "Golf Round" };
+    const runActivity = { ...rawActivity, id: 1001, sport_type: "Run", name: "Easy Run" };
+
+    mockFetchRecentActivitiesWithRateLimit
+      .mockResolvedValueOnce({ data: [golfActivity, runActivity], rateLimit: null })
+      .mockResolvedValueOnce({ data: [], rateLimit: null });
+
+    const calls: unknown[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      calls.push(table);
+      const chain = makeChain({ data: null, error: null });
+
+      if (table === "completed_activities") {
+        // Dedup check: not found
+        (chain as { maybeSingle: () => Promise<unknown> }).maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+        // Insert: return created activity
+        (chain as { single: () => Promise<unknown> }).single = jest.fn().mockResolvedValue({
+          data: { ...createdActivity, id: "activity-uuid-run" },
+          error: null
+        });
+      } else if (table === "sessions") {
+        (chain as { then: (resolve: (v: unknown) => void) => Promise<unknown> }).then = (resolve) =>
+          Promise.resolve({ data: [], error: null }).then(resolve);
+      }
+      return chain;
+    });
+
+    const result = await backfillRecentActivities("user-1", connection);
+
+    expect(result.imported).toBe(1); // only the run
+    expect(result.skipped).toBe(1); // the golf activity
   });
 
   it("paginates until empty page is returned", async () => {

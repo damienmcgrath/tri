@@ -19,6 +19,11 @@ import { syncSessionLoad } from "@/lib/training/load-sync";
 import { suggestSessionMatches, pickBestSuggestion } from "@/lib/workouts/matching-service";
 import { findCrossSourceDuplicate, mergeStravaIntoExisting } from "./cross-source-dedup";
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/** Sport types relevant to triathlon coaching — anything else is skipped on import. */
+const RELEVANT_SPORT_TYPES = new Set(["run", "bike", "swim", "strength"]);
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type IngestResult = {
@@ -255,6 +260,18 @@ export async function ingestStravaActivity(
   // 4. Normalize
   const normalized = normalizeStravaActivity(raw, userId);
 
+  // 4a. Skip non-triathlon activities (e.g. golf, soccer, kayaking)
+  if (!RELEVANT_SPORT_TYPES.has(normalized.sport_type)) {
+    const rawType = (normalized as Record<string, unknown>).activity_type_raw as string ?? "unknown";
+    console.log(`[INGEST] SKIPPED (non-triathlon: ${rawType}) activityId=${externalId}`);
+    await logSyncEvent(userId, "strava", "activity_filtered", externalId, "skipped", {
+      reason: "non_triathlon_sport",
+      rawSportType: rawType,
+      normalizedSportType: normalized.sport_type,
+    });
+    return { status: "skipped" };
+  }
+
   // 4b. Cross-source dedup — check if a FIT/TCX upload already has this workout
   const crossMatch = await findCrossSourceDuplicate(
     userId,
@@ -382,6 +399,12 @@ export async function backfillRecentActivities(
 
         // Normalize and insert from list summary (has all fields needed)
         const normalized = normalizeStravaActivity(activity, userId);
+
+        // Skip non-triathlon activities (e.g. golf, soccer, kayaking)
+        if (!RELEVANT_SPORT_TYPES.has(normalized.sport_type)) {
+          result.skipped++;
+          continue;
+        }
 
         // Cross-source dedup — check if a FIT/TCX upload already has this workout
         const crossMatch = await findCrossSourceDuplicate(
