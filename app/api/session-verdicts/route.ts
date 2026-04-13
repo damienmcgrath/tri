@@ -66,9 +66,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const { verdict, source, activityId } = await generateSessionVerdict(supabase, user.id, body.sessionId);
+    const { verdict, source, activityId, feel } = await generateSessionVerdict(supabase, user.id, body.sessionId);
 
-    // Upsert to session_verdicts
+    // Upsert to session_verdicts. `feel_data` holds the humanized feel snapshot
+    // mirroring what the LLM saw; `stale_reason` is explicitly cleared so any
+    // prior "refresh available" flag (set when a feel was captured after the
+    // previous generation) is resolved by this fresh write.
     const { data: saved, error } = await supabase.from("session_verdicts").upsert(
       {
         user_id: user.id,
@@ -86,6 +89,8 @@ export async function POST(request: Request) {
         adaptation_type: verdict.adaptation_type,
         affected_session_ids: verdict.affected_session_ids.length > 0 ? verdict.affected_session_ids : null,
         discipline: verdict.purpose_statement ? "run" : "other", // Will be overridden below
+        feel_data: feel,
+        stale_reason: null,
         raw_ai_response: verdict as unknown as Record<string, unknown>,
         ai_model_used: getCoachModel(),
         ai_prompt_version: SESSION_VERDICT_PROMPT_VERSION

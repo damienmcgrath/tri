@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { generateSessionVerdict } from "@/lib/ai/prompts/session-verdict";
+import { generateSessionVerdict, SESSION_VERDICT_PROMPT_VERSION } from "@/lib/ai/prompts/session-verdict";
 import { createRationaleFromVerdict } from "@/lib/ai/prompts/adaptation-rationale";
 import { triggerComparisonAfterVerdict } from "@/lib/training/session-comparison-engine";
 import { refreshWeeklyDebrief } from "@/lib/weekly-debrief";
@@ -87,8 +87,12 @@ async function generateVerdictChain(
   sessionId: string,
 ): Promise<void> {
   try {
-    const { verdict, activityId } = await generateSessionVerdict(supabase, userId, sessionId);
+    const { verdict, activityId, feel } = await generateSessionVerdict(supabase, userId, sessionId);
 
+    // `feel_data` holds the humanized feel snapshot mirroring what the LLM saw.
+    // `stale_reason` is explicitly cleared — any flag set before this fresh
+    // generation (e.g. the athlete captured a feel after a prior verdict) is
+    // now resolved by this write.
     const { data: saved } = await supabase.from("session_verdicts").upsert(
       {
         user_id: userId,
@@ -106,9 +110,11 @@ async function generateVerdictChain(
         adaptation_type: verdict.adaptation_type,
         affected_session_ids: verdict.affected_session_ids.length > 0 ? verdict.affected_session_ids : null,
         discipline: "other",
+        feel_data: feel,
+        stale_reason: null,
         raw_ai_response: verdict as unknown as Record<string, unknown>,
         ai_model_used: getCoachModel(),
-        ai_prompt_version: "v1",
+        ai_prompt_version: SESSION_VERDICT_PROMPT_VERSION,
       },
       { onConflict: "session_id" },
     ).select("id").maybeSingle();
