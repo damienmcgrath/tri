@@ -119,7 +119,22 @@ export async function markUnplannedAction(activityId: string) {
     .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
     .map((link: any) => link.planned_session_id as string);
 
-  await supabase.from("session_activity_links").delete().eq("user_id", user.id).eq("completed_activity_id", activityId);
+  // Mark links as rejected instead of deleting — preserves audit trail and
+  // provides a fallback signal for classifyActivityStatus (mirrors the
+  // persistExtraActivityMarker logic in calendar/actions.ts).
+  if (existingLinks && existingLinks.length > 0) {
+    await supabase
+      .from("session_activity_links")
+      .update({
+        confirmation_status: "rejected",
+        matched_by: user.id,
+        matched_at: new Date().toISOString(),
+        match_method: "unmatched"
+      })
+      .eq("user_id", user.id)
+      .eq("completed_activity_id", activityId);
+  }
+
   const { error } = await supabase.from("completed_activities").update({ is_unplanned: true, schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
   if (error) return { error: error.message };
   await updateUploadStatusForActivity({ supabase, userId: user.id, activityId, status: "matched" });
@@ -140,6 +155,8 @@ export async function markUnplannedAction(activityId: string) {
 
   revalidatePath(`/activities/${activityId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  revalidatePath("/debrief");
   return { ok: true };
 }
 
