@@ -5,6 +5,7 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getOptionalSessionRoleLabel, getSessionDisplayName } from "@/lib/training/session";
 import { getSessionIntentLabel } from "@/lib/training/semantics";
 import { computeSessionIntensityProfile, computeWeeklyIntensitySummary, getVisualWeight, type SessionIntensityProfile } from "@/lib/training/intensity-profile";
+import { computeTssFromDuration } from "@/lib/training/load";
 import { IntensityBar } from "./components/intensity-bar";
 import { WeeklyIntensityHeader } from "./components/weekly-intensity-header";
 import {
@@ -536,17 +537,32 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           </div>
           <div className="flex items-end gap-1.5">
             {(() => {
+              // Estimate per-session stress using the duration+intent heuristic so
+              // a short-hard Thursday is visually comparable to a long-easy Saturday.
+              // Fall back to minutes when no session has a resolvable stress estimate.
+              const sessionStress = (session: Session): number => {
+                const sport = (session.sport ?? "other") as "run" | "bike" | "swim" | "strength";
+                const tss = computeTssFromDuration(session.duration_minutes * 60, sport, session.intent_category ?? null);
+                return tss ?? session.duration_minutes;
+              };
+              const dayStressTotals = weekDays.map((d) => d.sessions.reduce((sum, s) => sum + sessionStress(s), 0));
+              const anyStress = dayStressTotals.some((v) => v > 0);
+              const maxStress = Math.max(...dayStressTotals, 1);
               const maxMinutes = Math.max(...weekDays.map((d) => d.totalMinutes), 1);
-              return weekDays.map((day) => (
+              return weekDays.map((day, dayIndex) => {
+                const dayStress = dayStressTotals[dayIndex];
+                return (
                 <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
                   <p className="text-[10px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
-                    {day.totalMinutes}
+                    {anyStress ? Math.round(dayStress) : day.totalMinutes}
                   </p>
                   <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
                     {(["swim", "bike", "run", "strength", "other"] as const).map((sport) => {
-                      const mins = day.sessions.filter((s) => s.sport === sport).reduce((sum, s) => sum + s.duration_minutes, 0);
-                      if (!mins) return null;
-                      const heightPct = (mins / maxMinutes) * 100;
+                      const sportSessions = day.sessions.filter((s) => s.sport === sport);
+                      if (sportSessions.length === 0) return null;
+                      const mins = sportSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
+                      const sportStress = sportSessions.reduce((sum, s) => sum + sessionStress(s), 0);
+                      const heightPct = anyStress ? (sportStress / maxStress) * 100 : (mins / maxMinutes) * 100;
                       const colors: Record<string, string> = {
                         swim: "var(--color-swim)",
                         bike: "var(--color-bike)",
@@ -557,7 +573,7 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                       return (
                         <div
                           key={sport}
-                          title={`${sport} · ${mins} min`}
+                          title={`${sport} · ${mins} min · ~${Math.round(sportStress)} TSS`}
                           style={{ height: `${heightPct}%`, backgroundColor: colors[sport] }}
                         />
                       );
@@ -565,9 +581,11 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
                   </div>
                   <p className="text-[11px] text-tertiary">{day.label}</p>
                 </div>
-              ));
+                );
+              });
             })()}
           </div>
+          <p className="mt-1 text-[10px] text-tertiary">Bar height reflects estimated training stress (TSS) per day, not duration.</p>
         </section>
       ) : null}
 

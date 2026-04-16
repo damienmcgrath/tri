@@ -105,6 +105,62 @@ function getIntentLabel(intentCategory: string): string {
   return INTENT_LABELS[intentCategory] ?? intentCategory.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+type RolePill = { label: string; className: string };
+
+function getRolePill(session: CalendarSession): RolePill | null {
+  const raw = (session.role ?? "").toLowerCase();
+  const role = session.is_key ? "key" : raw;
+  if (!role) return null;
+  switch (role) {
+    case "key":
+      return {
+        label: "Key",
+        className: "border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.08)] text-[hsl(var(--warning))]"
+      };
+    case "supporting":
+      return {
+        label: "Support",
+        className: "border-[rgba(99,179,237,0.3)] bg-[rgba(99,179,237,0.08)] text-[rgb(99,179,237)]"
+      };
+    case "recovery":
+      return {
+        label: "Recovery",
+        className: "border-[rgba(148,163,184,0.3)] bg-[rgba(148,163,184,0.08)] text-[rgb(148,163,184)]"
+      };
+    case "optional":
+      return {
+        label: "Optional",
+        className: "border-[rgba(148,163,184,0.2)] bg-transparent text-[rgba(148,163,184,0.7)]"
+      };
+    default:
+      return null;
+  }
+}
+
+const TARGET_HR_PATTERN = /(\d{2,3})\s*[-\u2013]\s*(\d{2,3})\s*(?:bpm|hr)/i;
+const TARGET_HR_CAP_PATTERN = /(?:hr|heart\s*rate)[^\n]{0,12}?(?:<|under|below|keep\s*under|cap)\s*(\d{2,3})/i;
+const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/km|\/mi|per\s*km|per\s*mi|min\/km|min\/mi)/i;
+const TARGET_POWER_PATTERN = /(\d{2,4})\s*[-\u2013]\s*(\d{2,4})\s*W\b/i;
+
+function extractTargetLine(session: CalendarSession): string | null {
+  const notes = session.notes ?? "";
+  if (!notes) return null;
+  const sport = (session.sport ?? "").toLowerCase();
+  if (sport === "bike") {
+    const power = notes.match(TARGET_POWER_PATTERN);
+    if (power) return `${power[1]}–${power[2]} W`;
+  }
+  if (sport === "run") {
+    const pace = notes.match(TARGET_PACE_PATTERN);
+    if (pace) return `${Number(pace[1])}:${pace[2]}/km`;
+  }
+  const hrRange = notes.match(TARGET_HR_PATTERN);
+  if (hrRange) return `HR ${hrRange[1]}–${hrRange[2]}`;
+  const hrCap = notes.match(TARGET_HR_CAP_PATTERN);
+  if (hrCap) return `HR ≤ ${hrCap[1]}`;
+  return null;
+}
+
 function getIntentPillClass(intentCategory: string): string {
   const classes: Record<string, string> = {
     aerobic_base: "border border-[rgba(99,179,237,0.3)] bg-[rgba(99,179,237,0.1)] text-[rgb(99,179,237)]",
@@ -857,9 +913,15 @@ export function WeekCalendar({
                             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
                             {discipline.label}
                           </span>
-                          {(session.is_key || session.role?.toLowerCase() === "key") ? (
-                            <span className="rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.08)] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--warning))]">Key</span>
-                          ) : null}
+                          {(() => {
+                            const pill = getRolePill(session);
+                            if (!pill) return null;
+                            return (
+                              <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${pill.className}`}>
+                                {pill.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <SessionActionMenu
                           session={session}
@@ -885,6 +947,10 @@ export function WeekCalendar({
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
                       <div className="mt-0 flex flex-wrap items-center gap-1">
                         <span className="text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</span>
+                        {state !== "unmatched_upload" ? (() => {
+                          const target = extractTargetLine(session);
+                          return target ? <span className="text-[11px] text-muted">· {target}</span> : null;
+                        })() : null}
                         {session.intentCategory && state !== "unmatched_upload" ? (
                           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${getIntentPillClass(session.intentCategory)}`}>
                             {getIntentLabel(session.intentCategory)}

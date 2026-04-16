@@ -26,6 +26,7 @@ import { DisciplineBalanceCompact } from "./components/discipline-balance-compac
 import { getLatestFitness, getReadinessState, getTsbTrend } from "@/lib/training/fitness-model";
 import { computeWeeklyDisciplineBalance, detectDisciplineImbalance } from "@/lib/training/discipline-balance";
 import { detectTrends } from "@/lib/training/trends";
+import { detectCrossDisciplineFatigue, type FatigueSignal } from "@/lib/training/fatigue-detection";
 import { getWeekTransitionBriefing, generateWeekTransitionBriefing } from "@/lib/training/week-transition";
 import { getOrGenerateMorningBrief, type MorningBrief } from "@/lib/training/morning-brief";
 import { MondayTransitionFlow } from "./components/monday-transition-flow";
@@ -366,8 +367,13 @@ export default async function DashboardPage({
   const behindByMinutes = Math.max(Math.round((expectedByTodayPct / 100) * totals.planned) - totals.completed, 0);
   // Only surface "behind" when there is genuinely remaining or overdue work.  A back-loaded week can
   // look "behind pace" even when every session through today is done — suppress the alert in that case.
+  // Also suppress on planned rest days: the Morning Brief already covers "take it fully" and the
+  // "behind" framing is misleading when today was never supposed to contain work.
   const todayHasRemainingWork = dailyStates.find((d) => d.iso === todayIso)?.tone === "today-remaining";
-  const behindAlertActive = behindByMinutes >= 30 && (missedSessionsCount > 0 || todayHasRemainingWork);
+  const behindAlertActive =
+    behindByMinutes >= 30 &&
+    dashboardMoment !== "rest_day" &&
+    (missedSessionsCount > 0 || todayHasRemainingWork);
 
   const sports = ["swim", "bike", "run", "strength"] as const;
   const biggestGap = sports
@@ -818,13 +824,17 @@ async function DashboardTrends(props: {
   if (!props?.supabase) return null;
   const { supabase, userId } = props;
   let trends: Awaited<ReturnType<typeof detectTrends>> = [];
+  let fatigueSignal: FatigueSignal | null = null;
   try {
-    trends = await detectTrends(supabase, userId);
+    [trends, fatigueSignal] = await Promise.all([
+      detectTrends(supabase, userId),
+      detectCrossDisciplineFatigue(supabase, userId).catch(() => null)
+    ]);
   } catch {
     return null;
   }
-  if (trends.length === 0) return null;
-  return <TrendCards trends={trends} />;
+  if (trends.length === 0 && !fatigueSignal) return null;
+  return <TrendCards trends={trends} fatigueSignal={fatigueSignal} />;
 }
 
 async function DashboardMondayTransition(props: {

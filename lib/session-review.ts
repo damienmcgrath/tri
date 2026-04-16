@@ -240,13 +240,13 @@ function toReviewState(status: string | null | undefined, diagnosis: Record<stri
 
 function deriveOneThingToChange(
   componentScores: ComponentScores | null,
-  scoreBand: ScoreBand | null,
+  _scoreBand: ScoreBand | null,
   aiNextAction: string | null,
-  verdictAdaptationType?: string | null
+  _verdictAdaptationType?: string | null
 ): string | null {
-  // If the verdict says modifications/redistribution are needed, prefer the AI action over "keep doing"
-  const verdictSuggestsChange = verdictAdaptationType && verdictAdaptationType !== "proceed";
-
+  // Unified prescription: always emit a concrete NEXT-format instruction,
+  // regardless of band. High scores still get the worst-component detail so
+  // the athlete knows what to hold and what to progress.
   if (componentScores) {
     const components = [
       { key: "intentMatch" as const, label: "intensity target", score: componentScores.intentMatch.score, detail: componentScores.intentMatch.detail },
@@ -255,12 +255,16 @@ function deriveOneThingToChange(
       { key: "recoveryCompliance" as const, label: "recovery discipline", score: componentScores.recoveryCompliance.score, detail: componentScores.recoveryCompliance.detail }
     ];
     const worst = components.reduce((a, b) => (a.score <= b.score ? a : b));
+    // Below 80: weakest component is the bottleneck — use its detail.
+    // 80+: prefer the AI next action (it can incorporate numeric targets);
+    // fall back to the worst component's detail so we always say something.
     if (worst.score < 80) {
       return sanitizeFieldNames(`NEXT ${worst.label}: ${worst.detail}`);
     }
-  }
-  if ((scoreBand === "On target" || scoreBand === "Solid") && !verdictSuggestsChange) {
-    return "Maintain this approach. Same targets next time.";
+    if (aiNextAction) {
+      return sanitizeFieldNames(aiNextAction);
+    }
+    return sanitizeFieldNames(`NEXT ${worst.label}: ${worst.detail}`);
   }
   return aiNextAction ? sanitizeFieldNames(aiNextAction) : null;
 }

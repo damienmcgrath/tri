@@ -309,15 +309,23 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .maybeSingle();
 
     if (weekRow?.training_block_id) {
-      const { data: block } = await supabase
-        .from("training_blocks")
-        .select("block_type,emphasis")
-        .eq("id", weekRow.training_block_id)
-        .maybeSingle();
+      const [{ data: block }, { count: blockWeekCount }] = await Promise.all([
+        supabase
+          .from("training_blocks")
+          .select("block_type,emphasis")
+          .eq("id", weekRow.training_block_id)
+          .maybeSingle(),
+        supabase
+          .from("training_weeks")
+          .select("id", { count: "exact", head: true })
+          .eq("training_block_id", weekRow.training_block_id)
+      ]);
 
       if (block) {
         const weekNum = (weekRow.week_index ?? 0) + 1;
-        blockContextLine = `Week ${weekNum} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
+        const totalWeeks = typeof blockWeekCount === "number" && blockWeekCount > 0 ? blockWeekCount : null;
+        const weekLabel = totalWeeks ? `Week ${weekNum} of ${totalWeeks}` : `Week ${weekNum}`;
+        blockContextLine = `${weekLabel} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
       }
     }
   }

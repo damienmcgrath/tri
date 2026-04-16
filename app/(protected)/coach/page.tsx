@@ -284,64 +284,85 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
   const contextIncomplete = athleteContext ? isContextIncomplete(athleteContext) : false;
   const missingContextLabels = athleteContext ? getMissingContextLabels(athleteContext) : [];
 
+  const hasBriefingContent =
+    (transitionBriefing && !transitionBriefing.dismissedAt) || weeklyBrief || Boolean(athleteContext);
+
   return (
-    <section className="space-y-6">
-      {/* ── Briefing cards (full width) ──────────────────────────── */}
-      {transitionBriefing && !transitionBriefing.dismissedAt ? (
-        <TransitionBriefingCard briefing={transitionBriefing} />
-      ) : null}
-
-      {weeklyBrief ? (
-        <CoachBriefingCard
-          brief={weeklyBrief}
-          athleteContext={athleteContext}
-          briefingContext={briefingContext}
-        />
-      ) : null}
-
-      {/* ── Week context row (side-by-side on md+) ──────────────── */}
-      {athleteContext ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} />
-
-          <article className="surface p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="label">Coaching profile</p>
-                <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
-                <p className="mt-1 text-sm text-muted">
-                  {contextIncomplete
-                    ? "Finish a few fields so Coach can personalize advice."
-                    : "Coach has your baseline context for briefing, reviews, and chat."}
-                </p>
-              </div>
-              <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md"}>
-                {contextIncomplete ? "Complete profile" : "Edit profile"}
-              </Link>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {contextIncomplete
-                ? missingContextLabels.map((label) => (
-                  <span key={label} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{label}</span>
-                ))
-                : (
-                  <>
-                    {athleteContext.goals.priorityEventName ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.priorityEventName}</span> : null}
-                    {athleteContext.goals.goalType ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.goalType}</span> : null}
-                    {athleteContext.declared.experienceLevel.value ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.declared.experienceLevel.value}</span> : null}
-                    {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
-                      <span key={limiter.value} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{limiter.value}</span>
-                    ))}
-                  </>
-                )}
-            </div>
-          </article>
-        </div>
-      ) : null}
-
-      {/* ── Chat (bottom of page) ────────────────────────────────── */}
+    <section className="space-y-4">
+      {/* ── Chat-first layout: chat renders above the briefing ──── */}
       <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
+
+      {/* ── Briefing bundle (collapsed by default) ──────────────── */}
+      {hasBriefingContent ? (
+        <details className="surface group rounded-xl">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">This week at a glance</p>
+              <p className="mt-0.5 truncate text-sm text-white">
+                {weeklyBrief?.weekHeadline
+                  ?? (athleteContext?.goals.priorityEventName
+                    ? `Priority: ${athleteContext.goals.priorityEventName}`
+                    : "Open for weekly brief, check-in, and coaching profile")}
+              </p>
+            </div>
+            <span className="text-[11px] text-tertiary transition group-open:hidden">Expand</span>
+            <span className="hidden text-[11px] text-tertiary group-open:inline">Collapse</span>
+          </summary>
+          <div className="space-y-4 px-4 pb-4">
+            {transitionBriefing && !transitionBriefing.dismissedAt ? (
+              <TransitionBriefingCard briefing={transitionBriefing} />
+            ) : null}
+
+            {weeklyBrief ? (
+              <CoachBriefingCard
+                brief={weeklyBrief}
+                athleteContext={athleteContext}
+                briefingContext={briefingContext}
+              />
+            ) : null}
+
+            {athleteContext ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} />
+
+                <article className="surface p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="label">Coaching profile</p>
+                      <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
+                      <p className="mt-1 text-sm text-muted">
+                        {contextIncomplete
+                          ? "Finish a few fields so Coach can personalize advice."
+                          : "Coach has your baseline context for briefing, reviews, and chat."}
+                      </p>
+                    </div>
+                    <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md"}>
+                      {contextIncomplete ? "Complete profile" : "Edit profile"}
+                    </Link>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {contextIncomplete
+                      ? missingContextLabels.map((label) => (
+                        <span key={label} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{label}</span>
+                      ))
+                      : (
+                        <>
+                          {athleteContext.goals.priorityEventName ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.priorityEventName}</span> : null}
+                          {athleteContext.goals.goalType ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.goalType}</span> : null}
+                          {athleteContext.declared.experienceLevel.value ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.declared.experienceLevel.value}</span> : null}
+                          {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
+                            <span key={limiter.value} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{limiter.value}</span>
+                          ))}
+                        </>
+                      )}
+                  </div>
+                </article>
+              </div>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

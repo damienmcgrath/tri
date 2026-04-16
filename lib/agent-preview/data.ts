@@ -418,7 +418,7 @@ export function createPreviewDatabase(): PreviewDatabase {
           executionScoreBand: "On target",
           executionScoreSummary: "Power held steady across all three intervals. Cadence consistent at 88rpm.",
           whyItMatters: "Clean FTP work confirms threshold capacity is tracking well for race build.",
-          recommendedNextAction: "Maintain this approach. Same targets next time."
+          recommendedNextAction: "NEXT sweet-spot set: 3×12 min @ 250–260W, 6 min easy between. If average interval power holds ≥255W and cadence stays 88rpm, extend the third rep to 15 min."
         }
       },
       {
