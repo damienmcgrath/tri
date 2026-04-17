@@ -246,10 +246,36 @@ export async function buildWeeklyExecutionBrief(args: {
     .filter((item): item is { id: string; name: string; review: PersistedExecutionReview } => Boolean(item));
 
   const reviewedCount = reviews.length;
-  const onTargetCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "on_target").length;
-  const partialCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "partial").length;
-  const missedCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "missed").length;
-  const provisionalCount = reviews.filter((item) => item.review.deterministic.rulesSummary.provisional).length;
+  let onTargetCount = 0;
+  let partialCount = 0;
+  let missedCount = 0;
+  let provisionalCount = 0;
+  const issueCounts = new Map<string, number>();
+  for (const { review } of reviews) {
+    const summary = review.deterministic.rulesSummary;
+    if (summary.intentMatch === "on_target") onTargetCount++;
+    else if (summary.intentMatch === "partial") partialCount++;
+    else if (summary.intentMatch === "missed") missedCount++;
+    if (summary.provisional) provisionalCount++;
+    for (const issue of review.deterministic.detectedIssues ?? []) {
+      if (!issue.code) continue;
+      issueCounts.set(issue.code, (issueCounts.get(issue.code) ?? 0) + 1);
+    }
+  }
+
+  const [dominantIssue, dominantIssueCount] = Array.from(issueCounts.entries())
+    .sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const PATTERN_MESSAGES: Record<string, string> = {
+    shortened: `${dominantIssueCount} of your last ${reviewedCount} sessions ran shorter than planned. Is that a schedule issue or a recovery issue? Worth a quick check-in.`,
+    too_hard: `${dominantIssueCount} of your last ${reviewedCount} easy sessions ran hotter than the target zone. Worth checking whether it's pacing or cumulative fatigue driving intensity up.`,
+    late_drift: `${dominantIssueCount} of your last ${reviewedCount} sessions drifted upward in the second half. That's usually a fueling or pacing cue.`,
+    incomplete_reps: `${dominantIssueCount} of your last ${reviewedCount} sessions cut reps short. Protect the next key set and flag if recovery feels off.`,
+    faded_late: `${dominantIssueCount} of your last ${reviewedCount} long sessions faded in the final third. Open more conservatively and fuel earlier next time.`
+  };
+  const patternNote =
+    reviewedCount >= 3 && dominantIssueCount >= 2 && PATTERN_MESSAGES[dominantIssue]
+      ? PATTERN_MESSAGES[dominantIssue]
+      : null;
 
   const sessionsNeedingAttention = reviews
     .filter((item) => item.review.deterministic.rulesSummary.intentMatch !== "on_target")
@@ -300,9 +326,15 @@ export async function buildWeeklyExecutionBrief(args: {
       provisionalCount
     },
     sessionsNeedingAttention,
+    // Prefer naming a concrete pattern when one is available; otherwise surface the
+    // provisional count so the briefing never reads more confident than the evidence
+    // warrants — including the case where every reviewed session is still provisional.
     confidenceNote:
-      provisionalCount > 0
-        ? `${provisionalCount} review${provisionalCount === 1 ? "" : "s"} are still provisional because evidence is incomplete.`
-        : null
+      patternNote
+        ?? (provisionalCount === reviewedCount && reviewedCount > 0
+          ? `Every reviewed session is still provisional — richer uploads will firm these reads up.`
+          : provisionalCount > 0
+            ? `${provisionalCount} of ${reviewedCount} review${reviewedCount === 1 ? "" : "s"} still need richer data to firm up the read.`
+            : null)
   } satisfies WeeklyExecutionBrief;
 }

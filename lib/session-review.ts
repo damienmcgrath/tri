@@ -618,12 +618,19 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
           ? "This workout is already linked. Execution Score will appear once the linked activity finishes processing into session analysis."
         : "Execution Score appears after the workout is completed and enough evidence has synced.";
 
+  const rawComponentScoresForNote = diagnosis?.componentScores as ComponentScores | null | undefined;
+  const capNoteMetric =
+    rawComponentScoresForNote?.intentMatch?.capped
+      ? rawComponentScoresForNote.missingDominantMetric
+      : null;
   const scoreConfidenceNote =
-    score !== null && provisional
-      ? "Provisional: band looks useful, but confidence improves once interval and intensity detail is richer."
-      : score === null && reviewState.isReviewable
-        ? "A richer upload with interval completion and intensity detail will unlock a stronger score."
-        : null;
+    score !== null && capNoteMetric
+      ? `${capNoteMetric} data is missing, so Intent Match is capped — treat the score as "likely on target" rather than confirmed.`
+      : score !== null && provisional
+        ? "Provisional: band looks useful, but confidence improves once interval and intensity detail is richer."
+        : score === null && reviewState.isReviewable
+          ? "A richer upload with interval completion and intensity detail will unlock a stronger score."
+          : null;
 
   const scoreTone: Tone =
     score === null

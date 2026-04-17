@@ -533,12 +533,18 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // otherwise suppress generic hedging when the read is confident.
   const missingCriticalData = reviewVm.componentScores?.missingCriticalData ?? [];
   const dataCompletenessPct = reviewVm.componentScores?.dataCompletenessPct ?? 1;
+  const intentMatchCapped = Boolean(reviewVm.componentScores?.intentMatch?.capped);
+  const cappedDominantMetric = intentMatchCapped
+    ? reviewVm.componentScores?.missingDominantMetric ?? null
+    : null;
   const confidenceQualifier =
-    missingCriticalData.length > 0
-      ? `${missingCriticalData[0]} missing`
-      : dataCompletenessPct < 0.6 && reviewVm.confidenceLabel === "low"
-        ? "limited evidence"
-        : null;
+    cappedDominantMetric
+      ? `${cappedDominantMetric} missing — likely on target`
+      : missingCriticalData.length > 0
+        ? `${missingCriticalData[0]} missing`
+        : dataCompletenessPct < 0.6 && reviewVm.confidenceLabel === "low"
+          ? "limited evidence"
+          : null;
 
   // Determine the one-thing callout label — don't say "change" when the advice is "keep doing this"
   // Only treat as "keep doing" when the advice STARTS with maintenance language, not when those
@@ -766,33 +772,54 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           </div>
           <div className="mt-3 space-y-3">
             {[
-              { label: "Intent match", weightLabel: "40%", score: reviewVm.componentScores.intentMatch.score, detail: reviewVm.componentScores.intentMatch.detail },
-              { label: "Pacing & execution", weightLabel: "25%", score: reviewVm.componentScores.pacingExecution.score, detail: reviewVm.componentScores.pacingExecution.detail },
-              { label: "Completion", weightLabel: "20%", score: reviewVm.componentScores.completion.score, detail: reviewVm.componentScores.completion.detail },
-              { label: "Recovery compliance", weightLabel: "15%", score: reviewVm.componentScores.recoveryCompliance.score, detail: reviewVm.componentScores.recoveryCompliance.detail }
-            ].map((component) => {
+              { label: "Intent match", weightLabel: "40%", component: reviewVm.componentScores.intentMatch },
+              { label: "Pacing & execution", weightLabel: "25%", component: reviewVm.componentScores.pacingExecution },
+              { label: "Completion", weightLabel: "20%", component: reviewVm.componentScores.completion },
+              { label: "Recovery compliance", weightLabel: "15%", component: reviewVm.componentScores.recoveryCompliance }
+            ].map(({ label, weightLabel, component }) => {
               const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
                 : component.score >= 60 ? "bg-[hsl(var(--warning))]"
                 : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
                 : "bg-[hsl(var(--signal-risk))]";
+              const cappedUpperPct = component.capped && typeof component.uncappedScore === "number"
+                ? Math.max(0, Math.min(100, component.uncappedScore) - component.score)
+                : 0;
               return (
-                <div key={component.label}>
+                <div key={label}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-white">{component.label}</span>
-                      <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{component.weightLabel}</span>
+                      <span className="text-xs font-medium text-white">{label}</span>
+                      <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{weightLabel}</span>
+                      {component.capped ? (
+                        <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Capped</span>
+                      ) : null}
                     </div>
                     <span className="text-xs font-mono font-medium text-white">{component.score}</span>
                   </div>
-                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${component.score}%` }} />
+                  <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                    <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
+                    {cappedUpperPct > 0 ? (
+                      <div
+                        className="h-full border-l border-warning/40"
+                        style={{
+                          width: `${cappedUpperPct}%`,
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
+                        }}
+                        aria-label="uncertainty band"
+                      />
+                    ) : null}
                   </div>
                   <p className="mt-1 text-[11px] text-muted">{component.detail}</p>
                 </div>
               );
             })}
           </div>
-          {missingCriticalData.length > 0 ? (
+          {cappedDominantMetric ? (
+            <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+              {cappedDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
+            </p>
+          ) : missingCriticalData.length > 0 ? (
             <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
               {missingCriticalData[0]} missing — pair the right sensor next time to unlock a confirmed read.
             </p>

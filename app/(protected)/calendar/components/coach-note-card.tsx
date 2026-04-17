@@ -27,7 +27,17 @@ type Props = {
   rationales: AdaptationRationale[];
 };
 
-const TRIGGER_LABELS: Record<string, string> = {
+type TriggerType =
+  | "recovery_signal"
+  | "missed_session"
+  | "load_rebalance"
+  | "cross_discipline"
+  | "feel_based"
+  | "block_transition"
+  | "athlete_request"
+  | "schedule_change";
+
+const TRIGGER_LABELS: Record<TriggerType, string> = {
   recovery_signal: "Recovery adjustment",
   missed_session: "Missed session",
   load_rebalance: "Load rebalance",
@@ -38,26 +48,53 @@ const TRIGGER_LABELS: Record<string, string> = {
   schedule_change: "Schedule change"
 };
 
-const TRIGGER_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+type TriggerColors = { bg: string; border: string; text: string };
+const DEFAULT_TRIGGER_COLORS: TriggerColors = {
+  bg: "rgba(255,255,255,0.04)",
+  border: "rgba(255,255,255,0.15)",
+  text: "rgba(255,255,255,0.7)"
+};
+const TRIGGER_COLORS: Partial<Record<TriggerType, TriggerColors>> = {
   recovery_signal: { bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.3)", text: "rgb(251,191,36)" },
   missed_session: { bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.3)", text: "rgb(248,113,113)" },
   load_rebalance: { bg: "rgba(99,179,237,0.08)", border: "rgba(99,179,237,0.3)", text: "rgb(99,179,237)" },
   feel_based: { bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.3)", text: "rgb(167,139,250)" },
-  block_transition: { bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.3)", text: "rgb(52,211,153)" },
-  default: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.15)", text: "rgba(255,255,255,0.7)" }
+  block_transition: { bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.3)", text: "rgb(52,211,153)" }
 };
 
-function SingleCoachNote({ rationale }: { rationale: AdaptationRationale }) {
-  const [expanded, setExpanded] = useState(false);
+/**
+ * Summarize a multi-sentence rationale into a single coach-note headline:
+ * - First sentence, capped at 140 characters
+ * - If no sentence break, first 140 chars with ellipsis
+ */
+function summarizeRationale(text: string): { summary: string; hasMore: boolean } {
+  const cleaned = text.trim();
+  if (cleaned.length === 0) return { summary: "", hasMore: false };
+  const sentenceMatch = cleaned.match(/^[^.!?\n]+[.!?]/);
+  if (sentenceMatch) {
+    const first = sentenceMatch[0].trim();
+    if (first.length <= 140) {
+      return { summary: first, hasMore: cleaned.length > first.length };
+    }
+  }
+  if (cleaned.length <= 140) return { summary: cleaned, hasMore: false };
+  return { summary: `${cleaned.slice(0, 137).trimEnd()}…`, hasMore: true };
+}
+
+function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: AdaptationRationale; defaultCollapsed?: boolean }) {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [acknowledging, setAcknowledging] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
 
-  const triggerLabel = TRIGGER_LABELS[rationale.trigger_type] ?? "Plan adjustment";
-  const colors = TRIGGER_COLORS[rationale.trigger_type] ?? TRIGGER_COLORS.default;
+  const triggerType = rationale.trigger_type as TriggerType;
+  const triggerLabel = TRIGGER_LABELS[triggerType] ?? "Plan adjustment";
+  const colors = TRIGGER_COLORS[triggerType] ?? DEFAULT_TRIGGER_COLORS;
   const changes = Array.isArray(rationale.changes_summary) ? rationale.changes_summary : [];
   const preserved = rationale.preserved_elements ?? [];
+  const { summary: summaryLine, hasMore } = summarizeRationale(rationale.rationale_text);
+  const canCollapse = hasMore || changes.length > 0 || preserved.length > 0;
 
   async function handleAcknowledge() {
     setAcknowledging(true);
@@ -89,18 +126,21 @@ function SingleCoachNote({ rationale }: { rationale: AdaptationRationale }) {
         </div>
       </div>
 
-      <p className="mt-2 text-sm text-white">{rationale.rationale_text}</p>
+      <p className="mt-2 text-sm text-white">
+        {expanded ? rationale.rationale_text : summaryLine}
+      </p>
 
-      {/* Expandable details */}
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="mt-2 text-xs text-tertiary hover:text-white"
-      >
-        {expanded ? "Hide details" : "Why?"}
-      </button>
+      {canCollapse ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="mt-2 text-xs text-tertiary hover:text-white"
+        >
+          {expanded ? "Show less" : "Show full reasoning"}
+        </button>
+      ) : null}
 
-      {expanded && (
+      {expanded && (changes.length > 0 || preserved.length > 0) && (
         <div className="mt-3 space-y-3 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
           {changes.length > 0 && (
             <div>

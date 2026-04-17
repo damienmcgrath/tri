@@ -300,6 +300,44 @@ describe("createReviewViewModel", () => {
     expect(vm.followUpIntro).toMatch(/extra session/i);
     expect(vm.followUpPrompts[0]).toMatch(/help or hurt the week/i);
   });
+
+  test("does not emit a 'capped' confidence note when intent match was not actually capped", () => {
+    // Partial/missed sessions can record a missingDominantMetric without the
+    // intent-match score being capped. The confidence note must key on the
+    // capped flag, not the raw missingDominantMetric.
+    const vm = createReviewViewModel({
+      id: "uncapped-partial-1",
+      date: "2026-03-14",
+      sport: "run",
+      type: "Run",
+      intent_category: "Threshold intervals",
+      duration_minutes: 55,
+      status: "completed",
+      execution_result: {
+        status: "partial_intent",
+        executionScore: 62,
+        executionScoreBand: "Partial match",
+        executionScoreSummary: "Threshold reps drifted late and a few fell short.",
+        componentScores: {
+          intentMatch: { score: 55, weight: 0.4, detail: "Partial.", capped: false },
+          pacingExecution: { score: 60, weight: 0.25, detail: "Drifted." },
+          completion: { score: 70, weight: 0.2, detail: "Most reps complete." },
+          recoveryCompliance: { score: 80, weight: 0.15, detail: "Fine." },
+          composite: 62,
+          dataCompletenessPct: 0.7,
+          missingCriticalData: [],
+          missingDominantMetric: "HR"
+        }
+      }
+    });
+
+    // When intentMatch.capped is false, the "capped" confidence copy must not appear,
+    // even if a missingDominantMetric is recorded. A null note is acceptable here.
+    if (vm.scoreConfidenceNote !== null) {
+      expect(vm.scoreConfidenceNote).not.toMatch(/capped/i);
+      expect(vm.scoreConfidenceNote).not.toMatch(/likely on target/i);
+    }
+  });
 });
 
 describe("sanitizeFieldNames", () => {

@@ -144,6 +144,8 @@ const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/(km|mi)|per\s*(km|mi)|mi
 const TARGET_POWER_PATTERN = /(\d{2,4})\s*[-\u2013]\s*(\d{2,4})\s*W\b/i;
 const TARGET_FTP_PCT_PATTERN = /(\d{1,3})\s*[-\u2013]\s*(\d{1,3})\s*%\s*FTP/i;
 const TARGET_SWIM_DISTANCE_PATTERN = /(\d{2,4})\s*m\b/i;
+const TARGET_SWIM_INTERVALS_PATTERN = /(\d+)\s*[x\u00d7]\s*(\d{2,4})\s*m/i;
+const TARGET_INTERVALS_PATTERN = /(\d+)\s*[x\u00d7]\s*(\d{1,2})\s*(?:min|'|\s*minutes?)/i;
 
 function extractTargetLine(session: CalendarSession): string | null {
   const target = session.target?.trim() ?? "";
@@ -156,6 +158,8 @@ function extractTargetLine(session: CalendarSession): string | null {
     if (power) return `${power[1]}–${power[2]} W`;
     const ftp = source.match(TARGET_FTP_PCT_PATTERN);
     if (ftp) return `${ftp[1]}–${ftp[2]}% FTP`;
+    const intervals = source.match(TARGET_INTERVALS_PATTERN);
+    if (intervals) return `${intervals[1]}×${intervals[2]} min`;
   }
   if (sport === "run") {
     const pace = source.match(TARGET_PACE_PATTERN);
@@ -163,8 +167,12 @@ function extractTargetLine(session: CalendarSession): string | null {
       const unit = (pace[3] ?? pace[4] ?? pace[5] ?? "km").toLowerCase();
       return `${Number(pace[1])}:${pace[2]}/${unit}`;
     }
+    const intervals = source.match(TARGET_INTERVALS_PATTERN);
+    if (intervals) return `${intervals[1]}×${intervals[2]} min`;
   }
   if (sport === "swim") {
+    const swimSet = source.match(TARGET_SWIM_INTERVALS_PATTERN);
+    if (swimSet) return `${swimSet[1]}×${swimSet[2]} m`;
     const distance = source.match(TARGET_SWIM_DISTANCE_PATTERN);
     if (distance) return `${distance[1]} m`;
   }
@@ -172,6 +180,14 @@ function extractTargetLine(session: CalendarSession): string | null {
   if (hrRange) return `HR ${hrRange[1]}–${hrRange[2]}`;
   const hrCap = source.match(TARGET_HR_CAP_PATTERN);
   if (hrCap) return `HR ≤ ${hrCap[1]}`;
+  // Fallback: when no structured target can be parsed, show the raw target string
+  // (trimmed to a one-line excerpt) so the calendar card still conveys "what + why"
+  // instead of just "45 min".
+  if (target) {
+    const firstLine = target.split(/\n|\u2022|\|/)[0].trim();
+    if (firstLine && firstLine.length <= 48) return firstLine;
+    if (firstLine) return `${firstLine.slice(0, 44).trimEnd()}…`;
+  }
   return null;
 }
 

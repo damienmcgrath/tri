@@ -54,6 +54,10 @@ export type ComponentScore = {
   score: number;
   weight: number;
   detail: string;
+  /** True when the score was capped below its natural value due to missing evidence. */
+  capped?: boolean;
+  /** Natural (pre-cap) score. Used by UI to render an uncertainty band from score → cap limit. */
+  uncappedScore?: number;
 };
 
 export type ComponentScores = {
@@ -64,6 +68,8 @@ export type ComponentScores = {
   composite: number;
   dataCompletenessPct: number;
   missingCriticalData: string[];
+  /** Name of the dominant intensity metric for this session when it was missing (e.g. "HR", "power"). */
+  missingDominantMetric?: string | null;
 };
 
 export type SessionDiagnosis = {
@@ -451,7 +457,36 @@ function getNextAction(status: IntentMatchStatus, issues: IssueKey[], bucket: In
 type DataCompleteness = {
   pct: number;
   missingCritical: string[];
+  /** The dominant intensity metric for this sport/intent (e.g. "HR" for easy bike, "power" for threshold bike, "pace" for run). Null if none applies. */
+  missingDominantMetric: string | null;
 };
+
+/**
+ * The single metric that most directly confirms intent for a sport + intent bucket.
+ * When this metric is absent, Intent Match cannot confidently score in the "matched"
+ * range even when no issues are detected — absence of a signal is not evidence of success.
+ */
+function getDominantIntensityMetric(sport: Sport, bucket: IntentBucket): "hr" | "power" | "pace" | null {
+  if (sport === "bike") {
+    // For easy / long / recovery bikes, HR is the dominant effort signal.
+    // Power can look clean while the athlete actually pushed harder in response to
+    // wind, terrain, traffic, etc. HR is the physiology.
+    if (bucket === "easy_endurance" || bucket === "recovery" || bucket === "long_endurance") {
+      return "hr";
+    }
+    if (bucket === "threshold_quality") {
+      return "power";
+    }
+    return "hr";
+  }
+  if (sport === "run") {
+    return "pace";
+  }
+  // Pool swim watches rarely provide continuous pace; interval completion + duration
+  // is the primary execution signal for pool-based swim sessions. Leave swim without
+  // a dominant metric so the cap doesn't fire on sparse-but-complete pool swims.
+  return null;
+}
 
 function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBucket): DataCompleteness {
   const actual = input.actual;
@@ -465,6 +500,9 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
   const hasIntervals = typeof actual.intervalCompletionPct === "number" || Boolean(actual.completedIntervals && planned.plannedIntervals);
   const hasDuration = Boolean(actual.durationSec && planned.plannedDurationSec);
   const hasSplits = Boolean(actual.splitMetrics?.firstHalfAvgHr || actual.splitMetrics?.firstHalfPaceSPerKm || actual.splitMetrics?.firstHalfAvgPower);
+  const hasAnyHr = Boolean(actual.avgHr ?? getMetric(actual, "avg_hr"));
+  const hasAnyPower = Boolean(actual.avgIntervalPower ?? actual.avgPower ?? getMetric(actual, "avg_power"));
+  const hasAnyPace = Boolean(actual.avgPaceSPerKm ?? getMetric(actual, "avg_pace_s_per_km"));
 
   const critical: Array<{ key: string; present: boolean; label: string }> = [];
 
@@ -506,13 +544,25 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
   }
 
   const hasSport = critical.length > 0;
-  if (!hasSport) return { pct: 1, missingCritical: [] };
+  if (!hasSport) return { pct: 1, missingCritical: [], missingDominantMetric: null };
 
   const presentCount = critical.filter((c) => c.present).length;
   const pct = presentCount / critical.length;
   const missingCritical = critical.filter((c) => !c.present).map((c) => c.label);
 
-  return { pct, missingCritical };
+  const dominant = getDominantIntensityMetric(sport, bucket);
+  let missingDominantMetric: string | null = null;
+  if (dominant === "hr" && !hasAnyHr) missingDominantMetric = "HR";
+  else if (dominant === "power" && !hasAnyPower) missingDominantMetric = "power";
+  else if (dominant === "pace" && !hasAnyPace && !hasAnyHr && !hasAnyPower) {
+    // Run pace is the dominant signal, but the scorer accepts HR or run power as
+    // valid intensity evidence everywhere else. Only flag pace as missing when none
+    // of pace, HR, or power is present — otherwise a power-only run would be
+    // penalized for data it doesn't actually need.
+    missingDominantMetric = "pace";
+  }
+
+  return { pct, missingCritical, missingDominantMetric };
 }
 
 function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket, completeness: DataCompleteness): ComponentScore {
@@ -538,18 +588,43 @@ function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket, co
     detail = "Recovery intent was compromised by excessive intensity.";
   }
 
-  // Data-completeness penalty: when critical evidence is missing, "matched_intent"
-  // reflects the absence of detected issues rather than confirmed success. Cap Intent
-  // Match so composite reflects that uncertainty.
-  if (completeness.missingCritical.length > 0 && draft.status === "matched_intent") {
+  const uncapped = score;
+  let capped = false;
+
+  // Dominant-metric cap: when the primary effort signal for this sport/intent is
+  // missing entirely, intent cannot be confirmed. Cap at 75 regardless of issue count
+  // — absence of the dominant signal is not evidence of success.
+  if (completeness.missingDominantMetric && draft.status === "matched_intent") {
+    const dominantCap = 75;
+    if (score > dominantCap) {
+      score = dominantCap;
+      capped = true;
+      detail = `${completeness.missingDominantMetric} missing — capped; intent cannot be confirmed without it.`;
+    }
+  }
+
+  // Data-completeness cap: critical evidence missing AND matched intent means we're
+  // reading "no issues" from limited signals. Broader uncertainty cap.
+  if (
+    completeness.missingCritical.length > 0 &&
+    draft.status === "matched_intent" &&
+    !completeness.missingDominantMetric // already handled above with tighter cap
+  ) {
     const cap = completeness.pct < 0.5 ? 65 : 78;
     if (score > cap) {
       score = cap;
+      capped = true;
       detail = `${completeness.missingCritical[0]} missing — cannot confirm intent match without it.`;
     }
   }
 
-  return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
+  const clamped = Math.round(Math.max(0, Math.min(100, score)));
+  return {
+    score: clamped,
+    weight,
+    detail,
+    ...(capped ? { capped: true, uncappedScore: Math.round(uncapped) } : {})
+  };
 }
 
 function computePacingExecutionScore(input: SessionDiagnosisInput, draft: DiagnosisDraft): ComponentScore {
@@ -690,7 +765,8 @@ function computeComponentScores(input: SessionDiagnosisInput, draft: DiagnosisDr
     recoveryCompliance,
     composite,
     dataCompletenessPct: completeness.pct,
-    missingCriticalData: completeness.missingCritical
+    missingCriticalData: completeness.missingCritical,
+    missingDominantMetric: completeness.missingDominantMetric
   };
 }
 
@@ -711,8 +787,14 @@ export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionD
               : evaluateUnknown(input);
 
   const components = computeComponentScores(input, draft, bucket);
+  // Provisional only when evidence is genuinely thin: <2 evidence items OR
+  // data completeness below 60%. A fully-telemetered session should not be
+  // labelled provisional just because its evidence count sits at the low end.
+  const isProvisional = components
+    ? draft.evidenceCount < 2 || components.dataCompletenessPct < 0.6
+    : draft.evidenceCount < 2;
   const score = components
-    ? { score: components.composite, band: getExecutionScoreBand(components.composite), provisional: draft.evidenceCount < 2 }
+    ? { score: components.composite, band: getExecutionScoreBand(components.composite), provisional: isProvisional }
     : deriveExecutionScore(bucket, draft);
   const summary = getSummary(draft.status, draft.issues, bucket);
 

@@ -3,6 +3,9 @@ import type { ReadinessState } from "@/lib/training/fitness-model";
 type Props = {
   readiness: ReadinessState;
   tsb: number;
+  tsbTrend?: "rising" | "stable" | "declining" | null;
+  /** Short contextual clause appended to the cue (e.g. "pace and power both trending down"). */
+  signalContext?: string | null;
 };
 
 const READINESS_CONFIG: Record<ReadinessState, { label: string; color: string; bgColor: string; borderColor: string; cue: string }> = {
@@ -36,27 +39,45 @@ const READINESS_CONFIG: Record<ReadinessState, { label: string; color: string; b
   },
 };
 
-export function ReadinessIndicator({ readiness, tsb }: Props) {
+function trendLabel(trend: Props["tsbTrend"]): string | null {
+  if (trend === "rising") return "TSB rising";
+  if (trend === "declining") return "TSB declining";
+  return null;
+}
+
+export function ReadinessIndicator({ readiness, tsb, tsbTrend, signalContext }: Props) {
   const config = READINESS_CONFIG[readiness];
+  const trendTag = trendLabel(tsbTrend);
+  const cueParts = [config.cue];
+  if (signalContext) cueParts.push(signalContext);
+  const cue = cueParts.join(" — ");
 
   return (
     <article
-      className="rounded-xl border p-3"
+      className="rounded-xl border p-4"
       style={{ borderColor: config.borderColor, backgroundColor: config.bgColor }}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className="inline-block h-2 w-2 rounded-full"
-          style={{ backgroundColor: config.color }}
-        />
-        <span className="text-xs font-medium uppercase tracking-[0.1em]" style={{ color: config.color }}>
-          {config.label}
-        </span>
-        <span className="text-[11px] text-tertiary">
-          TSB {tsb > 0 ? "+" : ""}{Math.round(tsb)}
-        </span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: config.color }}
+          />
+          <span className="text-xs font-medium uppercase tracking-[0.12em]" style={{ color: config.color }}>
+            {config.label}
+          </span>
+          <span className="text-[11px] font-mono text-tertiary">
+            TSB {tsb > 0 ? "+" : ""}{Math.round(tsb)}
+          </span>
+          {trendTag ? (
+            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-tertiary">
+              {trendTag}
+            </span>
+          ) : null}
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-tertiary">Readiness</span>
       </div>
-      <p className="mt-1.5 text-sm text-[rgba(255,255,255,0.7)]">{config.cue}</p>
+      <p className="mt-2 text-sm text-[rgba(255,255,255,0.78)]">{cue}</p>
     </article>
   );
 }
