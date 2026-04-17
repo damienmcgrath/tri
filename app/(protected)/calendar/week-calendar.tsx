@@ -142,15 +142,19 @@ const TARGET_HR_PATTERN = /(\d{2,3})\s*[-\u2013]\s*(\d{2,3})\s*(?:bpm|hr)/i;
 const TARGET_HR_CAP_PATTERN = /(?:hr|heart\s*rate)[^\n]{0,12}?(?:<|under|below|keep\s*under|cap)\s*(\d{2,3})/i;
 const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/km|\/mi|per\s*km|per\s*mi|min\/km|min\/mi)/i;
 const TARGET_POWER_PATTERN = /(\d{2,4})\s*[-\u2013]\s*(\d{2,4})\s*W\b/i;
+const TARGET_FTP_PCT_PATTERN = /(\d{1,3})\s*[-\u2013]\s*(\d{1,3})\s*%\s*FTP/i;
+const TARGET_SWIM_DISTANCE_PATTERN = /(\d{2,4})\s*m\b/i;
 
 function extractTargetLine(session: CalendarSession): string | null {
-  const source = `${session.target ?? ""} ${session.notes ?? ""}`.trim();
-  if (!source) return null;
+  const target = session.target?.trim() ?? "";
+  const notes = session.notes?.trim() ?? "";
+  if (!target && !notes) return null;
+  const source = target && notes ? `${target} ${notes}` : target || notes;
   const sport = (session.sport ?? "").toLowerCase();
   if (sport === "bike") {
     const power = source.match(TARGET_POWER_PATTERN);
     if (power) return `${power[1]}–${power[2]} W`;
-    const ftp = source.match(/(\d{1,3})\s*[-\u2013]\s*(\d{1,3})\s*%\s*FTP/i);
+    const ftp = source.match(TARGET_FTP_PCT_PATTERN);
     if (ftp) return `${ftp[1]}–${ftp[2]}% FTP`;
   }
   if (sport === "run") {
@@ -158,7 +162,7 @@ function extractTargetLine(session: CalendarSession): string | null {
     if (pace) return `${Number(pace[1])}:${pace[2]}/km`;
   }
   if (sport === "swim") {
-    const distance = source.match(/(\d{2,4})\s*m\b/i);
+    const distance = source.match(TARGET_SWIM_DISTANCE_PATTERN);
     if (distance) return `${distance[1]} m`;
   }
   const hrRange = source.match(TARGET_HR_PATTERN);
