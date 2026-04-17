@@ -131,6 +131,13 @@ function deriveElapsedFromActivity(activity: unknown): number | undefined {
   return positiveInt(firstPositiveNumber([record.total_timer_time, record.total_elapsed_time]));
 }
 
+function deriveElapsedFromDistanceSpeed(session: Record<string, unknown>): number | undefined {
+  const distance = positiveNumber(session.total_distance);
+  const speed = positiveNumber(session.avg_speed) ?? positiveNumber(session.enhanced_avg_speed);
+  if (!distance || !speed) return undefined;
+  return positiveInt(distance / speed);
+}
+
 function normalizeSport(raw?: string) {
   const sport = (raw ?? "").toLowerCase();
   if (sport.includes("run")) return "run";
@@ -520,22 +527,27 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     ?? deriveElapsedFromLaps(fit?.laps)
     ?? deriveElapsedFromRecords(fit?.records)
     ?? deriveElapsedFromSessionSpan(session)
-    ?? deriveElapsedFromActivity(fit?.activity);
+    ?? deriveElapsedFromActivity(fit?.activity)
+    ?? deriveElapsedFromDistanceSpeed(session);
   const durationSec = movingDurationSec ?? elapsedDurationSec ?? 0;
   const poolLengthM = firstPositiveNumber([session.pool_length, session.pool_length_m]);
 
   if (durationSec <= 0) {
-    const sessionKeys = Object.keys(session).sort();
-    const topKeys = Object.keys(fit ?? {}).sort();
-    console.error("[UPLOAD_PARSE] FIT duration fallbacks exhausted", {
-      sessionKeys,
-      topKeys,
-      lapsCount: Array.isArray(fit?.laps) ? fit.laps.length : 0,
-      recordsCount: Array.isArray(fit?.records) ? fit.records.length : 0,
-      sessionTimestamp: session.timestamp ?? null,
-      sessionStart: session.start_time ?? null
+    const sportLower = `${session.sport ?? ""}`.toLowerCase();
+    const subSportLower = `${session.sub_sport ?? ""}`.toLowerCase();
+    const isManualEntryCandidate =
+      sportLower === "training" ||
+      subSportLower.includes("strength") ||
+      subSportLower.includes("cardio") ||
+      sportLower === "fitness_equipment" ||
+      sportLower === "generic";
+    if (!isManualEntryCandidate) {
+      throw new Error("FIT file missing usable duration.");
+    }
+    console.warn("[UPLOAD_PARSE] FIT duration fallbacks exhausted — accepting 0-duration manual-entry activity", {
+      sport: session.sport ?? null,
+      subSport: session.sub_sport ?? null
     });
-    throw new Error("FIT file missing usable duration.");
   }
 
   const sportRaw = typeof session.sport === "string" ? session.sport : undefined;
