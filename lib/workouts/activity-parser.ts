@@ -118,6 +118,19 @@ function deriveElapsedFromRecords(records: unknown): number | undefined {
   return positiveInt((lastMs - firstMs) / 1000);
 }
 
+function deriveElapsedFromSessionSpan(session: Record<string, unknown>): number | undefined {
+  const startMs = new Date(session.start_time as string | number | Date).getTime();
+  const endMs = new Date(session.timestamp as string | number | Date).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return undefined;
+  return positiveInt((endMs - startMs) / 1000);
+}
+
+function deriveElapsedFromActivity(activity: unknown): number | undefined {
+  const record = asRecord(Array.isArray(activity) ? activity[0] : activity);
+  if (!record) return undefined;
+  return positiveInt(firstPositiveNumber([record.total_timer_time, record.total_elapsed_time]));
+}
+
 function normalizeSport(raw?: string) {
   const sport = (raw ?? "").toLowerCase();
   if (sport.includes("run")) return "run";
@@ -505,11 +518,23 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   const elapsedDurationSec =
     positiveInt(firstPositiveNumber([session.total_elapsed_time, session.total_time, movingDurationSec]))
     ?? deriveElapsedFromLaps(fit?.laps)
-    ?? deriveElapsedFromRecords(fit?.records);
+    ?? deriveElapsedFromRecords(fit?.records)
+    ?? deriveElapsedFromSessionSpan(session)
+    ?? deriveElapsedFromActivity(fit?.activity);
   const durationSec = movingDurationSec ?? elapsedDurationSec ?? 0;
   const poolLengthM = firstPositiveNumber([session.pool_length, session.pool_length_m]);
 
   if (durationSec <= 0) {
+    const sessionKeys = Object.keys(session).sort();
+    const topKeys = Object.keys(fit ?? {}).sort();
+    console.error("[UPLOAD_PARSE] FIT duration fallbacks exhausted", {
+      sessionKeys,
+      topKeys,
+      lapsCount: Array.isArray(fit?.laps) ? fit.laps.length : 0,
+      recordsCount: Array.isArray(fit?.records) ? fit.records.length : 0,
+      sessionTimestamp: session.timestamp ?? null,
+      sessionStart: session.start_time ?? null
+    });
     throw new Error("FIT file missing usable duration.");
   }
 

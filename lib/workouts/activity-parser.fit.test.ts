@@ -258,7 +258,45 @@ describe("parseFitFile", () => {
     expect(result.elapsedDurationSec).toBe(3600);
   });
 
-  test("throws when session, laps, and records all lack usable duration", async () => {
+  test("falls back to session.timestamp span for manual entries with no laps or records", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            timestamp: "2026-03-14T11:45:00.000Z",
+            sport: "running"
+          }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(2700);
+    expect(result.elapsedDurationSec).toBe(2700);
+  });
+
+  test("falls back to fit.activity.total_timer_time when session and laps omit duration", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        activity: { total_timer_time: 1500 }
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(1500);
+    expect(result.elapsedDurationSec).toBe(1500);
+  });
+
+  test("throws when session, laps, records, session-span, and activity all lack usable duration", async () => {
     parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
       callback(null, {
         sessions: [
