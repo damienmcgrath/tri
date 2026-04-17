@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getActivePlanId } from "@/lib/supabase/queries";
 import {
   generateWeekTransitionBriefingAI,
   WEEK_TRANSITION_PROMPT_VERSION,
@@ -121,11 +122,7 @@ export async function generateWeekTransitionBriefing(
     }));
 
   // Fetch training block context
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("active_plan_id")
-    .eq("id", athleteId)
-    .maybeSingle();
+  const activePlanId = await getActivePlanId(supabase, athleteId);
 
   let trainingBlock: WeekTransitionContext["trainingBlock"] = {
     currentBlock: "Build",
@@ -134,11 +131,11 @@ export async function generateWeekTransitionBriefing(
     weekNumber: 1
   };
 
-  if (profileData?.active_plan_id) {
+  if (activePlanId) {
     const { data: weeks } = await supabase
       .from("training_weeks")
       .select("week_index,focus,week_start_date")
-      .eq("plan_id", profileData.active_plan_id)
+      .eq("plan_id", activePlanId)
       .order("week_index", { ascending: true });
 
     if (weeks && weeks.length > 0) {

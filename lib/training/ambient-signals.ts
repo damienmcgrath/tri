@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { SESSION_BASE_COLUMNS } from "@/lib/supabase/queries";
 
 export type SignalSeverity = "info" | "caution" | "concern";
 
@@ -36,7 +37,7 @@ export async function detectAmbientSignals(
   // Load recent sessions (last 4 weeks)
   const { data: sessions } = await supabase
     .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status,skip_reason,execution_result")
+    .select(`${SESSION_BASE_COLUMNS},skip_reason,execution_result`)
     .eq("user_id", athleteId)
     .gte("date", fourWeeksAgo)
     .lte("date", today)

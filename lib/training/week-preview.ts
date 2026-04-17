@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MacroContext } from "./macro-context";
 import { computeWeekMinuteTotals, getKeySessionsRemaining } from "./week-metrics";
+import { SESSION_BASE_COLUMNS } from "@/lib/supabase/queries";
 
 export type WeekPreview = {
   weekStart: string;
@@ -32,7 +33,7 @@ export async function generateWeekPreview(
   // Fetch sessions for the upcoming week
   const { data: sessionsData } = await supabase
     .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status,is_key")
+    .select(`${SESSION_BASE_COLUMNS},is_key`)
     .eq("user_id", athleteId)
     .gte("date", weekStart)
     .lt("date", weekEnd)

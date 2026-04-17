@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { querySessionLoad } from "@/lib/supabase/queries";
 
 export type DisciplineVolume = {
   tss: number;
@@ -38,12 +39,7 @@ export async function computeWeeklyDisciplineBalance(
   const weekEnd = addDaysIso(weekStart, 6);
 
   // Fetch actual loads from session_load
-  const { data: loads } = await supabase
-    .from("session_load")
-    .select("sport, tss, duration_sec")
-    .eq("user_id", userId)
-    .gte("date", weekStart)
-    .lte("date", weekEnd);
+  const loads = await querySessionLoad(supabase, userId, weekStart, weekEnd);
 
   // Fetch planned sessions for the same week
   const { data: planned } = await supabase
