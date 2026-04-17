@@ -91,6 +91,33 @@ function firstPositiveNumber(values: unknown[]): number | undefined {
   return undefined;
 }
 
+function deriveElapsedFromLaps(laps: unknown): number | undefined {
+  const arr = asArray(laps as unknown[]);
+  if (arr.length === 0) return undefined;
+  let sum = 0;
+  for (const lap of arr) {
+    const record = asRecord(lap);
+    const lapSec = record
+      ? positiveNumber(record.total_elapsed_time) ?? positiveNumber(record.total_timer_time)
+      : undefined;
+    if (lapSec === undefined) return undefined;
+    sum += lapSec;
+  }
+  return positiveInt(sum);
+}
+
+function deriveElapsedFromRecords(records: unknown): number | undefined {
+  const arr = asArray(records as unknown[]);
+  if (arr.length < 2) return undefined;
+  const firstRecord = asRecord(arr[0]);
+  const lastRecord = asRecord(arr[arr.length - 1]);
+  if (!firstRecord || !lastRecord) return undefined;
+  const firstMs = new Date(firstRecord.timestamp as string | number | Date).getTime();
+  const lastMs = new Date(lastRecord.timestamp as string | number | Date).getTime();
+  if (!Number.isFinite(firstMs) || !Number.isFinite(lastMs)) return undefined;
+  return positiveInt((lastMs - firstMs) / 1000);
+}
+
 function normalizeSport(raw?: string) {
   const sport = (raw ?? "").toLowerCase();
   if (sport.includes("run")) return "run";
@@ -475,7 +502,10 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
 
   const start = new Date(session.start_time);
   const movingDurationSec = positiveInt(firstPositiveNumber([session.total_timer_time, session.total_moving_time]));
-  const elapsedDurationSec = positiveInt(firstPositiveNumber([session.total_elapsed_time, session.total_time, movingDurationSec]));
+  const elapsedDurationSec =
+    positiveInt(firstPositiveNumber([session.total_elapsed_time, session.total_time, movingDurationSec]))
+    ?? deriveElapsedFromLaps(fit?.laps)
+    ?? deriveElapsedFromRecords(fit?.records);
   const durationSec = movingDurationSec ?? elapsedDurationSec ?? 0;
   const poolLengthM = firstPositiveNumber([session.pool_length, session.pool_length_m]);
 

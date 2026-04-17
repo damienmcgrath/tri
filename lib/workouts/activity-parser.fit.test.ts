@@ -158,4 +158,145 @@ describe("parseFitFile", () => {
       ]
     });
   });
+
+  test("falls back to record timestamp span when session and laps lack duration", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        records: [
+          { timestamp: "2026-03-14T11:00:00.000Z" },
+          { timestamp: "2026-03-14T11:30:00.000Z" },
+          { timestamp: "2026-03-14T12:00:00.000Z" }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(3600);
+    expect(result.elapsedDurationSec).toBe(3600);
+    expect(result.movingDurationSec).toBeUndefined();
+  });
+
+  test("falls back to summed lap durations when session lacks duration fields", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        laps: [
+          { total_elapsed_time: 600 },
+          { total_elapsed_time: 600 },
+          { total_elapsed_time: 600 }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(1800);
+    expect(result.elapsedDurationSec).toBe(1800);
+  });
+
+  test("prefers lap-sum over record span when both fallbacks are available", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        laps: [
+          { total_elapsed_time: 900 },
+          { total_elapsed_time: 900 }
+        ],
+        records: [
+          { timestamp: "2026-03-14T11:00:00.000Z" },
+          { timestamp: "2026-03-14T12:00:00.000Z" }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(1800);
+  });
+
+  test("skips lap-sum and uses record span when any lap lacks duration metadata", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        laps: [
+          { total_elapsed_time: 600 },
+          { total_distance: 1000 },
+          { total_elapsed_time: 600 }
+        ],
+        records: [
+          { timestamp: "2026-03-14T11:00:00.000Z" },
+          { timestamp: "2026-03-14T12:00:00.000Z" }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(3600);
+    expect(result.elapsedDurationSec).toBe(3600);
+  });
+
+  test("throws when session, laps, and records all lack usable duration", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        records: [{ timestamp: "2026-03-14T11:00:00.000Z" }]
+      });
+    });
+
+    await expect(parseFitFile(Buffer.from("fit"))).rejects.toThrow("FIT file missing usable duration.");
+  });
+
+  test("uses session duration even when laps and records disagree", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running",
+            total_timer_time: 2700,
+            total_elapsed_time: 2700
+          }
+        ],
+        laps: [{ total_elapsed_time: 99 }],
+        records: [
+          { timestamp: "2026-03-14T11:00:00.000Z" },
+          { timestamp: "2026-03-14T11:00:01.000Z" }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(2700);
+    expect(result.movingDurationSec).toBe(2700);
+    expect(result.elapsedDurationSec).toBe(2700);
+  });
 });
