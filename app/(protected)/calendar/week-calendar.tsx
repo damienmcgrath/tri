@@ -140,7 +140,7 @@ function getRolePill(session: CalendarSession): RolePill | null {
 
 const TARGET_HR_PATTERN = /(\d{2,3})\s*[-\u2013]\s*(\d{2,3})\s*(?:bpm|hr)/i;
 const TARGET_HR_CAP_PATTERN = /(?:hr|heart\s*rate)[^\n]{0,12}?(?:<|under|below|keep\s*under|cap)\s*(\d{2,3})/i;
-const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/km|\/mi|per\s*km|per\s*mi|min\/km|min\/mi)/i;
+const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/(km|mi)|per\s*(km|mi)|min\/(km|mi))/i;
 const TARGET_POWER_PATTERN = /(\d{2,4})\s*[-\u2013]\s*(\d{2,4})\s*W\b/i;
 const TARGET_FTP_PCT_PATTERN = /(\d{1,3})\s*[-\u2013]\s*(\d{1,3})\s*%\s*FTP/i;
 const TARGET_SWIM_DISTANCE_PATTERN = /(\d{2,4})\s*m\b/i;
@@ -159,7 +159,10 @@ function extractTargetLine(session: CalendarSession): string | null {
   }
   if (sport === "run") {
     const pace = source.match(TARGET_PACE_PATTERN);
-    if (pace) return `${Number(pace[1])}:${pace[2]}/km`;
+    if (pace) {
+      const unit = (pace[3] ?? pace[4] ?? pace[5] ?? "km").toLowerCase();
+      return `${Number(pace[1])}:${pace[2]}/${unit}`;
+    }
   }
   if (sport === "swim") {
     const distance = source.match(TARGET_SWIM_DISTANCE_PATTERN);

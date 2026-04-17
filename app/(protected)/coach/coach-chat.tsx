@@ -389,6 +389,17 @@ export function CoachChat({
     [briefingContext, diagnosisSessions]
   );
   const [messages, setMessages] = useState<Message[]>([openingMessage]);
+
+  // When the review-backfill effect triggers router.refresh(), props update but the
+  // opening message in state goes stale. Replace it as long as the user hasn't
+  // started a conversation yet (only the opening message is present).
+  useEffect(() => {
+    setMessages((current) => {
+      if (current.length !== 1 || current[0].role !== "assistant") return current;
+      if (current[0].content === openingMessage.content) return current;
+      return [openingMessage];
+    });
+  }, [openingMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);

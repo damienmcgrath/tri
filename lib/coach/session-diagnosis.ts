@@ -468,19 +468,33 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
 
   const critical: Array<{ key: string; present: boolean; label: string }> = [];
 
+  const runIntensityPresent = hasHr || hasPower || hasPace || hasTimeAbove;
+  const runIntensityLabel = planned.targetBands?.pace ? "HR or pace data" : "HR data";
   switch (bucket) {
     case "easy_endurance":
     case "recovery":
-      critical.push({ key: "intensity", present: hasHr || hasPower || hasTimeAbove, label: sport === "bike" ? "HR or power" : "HR data" });
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? runIntensityPresent : hasHr || hasPower || hasTimeAbove,
+        label: sport === "bike" ? "HR or power" : sport === "run" ? runIntensityLabel : "HR data"
+      });
       critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
       break;
     case "threshold_quality":
-      critical.push({ key: "intensity", present: hasHr || hasPower, label: sport === "bike" ? "power or HR" : "HR data" });
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
+      });
       critical.push({ key: "completion", present: hasIntervals || hasDuration, label: "interval or duration completion" });
       break;
     case "long_endurance":
       critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
-      critical.push({ key: "intensity", present: hasHr || hasPower, label: sport === "bike" ? "power or HR" : "HR data" });
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
+      });
       critical.push({ key: "splits", present: hasSplits, label: "split metrics (HR drift or pace fade)" });
       break;
     case "swim_strength":

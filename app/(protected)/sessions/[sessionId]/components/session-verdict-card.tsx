@@ -210,10 +210,12 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
   const [showAllMetrics, setShowAllMetrics] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [autoRegenAttempted, setAutoRegenAttempted] = useState(false);
+  const [autoRegenFailed, setAutoRegenFailed] = useState(false);
 
   const fetchVerdict = useCallback(async (regenerate = false) => {
     setLoading(true);
     setError(null);
+    if (regenerate) setAutoRegenFailed(false);
     try {
       const res = await fetch("/api/session-verdicts", {
         method: "POST",
@@ -228,6 +230,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       setVerdict(data.verdict);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate verdict.");
+      if (regenerate) setAutoRegenFailed(true);
     } finally {
       setLoading(false);
     }
@@ -285,6 +288,11 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
   // Stale verdicts auto-regenerate silently (see useEffect above). When regeneration
   // is in flight, show a subtle indicator instead of the stale-data banner.
   const isAutoRegenerating = loading && autoRegenAttempted;
+  const handleRetryAutoRegen = () => {
+    setAutoRegenAttempted(false);
+    setAutoRegenFailed(false);
+    void fetchVerdict(true);
+  };
 
   return (
     <article className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]">
@@ -296,6 +304,14 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-accent)]" aria-hidden="true" />
             {"Refreshing\u2026"}
           </span>
+        ) : autoRegenFailed && verdict?.stale_reason ? (
+          <button
+            type="button"
+            onClick={handleRetryAutoRegen}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-2 py-0.5 text-[11px] text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.14)]"
+          >
+            Refresh failed — retry
+          </button>
         ) : null}
       </div>
 

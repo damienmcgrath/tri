@@ -318,6 +318,29 @@ describe("diagnoseCompletedSession", () => {
     expect(cs.composite).toBeLessThan(90);
   });
 
+  test("threshold run with pace-only target is not flagged as missing intensity", () => {
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "run",
+        intentCategory: "Threshold intervals",
+        plannedDurationSec: 3000,
+        plannedIntervals: 3,
+        targetBands: { pace: { min: 240, max: 255 } }
+      },
+      actual: {
+        durationSec: 3000,
+        avgPaceSPerKm: 248,
+        completedIntervals: 3
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData).not.toContain("HR data");
+    expect(cs.missingCriticalData).toEqual([]);
+    expect(cs.intentMatch.score).toBeGreaterThanOrEqual(90);
+  });
+
   test("full-telemetry easy run keeps intent match high and has no missing critical data", () => {
     const diagnosis = diagnoseCompletedSession({
       planned: {
