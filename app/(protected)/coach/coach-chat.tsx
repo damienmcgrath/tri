@@ -867,7 +867,7 @@ export function CoachChat({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {showBriefingPanel ? (
         <section className="surface p-5">
           <div className="border-b border-[hsl(var(--border))] pb-4">
@@ -1018,7 +1018,7 @@ export function CoachChat({
           </aside>
 
           <div className="flex min-h-0 flex-col">
-            <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-3.5 py-2.5">
+            <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="label">Active conversation</p>
@@ -1027,7 +1027,7 @@ export function CoachChat({
                 </div>
               </div>
             </div>
-            <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3.5 py-2">
+            <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2">
               <p className="text-xs text-[hsl(var(--text-secondary))]">
                 {sessionDiagnoses.length > 0
                   ? `${sessionDiagnoses.length} reviewed this week${flaggedSessions.length > 0 ? ` · ${flaggedSessions.length} needing attention` : ""}. Focus: ${nextActions[0] ?? "Stabilise execution quality."}`
@@ -1044,7 +1044,7 @@ export function CoachChat({
                 const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
                 shouldAutoScrollRef.current = distanceToBottom < 40;
               }}
-              className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3.5 py-3"
+              className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
             >
               {messages.map((message, index) => (
                 <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -1082,7 +1082,7 @@ export function CoachChat({
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2.5">
+            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-4 py-2.5">
               <label htmlFor="coach-input" className="sr-only">
                 Ask your triathlon coach
               </label>

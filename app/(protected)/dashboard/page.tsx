@@ -9,7 +9,7 @@ import {
 } from "@/lib/activities/completed-activities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
-import { computeWeekMinuteTotals } from "@/lib/training/week-metrics";
+import { computeWeekMinuteTotals, computeWeekShape } from "@/lib/training/week-metrics";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { addDays, getMonday, weekRangeLabel } from "../week-context";
@@ -280,7 +280,13 @@ export default async function DashboardPage({
   const remainingMinutes = minuteMetrics.remainingMinutes;
   const dayIndex = Math.floor((Date.parse(`${todayIso}T00:00:00.000Z`) - Date.parse(`${weekStart}T00:00:00.000Z`)) / 86_400_000);
   const elapsedDays = Math.max(0, Math.min(dayIndex + 1, 7));
-  const expectedByTodayPct = Math.round((elapsedDays / 7) * 100);
+  // Shape-aware expectation: use the actual planned minutes scheduled on or before today,
+  // not a flat elapsedDays/7 share. Back-loaded weeks (long run Sat, long bike Sun) should
+  // not read as "at risk" on Friday when Mon–Fri's share of the load is genuinely complete.
+  const weekShape = computeWeekShape({ sessions: weekMetricSessions, weekStart, todayIso });
+  const expectedByTodayPct = totals.planned > 0
+    ? Math.round(weekShape.expectedShareByToday * 100)
+    : Math.round((elapsedDays / 7) * 100);
   const statusChip = getStatusChip(completionPct, expectedByTodayPct);
 
   // Determine the dashboard moment for context-aware ordering
@@ -364,15 +370,38 @@ export default async function DashboardPage({
     .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
     .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 
-  const behindByMinutes = Math.max(Math.round((expectedByTodayPct / 100) * totals.planned) - totals.completed, 0);
+  const expectedMinutesByToday = totals.planned > 0
+    ? weekShape.expectedShareByToday * totals.planned
+    : (elapsedDays / 7) * totals.planned;
+  // Exclude extra / unplanned activities from the "behind on plan" calculation — an
+  // off-plan bike doesn't complete a remaining planned run. Use planned-completed
+  // minutes only for the pacing signal; extras stay visible through the Today card.
+  const behindByMinutes = Math.max(
+    Math.round(expectedMinutesByToday - minuteMetrics.plannedCompletedMinutes),
+    0
+  );
   // Only surface "behind" when there is genuinely remaining or overdue work.  A back-loaded week can
   // look "behind pace" even when every session through today is done — suppress the alert in that case.
   // Also suppress on planned rest days: the Morning Brief already covers "take it fully" and the
   // "behind" framing is misleading when today was never supposed to contain work.
+  //
+  // Additionally suppress when the week is weekend-loaded and the shape-adjusted completion
+  // is close to expectation — otherwise Fri shows "at risk 2h 34m behind" when the athlete
+  // has done 48% of the load correctly because 52% is scheduled Sat/Sun.
   const todayHasRemainingWork = dailyStates.find((d) => d.iso === todayIso)?.tone === "today-remaining";
+  const shapeAdjustedDeltaPct = completionPct - expectedByTodayPct;
+  // Only treat a week as "weekend-loaded on plan" when today has no outstanding work and
+  // no past sessions are missed. If today is partially complete, the user genuinely is
+  // behind and the shape argument shouldn't hide that.
+  const isWeekendLoadedOnPlan =
+    weekShape.isWeekendLoaded &&
+    missedSessionsCount === 0 &&
+    !todayHasRemainingWork &&
+    shapeAdjustedDeltaPct >= -12;
   const behindAlertActive =
     behindByMinutes >= 30 &&
     dashboardMoment !== "rest_day" &&
+    !isWeekendLoadedOnPlan &&
     (missedSessionsCount > 0 || todayHasRemainingWork);
 
   const sports = ["swim", "bike", "run", "strength"] as const;
@@ -777,9 +806,12 @@ export default async function DashboardPage({
         </>
       )}
 
-      {/* Training Score + Balance (side by side) + Readiness */}
+      {/* Readiness (at-a-glance) → Training Score + Balance */}
       {isCurrentWeek ? (
         <>
+          <Suspense fallback={null}>
+            <DashboardReadiness supabase={supabase} userId={user.id} />
+          </Suspense>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Suspense fallback={null}>
               <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
@@ -788,9 +820,6 @@ export default async function DashboardPage({
               <DashboardDisciplineBalance supabase={supabase} userId={user.id} weekStart={weekStart} />
             </Suspense>
           </div>
-          <Suspense fallback={null}>
-            <DashboardReadiness supabase={supabase} userId={user.id} />
-          </Suspense>
         </>
       ) : null}
 
@@ -1027,13 +1056,26 @@ async function DashboardReadiness(props: {
   if (!props?.supabase) return null;
   const { supabase, userId } = props;
   try {
-    const [fitness, tsbTrend] = await Promise.all([
+    const [fitness, tsbTrend, fatigue] = await Promise.all([
       getLatestFitness(supabase, userId),
       getTsbTrend(supabase, userId),
+      detectCrossDisciplineFatigue(supabase, userId).catch(() => null)
     ]);
     if (!fitness?.total) return null;
     const readiness = getReadinessState(fitness.total.tsb, tsbTrend);
-    return <ReadinessIndicator readiness={readiness} tsb={fitness.total.tsb} />;
+    const signalContext = fatigue?.sports && fatigue.sports.length >= 2
+      ? `${fatigue.sports.join(" + ")} trending down, expect heavier legs`
+      : readiness === "fatigued" || readiness === "overreaching"
+        ? "Hold the key session but keep easy days truly easy"
+        : null;
+    return (
+      <ReadinessIndicator
+        readiness={readiness}
+        tsb={fitness.total.tsb}
+        tsbTrend={tsbTrend}
+        signalContext={signalContext}
+      />
+    );
   } catch {
     return null;
   }

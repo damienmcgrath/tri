@@ -29,11 +29,59 @@ function getDeltaClass(delta: number | null): string {
   return delta > 0 ? "text-success" : "text-danger";
 }
 
+type WeakestComponent = {
+  key: "execution" | "progression" | "balance";
+  label: string;
+  value: number;
+  prompt: string;
+  linkLabel: string;
+};
+
+function getWeakestComponent(score: TrainingScore): WeakestComponent | null {
+  const candidates: WeakestComponent[] = [];
+  if (score.executionQuality !== null) {
+    candidates.push({
+      key: "execution",
+      label: "Execution",
+      value: score.executionQuality,
+      prompt: `My Execution score is ${Math.round(score.executionQuality)}. Which recent sessions pulled it down and what should I adjust in how I hit sessions to bring it back up?`,
+      linkLabel: "Why did Execution drop?"
+    });
+  }
+  if (score.progressionActive && score.progressionSignal !== null) {
+    candidates.push({
+      key: "progression",
+      label: "Progression",
+      value: score.progressionSignal,
+      prompt: `My Progression signal is ${Math.round(score.progressionSignal)}. Which disciplines or metrics are flat or regressing over my recent comparable sessions, and what should I change to restart progression?`,
+      linkLabel: "Why is Progression flat?"
+    });
+  }
+  if (score.balanceScore !== null) {
+    candidates.push({
+      key: "balance",
+      label: "Balance",
+      value: score.balanceScore,
+      prompt: `My Balance score is ${Math.round(score.balanceScore)} for a ${score.goalRaceType ?? "triathlon"} goal. Where am I over- or under-invested relative to an ideal distribution, and what should I shift next week?`,
+      linkLabel: "Why is Balance off?"
+    });
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.value - b.value);
+  return candidates[0];
+}
+
 export function TrainingScoreCard({ score }: Props) {
   const ringPct = Math.max(0, Math.min(100, score.compositeScore));
   const circumference = 2 * Math.PI * 40;
   const strokeDashoffset = circumference - (ringPct / 100) * circumference;
   const delta7d = getDeltaLabel(score.scoreDelta7d);
+  const weakest = getWeakestComponent(score);
+  const coachPrompt =
+    weakest !== null
+      ? weakest.prompt
+      : `Explain my training score of ${Math.round(score.compositeScore)}. What's driving each dimension and what should I focus on to improve it?`;
+  const coachLabel = weakest !== null ? weakest.linkLabel : "Explain my score";
 
   return (
     <article className="surface p-4 md:p-5">
@@ -142,10 +190,10 @@ export function TrainingScoreCard({ score }: Props) {
       {/* Coach hand-off */}
       <div className="mt-3 flex items-center justify-center">
         <a
-          href={`/coach?prompt=${encodeURIComponent(`Explain my training score of ${Math.round(score.compositeScore)}. What's driving each dimension and what should I focus on to improve it?`)}`}
+          href={`/coach?prompt=${encodeURIComponent(coachPrompt)}`}
           className="text-[11px] font-medium text-cyan-400 transition hover:text-cyan-300"
         >
-          Explain my score
+          {coachLabel}
         </a>
       </div>
     </article>

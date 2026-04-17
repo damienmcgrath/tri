@@ -42,60 +42,93 @@ function formatSports(sports: string[]): string {
   return `${sports.slice(0, -1).map((s) => SPORT_LABEL[s] ?? s).join(", ")}, and ${SPORT_LABEL[sports[sports.length - 1]] ?? sports[sports.length - 1]}`;
 }
 
+/**
+ * Derive a cross-discipline fatigue synthesis from the trend cards themselves when the
+ * TSB-based `detectCrossDisciplineFatigue` hasn't fired. This catches the case where
+ * performance metrics (pace, power) are declining together even before the
+ * load-balance model shows TSB drift.
+ */
+function deriveTrendFatigueSynthesis(trends: WeeklyTrend[]): { sports: string[]; metrics: string[] } | null {
+  // Only flag on output-metric declines (pace, power) — HR declining is ambiguous.
+  const OUTPUT_METRICS = new Set(["Run pace", "Bike avg power", "Swim pace"]);
+  const decliningOutputs = trends.filter(
+    (t) => t.direction === "declining" && OUTPUT_METRICS.has(t.metric) && t.confidence !== "low"
+  );
+  const distinctSports = new Set(decliningOutputs.map((t) => METRIC_SPORT[t.metric] ?? t.sport));
+  if (distinctSports.size < 2) return null;
+  return {
+    sports: Array.from(distinctSports),
+    metrics: decliningOutputs.map((t) => t.metric)
+  };
+}
+
 export function TrendCards({ trends, fatigueSignal }: { trends: WeeklyTrend[]; fatigueSignal?: FatigueSignal | null }) {
   if (trends.length === 0 && !fatigueSignal) return null;
 
+  // Prefer the TSB-based signal when present; otherwise synthesize from trend directions.
+  const derivedSynthesis = !fatigueSignal ? deriveTrendFatigueSynthesis(trends) : null;
+  const synthesisSports = fatigueSignal?.sports ?? derivedSynthesis?.sports ?? null;
+  const synthesisSeverity = fatigueSignal?.severity ?? "warning";
+
   return (
-    <article className="surface p-4 md:p-5">
-      <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent trends</p>
-      {fatigueSignal ? (
-        <div
-          className={`mt-3 rounded-xl border p-3 ${
-            fatigueSignal.severity === "alert"
+    <div className="space-y-3">
+      {synthesisSports && synthesisSports.length >= 2 ? (
+        <article
+          className={`rounded-2xl border p-4 md:p-5 ${
+            synthesisSeverity === "alert"
               ? "border-[hsl(var(--signal-risk))] bg-[hsl(var(--signal-risk)/0.08)]"
               : "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.08)]"
           }`}
+          aria-label="Cross-discipline fatigue synthesis"
         >
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white">
             Cross-discipline fatigue
           </p>
-          <p className="mt-1 text-sm text-white">
-            {formatSports(fatigueSignal.sports)} are both trending down over the same window — consider protecting this week&apos;s key session.
+          <p className="mt-2 text-sm text-white">
+            {formatSports(synthesisSports)} are trending down together over the same window.
+            This pattern typically indicates accumulated fatigue rather than
+            discipline-specific weakness. Prioritize recovery this weekend and watch how
+            your legs feel on the next long session.
           </p>
-          <p className="mt-1 text-[11px] text-muted">{fatigueSignal.detail}</p>
-        </div>
+          {fatigueSignal?.detail ? (
+            <p className="mt-2 text-[11px] text-muted">{fatigueSignal.detail}</p>
+          ) : null}
+        </article>
       ) : null}
       {trends.length > 0 ? (
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {trends.map((trend) => {
-          const sport = METRIC_SPORT[trend.metric] ?? "other";
-          const color = SPORT_COLOR[sport] ?? "hsl(var(--accent))";
-          const values = trend.dataPoints.map((d) => d.value);
-          const currentLabel = trend.dataPoints[trend.dataPoints.length - 1]?.label ?? "";
+        <article className="surface p-4 md:p-5">
+          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent trends</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {trends.map((trend) => {
+              const sport = METRIC_SPORT[trend.metric] ?? "other";
+              const color = SPORT_COLOR[sport] ?? "hsl(var(--accent))";
+              const values = trend.dataPoints.map((d) => d.value);
+              const currentLabel = trend.dataPoints[trend.dataPoints.length - 1]?.label ?? "";
 
-          return (
-            <div
-              key={trend.metric}
-              className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted">{trend.metric}</p>
-                <Sparkline values={values} color={color} width={80} height={24} />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-base font-semibold text-white">
-                  {currentLabel}
-                </span>
-                <span className={`text-xs font-medium ${DIRECTION_CLASS[trend.direction]}`}>
-                  {DIRECTION_ARROW[trend.direction]} {trend.direction}
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] leading-snug text-muted">{trend.detail}</p>
-            </div>
-          );
-        })}
-      </div>
+              return (
+                <div
+                  key={trend.metric}
+                  className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted">{trend.metric}</p>
+                    <Sparkline values={values} color={color} width={80} height={24} />
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-base font-semibold text-white">
+                      {currentLabel}
+                    </span>
+                    <span className={`text-xs font-medium ${DIRECTION_CLASS[trend.direction]}`}>
+                      {DIRECTION_ARROW[trend.direction]} {trend.direction}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-muted">{trend.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </article>
       ) : null}
-    </article>
+    </div>
   );
 }
