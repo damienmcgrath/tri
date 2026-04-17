@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCoachPanel } from "./coach-panel-context";
 
 type Message = {
@@ -251,8 +252,10 @@ export function CoachPanel() {
 // Floating Action Button to open the coach panel
 export function CoachFAB() {
   const { open, isOpen } = useCoachPanel();
+  const pathname = usePathname();
 
   if (isOpen) return null;
+  if (pathname?.startsWith("/coach")) return null;
 
   return (
     <button
