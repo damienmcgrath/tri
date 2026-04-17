@@ -283,7 +283,7 @@ export default async function DashboardPage({
   // Shape-aware expectation: use the actual planned minutes scheduled on or before today,
   // not a flat elapsedDays/7 share. Back-loaded weeks (long run Sat, long bike Sun) should
   // not read as "at risk" on Friday when Mon–Fri's share of the load is genuinely complete.
-  const weekShape = computeWeekShape({ sessions: weekMetricSessions, weekStart, todayIso });
+  const weekShape = computeWeekShape({ sessions: weekMetricSessions, todayIso });
   const expectedByTodayPct = totals.planned > 0
     ? Math.round(weekShape.expectedShareByToday * 100)
     : Math.round((elapsedDays / 7) * 100);

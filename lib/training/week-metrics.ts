@@ -70,7 +70,6 @@ export function getKeySessionsRemaining(sessions: WeekMetricSession[], todayIso?
  */
 export function computeWeekShape(args: {
   sessions: WeekMetricSession[];
-  weekStart: string;
   todayIso: string;
 }): {
   /** Fraction of week's planned minutes scheduled on or before today (0..1). */
@@ -80,40 +79,34 @@ export function computeWeekShape(args: {
   /** True if ≥50% of remaining (post-today) planned minutes fall on Sat/Sun. */
   isWeekendLoaded: boolean;
 } {
-  const { sessions, weekStart, todayIso } = args;
-  const totalPlanned = sessions.reduce((sum, s) => sum + Math.max(s.durationMinutes, 0), 0);
+  const { sessions, todayIso } = args;
+
+  let totalPlanned = 0;
+  let plannedOnOrBeforeToday = 0;
+  let plannedAfterToday = 0;
+  let weekendMinutes = 0;
+  let weekendMinutesRemaining = 0;
+
+  for (const session of sessions) {
+    const minutes = Math.max(session.durationMinutes, 0);
+    if (minutes === 0) continue;
+    totalPlanned += minutes;
+
+    const isPast = session.date <= todayIso;
+    if (isPast) plannedOnOrBeforeToday += minutes;
+    else plannedAfterToday += minutes;
+
+    const dow = new Date(Date.parse(`${session.date}T00:00:00.000Z`)).getUTCDay();
+    const isWeekend = dow === 0 || dow === 6;
+    if (isWeekend) {
+      weekendMinutes += minutes;
+      if (!isPast) weekendMinutesRemaining += minutes;
+    }
+  }
+
   if (totalPlanned <= 0) {
     return { expectedShareByToday: 0, weekendShare: 0, isWeekendLoaded: false };
   }
-
-  const plannedOnOrBeforeToday = sessions
-    .filter((s) => s.date <= todayIso)
-    .reduce((sum, s) => sum + Math.max(s.durationMinutes, 0), 0);
-
-  const plannedAfterToday = sessions
-    .filter((s) => s.date > todayIso)
-    .reduce((sum, s) => sum + Math.max(s.durationMinutes, 0), 0);
-
-  const weekStartMs = Date.parse(`${weekStart}T00:00:00.000Z`);
-  const weekendMinutes = sessions
-    .filter((s) => {
-      const dow = new Date(Date.parse(`${s.date}T00:00:00.000Z`)).getUTCDay();
-      // Sunday = 0, Saturday = 6. We care about both weekend days.
-      return dow === 0 || dow === 6;
-    })
-    .reduce((sum, s) => sum + Math.max(s.durationMinutes, 0), 0);
-
-  const weekendMinutesRemaining = sessions
-    .filter((s) => {
-      if (s.date <= todayIso) return false;
-      const dow = new Date(Date.parse(`${s.date}T00:00:00.000Z`)).getUTCDay();
-      return dow === 0 || dow === 6;
-    })
-    .reduce((sum, s) => sum + Math.max(s.durationMinutes, 0), 0);
-
-  // Suppress unused-var warning on weekStartMs — kept for future: could branch by
-  // offset from Monday vs. Sunday week-starts.
-  void weekStartMs;
 
   return {
     expectedShareByToday: plannedOnOrBeforeToday / totalPlanned,

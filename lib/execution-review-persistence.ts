@@ -246,20 +246,23 @@ export async function buildWeeklyExecutionBrief(args: {
     .filter((item): item is { id: string; name: string; review: PersistedExecutionReview } => Boolean(item));
 
   const reviewedCount = reviews.length;
-  const onTargetCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "on_target").length;
-  const partialCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "partial").length;
-  const missedCount = reviews.filter((item) => item.review.deterministic.rulesSummary.intentMatch === "missed").length;
-  const provisionalCount = reviews.filter((item) => item.review.deterministic.rulesSummary.provisional).length;
-  // Pattern synthesis: name the most common recurring issue across reviewed sessions so
-  // the brief reads as a coaching observation instead of a universal hedge.
+  let onTargetCount = 0;
+  let partialCount = 0;
+  let missedCount = 0;
+  let provisionalCount = 0;
   const issueCounts = new Map<string, number>();
-  for (const item of reviews) {
-    for (const issue of item.review.deterministic.detectedIssues ?? []) {
-      const code = issue.code;
-      if (!code) continue;
-      issueCounts.set(code, (issueCounts.get(code) ?? 0) + 1);
+  for (const { review } of reviews) {
+    const summary = review.deterministic.rulesSummary;
+    if (summary.intentMatch === "on_target") onTargetCount++;
+    else if (summary.intentMatch === "partial") partialCount++;
+    else if (summary.intentMatch === "missed") missedCount++;
+    if (summary.provisional) provisionalCount++;
+    for (const issue of review.deterministic.detectedIssues ?? []) {
+      if (!issue.code) continue;
+      issueCounts.set(issue.code, (issueCounts.get(issue.code) ?? 0) + 1);
     }
   }
+
   const [dominantIssue, dominantIssueCount] = Array.from(issueCounts.entries())
     .sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
   const PATTERN_MESSAGES: Record<string, string> = {
