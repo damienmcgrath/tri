@@ -296,20 +296,60 @@ describe("parseFitFile", () => {
     expect(result.elapsedDurationSec).toBe(1500);
   });
 
-  test("throws when session, laps, records, session-span, and activity all lack usable duration", async () => {
+  test("accepts 0-duration when all fallbacks are exhausted (manual-entry FIT)", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-04-17T07:00:00.000Z",
+            timestamp: "2026-04-17T07:00:00.000Z",
+            sport: "training",
+            sub_sport: "strength_training",
+            total_elapsed_time: 0,
+            total_timer_time: 0,
+            total_moving_time: 0,
+            total_distance: 0,
+            avg_speed: 0
+          }
+        ],
+        laps: [
+          {
+            start_time: "2026-04-17T07:00:00.000Z",
+            timestamp: "2026-04-17T07:00:00.000Z",
+            total_elapsed_time: 0,
+            total_timer_time: 0
+          }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(0);
+    expect(result.movingDurationSec).toBeUndefined();
+    expect(result.elapsedDurationSec).toBeUndefined();
+    expect(result.sportType).toBe("strength");
+  });
+
+  test("derives duration from distance/avg_speed when time fields are missing", async () => {
     parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
       callback(null, {
         sessions: [
           {
             start_time: "2026-03-14T11:00:00.000Z",
-            sport: "running"
+            timestamp: "2026-03-14T11:00:00.000Z",
+            sport: "running",
+            total_distance: 10000,
+            avg_speed: 2.778
           }
-        ],
-        records: [{ timestamp: "2026-03-14T11:00:00.000Z" }]
+        ]
       });
     });
 
-    await expect(parseFitFile(Buffer.from("fit"))).rejects.toThrow("FIT file missing usable duration.");
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(3600);
+    expect(result.elapsedDurationSec).toBe(3600);
   });
 
   test("uses session duration even when laps and records disagree", async () => {
