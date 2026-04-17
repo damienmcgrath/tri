@@ -1004,7 +1004,7 @@ export function CoachChat({
       ) : null}
 
       <section id="coaching-chat" className="surface overflow-hidden">
-        <div className="flex min-h-[420px] h-[calc(100dvh-213px)] max-h-[780px] flex-col lg:grid lg:h-[68vh] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
+        <div className="flex min-h-[420px] h-[calc(100dvh-213px)] flex-col lg:grid lg:h-[68vh] lg:max-h-[780px] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
           <aside className="hidden min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5 lg:flex">
             <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
               New conversation
