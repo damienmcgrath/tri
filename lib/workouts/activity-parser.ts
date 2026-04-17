@@ -92,12 +92,16 @@ function firstPositiveNumber(values: unknown[]): number | undefined {
 }
 
 function deriveElapsedFromLaps(laps: unknown): number | undefined {
+  const arr = asArray(laps as unknown[]);
+  if (arr.length === 0) return undefined;
   let sum = 0;
-  for (const lap of asArray(laps as unknown[])) {
+  for (const lap of arr) {
     const record = asRecord(lap);
-    if (!record) continue;
-    const lapSec = positiveNumber(record.total_elapsed_time) ?? positiveNumber(record.total_timer_time);
-    if (lapSec !== undefined) sum += lapSec;
+    const lapSec = record
+      ? positiveNumber(record.total_elapsed_time) ?? positiveNumber(record.total_timer_time)
+      : undefined;
+    if (lapSec === undefined) return undefined;
+    sum += lapSec;
   }
   return positiveInt(sum);
 }

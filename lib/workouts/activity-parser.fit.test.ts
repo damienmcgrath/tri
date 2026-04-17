@@ -231,6 +231,33 @@ describe("parseFitFile", () => {
     expect(result.durationSec).toBe(1800);
   });
 
+  test("skips lap-sum and uses record span when any lap lacks duration metadata", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        laps: [
+          { total_elapsed_time: 600 },
+          { total_distance: 1000 },
+          { total_elapsed_time: 600 }
+        ],
+        records: [
+          { timestamp: "2026-03-14T11:00:00.000Z" },
+          { timestamp: "2026-03-14T12:00:00.000Z" }
+        ]
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    expect(result.durationSec).toBe(3600);
+    expect(result.elapsedDurationSec).toBe(3600);
+  });
+
   test("throws when session, laps, and records all lack usable duration", async () => {
     parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
       callback(null, {
