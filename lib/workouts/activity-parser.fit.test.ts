@@ -352,6 +352,22 @@ describe("parseFitFile", () => {
     expect(result.elapsedDurationSec).toBe(3600);
   });
 
+  test("throws for endurance sports when all duration fallbacks are exhausted", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        sessions: [
+          {
+            start_time: "2026-03-14T11:00:00.000Z",
+            sport: "running"
+          }
+        ],
+        records: [{ timestamp: "2026-03-14T11:00:00.000Z" }]
+      });
+    });
+
+    await expect(parseFitFile(Buffer.from("fit"))).rejects.toThrow("FIT file missing usable duration.");
+  });
+
   test("uses session duration even when laps and records disagree", async () => {
     parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
       callback(null, {

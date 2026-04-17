@@ -533,11 +533,20 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
   const poolLengthM = firstPositiveNumber([session.pool_length, session.pool_length_m]);
 
   if (durationSec <= 0) {
-    console.warn("[UPLOAD_PARSE] FIT duration fallbacks exhausted — accepting 0-duration activity", {
+    const sportLower = `${session.sport ?? ""}`.toLowerCase();
+    const subSportLower = `${session.sub_sport ?? ""}`.toLowerCase();
+    const isManualEntryCandidate =
+      sportLower === "training" ||
+      subSportLower.includes("strength") ||
+      subSportLower.includes("cardio") ||
+      sportLower === "fitness_equipment" ||
+      sportLower === "generic";
+    if (!isManualEntryCandidate) {
+      throw new Error("FIT file missing usable duration.");
+    }
+    console.warn("[UPLOAD_PARSE] FIT duration fallbacks exhausted — accepting 0-duration manual-entry activity", {
       sport: session.sport ?? null,
-      subSport: session.sub_sport ?? null,
-      lapsCount: Array.isArray(fit?.laps) ? fit.laps.length : 0,
-      recordsCount: Array.isArray(fit?.records) ? fit.records.length : 0
+      subSport: session.sub_sport ?? null
     });
   }
 
