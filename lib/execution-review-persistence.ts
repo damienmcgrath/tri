@@ -326,13 +326,15 @@ export async function buildWeeklyExecutionBrief(args: {
       provisionalCount
     },
     sessionsNeedingAttention,
-    // Prefer naming a concrete pattern over universal "provisional" hedging. Only
-    // surface the provisional count when it's a meaningful minority and no richer
-    // pattern is available to lead with.
+    // Prefer naming a concrete pattern when one is available; otherwise surface the
+    // provisional count so the briefing never reads more confident than the evidence
+    // warrants — including the case where every reviewed session is still provisional.
     confidenceNote:
       patternNote
-        ?? (provisionalCount > 0 && provisionalCount < reviewedCount
-          ? `${provisionalCount} of ${reviewedCount} review${reviewedCount === 1 ? "" : "s"} still need richer data to firm up the read.`
-          : null)
+        ?? (provisionalCount === reviewedCount && reviewedCount > 0
+          ? `Every reviewed session is still provisional — richer uploads will firm these reads up.`
+          : provisionalCount > 0
+            ? `${provisionalCount} of ${reviewedCount} review${reviewedCount === 1 ? "" : "s"} still need richer data to firm up the read.`
+            : null)
   } satisfies WeeklyExecutionBrief;
 }

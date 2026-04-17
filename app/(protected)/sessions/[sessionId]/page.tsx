@@ -533,10 +533,13 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // otherwise suppress generic hedging when the read is confident.
   const missingCriticalData = reviewVm.componentScores?.missingCriticalData ?? [];
   const dataCompletenessPct = reviewVm.componentScores?.dataCompletenessPct ?? 1;
-  const missingDominantMetric = reviewVm.componentScores?.missingDominantMetric ?? null;
+  const intentMatchCapped = Boolean(reviewVm.componentScores?.intentMatch?.capped);
+  const cappedDominantMetric = intentMatchCapped
+    ? reviewVm.componentScores?.missingDominantMetric ?? null
+    : null;
   const confidenceQualifier =
-    missingDominantMetric
-      ? `${missingDominantMetric} missing — likely on target`
+    cappedDominantMetric
+      ? `${cappedDominantMetric} missing — likely on target`
       : missingCriticalData.length > 0
         ? `${missingCriticalData[0]} missing`
         : dataCompletenessPct < 0.6 && reviewVm.confidenceLabel === "low"
@@ -812,9 +815,9 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               );
             })}
           </div>
-          {reviewVm.componentScores?.missingDominantMetric ? (
+          {cappedDominantMetric ? (
             <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
-              {reviewVm.componentScores.missingDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
+              {cappedDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
             </p>
           ) : missingCriticalData.length > 0 ? (
             <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">

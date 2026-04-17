@@ -341,6 +341,33 @@ describe("diagnoseCompletedSession", () => {
     expect(cs.intentMatch.score).toBeGreaterThanOrEqual(90);
   });
 
+  test("power-only threshold run is not flagged as missing pace", () => {
+    // Run power is treated as valid intensity evidence elsewhere in the scorer.
+    // A run with power + HR but no pace stream should NOT be capped for missing
+    // the dominant metric.
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "run",
+        intentCategory: "Threshold intervals",
+        plannedDurationSec: 3000,
+        plannedIntervals: 3,
+        targetBands: { hr: { min: 165, max: 175 } }
+      },
+      actual: {
+        durationSec: 3000,
+        avgHr: 170,
+        avgPower: 290,
+        completedIntervals: 3
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingDominantMetric).toBeNull();
+    expect(cs.intentMatch.capped).toBeFalsy();
+    expect(cs.intentMatch.score).toBeGreaterThanOrEqual(85);
+  });
+
   test("full-telemetry easy run keeps intent match high and has no missing critical data", () => {
     const diagnosis = diagnoseCompletedSession({
       planned: {

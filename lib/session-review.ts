@@ -619,7 +619,10 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
         : "Execution Score appears after the workout is completed and enough evidence has synced.";
 
   const rawComponentScoresForNote = diagnosis?.componentScores as ComponentScores | null | undefined;
-  const capNoteMetric = rawComponentScoresForNote?.missingDominantMetric;
+  const capNoteMetric =
+    rawComponentScoresForNote?.intentMatch?.capped
+      ? rawComponentScoresForNote.missingDominantMetric
+      : null;
   const scoreConfidenceNote =
     score !== null && capNoteMetric
       ? `${capNoteMetric} data is missing, so Intent Match is capped — treat the score as "likely on target" rather than confirmed.`

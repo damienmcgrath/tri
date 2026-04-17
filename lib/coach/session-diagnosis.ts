@@ -554,10 +554,12 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
   let missingDominantMetric: string | null = null;
   if (dominant === "hr" && !hasAnyHr) missingDominantMetric = "HR";
   else if (dominant === "power" && !hasAnyPower) missingDominantMetric = "power";
-  else if (dominant === "pace" && !hasAnyPace && !hasAnyHr) {
-    // For run/swim, pace is dominant. If neither pace nor HR is present, we have no
-    // effort signal at all — mark pace missing so Intent Match gets capped.
-    missingDominantMetric = sport === "swim" ? "swim pace" : "pace";
+  else if (dominant === "pace" && !hasAnyPace && !hasAnyHr && !hasAnyPower) {
+    // Run pace is the dominant signal, but the scorer accepts HR or run power as
+    // valid intensity evidence everywhere else. Only flag pace as missing when none
+    // of pace, HR, or power is present — otherwise a power-only run would be
+    // penalized for data it doesn't actually need.
+    missingDominantMetric = "pace";
   }
 
   return { pct, missingCritical, missingDominantMetric };
