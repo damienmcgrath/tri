@@ -428,8 +428,8 @@ function buildCoachVerdictInstructions() {
     "- Never lead with duration comparison. Evaluate intensity compliance first, pacing second, duration third.",
     "- For interval sessions: evaluate interval quality before mentioning whether all were completed.",
     "- For endurance sessions: evaluate intensity compliance before mentioning duration.",
-    "- For 90+ scores: say 'Maintain this approach. Same targets next time.' in oneThingToChange.",
-    "- For scores below 90: use the NEXT format: 'NEXT [session type]: [specific target]. [success criterion]. [progression cue].'",
+    "- Always use the NEXT format for oneThingToChange, regardless of score: 'NEXT [session type]: [specific target with numbers]. [success criterion]. [progression cue if criterion met].'",
+    "- For 90+ scores, still restate the numeric target (pace ceiling, HR cap, interval structure) and add a progression trigger (e.g. 'if HR holds, extend by 10 min next time').",
     "- Do not use words like 'appears', 'seems', 'might', 'possibly', 'likely'. State what the data shows.",
     "",
     "Field requirements:",
@@ -520,7 +520,7 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
           : "When execution drifts, the session can stop delivering the precise stimulus the week depends on.",
       oneThingToChange:
         intentMatch === "on_target"
-          ? "Maintain this approach. Same targets next time."
+          ? `NEXT ${evidence.planned.intentCategory ?? "session"}: hold the same targets. If it still feels controlled, progress duration by ~10% or tighten the interval structure next time.`
           : intentMatch === "missed"
             ? `NEXT ${evidence.planned.intentCategory ?? "session"}: start more conservatively and protect the key work before adding intensity.`
             : `NEXT ${evidence.planned.intentCategory ?? "session"}: tighten control earlier in the session.`,

@@ -205,7 +205,16 @@ export function createPreviewDatabase(): PreviewDatabase {
           executionScoreBand: "Partial match",
           executionScoreSummary: "The first two reps landed, but power faded late.",
           whyItMatters: "Late fade reduces the quality of the session's sustained-threshold signal.",
-          recommendedNextAction: "Shorten the final rep slightly or start 5 watts lower to hold form deeper."
+          recommendedNextAction: "NEXT threshold set: 3×12 min @ 245–255W, 6 min easy between. If average interval power holds ≥248W through all three reps, extend the final rep to 14 min.",
+          componentScores: {
+            intentMatch: { score: 70, weight: 0.4, detail: "HR missing — cannot verify cardiovascular load against threshold target." },
+            pacingExecution: { score: 65, weight: 0.25, detail: "Power faded ~6% on the final rep; variability index 1.08." },
+            completion: { score: 85, weight: 0.2, detail: "All three reps completed; total duration matched plan." },
+            recoveryCompliance: { score: 80, weight: 0.15, detail: "TSS within the weekly envelope; next-day session still easy." },
+            composite: 74,
+            dataCompletenessPct: 0.55,
+            missingCriticalData: ["Heart rate"]
+          }
         }
       },
       {
@@ -418,7 +427,7 @@ export function createPreviewDatabase(): PreviewDatabase {
           executionScoreBand: "On target",
           executionScoreSummary: "Power held steady across all three intervals. Cadence consistent at 88rpm.",
           whyItMatters: "Clean FTP work confirms threshold capacity is tracking well for race build.",
-          recommendedNextAction: "Maintain this approach. Same targets next time."
+          recommendedNextAction: "NEXT sweet-spot set: 3×12 min @ 250–260W, 6 min easy between. If average interval power holds ≥255W and cadence stays 88rpm, extend the third rep to 15 min."
         }
       },
       {
@@ -1672,7 +1681,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 5;
+const PREVIEW_DATABASE_VERSION = 6;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;

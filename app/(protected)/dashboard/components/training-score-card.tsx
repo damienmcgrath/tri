@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { TrainingScore } from "@/lib/training/scoring";
 
 type Props = {
@@ -31,7 +30,6 @@ function getDeltaClass(delta: number | null): string {
 }
 
 export function TrainingScoreCard({ score }: Props) {
-  const [expanded, setExpanded] = useState(false);
   const ringPct = Math.max(0, Math.min(100, score.compositeScore));
   const circumference = 2 * Math.PI * 40;
   const strokeDashoffset = circumference - (ringPct / 100) * circumference;
@@ -81,14 +79,68 @@ export function TrainingScoreCard({ score }: Props) {
         ) : null}
       </div>
 
-      {/* Actions */}
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-[11px] font-medium text-tertiary transition hover:text-white"
-        >
-          {expanded ? "Hide details" : "What affects this?"}
-        </button>
+      {/* Inline component breakdown — always visible */}
+      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[rgba(255,255,255,0.08)] pt-3">
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px]">✓</span>
+            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Execution</span>
+          </div>
+          <span className="text-sm font-semibold text-white">
+            {score.executionQuality !== null ? Math.round(score.executionQuality) : "—"}
+          </span>
+          <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+            <div
+              className="h-full rounded-full bg-white/60"
+              style={{ width: `${score.executionQuality ?? 0}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px]">↗</span>
+            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Progression</span>
+          </div>
+          {score.progressionActive ? (
+            <>
+              <span className="text-sm font-semibold text-white">
+                {score.progressionSignal !== null ? Math.round(score.progressionSignal) : "—"}
+              </span>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                <div
+                  className="h-full rounded-full bg-white/60"
+                  style={{ width: `${score.progressionSignal ?? 0}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-sm font-semibold text-tertiary">—</span>
+              <span className="text-[9px] text-tertiary">Building</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px]">⚖</span>
+            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Balance</span>
+          </div>
+          <span className="text-sm font-semibold text-white">
+            {score.balanceScore !== null ? Math.round(score.balanceScore) : "—"}
+          </span>
+          <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+            <div
+              className="h-full rounded-full bg-white/60"
+              style={{ width: `${score.balanceScore ?? 0}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Coach hand-off */}
+      <div className="mt-3 flex items-center justify-center">
         <a
           href={`/coach?prompt=${encodeURIComponent(`Explain my training score of ${Math.round(score.compositeScore)}. What's driving each dimension and what should I focus on to improve it?`)}`}
           className="text-[11px] font-medium text-cyan-400 transition hover:text-cyan-300"
@@ -96,73 +148,6 @@ export function TrainingScoreCard({ score }: Props) {
           Explain my score
         </a>
       </div>
-
-      {expanded ? (
-        <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.08)] pt-3">
-          {/* Execution Quality */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px]">✓</span>
-              <span className="text-xs text-muted">Execution</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                <div
-                  className="h-full rounded-full bg-white/60"
-                  style={{ width: `${score.executionQuality ?? 0}%` }}
-                />
-              </div>
-              <span className="w-8 text-right text-xs font-medium text-white">
-                {score.executionQuality !== null ? Math.round(score.executionQuality) : "—"}
-              </span>
-            </div>
-          </div>
-
-          {/* Progression Signal */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px]">↗</span>
-              <span className="text-xs text-muted">Progression</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {score.progressionActive ? (
-                <>
-                  <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                    <div
-                      className="h-full rounded-full bg-white/60"
-                      style={{ width: `${score.progressionSignal ?? 0}%` }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-xs font-medium text-white">
-                    {score.progressionSignal !== null ? Math.round(score.progressionSignal) : "—"}
-                  </span>
-                </>
-              ) : (
-                <span className="text-xs text-tertiary">Building...</span>
-              )}
-            </div>
-          </div>
-
-          {/* Balance Score */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px]">⚖</span>
-              <span className="text-xs text-muted">Balance</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                <div
-                  className="h-full rounded-full bg-white/60"
-                  style={{ width: `${score.balanceScore ?? 0}%` }}
-                />
-              </div>
-              <span className="w-8 text-right text-xs font-medium text-white">
-                {score.balanceScore !== null ? Math.round(score.balanceScore) : "—"}
-              </span>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </article>
   );
 }

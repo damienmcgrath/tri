@@ -89,22 +89,6 @@ type SessionVerdict = {
   stale_reason?: string | null;
 };
 
-function getStaleLabel(reason: string | null | undefined): string | null {
-  if (!reason) return null;
-  switch (reason) {
-    case "feel_updated":
-      return "New feel captured — refresh for updated verdict";
-    case "activity_rematched":
-      return "Activity re-linked — refresh for updated verdict";
-    case "plan_edited":
-      return "Plan updated — refresh for updated verdict";
-    case "prompt_version_bump":
-      return "Coach logic updated — refresh for updated verdict";
-    default:
-      return "New info available — refresh for updated verdict";
-  }
-}
-
 type Props = {
   sessionId: string;
   existingVerdict?: SessionVerdict | null;
@@ -225,10 +209,13 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
   const [error, setError] = useState<string | null>(null);
   const [showAllMetrics, setShowAllMetrics] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [autoRegenAttempted, setAutoRegenAttempted] = useState(false);
+  const [autoRegenFailed, setAutoRegenFailed] = useState(false);
 
   const fetchVerdict = useCallback(async (regenerate = false) => {
     setLoading(true);
     setError(null);
+    if (regenerate) setAutoRegenFailed(false);
     try {
       const res = await fetch("/api/session-verdicts", {
         method: "POST",
@@ -243,6 +230,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       setVerdict(data.verdict);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate verdict.");
+      if (regenerate) setAutoRegenFailed(true);
     } finally {
       setLoading(false);
     }
@@ -253,6 +241,15 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       void fetchVerdict();
     }
   }, [verdict, sessionCompleted, loading, error, fetchVerdict]);
+
+  // Auto-regenerate when the verdict is stale (feel captured, activity re-linked,
+  // plan edited, prompt version bumped). Silent refresh — no user-visible button.
+  useEffect(() => {
+    if (!autoRegenAttempted && verdict?.stale_reason && !loading && !error) {
+      setAutoRegenAttempted(true);
+      void fetchVerdict(true);
+    }
+  }, [verdict, autoRegenAttempted, loading, error, fetchVerdict]);
 
   if (!sessionCompleted) return null;
 
@@ -288,44 +285,35 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
   const visibleMetrics = showAllMetrics ? verdict.metric_comparisons : verdict.metric_comparisons.slice(0, 3);
   const hasMoreMetrics = verdict.metric_comparisons.length > 3;
 
-  const staleLabel = getStaleLabel(verdict.stale_reason);
+  // Stale verdicts auto-regenerate silently (see useEffect above). When regeneration
+  // is in flight, show a subtle indicator instead of the stale-data banner.
+  const isAutoRegenerating = loading && autoRegenAttempted;
+  const handleRetryAutoRegen = () => {
+    setAutoRegenAttempted(false);
+    setAutoRegenFailed(false);
+    void fetchVerdict(true);
+  };
 
   return (
     <article className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
         <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Session verdict</p>
-        <div className="flex items-center gap-2">
-          {staleLabel && (
-            <span
-              className="hidden items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-[11px] text-warning sm:inline-flex"
-              title={staleLabel}
-            >
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
-                <circle cx="6" cy="6" r="1.5" fill="currentColor" />
-              </svg>
-              {staleLabel}
-            </span>
-          )}
+        {isAutoRegenerating ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-tertiary">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-accent)]" aria-hidden="true" />
+            {"Refreshing\u2026"}
+          </span>
+        ) : autoRegenFailed && verdict?.stale_reason ? (
           <button
             type="button"
-            onClick={() => void fetchVerdict(true)}
-            disabled={loading}
-            className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-xs text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white disabled:opacity-40"
+            onClick={handleRetryAutoRegen}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-2 py-0.5 text-[11px] text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.14)]"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            </svg>
-            {loading ? "Regenerating\u2026" : "Regenerate"}
+            Refresh failed — retry
           </button>
-        </div>
+        ) : null}
       </div>
-      {staleLabel && (
-        <div className="px-5 pt-2 sm:hidden">
-          <p className="text-[11px] text-warning">{staleLabel}</p>
-        </div>
-      )}
 
       <div className="divide-y divide-[hsl(var(--border))]">
         {/* Part 1: Purpose Statement */}

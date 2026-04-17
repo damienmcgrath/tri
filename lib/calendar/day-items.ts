@@ -18,6 +18,7 @@ type CalendarSessionRecord = {
   execution_result?: { status?: ExecutionResultState | null; summary?: string | null } | null;
   duration_minutes: number | null;
   notes: string | null;
+  target?: string | null;
   created_at: string;
   status?: SessionLifecycleState;
   is_key?: boolean | null;
@@ -64,6 +65,7 @@ export type CalendarDisplayItem = {
   executionResult: { status?: ExecutionResultState | null; summary?: string | null } | null;
   duration: number;
   notes: string | null;
+  target: string | null;
   created_at: string;
   status: SessionLifecycleState;
   linkedActivityCount: number;
@@ -219,6 +221,7 @@ export function buildCalendarDisplayItems(input: {
       executionResult: normalizedSession.executionResult,
       duration: normalizedSession.durationMinutes,
       notes: session.notes,
+      target: session.target ?? null,
       created_at: session.created_at,
       status: linked.length > 0 ? "completed" : fallbackStatus(session, completionLedger),
       linkedActivityCount: linked.length,
@@ -247,6 +250,7 @@ export function buildCalendarDisplayItems(input: {
       executionResult: null,
       duration: item.duration_min,
       notes: null,
+      target: null,
       created_at: item.created_at,
       status: "unmatched_upload",
       linkedActivityCount: 1,

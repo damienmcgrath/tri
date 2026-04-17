@@ -528,11 +528,17 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // Training block context from verdict (e.g. "Week 8 of an 8-week Build block, 61 days to Warsaw 70.3")
   const blockContext = existingVerdictData?.training_block_context ?? null;
 
-  // Score confidence qualifier for inline display
+  // Score confidence qualifier for inline display.
+  // Prefer a specific, actionable data-gap line when critical evidence is missing;
+  // otherwise suppress generic hedging when the read is confident.
+  const missingCriticalData = reviewVm.componentScores?.missingCriticalData ?? [];
+  const dataCompletenessPct = reviewVm.componentScores?.dataCompletenessPct ?? 1;
   const confidenceQualifier =
-    reviewVm.confidenceLabel === "low" ? "early read"
-    : reviewVm.confidenceLabel === "medium" ? "moderate confidence"
-    : null;
+    missingCriticalData.length > 0
+      ? `${missingCriticalData[0]} missing`
+      : dataCompletenessPct < 0.6 && reviewVm.confidenceLabel === "low"
+        ? "limited evidence"
+        : null;
 
   // Determine the one-thing callout label — don't say "change" when the advice is "keep doing this"
   // Only treat as "keep doing" when the advice STARTS with maintenance language, not when those
@@ -740,12 +746,66 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         )}
       </section>
 
-      {/* ── Section 4: Compared to Previous ── */}
+      {/* ── Section 4: Score Breakdown (visible by default) ── */}
+      {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (
+        <article className="surface p-4 md:p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Score breakdown</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {reviewVm.scoreBand ? (
+                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                  {reviewVm.scoreBand}
+                </span>
+              ) : null}
+              {reviewVm.executionCostLabel ? (
+                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                  Execution cost: {reviewVm.executionCostLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 space-y-3">
+            {[
+              { label: "Intent match", weightLabel: "40%", score: reviewVm.componentScores.intentMatch.score, detail: reviewVm.componentScores.intentMatch.detail },
+              { label: "Pacing & execution", weightLabel: "25%", score: reviewVm.componentScores.pacingExecution.score, detail: reviewVm.componentScores.pacingExecution.detail },
+              { label: "Completion", weightLabel: "20%", score: reviewVm.componentScores.completion.score, detail: reviewVm.componentScores.completion.detail },
+              { label: "Recovery compliance", weightLabel: "15%", score: reviewVm.componentScores.recoveryCompliance.score, detail: reviewVm.componentScores.recoveryCompliance.detail }
+            ].map((component) => {
+              const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
+                : component.score >= 60 ? "bg-[hsl(var(--warning))]"
+                : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
+                : "bg-[hsl(var(--signal-risk))]";
+              return (
+                <div key={component.label}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-white">{component.label}</span>
+                      <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{component.weightLabel}</span>
+                    </div>
+                    <span className="text-xs font-mono font-medium text-white">{component.score}</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${component.score}%` }} />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted">{component.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+          {missingCriticalData.length > 0 ? (
+            <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+              {missingCriticalData[0]} missing — pair the right sensor next time to unlock a confirmed read.
+            </p>
+          ) : null}
+        </article>
+      ) : null}
+
+      {/* ── Section 5: Compared to Previous ── */}
       {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} sport={session.sport} /> : null}
 
-      {/* ── Section 5: Details + Follow-up (progressive disclosure) ── */}
+      {/* ── Section 6: Details + Follow-up (progressive disclosure) ── */}
 
-      {reviewVm.uncertaintyDetail ? (
+      {reviewVm.uncertaintyDetail && dataCompletenessPct < 0.6 ? (
         <DetailsAccordion title="Data confidence" summaryDetail={
           <span className="text-[11px] text-muted">{reviewVm.uncertaintyTitle ?? "Limited data"}</span>
         }>
@@ -753,68 +813,6 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           {reviewVm.missingEvidence.length > 0 ? (
             <p className="mt-2 text-sm text-muted">Missing: {reviewVm.missingEvidence.join(", ")}.</p>
           ) : null}
-        </DetailsAccordion>
-      ) : null}
-
-      {reviewVm.isReviewable && reviewVm.score !== null ? (
-        <DetailsAccordion
-          title="How is this scored?"
-          summaryDetail={
-            <span className="rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.08)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-accent)]">
-              {reviewVm.score}/100
-            </span>
-          }
-        >
-          <div className="space-y-3">
-            {reviewVm.componentScores ? (
-              <div className="space-y-3">
-                {[
-                  { label: "Intent match", weightLabel: "40%", score: reviewVm.componentScores.intentMatch.score, detail: reviewVm.componentScores.intentMatch.detail },
-                  { label: "Pacing & execution", weightLabel: "25%", score: reviewVm.componentScores.pacingExecution.score, detail: reviewVm.componentScores.pacingExecution.detail },
-                  { label: "Completion", weightLabel: "20%", score: reviewVm.componentScores.completion.score, detail: reviewVm.componentScores.completion.detail },
-                  { label: "Recovery compliance", weightLabel: "15%", score: reviewVm.componentScores.recoveryCompliance.score, detail: reviewVm.componentScores.recoveryCompliance.detail }
-                ].map((component) => {
-                  const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
-                    : component.score >= 60 ? "bg-[hsl(var(--warning))]"
-                    : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
-                    : "bg-[hsl(var(--signal-risk))]";
-                  return (
-                    <div key={component.label}>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-white">{component.label}</span>
-                          <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{component.weightLabel}</span>
-                        </div>
-                        <span className="text-xs font-mono font-medium text-white">{component.score}</span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${component.score}%` }} />
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted">{component.detail}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted">
-                Execution scores compare what actually happened against what was planned —
-                across duration, intensity, intent alignment, and consistency. A higher score means the
-                session delivered the intended training stimulus.
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {reviewVm.scoreBand ? (
-                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
-                  Band: {reviewVm.scoreBand}
-                </span>
-              ) : null}
-              {reviewVm.executionCostLabel ? (
-                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-muted">
-                  Execution cost: {reviewVm.executionCostLabel}
-                </span>
-              ) : null}
-            </div>
-          </div>
         </DetailsAccordion>
       ) : null}
 

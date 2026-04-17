@@ -62,6 +62,8 @@ export type ComponentScores = {
   completion: ComponentScore;
   recoveryCompliance: ComponentScore;
   composite: number;
+  dataCompletenessPct: number;
+  missingCriticalData: string[];
 };
 
 export type SessionDiagnosis = {
@@ -446,7 +448,74 @@ function getNextAction(status: IntentMatchStatus, issues: IssueKey[], bucket: In
   return "Use this result as feedback and aim for tighter control against the planned intent next time.";
 }
 
-function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket): ComponentScore {
+type DataCompleteness = {
+  pct: number;
+  missingCritical: string[];
+};
+
+function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBucket): DataCompleteness {
+  const actual = input.actual;
+  const planned = input.planned;
+  const sport = planned.sport ?? "other";
+
+  const hasHr = Boolean((actual.avgHr ?? getMetric(actual, "avg_hr")) && planned.targetBands?.hr);
+  const hasPower = Boolean((actual.avgIntervalPower ?? actual.avgPower ?? getMetric(actual, "avg_power")) && planned.targetBands?.power);
+  const hasPace = Boolean((actual.avgPaceSPerKm ?? getMetric(actual, "avg_pace_s_per_km")) && planned.targetBands?.pace);
+  const hasTimeAbove = typeof actual.timeAboveTargetPct === "number";
+  const hasIntervals = typeof actual.intervalCompletionPct === "number" || Boolean(actual.completedIntervals && planned.plannedIntervals);
+  const hasDuration = Boolean(actual.durationSec && planned.plannedDurationSec);
+  const hasSplits = Boolean(actual.splitMetrics?.firstHalfAvgHr || actual.splitMetrics?.firstHalfPaceSPerKm || actual.splitMetrics?.firstHalfAvgPower);
+
+  const critical: Array<{ key: string; present: boolean; label: string }> = [];
+
+  const runIntensityPresent = hasHr || hasPower || hasPace || hasTimeAbove;
+  const runIntensityLabel = planned.targetBands?.pace ? "HR or pace data" : "HR data";
+  switch (bucket) {
+    case "easy_endurance":
+    case "recovery":
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? runIntensityPresent : hasHr || hasPower || hasTimeAbove,
+        label: sport === "bike" ? "HR or power" : sport === "run" ? runIntensityLabel : "HR data"
+      });
+      critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
+      break;
+    case "threshold_quality":
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
+      });
+      critical.push({ key: "completion", present: hasIntervals || hasDuration, label: "interval or duration completion" });
+      break;
+    case "long_endurance":
+      critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
+      critical.push({
+        key: "intensity",
+        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
+      });
+      critical.push({ key: "splits", present: hasSplits, label: "split metrics (HR drift or pace fade)" });
+      break;
+    case "swim_strength":
+      critical.push({ key: "completion", present: hasIntervals || hasDuration, label: "interval or duration completion" });
+      break;
+    case "unknown":
+      critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
+      break;
+  }
+
+  const hasSport = critical.length > 0;
+  if (!hasSport) return { pct: 1, missingCritical: [] };
+
+  const presentCount = critical.filter((c) => c.present).length;
+  const pct = presentCount / critical.length;
+  const missingCritical = critical.filter((c) => !c.present).map((c) => c.label);
+
+  return { pct, missingCritical };
+}
+
+function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket, completeness: DataCompleteness): ComponentScore {
   const weight = 0.40;
   let score: number;
   let detail: string;
@@ -467,6 +536,17 @@ function computeIntentMatchScore(draft: DiagnosisDraft, bucket: IntentBucket): C
   if (bucket === "recovery" && draft.issues.includes("too_hard")) {
     score = Math.min(score, 40);
     detail = "Recovery intent was compromised by excessive intensity.";
+  }
+
+  // Data-completeness penalty: when critical evidence is missing, "matched_intent"
+  // reflects the absence of detected issues rather than confirmed success. Cap Intent
+  // Match so composite reflects that uncertainty.
+  if (completeness.missingCritical.length > 0 && draft.status === "matched_intent") {
+    const cap = completeness.pct < 0.5 ? 65 : 78;
+    if (score > cap) {
+      score = cap;
+      detail = `${completeness.missingCritical[0]} missing — cannot confirm intent match without it.`;
+    }
   }
 
   return { score: Math.round(Math.max(0, Math.min(100, score))), weight, detail };
@@ -590,7 +670,8 @@ function computeRecoveryComplianceScore(input: SessionDiagnosisInput, bucket: In
 function computeComponentScores(input: SessionDiagnosisInput, draft: DiagnosisDraft, bucket: IntentBucket): ComponentScores | null {
   if (draft.evidenceCount === 0) return null;
 
-  const intentMatch = computeIntentMatchScore(draft, bucket);
+  const completeness = computeDataCompleteness(input, bucket);
+  const intentMatch = computeIntentMatchScore(draft, bucket, completeness);
   const pacingExecution = computePacingExecutionScore(input, draft);
   const completion = computeCompletionScore(input, draft);
   const recoveryCompliance = computeRecoveryComplianceScore(input, bucket);
@@ -602,7 +683,15 @@ function computeComponentScores(input: SessionDiagnosisInput, draft: DiagnosisDr
     recoveryCompliance.score * recoveryCompliance.weight
   );
 
-  return { intentMatch, pacingExecution, completion, recoveryCompliance, composite };
+  return {
+    intentMatch,
+    pacingExecution,
+    completion,
+    recoveryCompliance,
+    composite,
+    dataCompletenessPct: completeness.pct,
+    missingCriticalData: completeness.missingCritical
+  };
 }
 
 export function diagnoseCompletedSession(input: SessionDiagnosisInput): SessionDiagnosis {

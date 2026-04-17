@@ -59,12 +59,37 @@ type RankedSession = SessionDiagnosis & {
   themes: DiagnosisTheme[];
 };
 
-const defaultAssistantMessage: Message = {
-  id: "coach-default",
-  role: "assistant",
-  content:
-    "I can use execution scores and intent-match review to explain what happened in completed sessions, then help you decide exactly what to adjust next."
-};
+function buildOpeningMessage(
+  briefing: CoachBriefingContext,
+  diagnoses: SessionDiagnosis[]
+): Message {
+  const reviewed = briefing.reviewedSessionCount;
+  const onTarget = diagnoses.filter((d) => d.executionScoreBand === "On target").length;
+  const partial = diagnoses.filter((d) => d.executionScoreBand === "Partial match").length;
+  const missed = diagnoses.filter((d) => d.executionScoreBand === "Missed intent").length;
+  const latest = diagnoses[0];
+  const latestName = latest?.sessionName ?? null;
+  const nextKey = briefing.upcomingKeySessionNames?.[0] ?? null;
+
+  let content: string;
+  if (reviewed === 0 && briefing.uploadedSessionCount === 0) {
+    content = nextKey
+      ? `No sessions reviewed yet — once you upload activity data I can dig into execution. Want to talk through ${nextKey} in the meantime?`
+      : "No sessions reviewed yet. Upload an activity or link one to a planned session and I'll break down the execution.";
+  } else if (missed >= 2) {
+    content = `${missed} sessions came in below target recently${latestName ? `, most recently ${latestName}` : ""}. Want to look at what's driving that before we plan the next one?`;
+  } else if (partial >= 1 && missed === 0) {
+    content = `Mostly on track — ${onTarget} on target, ${partial} partial${latestName ? ` (latest: ${latestName})` : ""}. Anything about the partial sessions that felt off to you?`;
+  } else if (onTarget >= 3 && missed === 0) {
+    content = `You're stacking clean sessions — ${onTarget} on target and nothing missed. Before we talk about next week, is there anything that felt off?`;
+  } else if (latestName) {
+    content = `I've got ${reviewed} reviewed session${reviewed === 1 ? "" : "s"} in the picture, most recently ${latestName}. What do you want to dig into?`;
+  } else {
+    content = "I can use execution scores and intent-match review to explain what happened in completed sessions, then help you decide exactly what to adjust next.";
+  }
+
+  return { id: "coach-default", role: "assistant", content };
+}
 
 function createMessageId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -359,7 +384,22 @@ export function CoachChat({
   showBriefingPanel?: boolean;
 }) {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([defaultAssistantMessage]);
+  const openingMessage = useMemo(
+    () => buildOpeningMessage(briefingContext, diagnosisSessions),
+    [briefingContext, diagnosisSessions]
+  );
+  const [messages, setMessages] = useState<Message[]>([openingMessage]);
+
+  // When the review-backfill effect triggers router.refresh(), props update but the
+  // opening message in state goes stale. Replace it as long as the user hasn't
+  // started a conversation yet (only the opening message is present).
+  useEffect(() => {
+    setMessages((current) => {
+      if (current.length !== 1 || current[0].role !== "assistant") return current;
+      if (current[0].content === openingMessage.content) return current;
+      return [openingMessage];
+    });
+  }, [openingMessage]);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -592,7 +632,7 @@ export function CoachChat({
       }
 
       setConversationId(nextConversationId);
-      setMessages(data.messages?.length ? data.messages : [defaultAssistantMessage]);
+      setMessages(data.messages?.length ? data.messages : [openingMessage]);
     } catch (conversationError) {
       setError(conversationError instanceof Error ? conversationError.message : "Failed to load conversation.");
     }
@@ -601,7 +641,7 @@ export function CoachChat({
   function handleNewChat() {
     activeRequestRef.current?.abort();
     setConversationId(null);
-    setMessages([defaultAssistantMessage]);
+    setMessages([openingMessage]);
     setSummary(null);
     setError(null);
     setPendingMessageId(null);

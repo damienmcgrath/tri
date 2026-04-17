@@ -24,6 +24,7 @@ type Session = {
   execution_result?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null; executionScore?: number | null; execution_score?: number | null; executionScoreBand?: string | null; execution_score_band?: string | null; executionScoreSummary?: string | null; recommendedNextAction?: string | null; recommended_next_action?: string | null; executionScoreProvisional?: boolean | null; execution_score_provisional?: boolean | null } | null;
   duration_minutes: number | null;
   notes: string | null;
+  target?: string | null;
   created_at: string;
   status?: SessionLifecycleState;
   is_key?: boolean | null;
@@ -117,7 +118,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   {
     const query = await supabase
       .from("sessions")
-      .select("id,date,sport,type,session_name,discipline,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,created_at,status,is_key")
+      .select("id,date,sport,type,session_name,discipline,subtype,workout_type,duration_minutes,intent_category,session_role,source_metadata,execution_result,notes,target,created_at,status,is_key")
       .eq("user_id", user.id)
       .gte("date", weekStart)
       .lt("date", weekEnd)
@@ -309,15 +310,23 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .maybeSingle();
 
     if (weekRow?.training_block_id) {
-      const { data: block } = await supabase
-        .from("training_blocks")
-        .select("block_type,emphasis")
-        .eq("id", weekRow.training_block_id)
-        .maybeSingle();
+      const [{ data: block }, { count: blockWeekCount }] = await Promise.all([
+        supabase
+          .from("training_blocks")
+          .select("block_type,emphasis")
+          .eq("id", weekRow.training_block_id)
+          .maybeSingle(),
+        supabase
+          .from("training_weeks")
+          .select("id", { count: "exact", head: true })
+          .eq("training_block_id", weekRow.training_block_id)
+      ]);
 
       if (block) {
         const weekNum = (weekRow.week_index ?? 0) + 1;
-        blockContextLine = `Week ${weekNum} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
+        const totalWeeks = typeof blockWeekCount === "number" && blockWeekCount > 0 ? blockWeekCount : null;
+        const weekLabel = totalWeeks ? `Week ${weekNum} of ${totalWeeks}` : `Week ${weekNum}`;
+        blockContextLine = `${weekLabel} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
       }
     }
   }

@@ -271,4 +271,95 @@ describe("diagnoseCompletedSession", () => {
     // 245 > 220*1.06 = 233.2 → should flag over_target
     expect(diagnosis.detectedIssues).toContain("over_target");
   });
+
+  test("caps intent match when critical sensor data is missing (bike ride without HR)", () => {
+    // Bike easy ride with duration completion but NO HR (strap missing) and NO power meter.
+    // Has target HR range defined, but no actual HR to compare. Only duration + pace signals.
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Easy Z2 spin",
+        plannedDurationSec: 3600,
+        targetBands: { hr: { max: 145 } }
+      },
+      actual: {
+        durationSec: 3600,
+        timeAboveTargetPct: 0.05
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    // timeAboveTargetPct covers intensity for easy_endurance, so HR alone isn't the only signal.
+    // Full critical coverage for easy_endurance needs intensity + duration — both present here.
+    expect(cs.dataCompletenessPct).toBe(1);
+  });
+
+  test("caps intent match for long endurance without split metrics or intensity", () => {
+    // Long endurance needs duration + intensity + splits. Only duration present here.
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Long endurance ride",
+        plannedDurationSec: 10800
+      },
+      actual: {
+        durationSec: 10500,
+        timeAboveTargetPct: 0.05
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData.length).toBeGreaterThan(0);
+    expect(cs.dataCompletenessPct).toBeLessThan(1);
+    expect(cs.intentMatch.score).toBeLessThanOrEqual(78);
+    // Composite should reflect the incompleteness — can't hit 90+ without the critical evidence.
+    expect(cs.composite).toBeLessThan(90);
+  });
+
+  test("threshold run with pace-only target is not flagged as missing intensity", () => {
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "run",
+        intentCategory: "Threshold intervals",
+        plannedDurationSec: 3000,
+        plannedIntervals: 3,
+        targetBands: { pace: { min: 240, max: 255 } }
+      },
+      actual: {
+        durationSec: 3000,
+        avgPaceSPerKm: 248,
+        completedIntervals: 3
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData).not.toContain("HR data");
+    expect(cs.missingCriticalData).toEqual([]);
+    expect(cs.intentMatch.score).toBeGreaterThanOrEqual(90);
+  });
+
+  test("full-telemetry easy run keeps intent match high and has no missing critical data", () => {
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "run",
+        intentCategory: "Easy Z2 run",
+        plannedDurationSec: 3600,
+        targetBands: { hr: { max: 145 } }
+      },
+      actual: {
+        durationSec: 3600,
+        avgHr: 140,
+        timeAboveTargetPct: 0.02
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData).toEqual([]);
+    expect(cs.dataCompletenessPct).toBe(1);
+    expect(cs.intentMatch.score).toBeGreaterThanOrEqual(90);
+  });
 });
