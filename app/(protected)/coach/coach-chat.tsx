@@ -866,6 +866,62 @@ export function CoachChat({
     void streamAssistantReply(retryText);
   }
 
+  const renderConversationItem = (conversation: Conversation) => {
+    const isActive = conversation.id === conversationId;
+    const idx = conversations.indexOf(conversation);
+    return (
+      <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
+        <div className="flex items-start justify-between gap-1">
+          <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
+            <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
+              {conversationTitle(conversation, idx)}
+            </p>
+            <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
+          </button>
+          <details className="relative">
+            <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-white">⋯</summary>
+            <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
+              <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
+              <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
+            </div>
+          </details>
+        </div>
+      </div>
+    );
+  };
+
+  const historyGroups = (
+    <>
+      {memoizedGroups.thisWeek.length > 0 ? (
+        <div>
+          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">This week</p>
+          <div className="space-y-1">{memoizedGroups.thisWeek.slice(0, 5).map(renderConversationItem)}</div>
+        </div>
+      ) : null}
+      {memoizedGroups.lastWeek.length > 0 ? (
+        <div>
+          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">Last week</p>
+          <div className="space-y-1">{memoizedGroups.lastWeek.slice(0, 3).map(renderConversationItem)}</div>
+        </div>
+      ) : null}
+      {memoizedGroups.older.length > 0 ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowOlderConversations((prev) => !prev)}
+            className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
+          >
+            <span>Older</span>
+            <span className="rounded-full border border-[rgba(255,255,255,0.12)] px-1.5 py-0.5 text-[9px]">{memoizedGroups.older.length}</span>
+          </button>
+          {showOlderConversations ? (
+            <div className="space-y-1">{memoizedGroups.older.map(renderConversationItem)}</div>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="space-y-4">
       {showBriefingPanel ? (
@@ -948,86 +1004,40 @@ export function CoachChat({
       ) : null}
 
       <section id="coaching-chat" className="surface overflow-hidden">
-        <div className="grid h-[68vh] min-h-[560px] max-h-[780px] lg:grid-cols-[248px_1fr]">
-          <aside className="flex min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5">
+        <div className="flex min-h-[420px] h-[calc(100dvh-213px)] max-h-[780px] flex-col lg:grid lg:h-[68vh] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
+          <aside className="hidden min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5 lg:flex">
             <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
               New conversation
             </button>
             <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {(() => {
-                const groups = memoizedGroups;
-                const allIndex = conversations.slice();
-
-                function renderConversation(conversation: Conversation) {
-                  const isActive = conversation.id === conversationId;
-                  const idx = allIndex.indexOf(conversation);
-                  return (
-                    <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
-                      <div className="flex items-start justify-between gap-1">
-                        <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-                          <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
-                            {conversationTitle(conversation, idx)}
-                          </p>
-                          <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
-                        </button>
-                        <details className="relative">
-                          <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-white">⋯</summary>
-                          <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
-                            <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
-                            <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
-                          </div>
-                        </details>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <>
-                    {groups.thisWeek.length > 0 ? (
-                      <div>
-                        <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">This week</p>
-                        <div className="space-y-1">{groups.thisWeek.slice(0, 5).map(renderConversation)}</div>
-                      </div>
-                    ) : null}
-                    {groups.lastWeek.length > 0 ? (
-                      <div>
-                        <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">Last week</p>
-                        <div className="space-y-1">{groups.lastWeek.slice(0, 3).map(renderConversation)}</div>
-                      </div>
-                    ) : null}
-                    {groups.older.length > 0 ? (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setShowOlderConversations((prev) => !prev)}
-                          className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
-                        >
-                          <span>Older</span>
-                          <span className="rounded-full border border-[rgba(255,255,255,0.12)] px-1.5 py-0.5 text-[9px]">{groups.older.length}</span>
-                        </button>
-                        {showOlderConversations ? (
-                          <div className="space-y-1">{groups.older.map(renderConversation)}</div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </>
-                );
-              })()}
+              {historyGroups}
             </div>
           </aside>
 
-          <div className="flex min-h-0 flex-col">
-            <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-2.5">
+          <details className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] lg:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2 text-sm">
+              <span className="font-medium text-white">History</span>
+              <span className="text-xs text-tertiary">{conversations.length}</span>
+            </summary>
+            <div className="max-h-[40vh] space-y-3 overflow-y-auto p-2.5">
+              <button type="button" onClick={handleNewChat} className="w-full rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
+                New conversation
+              </button>
+              {historyGroups}
+            </div>
+          </details>
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="border-b border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--surface-1))] to-[hsl(var(--surface-2))] px-4 py-2 sm:py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="label">Active conversation</p>
-                  <h3 className="mt-0.5 text-base font-semibold">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
-                  <p className="mt-0.5 text-sm text-muted">{dataRecency}</p>
+                <div className="min-w-0">
+                  <p className="label hidden sm:block">Active conversation</p>
+                  <h3 className="truncate text-sm font-semibold sm:mt-0.5 sm:text-base">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
+                  <p className="text-[11px] text-muted sm:mt-0.5 sm:text-sm">{dataRecency}</p>
                 </div>
               </div>
             </div>
-            <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2">
+            <div className="hidden border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2 sm:block">
               <p className="text-xs text-[hsl(var(--text-secondary))]">
                 {sessionDiagnoses.length > 0
                   ? `${sessionDiagnoses.length} reviewed this week${flaggedSessions.length > 0 ? ` · ${flaggedSessions.length} needing attention` : ""}. Focus: ${nextActions[0] ?? "Stabilise execution quality."}`
@@ -1082,17 +1092,17 @@ export function CoachChat({
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-4 py-2.5">
+            <form onSubmit={handleSubmit} className="sticky bottom-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-4 py-2.5 pb-[max(10px,env(safe-area-inset-bottom))] sm:pb-2.5">
               <label htmlFor="coach-input" className="sr-only">
                 Ask your triathlon coach
               </label>
-              <div className="mb-1.5 flex flex-wrap gap-1">
+              <div className="-mx-4 mb-1.5 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
                 {quickPrompts.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setInput(prompt)}
-                    className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1 text-[12px] font-medium text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
+                    className="shrink-0 whitespace-nowrap rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1 text-[12px] font-medium text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
                   >
                     {prompt}
                   </button>
@@ -1104,15 +1114,17 @@ export function CoachChat({
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder="Ask how to execute better and what to adjust next..."
-                  className="w-full rounded-md border border-[rgba(255,255,255,0.08)] bg-[#18181C] px-3 py-2 text-[rgba(255,255,255,0.8)] placeholder:text-[rgba(255,255,255,0.25)] focus:border-[rgba(190,255,0,0.30)]"
+                  className="w-full min-w-0 rounded-md border border-[rgba(255,255,255,0.08)] bg-[#18181C] px-3 py-2 text-[rgba(255,255,255,0.8)] placeholder:text-[rgba(255,255,255,0.25)] focus:border-[rgba(190,255,0,0.30)]"
                   disabled={isLoading}
                 />
-                <button type="submit" disabled={isLoading} className="btn-primary disabled:opacity-70">
-                  Send
+                <button type="submit" disabled={isLoading} aria-label="Send" className="btn-primary inline-flex shrink-0 items-center justify-center px-3 disabled:opacity-70 sm:px-4">
+                  <span className="hidden sm:inline">Send</span>
+                  <svg className="sm:hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
                 </button>
                 {isLoading ? (
-                  <button type="button" onClick={handleStopStreaming} className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-white">
-                    Stop
+                  <button type="button" onClick={handleStopStreaming} aria-label="Stop" className="inline-flex shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-white">
+                    <span className="hidden sm:inline">Stop</span>
+                    <svg className="sm:hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
                   </button>
                 ) : null}
               </div>
