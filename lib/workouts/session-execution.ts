@@ -486,6 +486,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
   return toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,
+    componentScores: diagnosis.componentScores,
     narrativeSource: "fallback",
     verdict: {
       sessionVerdict: {
@@ -566,7 +567,7 @@ export async function syncSessionExecutionFromActivityLink(args: {
   } catch {
     athleteContext = null;
   }
-  const { evidence } = buildExecutionEvidence({
+  const { diagnosis, evidence } = buildExecutionEvidence({
     athleteId: session.athlete_id ?? args.userId,
     sessionId: session.id,
     sessionTitle: session.session_name ?? session.type,
@@ -583,6 +584,7 @@ export async function syncSessionExecutionFromActivityLink(args: {
   const executionResult = toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,
+    componentScores: diagnosis.componentScores,
     verdict: generated.verdict,
     narrativeSource: generated.source
   });
@@ -863,7 +865,7 @@ export async function syncExtraActivityExecution(args: {
   }
 
   const intentSource = args.intentOverride ? "User override" : "Inferred intent";
-  const { evidence } = buildExecutionEvidence({
+  const { diagnosis, evidence } = buildExecutionEvidence({
     athleteId: args.userId,
     sessionId: syntheticSession.id,
     sessionTitle: "Extra workout",
@@ -877,6 +879,7 @@ export async function syncExtraActivityExecution(args: {
   const executionResult = toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,
+    componentScores: diagnosis.componentScores,
     verdict: generated.verdict,
     narrativeSource: generated.source
   });

@@ -30,6 +30,7 @@ type CalendarSession = {
   executionResult?: { status?: "matched_intent" | "partial_intent" | "missed_intent" | null; summary?: string | null; executionScore?: number | null; execution_score?: number | null; executionScoreBand?: string | null; execution_score_band?: string | null; executionScoreSummary?: string | null; recommendedNextAction?: string | null; recommended_next_action?: string | null; executionScoreProvisional?: boolean | null; execution_score_provisional?: boolean | null } | null;
   duration: number;
   notes: string | null;
+  target?: string | null;
   created_at: string;
   status: SessionStatus;
   linkedActivityCount?: number;
@@ -143,20 +144,26 @@ const TARGET_PACE_PATTERN = /(\d{1,2}):([0-5]\d)\s*(?:\/km|\/mi|per\s*km|per\s*m
 const TARGET_POWER_PATTERN = /(\d{2,4})\s*[-\u2013]\s*(\d{2,4})\s*W\b/i;
 
 function extractTargetLine(session: CalendarSession): string | null {
-  const notes = session.notes ?? "";
-  if (!notes) return null;
+  const source = `${session.target ?? ""} ${session.notes ?? ""}`.trim();
+  if (!source) return null;
   const sport = (session.sport ?? "").toLowerCase();
   if (sport === "bike") {
-    const power = notes.match(TARGET_POWER_PATTERN);
+    const power = source.match(TARGET_POWER_PATTERN);
     if (power) return `${power[1]}–${power[2]} W`;
+    const ftp = source.match(/(\d{1,3})\s*[-\u2013]\s*(\d{1,3})\s*%\s*FTP/i);
+    if (ftp) return `${ftp[1]}–${ftp[2]}% FTP`;
   }
   if (sport === "run") {
-    const pace = notes.match(TARGET_PACE_PATTERN);
+    const pace = source.match(TARGET_PACE_PATTERN);
     if (pace) return `${Number(pace[1])}:${pace[2]}/km`;
   }
-  const hrRange = notes.match(TARGET_HR_PATTERN);
+  if (sport === "swim") {
+    const distance = source.match(/(\d{2,4})\s*m\b/i);
+    if (distance) return `${distance[1]} m`;
+  }
+  const hrRange = source.match(TARGET_HR_PATTERN);
   if (hrRange) return `HR ${hrRange[1]}–${hrRange[2]}`;
-  const hrCap = notes.match(TARGET_HR_CAP_PATTERN);
+  const hrCap = source.match(TARGET_HR_CAP_PATTERN);
   if (hrCap) return `HR ≤ ${hrCap[1]}`;
   return null;
 }

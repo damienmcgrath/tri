@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
+import type { ComponentScores } from "@/lib/coach/session-diagnosis";
 import type {
   ExecutionEvidence,
   CoachVerdict,
@@ -70,6 +71,7 @@ export function toPersistedExecutionReview(args: {
   narrativeSource?: "ai" | "fallback" | "legacy_unknown";
   createdAt?: string;
   updatedAt?: string;
+  componentScores?: ComponentScores | null;
 }): PersistedExecutionReview {
   const createdAt = args.createdAt ?? new Date().toISOString();
   const updatedAt = args.updatedAt ?? createdAt;
@@ -140,7 +142,8 @@ export function toPersistedExecutionReview(args: {
     firstHalfStrokeRate: args.evidence.actual.splitMetrics?.firstHalfStrokeRate ?? null,
     lastHalfStrokeRate: args.evidence.actual.splitMetrics?.lastHalfStrokeRate ?? null,
     executionCost: args.evidence.rulesSummary.executionCost,
-    missingEvidence: args.evidence.missingEvidence
+    missingEvidence: args.evidence.missingEvidence,
+    componentScores: args.componentScores ?? null
   };
 }
 

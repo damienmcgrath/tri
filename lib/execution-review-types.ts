@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Sport } from "@/lib/coach/session-diagnosis";
+import type { ComponentScores, Sport } from "@/lib/coach/session-diagnosis";
 
 export type ExecutionEvidence = {
   sessionId: string;
@@ -255,6 +255,7 @@ export type PersistedExecutionReview = {
   lastHalfStrokeRate?: number | null;
   executionCost: "low" | "moderate" | "high" | "unknown";
   missingEvidence: string[];
+  componentScores?: ComponentScores | null;
 };
 
 export const coachVerdictSchema = z.object({
