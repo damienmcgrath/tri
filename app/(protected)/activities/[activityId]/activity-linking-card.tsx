@@ -75,16 +75,18 @@ export function ActivityLinkingCard({
               </ul>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                className="btn-primary text-xs"
-                disabled={pending || !selectedSessionId}
-                onClick={() => startTransition(async () => {
-                  const result = await linkActivityAction(activityId, selectedSessionId);
-                  if (result?.error) setMessage(result.error);
-                })}
-              >
-                Link activity
-              </button>
+              {candidates.length > 0 && (
+                <button
+                  className="btn-primary text-xs"
+                  disabled={pending || !selectedSessionId}
+                  onClick={() => startTransition(async () => {
+                    const result = await linkActivityAction(activityId, selectedSessionId);
+                    if (result?.error) setMessage(result.error);
+                  })}
+                >
+                  Link activity
+                </button>
+              )}
               <button className="btn-secondary text-xs" disabled={pending} onClick={() => startTransition(async () => void markUnplannedAction(activityId))}>This wasn&apos;t planned</button>
             </div>
             {isUnplanned ? <p className="mt-2 text-xs text-muted">Marked as intentionally unplanned.</p> : null}
