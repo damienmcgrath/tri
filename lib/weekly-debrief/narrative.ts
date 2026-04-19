@@ -1,4 +1,5 @@
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
+import { zodTextFormat } from "openai/helpers/zod";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import type {
   WeeklyDebriefFacts,
@@ -46,6 +47,13 @@ export async function generateNarrative(args: {
         "\n" +
         "Voice variance: avoid opening phrasings you have used in prior weeks (if recentFeedback or prior headlines are visible in the context, do not reuse them). Each week should sound distinct." +
         calibrationNote,
+      reasoning: { effort: "low" },
+      max_output_tokens: 4000,
+      text: {
+        format: zodTextFormat(weeklyDebriefNarrativeSchema, "weekly_debrief_narrative", {
+          description: "Structured weekly debrief narrative."
+        })
+      },
       input: [
         {
           role: "user" as const,

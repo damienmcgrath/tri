@@ -35,11 +35,19 @@ export async function postSessionSyncSideEffects(args: {
   activityId: string;
   /** ISO date (YYYY-MM-DD) of the session, used to determine which week's debrief to refresh. */
   sessionDate?: string | null;
+  /**
+   * When true, skip the weekly debrief refresh. Use this from batch callers
+   * (e.g. refresh-ai-content.ts) that will refresh debriefs once per week
+   * separately, instead of N times per session.
+   */
+  skipDebriefRefresh?: boolean;
 }): Promise<void> {
   const effects: Promise<void>[] = [
     generateVerdictChain(args.supabase, args.userId, args.sessionId),
-    refreshDebriefForSession(args.supabase, args.userId, args.sessionDate ?? null),
   ];
+  if (!args.skipDebriefRefresh) {
+    effects.push(refreshDebriefForSession(args.supabase, args.userId, args.sessionDate ?? null));
+  }
 
   await Promise.allSettled(effects);
 }
