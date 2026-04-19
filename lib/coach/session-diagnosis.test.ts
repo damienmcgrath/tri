@@ -368,6 +368,56 @@ describe("diagnoseCompletedSession", () => {
     expect(cs.intentMatch.score).toBeGreaterThanOrEqual(85);
   });
 
+  test("HR-targeted threshold bike with power-only telemetry still flags missing intensity", () => {
+    // Plan specifies HR targets but the activity only has power (no HR strap).
+    // The scorer can't evaluate HR compliance from power alone, so intensity
+    // should remain flagged as missing and the score should be capped.
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Threshold intervals",
+        plannedDurationSec: 3600,
+        plannedIntervals: 4,
+        targetBands: { hr: { min: 155, max: 170 } }
+      },
+      actual: {
+        durationSec: 3600,
+        avgPower: 250,
+        completedIntervals: 4
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData.length).toBeGreaterThan(0);
+    expect(cs.dataCompletenessPct).toBeLessThan(1);
+    expect(cs.composite).toBeLessThan(90);
+  });
+
+  test("no target bands with HR data does not falsely report HR missing", () => {
+    // Plan has no explicit target bands (e.g. free-text session description
+    // without "140-150 bpm"). The activity recorded HR via Strava. The UI
+    // should NOT say "HR data missing — pair the right sensor".
+    const diagnosis = diagnoseCompletedSession({
+      planned: {
+        sport: "bike",
+        intentCategory: "Easy Z2 spin",
+        plannedDurationSec: 3600,
+        targetBands: null
+      },
+      actual: {
+        durationSec: 3500,
+        avgHr: 138,
+        splitMetrics: { firstHalfAvgHr: 136, lastHalfAvgHr: 140 }
+      }
+    });
+
+    expect(diagnosis.componentScores).not.toBeNull();
+    const cs = diagnosis.componentScores!;
+    expect(cs.missingCriticalData).not.toContain("HR data");
+    expect(cs.missingCriticalData).not.toContain("HR or power");
+  });
+
   test("full-telemetry easy run keeps intent match high and has no missing critical data", () => {
     const diagnosis = diagnoseCompletedSession({
       planned: {
