@@ -506,14 +506,18 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
 
   const critical: Array<{ key: string; present: boolean; label: string }> = [];
 
-  const runIntensityPresent = hasHr || hasPower || hasPace || hasTimeAbove;
+  // For critical data checks, use raw data presence (hasAny*) — not the
+  // target-band-gated versions (hasHr/hasPower/hasPace). The device recorded
+  // the data even if the plan didn't specify target bands to compare against.
+  // Target-band awareness is handled separately by the intent-match scorer.
+  const runIntensityPresent = hasAnyHr || hasAnyPower || hasAnyPace || hasTimeAbove;
   const runIntensityLabel = planned.targetBands?.pace ? "HR or pace data" : "HR data";
   switch (bucket) {
     case "easy_endurance":
     case "recovery":
       critical.push({
         key: "intensity",
-        present: sport === "run" ? runIntensityPresent : hasHr || hasPower || hasTimeAbove,
+        present: sport === "run" ? runIntensityPresent : hasAnyHr || hasAnyPower || hasTimeAbove,
         label: sport === "bike" ? "HR or power" : sport === "run" ? runIntensityLabel : "HR data"
       });
       critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
@@ -521,7 +525,7 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
     case "threshold_quality":
       critical.push({
         key: "intensity",
-        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        present: sport === "run" ? hasAnyHr || hasAnyPower || hasAnyPace : hasAnyHr || hasAnyPower,
         label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
       });
       critical.push({ key: "completion", present: hasIntervals || hasDuration, label: "interval or duration completion" });
@@ -530,7 +534,7 @@ function computeDataCompleteness(input: SessionDiagnosisInput, bucket: IntentBuc
       critical.push({ key: "duration", present: hasDuration, label: "duration tracking" });
       critical.push({
         key: "intensity",
-        present: sport === "run" ? hasHr || hasPower || hasPace : hasHr || hasPower,
+        present: sport === "run" ? hasAnyHr || hasAnyPower || hasAnyPace : hasAnyHr || hasAnyPower,
         label: sport === "bike" ? "power or HR" : sport === "run" ? runIntensityLabel : "HR data"
       });
       critical.push({ key: "splits", present: hasSplits, label: "split metrics (HR drift or pace fade)" });
