@@ -111,6 +111,28 @@ export type SessionVerdictContext = {
   extendedSignals?: ExtendedSignals;
 };
 
+/**
+ * Locate a pre-computed `ExtendedSignals` payload inside a persisted
+ * `sessions.execution_result` blob. `toPersistedExecutionReview` nests the full
+ * evidence under `deterministic`, so that's the canonical path. A top-level
+ * `extendedSignals` key is also accepted for tolerance against hand-written or
+ * forward-ported payloads. Exported so the read path is unit-testable without
+ * a Supabase mock.
+ */
+export function readPersistedExtendedSignals(executionResult: unknown): ExtendedSignals | null {
+  if (!executionResult || typeof executionResult !== "object" || Array.isArray(executionResult)) return null;
+  const record = executionResult as Record<string, unknown>;
+  const deterministic = record.deterministic as Record<string, unknown> | null | undefined;
+  const candidates: unknown[] = [deterministic?.extendedSignals, record.extendedSignals];
+  for (const raw of candidates) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const candidate = raw as Partial<ExtendedSignals>;
+      if (candidate.historicalComparables !== undefined) return candidate as ExtendedSignals;
+    }
+  }
+  return null;
+}
+
 export async function buildSessionVerdictContext(
   supabase: SupabaseClient,
   userId: string,
@@ -247,18 +269,7 @@ export async function buildSessionVerdictContext(
     // Non-critical
   }
 
-  // Pull pre-computed extendedSignals from the persisted execution_result when
-  // the upstream review has already written them. If not present, recompute
-  // from DB so the session verdict still benefits from the new signal layer.
-  const persistedExtended = (() => {
-    const execResult = session.execution_result as Record<string, unknown> | null | undefined;
-    const raw = execResult?.extendedSignals;
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      const candidate = raw as Partial<ExtendedSignals>;
-      if (candidate.historicalComparables !== undefined) return candidate as ExtendedSignals;
-    }
-    return null;
-  })();
+  const persistedExtended = readPersistedExtendedSignals(session.execution_result);
 
   let extendedSignals: ExtendedSignals = persistedExtended ?? EMPTY_EXTENDED_SIGNALS;
   if (!persistedExtended) {

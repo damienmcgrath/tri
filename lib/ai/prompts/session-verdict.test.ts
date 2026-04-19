@@ -3,6 +3,7 @@ import {
   buildVerdictInstructions,
   humanizeExecutionResult,
   humanizeFeel,
+  readPersistedExtendedSignals,
   sanitizeRawFieldNames,
   type SessionVerdictContext
 } from "./session-verdict";
@@ -49,6 +50,55 @@ function makeCtx(overrides: Partial<SessionVerdictContext> = {}): SessionVerdict
     ...overrides
   };
 }
+
+describe("readPersistedExtendedSignals", () => {
+  const SIGNAL_PAYLOAD = {
+    aerobicDecoupling: null,
+    weather: null,
+    historicalComparables: [
+      {
+        sessionId: "prior-1",
+        date: "2026-04-01",
+        title: "Threshold bike",
+        durationMin: 60,
+        avgHr: 148,
+        avgPower: 255,
+        avgPaceSPerKm: null,
+        avgPacePer100mSec: null,
+        intentMatch: "on_target" as const,
+        executionScore: 86,
+        takeaway: "Controlled, repeatable."
+      }
+    ]
+  };
+
+  test("reads signals from the canonical `deterministic.extendedSignals` location written by toPersistedExecutionReview", () => {
+    const executionResult = { deterministic: { extendedSignals: SIGNAL_PAYLOAD } };
+    const result = readPersistedExtendedSignals(executionResult);
+    expect(result).not.toBeNull();
+    expect(result!.historicalComparables).toHaveLength(1);
+    expect(result!.historicalComparables[0].sessionId).toBe("prior-1");
+  });
+
+  test("falls back to top-level `extendedSignals` when deterministic is absent", () => {
+    const executionResult = { extendedSignals: SIGNAL_PAYLOAD };
+    const result = readPersistedExtendedSignals(executionResult);
+    expect(result).not.toBeNull();
+  });
+
+  test("returns null when the payload has no extendedSignals in either location", () => {
+    expect(readPersistedExtendedSignals({ deterministic: {}, someOther: "field" })).toBeNull();
+    expect(readPersistedExtendedSignals(null)).toBeNull();
+    expect(readPersistedExtendedSignals("not an object")).toBeNull();
+  });
+
+  test("rejects malformed signal blobs that lack historicalComparables", () => {
+    const executionResult = {
+      deterministic: { extendedSignals: { aerobicDecoupling: null, weather: null } }
+    };
+    expect(readPersistedExtendedSignals(executionResult)).toBeNull();
+  });
+});
 
 describe("humanizeExecutionResult", () => {
   test("omits execution_score and execution_score_band from output", () => {

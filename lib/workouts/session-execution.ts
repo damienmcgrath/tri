@@ -839,7 +839,7 @@ export async function syncExtraActivityExecution(args: {
 }): Promise<PersistedExecutionReview> {
   const { data: activity, error: activityError } = await args.supabase
     .from("completed_activities")
-    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override")
+    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override,start_time_utc")
     .eq("id", args.activityId)
     .eq("user_id", args.userId)
     .maybeSingle();
@@ -897,6 +897,10 @@ export async function syncExtraActivityExecution(args: {
   });
 
   let extraExtendedSignals: ExtendedSignals = EMPTY_EXTENDED_SIGNALS;
+  // `start_time_utc` MUST be included in the completed_activities select above;
+  // without it `activityStartDate` collapses to null, `buildExtendedSignals`
+  // never runs for extras, and every extra-activity review silently falls back
+  // to the generic "no history" insight.
   const activityStartDate = typeof (activity as unknown as { start_time_utc?: unknown }).start_time_utc === "string"
     ? ((activity as unknown as { start_time_utc: string }).start_time_utc).slice(0, 10)
     : null;

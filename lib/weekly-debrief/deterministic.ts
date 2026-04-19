@@ -310,6 +310,22 @@ function normalizePersistedFacts(rawFacts: unknown): Record<string, unknown> {
   };
 }
 
+/**
+ * Legacy debriefs were saved before `nonObviousInsight` existed on
+ * `weeklyDebriefNarrativeSchema`. Injecting a neutral placeholder keeps the
+ * read-path rendering instead of throwing — the field is required on fresh
+ * generations (prompt + generator) but tolerated on historical reads.
+ */
+const LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER =
+  "No cross-session insight was captured for this debrief (saved before this field existed).";
+
+function ensureNarrativeHasInsight(narrative: unknown): unknown {
+  if (!narrative || typeof narrative !== "object" || Array.isArray(narrative)) return narrative;
+  const record = narrative as Record<string, unknown>;
+  if (typeof record.nonObviousInsight === "string" && record.nonObviousInsight.trim().length > 0) return record;
+  return { ...record, nonObviousInsight: LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER };
+}
+
 export function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiveStatus: "ready" | "stale" | "failed") {
   const normalizedFacts = normalizePersistedFacts(record.facts);
 
@@ -321,7 +337,7 @@ export function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiv
     generatedAt: normalizeTimestamp(record.generated_at),
     generationVersion: record.generation_version,
     facts: normalizedFacts,
-    narrative: record.narrative,
+    narrative: ensureNarrativeHasInsight(record.narrative),
     coachShare: record.coach_share,
     evidence: Array.isArray((normalizedFacts as { evidence?: unknown })?.evidence) ? (normalizedFacts as { evidence: WeeklyDebriefEvidenceItem[] }).evidence : [],
     evidenceGroups: Array.isArray((normalizedFacts as { evidenceGroups?: unknown })?.evidenceGroups) ? (normalizedFacts as { evidenceGroups: WeeklyDebriefEvidenceGroup[] }).evidenceGroups : [],
