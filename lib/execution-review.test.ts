@@ -23,6 +23,7 @@ describe("coerceCoachVerdictPayloadForTest", () => {
         whatToDoNextTime: "Start a touch easier.",
         whatToDoThisWeek: "Keep the next key day controlled."
       },
+      nonObviousInsight: "HR drift of 7% vs. your last three threshold sessions (which held under 3%) points at durability, not top-end power.",
       uncertainty: {
         label: "early_read",
         detail: "Useful read, but some split evidence is missing.",
@@ -56,6 +57,7 @@ describe("coerceCoachVerdictPayloadForTest", () => {
           whatToDoNextTime: "Repeat the same pacing approach.",
           whatToDoThisWeek: "Keep the rest of the week as planned."
         },
+        nonObviousInsight: "This is the third threshold bike in a row; execution scores are trending flat, not up.",
         uncertainty: {
           label: "confident_read",
           detail: "Enough evidence is present for a strong read.",
@@ -141,6 +143,7 @@ describe("coerceCoachVerdictPayloadForTest", () => {
         whatToDoNextTime: "Start a touch easier.",
         whatToDoThisWeek: "Keep the next key day controlled."
       },
+      nonObviousInsight: "No comparable history yet — this is session one in this intent category.",
       uncertainty: {
         label: "early_read",
         detail: "Useful read, but some split evidence is missing.",

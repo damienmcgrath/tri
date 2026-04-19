@@ -169,6 +169,21 @@ export function buildDeterministicNarrative(args: {
       : "The stronger sessions are worth repeating next week."
   ].filter((value, index, all) => value && all.indexOf(value) === index).slice(0, 3);
 
+  const nonObviousInsight = (() => {
+    const keyDone = args.facts.keySessionsCompleted;
+    const keyTotal = args.facts.keySessionsTotal;
+    if (keyTotal > 0 && keyDone < keyTotal && args.facts.completionPct >= 85) {
+      return `Overall completion looks healthy (${args.facts.completionPct}%), but ${keyTotal - keyDone} of ${keyTotal} key sessions slipped — the week's volume is being held up by supporting work, not the sessions that drive adaptation.`;
+    }
+    if (args.facts.weekShape === "disrupted") {
+      return "The week's disruption is visible in the session mix — next week's priority is to anchor the key sessions before any added volume.";
+    }
+    if (keyTotal > 0 && keyDone === keyTotal) {
+      return "Every key session landed. The next comparison to watch is whether execution quality holds when volume bumps rather than whether the sessions happen.";
+    }
+    return "No cross-session pattern surfaced deterministically this week. Enough completed sessions will allow a richer trend read starting next week.";
+  })();
+
   return weeklyDebriefNarrativeSchema.parse({
     executiveSummary:
       args.facts.weekShape === "partial_reflection" && args.facts.confidenceNote
@@ -176,7 +191,8 @@ export function buildDeterministicNarrative(args: {
         : args.facts.primaryTakeawayDetail,
     highlights,
     observations: args.observations.slice(0, Math.max(1, Math.min(3, args.observations.length))),
-    carryForward: args.carryForward.slice(0, 2)
+    carryForward: args.carryForward.slice(0, 2),
+    nonObviousInsight
   });
 }
 
@@ -237,7 +253,10 @@ export function normalizeNarrativePayload(payload: unknown) {
     executiveSummary: coerceNarrativeString(record.executiveSummary, 420),
     highlights: coerceNarrativeList(record.highlights, 3, 220),
     observations: coerceNarrativeList(record.observations, 3, 220),
-    carryForward: coerceNarrativeList(record.carryForward, 2, 280)
+    carryForward: coerceNarrativeList(record.carryForward, 2, 280),
+    nonObviousInsight:
+      coerceNarrativeString(record.nonObviousInsight, 360) ??
+      coerceNarrativeString(record.non_obvious_insight, 360)
   };
 }
 
@@ -249,7 +268,8 @@ export function hydrateNarrativePayload(
     executiveSummary: normalized.executiveSummary ?? fallback.executiveSummary,
     highlights: normalized.highlights.length > 0 ? normalized.highlights : fallback.highlights.slice(0, 3),
     observations: normalized.observations.length > 0 ? normalized.observations : fallback.observations.slice(0, 3),
-    carryForward: normalized.carryForward.length > 0 ? normalized.carryForward : fallback.carryForward.slice(0, 2)
+    carryForward: normalized.carryForward.length > 0 ? normalized.carryForward : fallback.carryForward.slice(0, 2),
+    nonObviousInsight: normalized.nonObviousInsight ?? fallback.nonObviousInsight
   };
 }
 
@@ -290,6 +310,22 @@ function normalizePersistedFacts(rawFacts: unknown): Record<string, unknown> {
   };
 }
 
+/**
+ * Legacy debriefs were saved before `nonObviousInsight` existed on
+ * `weeklyDebriefNarrativeSchema`. Injecting a neutral placeholder keeps the
+ * read-path rendering instead of throwing — the field is required on fresh
+ * generations (prompt + generator) but tolerated on historical reads.
+ */
+const LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER =
+  "No cross-session insight was captured for this debrief (saved before this field existed).";
+
+function ensureNarrativeHasInsight(narrative: unknown): unknown {
+  if (!narrative || typeof narrative !== "object" || Array.isArray(narrative)) return narrative;
+  const record = narrative as Record<string, unknown>;
+  if (typeof record.nonObviousInsight === "string" && record.nonObviousInsight.trim().length > 0) return record;
+  return { ...record, nonObviousInsight: LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER };
+}
+
 export function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiveStatus: "ready" | "stale" | "failed") {
   const normalizedFacts = normalizePersistedFacts(record.facts);
 
@@ -301,7 +337,7 @@ export function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiv
     generatedAt: normalizeTimestamp(record.generated_at),
     generationVersion: record.generation_version,
     facts: normalizedFacts,
-    narrative: record.narrative,
+    narrative: ensureNarrativeHasInsight(record.narrative),
     coachShare: record.coach_share,
     evidence: Array.isArray((normalizedFacts as { evidence?: unknown })?.evidence) ? (normalizedFacts as { evidence: WeeklyDebriefEvidenceItem[] }).evidence : [],
     evidenceGroups: Array.isArray((normalizedFacts as { evidenceGroups?: unknown })?.evidenceGroups) ? (normalizedFacts as { evidenceGroups: WeeklyDebriefEvidenceGroup[] }).evidenceGroups : [],

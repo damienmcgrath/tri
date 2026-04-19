@@ -4,6 +4,7 @@ import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
 import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
 import { inferExtraIntent } from "@/lib/workouts/infer-extra-intent";
+import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
 
 type SessionExecutionSessionRow = {
   id: string;
@@ -12,6 +13,7 @@ type SessionExecutionSessionRow = {
   sport: string;
   type: string;
   duration_minutes: number | null;
+  date?: string | null;
   target?: string | null;
   notes?: string | null;
   intent_category?: string | null;
@@ -508,6 +510,8 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
         whatToDoNextTime: diagnosis.recommendedNextAction,
         whatToDoThisWeek: deriveWeekAdjustment(diagnosis)
       },
+      nonObviousInsight:
+        "Not enough comparative history or extended signals in this preview path to surface a cross-session finding.",
       uncertainty: {
         label: diagnosis.diagnosisConfidence === "high" ? "confident_read" : diagnosis.evidenceCount > 0 ? "early_read" : "insufficient_data",
         detail:
@@ -530,7 +534,7 @@ async function loadSessionAndActivity(supabase: SupabaseClient, userId: string, 
   const [{ data: session, error: sessionError }, { data: activity, error: activityError }] = await Promise.all([
     supabase
       .from("sessions")
-      .select("id,athlete_id,user_id,sport,type,duration_minutes,target,notes,intent_category,session_name,session_role,status")
+      .select("id,athlete_id,user_id,sport,type,duration_minutes,date,target,notes,intent_category,session_name,session_role,status")
       .eq("id", sessionId)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -576,6 +580,23 @@ export async function syncSessionExecutionFromActivityLink(args: {
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });
+  let extendedSignals: ExtendedSignals = EMPTY_EXTENDED_SIGNALS;
+  if (session.date) {
+    try {
+      extendedSignals = await buildExtendedSignals(args.supabase, {
+        athleteId: session.athlete_id ?? args.userId,
+        sessionId: session.id,
+        sport: session.sport,
+        intentCategory: session.intent_category ?? null,
+        sessionDate: session.date,
+        splitHalves: diagnosisInput.actual.splitMetrics ?? null,
+        environment: asRecord(activity.metrics_v2)?.environment ?? null
+      });
+    } catch {
+      extendedSignals = EMPTY_EXTENDED_SIGNALS;
+    }
+  }
+  evidence.extendedSignals = extendedSignals;
   const generated = await generateCoachVerdict({
     evidence,
     athleteContext,
@@ -818,7 +839,7 @@ export async function syncExtraActivityExecution(args: {
 }): Promise<PersistedExecutionReview> {
   const { data: activity, error: activityError } = await args.supabase
     .from("completed_activities")
-    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override")
+    .select("id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,intent_override,start_time_utc")
     .eq("id", args.activityId)
     .eq("user_id", args.userId)
     .maybeSingle();
@@ -874,6 +895,31 @@ export async function syncExtraActivityExecution(args: {
     diagnosisInput,
     weeklyState: athleteContext ? { fatigue: athleteContext.weeklyState.fatigue } : null
   });
+
+  let extraExtendedSignals: ExtendedSignals = EMPTY_EXTENDED_SIGNALS;
+  // `start_time_utc` MUST be included in the completed_activities select above;
+  // without it `activityStartDate` collapses to null, `buildExtendedSignals`
+  // never runs for extras, and every extra-activity review silently falls back
+  // to the generic "no history" insight.
+  const activityStartDate = typeof (activity as unknown as { start_time_utc?: unknown }).start_time_utc === "string"
+    ? ((activity as unknown as { start_time_utc: string }).start_time_utc).slice(0, 10)
+    : null;
+  if (activityStartDate) {
+    try {
+      extraExtendedSignals = await buildExtendedSignals(args.supabase, {
+        athleteId: args.userId,
+        sessionId: syntheticSession.id,
+        sport: syntheticSession.sport,
+        intentCategory: intentResult.intentCategory,
+        sessionDate: activityStartDate,
+        splitHalves: diagnosisInput.actual.splitMetrics ?? null,
+        environment: asRecord(activity.metrics_v2)?.environment ?? null
+      });
+    } catch {
+      extraExtendedSignals = EMPTY_EXTENDED_SIGNALS;
+    }
+  }
+  evidence.extendedSignals = extraExtendedSignals;
 
   const generated = await generateCoachVerdict({ evidence, athleteContext, recentReviewedSessions: [] });
   const executionResult = toPersistedExecutionReview({

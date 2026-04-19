@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "refresh-ai": "tsx --env-file-if-exists=.env.local -r ./scripts/_preload-react-cache.cjs scripts/refresh-ai-content.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",

@@ -299,6 +299,12 @@ function normalizeCoachVerdictPayload(
         whatToDoNextTime: clip(nextTime ?? "Use one clear execution cue on the next similar session.", 500),
         whatToDoThisWeek: clip(thisWeek ?? "Keep the rest of the week stable and use this review as guidance for the next similar session.", 500)
       },
+      nonObviousInsight: clip(
+        asString(root.nonObviousInsight) ??
+          asString(root.non_obvious_insight) ??
+          "No comparative history or cross-session signal was strong enough to surface a non-obvious finding for this session.",
+        320
+      ),
       uncertainty: {
         label: missingEvidence.length > 0 || uncertaintyDetailParts.length > 0 ? "early_read" : "confident_read",
         detail: clip(
@@ -385,6 +391,7 @@ function normalizeVerdictUnits(verdict: CoachVerdict): CoachVerdict {
       whatToDoNextTime: n(verdict.explanation.whatToDoNextTime),
       whatToDoThisWeek: n(verdict.explanation.whatToDoThisWeek)
     },
+    nonObviousInsight: n(verdict.nonObviousInsight),
     uncertainty: {
       ...verdict.uncertainty,
       detail: n(verdict.uncertainty.detail)
@@ -432,6 +439,18 @@ function buildCoachVerdictInstructions() {
     "- For 90+ scores, still restate the numeric target (pace ceiling, HR cap, interval structure) and add a progression trigger (e.g. 'if HR holds, extend by 10 min next time').",
     "- Do not use words like 'appears', 'seems', 'might', 'possibly', 'likely'. State what the data shows.",
     "",
+    "Extended signals:",
+    "- `extendedSignals.historicalComparables` lists up to four previous same-sport, same-intent sessions with their execution score, pace/power, HR, and stored takeaway. Use these to frame trends (\"third threshold bike in a row with HR creeping higher for the same power\"). If the array is empty, skip trend claims.",
+    "- `extendedSignals.aerobicDecoupling` reports how the HR-per-output ratio changed from the first to the second half of this session. `percent` is the raw drift; `severity` maps to stable (<3%), mild_drift (3-5%), significant_drift (5-10%), or poor_durability (≥10%). Reference decoupling only for endurance or tempo sessions where it is load-bearing, never for short intervals or strength.",
+    "- `extendedSignals.weather` carries the session's temperature data and a `notable` flag list (hot, warm, cool, cold, large range). Use it to contextualise HR/pace deviations — a hot day explains HR elevation at the same pace without implying fitness loss.",
+    "- These signals are inputs, not requirements. If a signal is null or empty, do not mention it and do not invent one.",
+    "",
+    "nonObviousInsight rules:",
+    "- Every verdict must include a `nonObviousInsight` (≤320 chars) — a finding the athlete would not reach by glancing at this session alone.",
+    "- Draw it from: a comparison against `historicalComparables`, a `aerobicDecoupling` trend, a weather-adjusted interpretation, or a correlation between feel and execution across `recentReviewedSessions`.",
+    "- Do not repeat what is already in `whatHappened`. If you cannot surface something genuinely non-obvious from the evidence, state that honestly (e.g. \"Not enough prior sessions in this intent category to establish a trend yet.\") — but still use this field.",
+    "- No generic coaching platitudes. Ground every claim in a specific number, date, or signal.",
+    "",
     "Field requirements:",
     "- `sessionVerdict.headline`: short label, max 160 chars.",
     "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
@@ -444,6 +463,7 @@ function buildCoachVerdictInstructions() {
     "- `explanation.oneThingToChange` (optional): single concrete instruction using NEXT format, max 500 chars.",
     "- `explanation.whatToDoNextTime`: one practical cue for the next similar session, max 500 chars.",
     "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
+    "- `nonObviousInsight`: one finding grounded in an extended signal, max 320 chars. Required.",
     "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
     "- `uncertainty.detail`: explain the confidence level plainly, max 500 chars.",
     "- `uncertainty.missingEvidence`: array of missing evidence strings, max 8 items.",
@@ -493,6 +513,28 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
         ? "early_read"
         : "insufficient_data";
 
+  const decoupling = evidence.extendedSignals?.aerobicDecoupling ?? null;
+  const comparables = evidence.extendedSignals?.historicalComparables ?? [];
+  const weatherNotable = evidence.extendedSignals?.weather?.notable ?? [];
+  let nonObviousInsight: string;
+  if (decoupling && (decoupling.severity === "significant_drift" || decoupling.severity === "poor_durability")) {
+    nonObviousInsight = `Cardiac-to-output drift of ${decoupling.percent.toFixed(1)}% from the first half to the second points at aerobic durability, not top-end capacity, as the current limiter.`;
+  } else if (comparables.length >= 2) {
+    const scores = comparables
+      .map((c) => c.executionScore)
+      .filter((n): n is number => typeof n === "number");
+    if (scores.length >= 2) {
+      const trend = scores[0] > scores[scores.length - 1] ? "improving" : scores[0] < scores[scores.length - 1] ? "sliding" : "flat";
+      nonObviousInsight = `This is your ${comparables.length + 1}${comparables.length + 1 === 2 ? "nd" : comparables.length + 1 === 3 ? "rd" : "th"} session in this intent category; execution scores are ${trend} vs. your recent history.`;
+    } else {
+      nonObviousInsight = `Compared against ${comparables.length} prior session${comparables.length === 1 ? "" : "s"} in this intent category, this read fits the pattern rather than breaking it.`;
+    }
+  } else if (weatherNotable.length > 0) {
+    nonObviousInsight = `Conditions today (${weatherNotable.join(", ")}) materially shift how HR and pace should be interpreted — adjust expectations accordingly.`;
+  } else {
+    nonObviousInsight = "Not enough prior sessions in this intent category to establish a trend yet. A fresh comparative read will emerge after the next one or two completed sessions like this.";
+  }
+
   return {
     sessionVerdict: {
       headline:
@@ -539,6 +581,7 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
               ? "Keep the next key session controlled rather than forcing progression."
               : "Move into the rest of the week as planned."
     },
+    nonObviousInsight,
     uncertainty: {
       label: uncertaintyLabel,
       detail:
@@ -649,7 +692,8 @@ export function buildExecutionEvidence(args: {
         provisional: diagnosis.executionScoreProvisional,
         evidenceCount: diagnosis.evidenceCount,
         executionCost
-      }
+      },
+      extendedSignals: null as ExecutionEvidence["extendedSignals"]
     } satisfies ExecutionEvidence
   };
 }
