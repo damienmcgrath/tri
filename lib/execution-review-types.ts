@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ComponentScores, Sport } from "@/lib/coach/session-diagnosis";
+import type { ExtendedSignals } from "@/lib/analytics/extended-signals";
 
 export type ExecutionEvidence = {
   sessionId: string;
@@ -142,6 +143,13 @@ export type ExecutionEvidence = {
     evidenceCount: number;
     executionCost: "low" | "moderate" | "high" | "unknown";
   };
+  /**
+   * Enriched signals sitting alongside the deterministic evidence. Present when
+   * the async review path pre-fetches them; null when the evidence is built in
+   * a sync-only context (e.g. fallback preview). Empty defaults are tolerated
+   * by the prompt, so absence never breaks the reviewer.
+   */
+  extendedSignals?: ExtendedSignals | null;
 };
 
 export type CoachVerdict = {
@@ -161,6 +169,13 @@ export type CoachVerdict = {
     whatToDoNextTime: string;
     whatToDoThisWeek: string;
   };
+  /**
+   * A single finding that goes beyond restating the session's numbers — a
+   * trend against the athlete's own history, a cardiac-vs-output pattern, an
+   * environmental adjustment, or a cross-session correlation. Required on
+   * every verdict so the AI can't fall back to pure summarisation.
+   */
+  nonObviousInsight: string;
   uncertainty: {
     label: "confident_read" | "early_read" | "insufficient_data";
     detail: string;
@@ -275,6 +290,7 @@ export const coachVerdictSchema = z.object({
     whatToDoNextTime: z.string().min(1).max(500),
     whatToDoThisWeek: z.string().min(1).max(500)
   }),
+  nonObviousInsight: z.string().min(1).max(320),
   uncertainty: z.object({
     label: z.enum(["confident_read", "early_read", "insufficient_data"]),
     detail: z.string().min(1).max(500),
@@ -303,6 +319,7 @@ export const COACH_VERDICT_EXAMPLE: CoachVerdict = {
     whatToDoNextTime: "Start the first work block a touch easier so you can hold form and finish the full set.",
     whatToDoThisWeek: "Keep the next key session on the calendar, but avoid forcing progression if fatigue is still lingering."
   },
+  nonObviousInsight: "HR drifted 7% vs. your last three threshold sessions, which held under 3%. The stimulus still landed, but durability is the next limiter — not top-end power.",
   uncertainty: {
     label: "early_read",
     detail: "This read is useful, but it is still limited by missing split or interval detail.",

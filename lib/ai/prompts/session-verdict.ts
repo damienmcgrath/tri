@@ -5,8 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
+import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
 
-export const SESSION_VERDICT_PROMPT_VERSION = "v2";
+export const SESSION_VERDICT_PROMPT_VERSION = "v3";
 
 // --- Zod schema for AI output ---
 
@@ -32,6 +33,13 @@ export const sessionVerdictOutputSchema = z.object({
   verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
   metric_comparisons: z.array(metricComparisonSchema).max(6),
   key_deviations: z.array(deviationSchema).max(5),
+  /**
+   * A single finding that goes beyond restating the session. Must cite a
+   * historical comparable, aerobic decoupling, weather-adjusted context, or a
+   * cross-session pattern. Required so the model can never fall back to a pure
+   * summary of this session's numbers.
+   */
+  non_obvious_insight: z.string().min(1).max(320),
   adaptation_signal: z.string().min(1).max(800),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
   affected_session_ids: z.array(z.string()).max(5)
@@ -95,6 +103,12 @@ export type SessionVerdictContext = {
     currentAtl: number | null;
     currentTsb: number | null;
   } | null;
+  /**
+   * Optional so older test fixtures remain valid. When absent at runtime the
+   * fallback verdict still emits a `non_obvious_insight` grounded in whatever
+   * evidence is present.
+   */
+  extendedSignals?: ExtendedSignals;
 };
 
 export async function buildSessionVerdictContext(
@@ -119,6 +133,7 @@ export async function buildSessionVerdictContext(
     .eq("planned_session_id", sessionId);
 
   let activity: SessionVerdictContext["activity"] = null;
+  let activityEnvironment: unknown = null;
   const activityId = links?.[0]?.completed_activity_id;
   if (activityId) {
     const { data: act } = await supabase
@@ -129,6 +144,7 @@ export async function buildSessionVerdictContext(
     if (act) {
       const execResult = act.execution_result as Record<string, unknown> | null | undefined;
       const intervalPower = execResult?.avgIntervalPower;
+      const metrics = (act.metrics_v2 as Record<string, unknown>) ?? null;
       activity = {
         durationSec: act.duration_sec,
         distanceM: act.distance_m,
@@ -136,8 +152,9 @@ export async function buildSessionVerdictContext(
         avgPower: act.avg_power,
         avgIntervalPower: typeof intervalPower === "number" ? intervalPower : null,
         avgPacePer100mSec: act.avg_pace_per_100m_sec ?? null,
-        metrics: (act.metrics_v2 as Record<string, unknown>) ?? null
+        metrics
       };
+      activityEnvironment = metrics && typeof metrics === "object" ? (metrics as Record<string, unknown>).environment : null;
     }
   }
 
@@ -230,6 +247,51 @@ export async function buildSessionVerdictContext(
     // Non-critical
   }
 
+  // Pull pre-computed extendedSignals from the persisted execution_result when
+  // the upstream review has already written them. If not present, recompute
+  // from DB so the session verdict still benefits from the new signal layer.
+  const persistedExtended = (() => {
+    const execResult = session.execution_result as Record<string, unknown> | null | undefined;
+    const raw = execResult?.extendedSignals;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const candidate = raw as Partial<ExtendedSignals>;
+      if (candidate.historicalComparables !== undefined) return candidate as ExtendedSignals;
+    }
+    return null;
+  })();
+
+  let extendedSignals: ExtendedSignals = persistedExtended ?? EMPTY_EXTENDED_SIGNALS;
+  if (!persistedExtended) {
+    try {
+      const splitHalves = (() => {
+        const execResult = session.execution_result as Record<string, unknown> | null | undefined;
+        if (!execResult) return null;
+        const firstHalfAvgHr = typeof execResult.firstHalfAvgHr === "number" ? execResult.firstHalfAvgHr : null;
+        const lastHalfAvgHr = typeof execResult.lastHalfAvgHr === "number" ? execResult.lastHalfAvgHr : null;
+        if (!firstHalfAvgHr || !lastHalfAvgHr) return null;
+        return {
+          firstHalfAvgHr,
+          lastHalfAvgHr,
+          firstHalfAvgPower: typeof execResult.firstHalfAvgPower === "number" ? execResult.firstHalfAvgPower : null,
+          lastHalfAvgPower: typeof execResult.lastHalfAvgPower === "number" ? execResult.lastHalfAvgPower : null,
+          firstHalfPaceSPerKm: typeof execResult.firstHalfPaceSPerKm === "number" ? execResult.firstHalfPaceSPerKm : null,
+          lastHalfPaceSPerKm: typeof execResult.lastHalfPaceSPerKm === "number" ? execResult.lastHalfPaceSPerKm : null
+        };
+      })();
+      extendedSignals = await buildExtendedSignals(supabase, {
+        athleteId: userId,
+        sessionId,
+        sport: session.sport as string,
+        intentCategory: (session.intent_category as string | null) ?? null,
+        sessionDate: session.date as string,
+        splitHalves,
+        environment: activityEnvironment
+      });
+    } catch {
+      extendedSignals = EMPTY_EXTENDED_SIGNALS;
+    }
+  }
+
   return {
     session: {
       id: session.id,
@@ -254,7 +316,8 @@ export async function buildSessionVerdictContext(
       type: s.type,
       isKey: Boolean(s.is_key)
     })),
-    recentLoadTrend
+    recentLoadTrend,
+    extendedSignals
   };
 }
 
@@ -293,6 +356,18 @@ export function buildVerdictInstructions(): string {
     "- If missed/off-target: explain redistribution or recovery implications.",
     "- Reference upcoming sessions by weekday name and sport, NOT by ISO date (e.g. 'Wednesday's bike' not '2026-04-09 bike').",
     "- Keep adaptation_signal to 2-3 sentences. Be direct, not exhaustive.",
+    "",
+    "EXTENDED SIGNALS (`extendedSignals`):",
+    "- `historicalComparables`: up to four previous same-sport, same-intent sessions with execution scores, pace/power/HR, and prior takeaways. Use these to detect trends ('HR is rising at the same power on each of the last three threshold bikes').",
+    "- `aerobicDecoupling`: percentage drift in HR-per-output ratio from first to second half; severity mapped to stable (<3%), mild_drift (3-5%), significant_drift (5-10%), poor_durability (≥10%). Reference only for endurance/tempo/threshold work, never for short intervals or strength.",
+    "- `weather`: `avgTemperatureC` and a `notable` flag list (hot, warm, cool, cold, large range). Use it to contextualise HR/pace deviations — a hot day raises HR at the same pace and is not a fitness signal.",
+    "- These signals are inputs. If absent or empty, do not mention them.",
+    "",
+    "NON-OBVIOUS INSIGHT (`non_obvious_insight`):",
+    "- Required on every verdict. ≤320 chars.",
+    "- It must surface something the athlete would miss from this session alone — a trend against their own history, a decoupling/weather read, or a pattern across feel and execution.",
+    "- Do not repeat what execution_summary already says. No generic coaching platitudes. Cite a number, date, or signal.",
+    "- If no comparable is available and no signal stands out, say that honestly: 'No prior sessions in this intent category yet — next similar session will start to build a comparison.'",
     "",
     "FEEL DATA — CRITICAL:",
     "- When `feel` is present in the input, you MUST reference it in execution_summary. Name the overall feel label (e.g. 'Terrible', 'Good') and any legs, energy, or life-stress signal the athlete reported.",
@@ -492,6 +567,20 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
     adaptationType = "flag_review";
   }
 
+  const comparables = ctx.extendedSignals?.historicalComparables ?? [];
+  const decoupling = ctx.extendedSignals?.aerobicDecoupling ?? null;
+  const weatherNotable = ctx.extendedSignals?.weather?.notable ?? [];
+  let nonObviousInsight: string;
+  if (decoupling && (decoupling.severity === "significant_drift" || decoupling.severity === "poor_durability")) {
+    nonObviousInsight = `Cardiac-to-output drift of ${decoupling.percent.toFixed(1)}% from first to second half points at aerobic durability — not top-end capacity — as the current limiter.`;
+  } else if (comparables.length >= 2) {
+    nonObviousInsight = `This is session ${comparables.length + 1} in this intent category — use the prior ${comparables.length} stored takeaways to compare.`;
+  } else if (weatherNotable.length > 0) {
+    nonObviousInsight = `Conditions today (${weatherNotable.join(", ")}) shift how HR and pace should be read; adjust expectations accordingly.`;
+  } else {
+    nonObviousInsight = "No prior sessions in this intent category yet — the next similar session will start to build a comparison.";
+  }
+
   return {
     purpose_statement: ctx.session.target
       ? `${ctx.session.sessionName ?? ctx.session.type}: ${ctx.session.target}`
@@ -503,6 +592,7 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
     verdict_status: status,
     metric_comparisons: metricComparisons,
     key_deviations: [],
+    non_obvious_insight: nonObviousInsight,
     adaptation_signal: adaptationSignal,
     adaptation_type: adaptationType,
     affected_session_ids: []
@@ -702,6 +792,7 @@ function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVer
     intended_zones: n(verdict.intended_zones),
     intended_metrics: n(verdict.intended_metrics),
     execution_summary: n(verdict.execution_summary),
+    non_obvious_insight: n(verdict.non_obvious_insight),
     adaptation_signal: trimToLastSentence(n(verdict.adaptation_signal)),
     metric_comparisons: verdict.metric_comparisons.map(mc => ({
       ...mc,

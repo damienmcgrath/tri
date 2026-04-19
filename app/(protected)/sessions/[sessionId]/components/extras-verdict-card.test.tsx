@@ -25,6 +25,7 @@ function makeVerdict(overrides: Partial<CoachVerdict> = {}): CoachVerdict {
       whatToDoThisWeek: "No adjustment needed — this sits well alongside the planned sessions.",
       ...overrides.explanation,
     },
+    nonObviousInsight: overrides.nonObviousInsight ?? "No comparative history available yet for this intent category.",
     uncertainty: {
       label: "confident_read",
       detail: "Enough data to assess this session confidently.",

@@ -84,7 +84,13 @@ export const weeklyDebriefNarrativeSchema = z.object({
   executiveSummary: z.string().min(1).max(420),
   highlights: z.array(z.string().min(1).max(220)).min(3).max(3),
   observations: z.array(z.string().min(1).max(220)).min(1).max(3),
-  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2)
+  carryForward: z.array(z.string().min(1).max(280)).min(2).max(2),
+  /**
+   * Required weekly-level finding the athlete would not spot by reading
+   * individual session reviews. Usually a pattern across sessions, a shift in
+   * decoupling/readiness over the week, or a historical comparison.
+   */
+  nonObviousInsight: z.string().min(1).max(360)
 });
 
 export type WeeklyDebriefNarrative = z.infer<typeof weeklyDebriefNarrativeSchema>;
