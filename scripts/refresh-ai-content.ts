@@ -190,7 +190,8 @@ async function refreshSessions(supabase: SupabaseClient, args: Args): Promise<vo
       userId: args.userId,
       sessionId: session.id,
       activityId,
-      sessionDate: session.date
+      sessionDate: session.date,
+      skipDebriefRefresh: true
     });
   });
   console.log(`[sessions] ${ok} refreshed, ${failed} failed.`);

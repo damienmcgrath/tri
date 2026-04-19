@@ -717,7 +717,7 @@ export async function generateCoachVerdict(args: {
     buildRequest: () => ({
       instructions: buildCoachVerdictInstructions(),
       reasoning: { effort: "low" },
-      max_output_tokens: 1600,
+      max_output_tokens: 3000,
       text: {
         format: zodTextFormat(coachVerdictSchema, "session_coach_verdict", {
           description: "Structured session review verdict."
