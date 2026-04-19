@@ -52,18 +52,44 @@ function delay(ms: number): Promise<void> {
 
 // ─── Core backfill ────────────────────────────────────────────────────────────
 
+export type BackfillOptions = {
+  /**
+   * When true, bypass the "already backfilled" skip check and re-process
+   * every Strava activity (optionally narrowed by externalActivityIds).
+   * Use when the normalizer shape has changed and historical rows need to
+   * be rewritten.
+   */
+  force?: boolean;
+  /**
+   * When set, only process activities whose external_activity_id matches
+   * one of these values. Values are compared as strings.
+   */
+  externalActivityIds?: string[];
+  onProgress?: (progress: BackfillProgress) => void;
+};
+
 /**
  * Re-fetch all Strava activities for a user from the detailed endpoint
  * and update their metrics_v2, laps, pace, and other enriched fields.
  *
- * Only processes activities that are missing metrics_v2 (or have no
- * schemaVersion). Activities already backfilled are skipped.
+ * By default, only processes activities that are missing metrics_v2 (or
+ * have no schemaVersion / no laps array). Pass `force: true` to re-process
+ * every activity — required when the normalizer output shape itself has
+ * changed and historical rows need to be rewritten.
  */
 export async function backfillStravaMetrics(
   userId: string,
   connection: ExternalConnection,
-  onProgress?: (progress: BackfillProgress) => void
+  optsOrProgress?: BackfillOptions | ((progress: BackfillProgress) => void)
 ): Promise<BackfillResult> {
+  // Back-compat: previous callers passed a bare onProgress callback.
+  const opts: BackfillOptions =
+    typeof optsOrProgress === "function" ? { onProgress: optsOrProgress } : optsOrProgress ?? {};
+  const onProgress = opts.onProgress;
+  const force = opts.force === true;
+  const idFilter = opts.externalActivityIds && opts.externalActivityIds.length > 0
+    ? new Set(opts.externalActivityIds.map((v) => String(v)))
+    : null;
   const supabase = getAdminClient();
 
   // Find all Strava activities missing metrics_v2
@@ -91,7 +117,7 @@ export async function backfillStravaMetrics(
     .eq("external_provider", "strava");
 
   const alreadyBackfilled = new Set<string>();
-  if (withMetrics) {
+  if (withMetrics && !force) {
     for (const row of withMetrics) {
       const mv2 = row.metrics_v2 as Record<string, unknown> | null;
       // Only consider fully enriched if laps is a real array (not null) —
@@ -103,7 +129,12 @@ export async function backfillStravaMetrics(
     }
   }
 
-  const needsBackfill = activities.filter((a) => !alreadyBackfilled.has(a.id));
+  const needsBackfill = activities.filter((a) => {
+    if (idFilter && (!a.external_activity_id || !idFilter.has(String(a.external_activity_id)))) {
+      return false;
+    }
+    return force || !alreadyBackfilled.has(a.id);
+  });
 
   if (needsBackfill.length === 0) {
     return { updated: 0, skipped: activities.length, failed: 0, rateLimited: false, total: activities.length };

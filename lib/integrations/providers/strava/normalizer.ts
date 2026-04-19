@@ -210,11 +210,29 @@ function buildLapSummaries(laps: StravaLap[] | undefined, sport: string): Record
   });
 }
 
+type SplitHalves = {
+  firstHalfAvgHr: number | null;
+  lastHalfAvgHr: number | null;
+  firstHalfPaceSPerKm: number | null;
+  lastHalfPaceSPerKm: number | null;
+  hrDriftPct: number | null;
+  paceFadePct: number | null;
+};
+
+const EMPTY_SPLIT_HALVES: SplitHalves = {
+  firstHalfAvgHr: null,
+  lastHalfAvgHr: null,
+  firstHalfPaceSPerKm: null,
+  lastHalfPaceSPerKm: null,
+  hrDriftPct: null,
+  paceFadePct: null
+};
+
 function buildSplitSummaries(
   splits: StravaSplit[] | undefined,
   sport: string
-): { hrDriftPct: number | null; paceFadePct: number | null } {
-  if (!splits || splits.length < 4) return { hrDriftPct: null, paceFadePct: null };
+): SplitHalves {
+  if (!splits || splits.length < 4) return EMPTY_SPLIT_HALVES;
 
   const mid = Math.floor(splits.length / 2);
   const firstHalf = splits.slice(0, mid);
@@ -223,29 +241,48 @@ function buildSplitSummaries(
   // HR drift: average HR second half vs first half
   const firstHalfHrs = firstHalf.map((s) => s.average_heartrate).filter((v): v is number => v != null && v > 0);
   const lastHalfHrs = lastHalf.map((s) => s.average_heartrate).filter((v): v is number => v != null && v > 0);
+  let firstHalfAvgHr: number | null = null;
+  let lastHalfAvgHr: number | null = null;
   let hrDriftPct: number | null = null;
   if (firstHalfHrs.length > 0 && lastHalfHrs.length > 0) {
     const firstAvg = firstHalfHrs.reduce((a, b) => a + b, 0) / firstHalfHrs.length;
     const lastAvg = lastHalfHrs.reduce((a, b) => a + b, 0) / lastHalfHrs.length;
+    firstHalfAvgHr = Math.round(firstAvg);
+    lastHalfAvgHr = Math.round(lastAvg);
     if (firstAvg > 0) {
       hrDriftPct = Number((((lastAvg - firstAvg) / firstAvg) * 100).toFixed(1));
     }
   }
 
-  // Pace fade: average speed second half vs first half
+  // Pace fade: average speed second half vs first half. Pace halves only
+  // populated for run (same gate as top-level avg_pace_sec_per_km) — swim pace
+  // comes from stroke telemetry, bike doesn't use pace.
   const firstHalfSpeeds = firstHalf.map((s) => s.average_speed).filter((v): v is number => v != null && v > 0);
   const lastHalfSpeeds = lastHalf.map((s) => s.average_speed).filter((v): v is number => v != null && v > 0);
+  let firstHalfPaceSPerKm: number | null = null;
+  let lastHalfPaceSPerKm: number | null = null;
   let paceFadePct: number | null = null;
   if (firstHalfSpeeds.length > 0 && lastHalfSpeeds.length > 0) {
     const firstAvgSpeed = firstHalfSpeeds.reduce((a, b) => a + b, 0) / firstHalfSpeeds.length;
     const lastAvgSpeed = lastHalfSpeeds.reduce((a, b) => a + b, 0) / lastHalfSpeeds.length;
+    if (sport === "run") {
+      if (firstAvgSpeed > 0) firstHalfPaceSPerKm = Number((1000 / firstAvgSpeed).toFixed(2));
+      if (lastAvgSpeed > 0) lastHalfPaceSPerKm = Number((1000 / lastAvgSpeed).toFixed(2));
+    }
     if (firstAvgSpeed > 0) {
       // Negative means slowed down (higher pace = slower)
       paceFadePct = Number((((firstAvgSpeed - lastAvgSpeed) / firstAvgSpeed) * 100).toFixed(1));
     }
   }
 
-  return { hrDriftPct, paceFadePct };
+  return {
+    firstHalfAvgHr,
+    lastHalfAvgHr,
+    firstHalfPaceSPerKm,
+    lastHalfPaceSPerKm,
+    hrDriftPct,
+    paceFadePct
+  };
 }
 
 export function normalizeStravaActivity(
@@ -275,7 +312,8 @@ export function normalizeStravaActivity(
 
   const lapsCount = raw.laps?.length ?? null;
   const lapSummaries = buildLapSummaries(raw.laps, normalizedSport);
-  const { hrDriftPct, paceFadePct } = buildSplitSummaries(raw.splits_metric, normalizedSport);
+  const splitHalves = buildSplitSummaries(raw.splits_metric, normalizedSport);
+  const hasSplitData = Object.values(splitHalves).some((v) => v !== null);
 
   // Pause duration from elapsed vs moving time
   const pausedDurationSec = elapsedTimeSec > movingTimeSec
@@ -372,12 +410,8 @@ export function normalizeStravaActivity(
       count: pausedDurationSec != null && pausedDurationSec > 0 ? 1 : 0,
       totalPausedSec: pausedDurationSec ?? null
     },
-    splits: hrDriftPct !== null || paceFadePct !== null
-      ? { hrDriftPct, paceFadePct }
-      : null,
-    halves: hrDriftPct !== null || paceFadePct !== null
-      ? { hrDriftPct, paceFadePct }
-      : null,
+    splits: hasSplitData ? { ...splitHalves } : null,
+    halves: hasSplitData ? { ...splitHalves } : null,
     laps: lapSummaries,
     events: null
   };

@@ -260,6 +260,57 @@ describe("normalizeStravaActivity", () => {
       expect((splits.paceFadePct as number)).toBeGreaterThan(0); // speed dropped
     });
 
+    it("populates raw first/last half HR and pace from splits (run)", () => {
+      // Consumers in lib/workouts/session-execution.ts#extractSplitMetrics and
+      // lib/coach/session-diagnosis.ts#hasSplits read the raw halves, not the
+      // derived percentages. Without these fields, Strava long-endurance runs
+      // falsely report "split metrics missing".
+      const withSplits: StravaActivitySummary = {
+        ...baseActivity,
+        splits_metric: [
+          { split: 1, distance: 1000, elapsed_time: 350, moving_time: 345, average_heartrate: 140, average_speed: 2.9 },
+          { split: 2, distance: 1000, elapsed_time: 348, moving_time: 345, average_heartrate: 142, average_speed: 2.88 },
+          { split: 3, distance: 1000, elapsed_time: 355, moving_time: 350, average_heartrate: 150, average_speed: 2.85 },
+          { split: 4, distance: 1000, elapsed_time: 360, moving_time: 355, average_heartrate: 155, average_speed: 2.8 },
+          { split: 5, distance: 1000, elapsed_time: 365, moving_time: 360, average_heartrate: 158, average_speed: 2.75 },
+          { split: 6, distance: 1000, elapsed_time: 370, moving_time: 365, average_heartrate: 160, average_speed: 2.7 }
+        ]
+      };
+      const result = normalizeStravaActivity(withSplits, "user-abc");
+      const splits = result.metrics_v2.splits as Record<string, unknown>;
+      const halves = result.metrics_v2.halves as Record<string, unknown>;
+
+      // first half HR avg = (140+142+150)/3 = 144, last half = (155+158+160)/3 = 157.67 → 158
+      expect(splits.firstHalfAvgHr).toBe(144);
+      expect(splits.lastHalfAvgHr).toBe(158);
+      // first half speed avg ≈ 2.8767 → pace 1000/2.8767 ≈ 347.62 s/km
+      expect(splits.firstHalfPaceSPerKm).toBeCloseTo(347.62, 1);
+      expect(splits.lastHalfPaceSPerKm).toBeCloseTo(363.64, 1);
+      // halves mirrors splits for consumer path-search compatibility
+      expect(halves.firstHalfAvgHr).toBe(144);
+      expect(halves.lastHalfPaceSPerKm).toBeCloseTo(363.64, 1);
+    });
+
+    it("omits pace halves for non-run sports but keeps HR halves", () => {
+      // Bike splits can carry HR but Strava pace halves aren't meaningful there.
+      const bikeWithSplits: StravaActivitySummary = {
+        ...baseActivity,
+        sport_type: "Ride",
+        splits_metric: [
+          { split: 1, distance: 1000, elapsed_time: 120, moving_time: 120, average_heartrate: 130, average_speed: 8.3 },
+          { split: 2, distance: 1000, elapsed_time: 120, moving_time: 120, average_heartrate: 132, average_speed: 8.3 },
+          { split: 3, distance: 1000, elapsed_time: 120, moving_time: 120, average_heartrate: 140, average_speed: 8.3 },
+          { split: 4, distance: 1000, elapsed_time: 120, moving_time: 120, average_heartrate: 142, average_speed: 8.3 }
+        ]
+      };
+      const result = normalizeStravaActivity(bikeWithSplits, "user-abc");
+      const splits = result.metrics_v2.splits as Record<string, unknown>;
+      expect(splits.firstHalfAvgHr).toBe(131);
+      expect(splits.lastHalfAvgHr).toBe(141);
+      expect(splits.firstHalfPaceSPerKm).toBeNull();
+      expect(splits.lastHalfPaceSPerKm).toBeNull();
+    });
+
     it("swim laps include per-lap pace, stroke rate, and rest detection", () => {
       const swimWithLaps: StravaActivitySummary = {
         ...baseActivity,
