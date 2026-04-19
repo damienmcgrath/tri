@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { SESSION_BASE_COLUMNS } from "@/lib/supabase/queries";
 
 export type MetricDelta = {
   metric: string;
@@ -224,7 +225,7 @@ export async function getSessionComparison(
   // Load the target session
   const { data: targetSession } = await supabase
     .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status")
+    .select(SESSION_BASE_COLUMNS)
     .eq("id", sessionId)
     .eq("user_id", athleteId)
     .maybeSingle();
@@ -240,7 +241,7 @@ export async function getSessionComparison(
   if (comparisonSessionId) {
     const { data: specifiedSession } = await supabase
       .from("sessions")
-      .select("id,date,sport,type,duration_minutes,status")
+      .select(SESSION_BASE_COLUMNS)
       .eq("id", comparisonSessionId)
       .eq("user_id", athleteId)
       .maybeSingle();
@@ -254,7 +255,7 @@ export async function getSessionComparison(
 
     let { data: candidates } = await supabase
       .from("sessions")
-      .select("id,date,sport,type,duration_minutes,status")
+      .select(SESSION_BASE_COLUMNS)
       .eq("user_id", athleteId)
       .eq("sport", session.sport)
       .eq("type", session.type)
@@ -267,7 +268,7 @@ export async function getSessionComparison(
     if (!candidates || candidates.length === 0) {
       const { data: fallback } = await supabase
         .from("sessions")
-        .select("id,date,sport,type,duration_minutes,status")
+        .select(SESSION_BASE_COLUMNS)
         .eq("user_id", athleteId)
         .eq("sport", session.sport)
         .eq("status", "completed")

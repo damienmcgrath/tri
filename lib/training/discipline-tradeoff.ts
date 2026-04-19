@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTargetDistribution } from "./race-profile";
+import { querySessionLoad } from "@/lib/supabase/queries";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,18 +65,13 @@ export async function computeRollingDisciplineBalance(
   const windowStart = new Date(today.getTime() - windowDays * 86400000).toISOString().slice(0, 10);
 
   // Fetch session load data for the window
-  const { data: loads } = await supabase
-    .from("session_load")
-    .select("sport, tss, duration_sec")
-    .eq("user_id", userId)
-    .gte("date", windowStart)
-    .lte("date", todayIso);
+  const loads = await querySessionLoad(supabase, userId, windowStart, todayIso);
 
   // Aggregate duration by sport
   const hoursBySport: Record<string, number> = {};
   let totalSeconds = 0;
 
-  for (const row of loads ?? []) {
+  for (const row of loads) {
     const sport = (row.sport as string) ?? "other";
     const durSec = Number(row.duration_sec) || 0;
     hoursBySport[sport] = (hoursBySport[sport] ?? 0) + durSec / 3600;

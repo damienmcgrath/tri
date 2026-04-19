@@ -13,6 +13,7 @@ import {
 } from "@/lib/coach/tools";
 import { logCoachAudit } from "@/lib/coach/audit";
 import { getNestedNumber } from "@/lib/workouts/metrics-v2";
+import { SESSION_BASE_COLUMNS } from "@/lib/supabase/queries";
 
 type ToolDeps = {
   supabase: SupabaseClient;
@@ -89,7 +90,7 @@ async function getRecentSessions(args: unknown, deps: ToolDeps) {
 
   const { data: planned } = await deps.supabase
     .from("sessions")
-    .select("id,date,sport,type,duration_minutes,status,execution_result")
+    .select(`${SESSION_BASE_COLUMNS},execution_result`)
     .eq("athlete_id", deps.ctx.athleteId)
     .gte("date", since)
     .lte("date", today)

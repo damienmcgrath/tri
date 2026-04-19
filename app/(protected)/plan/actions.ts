@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { insertWithCompat, insertBatchWithCompat, updateWithCompat, isMissingColumnError, SESSIONS_OPTIONAL_COLUMNS } from "@/lib/supabase/schema-compat";
+import { getActivePlanId } from "@/lib/supabase/queries";
 
 const uuidSchema = z.string().uuid();
 
@@ -232,8 +233,8 @@ export async function deletePlanAction(formData: FormData) {
     throw new Error(error.message);
   }
 
-  const { data: currentProfile } = await supabase.from("profiles").select("active_plan_id").eq("id", user.id).maybeSingle();
-  if (currentProfile?.active_plan_id === parsed.planId) {
+  const currentActivePlanId = await getActivePlanId(supabase, user.id);
+  if (currentActivePlanId === parsed.planId) {
     const { data: fallbackPlan } = await supabase
       .from("training_plans")
       .select("id")
