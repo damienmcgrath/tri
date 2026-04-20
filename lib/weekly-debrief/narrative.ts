@@ -12,6 +12,7 @@ import { weeklyDebriefNarrativeSchema } from "./types";
 import { normalizeNarrativePayload, hydrateNarrativePayload } from "./deterministic";
 import type { WeeklyFindings } from "./analytic-findings";
 import type { WeeklyDebriefPriorHeadline } from "./variance-corpus";
+import { WEEKLY_NARRATIVE_FEW_SHOT_JSON } from "./examples";
 
 const SINGLE_PASS_INSTRUCTIONS = "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. If trendsThisWeek is provided, weave relevant session-over-session trends into observations (e.g. 'Your threshold run shows steady improvement over the last 3 weeks'). If scoreTrajectory is provided, reference the composite Training Score trajectory where it adds insight (e.g. score direction, which dimension is strongest/weakest). Do not over-emphasise scores — use them to contextualise, not replace, the evidence-based narrative. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence.\n" +
   "\n" +
@@ -19,7 +20,10 @@ const SINGLE_PASS_INSTRUCTIONS = "You write Weekly Debrief copy for endurance at
   "\n" +
   "teach (optional, ≤200 chars): when the week exposes a mechanistically important metric — aerobic decoupling across endurance work, variability index on intervals, negative-split failure, durability fade in the final session, HR↔pace divergence, power-per-HR shift — use teach to explain in one sentence *why* that metric matters for training. Set teach to null when no mechanism is worth explaining; do not manufacture a teach moment. Prefer a different mechanism than appears in priorHeadlines — rotate focus week over week. teach is separate from nonObviousInsight: insight observes *what* is true; teach explains *why* it matters.\n" +
   "\n" +
-  "Voice variance: priorHeadlines lists the athlete's most recent coachHeadline / executiveSummary / nonObviousInsight / takeawayTitle. Treat it as a 'do not reuse' corpus: do not echo those opening phrasings, metaphors, or framings. Concrete numbers, dates, and session names may repeat — the prose must not. Each week should sound distinct.";
+  "Voice variance: priorHeadlines lists the athlete's most recent coachHeadline / executiveSummary / nonObviousInsight / takeawayTitle. Treat it as a 'do not reuse' corpus: do not echo those opening phrasings, metaphors, or framings. Concrete numbers, dates, and session names may repeat — the prose must not. Each week should sound distinct.\n" +
+  "\n" +
+  "Few-shot examples (two realistic narratives covering a clean build week and a disrupted week; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:\n" +
+  WEEKLY_NARRATIVE_FEW_SHOT_JSON;
 
 const FINDINGS_DRIVEN_INSTRUCTIONS = "You write Weekly Debrief copy for endurance athletes. An analytic pass has already extracted structured findings — your job is voice and format, not re-analysis.\n" +
   "\n" +
@@ -36,7 +40,10 @@ const FINDINGS_DRIVEN_INSTRUCTIONS = "You write Weekly Debrief copy for enduranc
   "- Sport-specific: for runs weigh splits, HR drift, pace fade; for swims weigh rep structure, rest, stroke metrics; for rides weigh power, load, cadence.\n" +
   "- Avoid opening phrasings from prior weeks — each week must sound distinct. priorHeadlines (if present) is a 'do not reuse' corpus of the athlete's recent coachHeadline/executiveSummary/nonObviousInsight/takeawayTitle; do not echo those framings.\n" +
   "- If findings.confidenceNote is present, honour it: don't overclaim signals the analytic pass already flagged as under-evidenced.\n" +
-  "- Do not repeat the executiveSummary inside nonObviousInsight. They serve different purposes.";
+  "- Do not repeat the executiveSummary inside nonObviousInsight. They serve different purposes.\n" +
+  "\n" +
+  "Few-shot examples (two realistic narratives covering a clean build week and a disrupted week; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:\n" +
+  WEEKLY_NARRATIVE_FEW_SHOT_JSON;
 
 export async function generateNarrative(args: {
   facts: WeeklyDebriefFacts;

@@ -11,6 +11,7 @@ import {
   SESSION_VARIANCE_PROMPT,
   type SessionPriorHeadline,
 } from "@/lib/ai/session-variance-corpus";
+import { SESSION_VERDICT_FEW_SHOT_JSON } from "./session-verdict-examples";
 
 export const SESSION_VERDICT_PROMPT_VERSION = "v3";
 
@@ -423,7 +424,10 @@ export function buildVerdictInstructions(): string {
     "- NEVER reference the internal execution score or score band in execution_summary or any text field. The score is displayed separately in the UI.",
     "- Express interval completion as a count when possible (e.g. '3 of 5 intervals completed' or 'all 5 intervals completed'), not as a decimal or percentage of 'intervalCompletionPct'.",
     "- Express abbreviations in full on first use: 'NP' → 'normalized power', 'VI' → 'variability index', 'TSS' → 'training stress score'. After first use, abbreviations are fine.",
-    "- In execution_summary, write ONE clear sentence about whether the session achieved its purpose. Move specific metrics to metric_comparisons."
+    "- In execution_summary, write ONE clear sentence about whether the session achieved its purpose. Move specific metrics to metric_comparisons.",
+    "",
+    "Few-shot examples (three realistic verdicts across Z2 aerobic, threshold intervals, and heat-affected long run; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:",
+    SESSION_VERDICT_FEW_SHOT_JSON
   ].join("\n");
 }
 

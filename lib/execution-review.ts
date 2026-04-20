@@ -14,6 +14,7 @@ import {
   coachVerdictSchema,
   COACH_VERDICT_JSON_EXAMPLE,
 } from "@/lib/execution-review-types";
+import { COACH_VERDICT_FEW_SHOT_JSON } from "@/lib/execution-review-examples";
 import {
   nextCallFromEvidence,
   buildEvidenceSummary,
@@ -497,7 +498,10 @@ function buildCoachVerdictInstructions() {
     "- `citedEvidence[].claim`: max 200 chars.",
     "- `citedEvidence[].support`: max 4 short support strings, each max 180 chars.",
     "Required output schema example:",
-    COACH_VERDICT_JSON_EXAMPLE
+    COACH_VERDICT_JSON_EXAMPLE,
+    "",
+    "Few-shot examples (three realistic verdicts across different intent categories; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:",
+    COACH_VERDICT_FEW_SHOT_JSON
   ].join("\n");
 }
 
