@@ -5,6 +5,7 @@ import { DebriefFeedbackCard } from "./debrief-feedback-card";
 import { DebriefRefreshButton } from "./debrief-refresh-button";
 import { DetailsAccordion } from "../details-accordion";
 import { WEEKLY_DEBRIEF_GENERATION_VERSION, getAdjacentWeeklyDebriefs, getWeeklyDebriefSnapshot, refreshWeeklyDebrief } from "@/lib/weekly-debrief";
+import { LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER } from "@/lib/weekly-debrief/deterministic";
 import { localIsoDate } from "@/lib/activities/completed-activities";
 import { getMacroContext } from "@/lib/training/macro-context";
 import type { MacroContext } from "@/lib/training/macro-context";
@@ -395,22 +396,33 @@ export default async function DebriefPage({
         </div>
       </article>
 
-      {artifact.narrative.nonObviousInsight || artifact.narrative.teach ? (
-        <article className="debrief-section-card p-5">
-          {artifact.narrative.nonObviousInsight ? (
-            <>
-              <p className="debrief-kicker text-accent">Coach insight</p>
-              <p className="mt-3 text-[15px] font-medium leading-7 text-white">{artifact.narrative.nonObviousInsight}</p>
-            </>
-          ) : null}
-          {artifact.narrative.teach ? (
-            <>
-              <p className="debrief-kicker mt-5">Why this matters</p>
-              <p className="mt-3 text-sm leading-6 text-muted">{artifact.narrative.teach}</p>
-            </>
-          ) : null}
-        </article>
-      ) : null}
+      {(() => {
+        // Legacy pre-Stage-3 weekly_debriefs had no nonObviousInsight, so the
+        // read path injects a compat placeholder to satisfy zod validation —
+        // that placeholder is NOT athlete-facing copy. Sentinel-check it here
+        // so legacy rows render no Coach insight section at all (correct),
+        // not a "saved before this field existed" fake insight.
+        const rawInsight = artifact.narrative.nonObviousInsight;
+        const insight = rawInsight && rawInsight !== LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER ? rawInsight : null;
+        const teach = artifact.narrative.teach;
+        if (!insight && !teach) return null;
+        return (
+          <article className="debrief-section-card p-5">
+            {insight ? (
+              <>
+                <p className="debrief-kicker text-accent">Coach insight</p>
+                <p className="mt-3 text-[15px] font-medium leading-7 text-white">{insight}</p>
+              </>
+            ) : null}
+            {teach ? (
+              <>
+                <p className="debrief-kicker mt-5">Why this matters</p>
+                <p className="mt-3 text-sm leading-6 text-muted">{teach}</p>
+              </>
+            ) : null}
+          </article>
+        );
+      })()}
 
       <Suspense fallback={null}>
         <DebriefTrends supabase={supabase} userId={user.id} />

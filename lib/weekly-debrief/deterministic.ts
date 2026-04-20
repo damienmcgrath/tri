@@ -316,10 +316,15 @@ function normalizePersistedFacts(rawFacts: unknown): Record<string, unknown> {
 /**
  * Legacy debriefs were saved before `nonObviousInsight` existed on
  * `weeklyDebriefNarrativeSchema`. Injecting a neutral placeholder keeps the
- * read-path rendering instead of throwing — the field is required on fresh
+ * read-path zod validation from throwing — the field is required on fresh
  * generations (prompt + generator) but tolerated on historical reads.
+ *
+ * The placeholder is schema-compat only: the UI must NOT surface it as
+ * athlete-facing copy. Exported so render sites can sentinel-check the
+ * value and hide the Coach insight section for legacy rows rather than
+ * showing "saved before this field existed" as a real coach note.
  */
-const LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER =
+export const LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER =
   "No cross-session insight was captured for this debrief (saved before this field existed).";
 
 function ensureNarrativeHasInsight(narrative: unknown): unknown {
