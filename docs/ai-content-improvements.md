@@ -25,6 +25,8 @@ All generators run on `OPENAI_COACH_MODEL` (= `gpt-5-mini`), Zod-schema-enforced
 7. **Feedback loop only on weekly** — `session_verdicts` has no `helpful`/`accurate` capture.
 8. **Truncation bugs** — `adaptation_context` ends mid-word ("after your 10").
 9. **No insight floor** — prompts require fidelity, never require a non-obvious finding. Model defaults to safe restatement.
+10. **Session-verdict variance unverified** — templated-phrase audit was run on weekly debriefs only; session verdicts may have the same issue and no one has checked.
+11. **Injected signals are optional** — even when historical comparables / decoupling / weather are in context, prompts never require the output to reference them. Model can ignore them and still pass schema.
 
 ## The 5 stages
 
@@ -50,9 +52,11 @@ Expand `athlete-context.ts` and per-session evidence builder:
 - **3.1 — `nonObviousInsight` field** (all 3 schemas, 280 chars) ← **IN PROGRESS**. Must reference a signal the athlete wouldn't see by glancing at the session.
 - **3.2 — `teach` field** (optional, 200 chars) — explains *why* a metric matters when session exposes it (VI spike, decoupling, negative-split failure). Rotate focus.
 - **3.3 — Few-shot examples** — 2-3 per generator from golden set.
-- **3.4 — Variance prompt** — pass prior 4 headlines, instruct model not to reuse phrasings.
+- **3.4 — Variance prompt** — pass prior N headlines, instruct model not to reuse phrasings. Apply to **both** weekly debriefs (prior 4 weeks) and session verdicts (prior 3-5 same-sport headlines). Before shipping, run the weekly-debrief templated-phrase audit against `session_verdicts` to confirm the problem exists there too.
+- **3.4b — Required comparable reference** — when historical comparables are present in context, require session verdict / execution review output to cite at least one ("vs. last 3 tempo runs", "slower than prior same-HR Z2"). Enforce via schema-level required field (e.g. `comparableReference: string | null` with prompt rule: non-null when comparables exist).
 - **3.5 — Two-pass weekly debrief**: analytic pass (`gpt-5.4`, `effort: medium`) → structured findings, then narrative pass (`gpt-5-mini`) → voice/formatting.
 - **3.6 — Bump execution-review `effort: medium`** for key sessions only.
+- **3.7 — Cadence / pacing halves** — already collected on completed activities (noted line 44) but not threaded into session-overview context. Cheap win for run + bike verdicts (negative-split detection, cadence drift).
 
 ### Stage 4 — New generator: Progress Report (every 4 weeks or end-of-block)
 Compares current 4wk block vs. previous: pace-at-HR by discipline, CTL trajectory, durability (late-session fade), peak performances. Uses `gpt-5.4` + `effort: medium`. Tells athlete "you're getting fitter at X, here's the evidence."
@@ -60,7 +64,7 @@ Compares current 4wk block vs. previous: pace-at-HR by discipline, CTL trajector
 ### Stage 5 — Tooling polish
 - Retry with alternate prompt on schema-fail before deterministic fallback
 - Prompt versioning + A/B (`ai_prompt_version` column already exists)
-- Fix truncation — cap `max_output_tokens` on weekly_debrief
+- Fix truncation — cap `max_output_tokens` on weekly_debrief **and** on session verdicts / execution reviews (same bug class; `adaptation_context` already bitten — see Problem #8). Audit all generators, not just weekly.
 - OpenAI prompt caching — restructure so instructional scaffolding is cacheable prefix
 
 ## Current work — Stage 2 + Stage 3.1
@@ -76,6 +80,8 @@ Compares current 4wk block vs. previous: pace-at-HR by discipline, CTL trajector
 6. Rolling trends (4/8/12wk)
 7. Consecutive-hard-day count
 8. Feel × performance correlation
+9. Cadence / pacing halves (already collected; just thread into session-overview context — Stage 3.7)
+10. Required `comparableReference` field on session verdicts when comparables are present (Stage 3.4b)
 
 **Files expected to change:**
 - `lib/athlete-context.ts` — add historical comparables + rolling trends + feel-performance correlation
