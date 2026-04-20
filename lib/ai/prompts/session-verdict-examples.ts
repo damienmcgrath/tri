@@ -27,6 +27,8 @@ export const SESSION_VERDICT_FEW_SHOT: SessionVerdictOutput[] = [
       "Pace-at-138 bpm improved 4 s/km vs. your 8-week rolling average — aerobic ceiling is moving up under the same cardiac cost.",
     teach:
       "HR drift under 2% over 60 min of Z2 means oxygen delivery is keeping up with demand — the clearest signal the aerobic engine is still building capacity.",
+    comparable_reference:
+      "2026-02-14 Z2 run: 138 bpm at 5:32/km over 60 min — today 138 bpm at 5:28/km over 60 min, same HR cost, 4 s/km faster.",
     adaptation_signal:
       "Protect this pattern. Keep Wednesday's bike conservative so Thursday's key threshold run lands fresh. No plan changes needed.",
     adaptation_type: "proceed",
@@ -57,6 +59,8 @@ export const SESSION_VERDICT_FEW_SHOT: SessionVerdictOutput[] = [
       "HR drift of 7% between the first and last threshold reps vs. under 3% on your prior three threshold sessions points at durability, not top-end capacity, as the current limiter.",
     teach:
       "When pace drops but HR climbs inside an interval set, the aerobic system is losing efficiency before the legs — the fix is more volume, not harder intervals.",
+    comparable_reference:
+      "2026-04-06 threshold run: 168 bpm avg at 4:15/km with <3% drift, exec 86 — today 172 bpm on reps 1-4 but drifted to 178 bpm at 4:25/km by rep 6.",
     adaptation_signal:
       "Start Thursday's bike 5% easier than planned so Saturday's long run can absorb the residual cost. Next threshold attempt: hold the band across all 6 reps rather than pushing the first 4.",
     adaptation_type: "modify",
@@ -87,6 +91,8 @@ export const SESSION_VERDICT_FEW_SHOT: SessionVerdictOutput[] = [
       "At 28 °C, your HR at 5:20/km pace runs 6-8 bpm higher than on a 15 °C day — this session's drift reads as heat, not decoupling. The last two long runs at cool temps held HR flat.",
     teach:
       "Heat raises HR at the same pace because blood diverts to skin for cooling — hot-day HR under-reads fitness. Judge by effort and pace-at-cool-HR, not raw numbers.",
+    comparable_reference:
+      "2026-04-06 long run (15 °C): 148 bpm at 5:20/km held flat across both halves — today 148 bpm first half, 154 bpm second half at 5:26/km under 28 °C heat.",
     adaptation_signal:
       "No plan changes. Keep Tuesday's recovery spin easy given the Hard feel late in today's run. Next long run in cooler conditions will give a clean durability read.",
     adaptation_type: "proceed",

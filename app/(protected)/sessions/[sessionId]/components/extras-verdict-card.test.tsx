@@ -27,6 +27,7 @@ function makeVerdict(overrides: Partial<CoachVerdict> = {}): CoachVerdict {
     },
     nonObviousInsight: overrides.nonObviousInsight ?? "No comparative history available yet for this intent category.",
     teach: overrides.teach ?? null,
+    comparableReference: overrides.comparableReference ?? null,
     uncertainty: {
       label: "confident_read",
       detail: "Enough data to assess this session confidently.",

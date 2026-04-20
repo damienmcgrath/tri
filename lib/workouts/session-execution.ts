@@ -334,6 +334,22 @@ export function shouldRefreshExecutionResultFromActivity(
     ].some((value) => value !== null);
 
     if (!hasSplitMetricsInResult) return true;
+
+    // Cadence halves were added after the original split-metric fields. Legacy
+    // results may already carry HR/pace halves but lack cadence halves, which
+    // means the aggregate check above would short-circuit and the prompt
+    // context would never get the new signal. Trigger a refresh when the
+    // activity has cadence halves but the stored result does not.
+    const extended = splitMetrics as Record<string, number>;
+    const activityHasCadenceHalves =
+      typeof extended.firstHalfAvgCadence === "number" &&
+      typeof extended.lastHalfAvgCadence === "number";
+    if (activityHasCadenceHalves) {
+      const resultHasCadenceHalves =
+        getNumber(current, ["firstHalfAvgCadence", "first_half_avg_cadence"]) !== null &&
+        getNumber(current, ["lastHalfAvgCadence", "last_half_avg_cadence"]) !== null;
+      if (!resultHasCadenceHalves) return true;
+    }
   }
 
   if (activity.sport_type === "swim" && hasLapStructure && getNumber(current, ["lengthCount", "length_count"]) === null) {
@@ -514,6 +530,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
       nonObviousInsight:
         "Not enough comparative history or extended signals in this preview path to surface a cross-session finding.",
       teach: null,
+      comparableReference: null,
       uncertainty: {
         label: diagnosis.diagnosisConfidence === "high" ? "confident_read" : diagnosis.evidenceCount > 0 ? "early_read" : "insufficient_data",
         detail:

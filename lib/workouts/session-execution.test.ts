@@ -527,6 +527,63 @@ describe("shouldRefreshExecutionResultFromActivity", () => {
       }
     )).toBe(false);
   });
+
+  test("returns true when activity has cadence halves but stored result only carries HR halves", () => {
+    // Legacy result from before cadence halves were captured: HR halves
+    // satisfy the aggregate split-metric gate, so without the dedicated
+    // cadence check the prompt context would never see the new signal.
+    expect(shouldRefreshExecutionResultFromActivity(
+      {
+        firstHalfAvgHr: 140,
+        lastHalfAvgHr: 152,
+      },
+      {
+        id: "a1",
+        sport_type: "run",
+        duration_sec: 3600,
+        distance_m: 10000,
+        avg_hr: 148,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {
+          halves: {
+            firstHalfAvgHr: 140,
+            lastHalfAvgHr: 152,
+            firstHalfAvgCadence: 178,
+            lastHalfAvgCadence: 172,
+          }
+        }
+      }
+    )).toBe(true);
+  });
+
+  test("returns false when cadence halves are already in the stored result", () => {
+    expect(shouldRefreshExecutionResultFromActivity(
+      {
+        firstHalfAvgHr: 140,
+        lastHalfAvgHr: 152,
+        firstHalfAvgCadence: 178,
+        lastHalfAvgCadence: 172,
+      },
+      {
+        id: "a1",
+        sport_type: "run",
+        duration_sec: 3600,
+        distance_m: 10000,
+        avg_hr: 148,
+        avg_power: null,
+        parse_summary: {},
+        metrics_v2: {
+          halves: {
+            firstHalfAvgHr: 140,
+            lastHalfAvgHr: 152,
+            firstHalfAvgCadence: 178,
+            lastHalfAvgCadence: 172,
+          }
+        }
+      }
+    )).toBe(false);
+  });
 });
 
 describe("deriveWorkIntervalAvgPower", () => {
