@@ -87,6 +87,18 @@ type SessionVerdict = {
   adaptation_signal: string;
   adaptation_type: AdaptationType | null;
   stale_reason?: string | null;
+  /**
+   * Cross-session finding surfaced by the session-verdict generator. Pulled
+   * from `session_verdicts.raw_ai_response.non_obvious_insight`; null on
+   * legacy pre-Stage-3 rows until refresh-ai regenerates them.
+   */
+  non_obvious_insight?: string | null;
+  /**
+   * Optional one-sentence teach moment explaining *why* a metric matters.
+   * Pulled from `session_verdicts.raw_ai_response.teach`; null when the
+   * generator skipped it or on legacy rows.
+   */
+  teach?: string | null;
 };
 
 type Props = {
@@ -412,6 +424,24 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
             </div>
           )}
         </div>
+
+        {/* Coach insight — non-obvious cross-session finding, and optional teach moment */}
+        {(verdict.non_obvious_insight || verdict.teach) && (
+          <div className="px-5 py-4">
+            {verdict.non_obvious_insight && (
+              <>
+                <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-accent)]">Coach insight</p>
+                <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.non_obvious_insight)}</p>
+              </>
+            )}
+            {verdict.teach && (
+              <>
+                <p className="mt-3 text-xs uppercase tracking-[0.14em] text-tertiary">Why this matters</p>
+                <p className="mt-2 text-sm text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Part 3: Adaptation Signal */}
         <div className="px-5 py-4">

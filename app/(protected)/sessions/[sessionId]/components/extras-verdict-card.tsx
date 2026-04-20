@@ -201,6 +201,24 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
           ) : null}
         </div>
 
+        {/* Coach insight — the non-obvious cross-session finding, and optional teach */}
+        {verdict.nonObviousInsight || verdict.teach ? (
+          <div className="px-5 py-4">
+            {verdict.nonObviousInsight ? (
+              <>
+                <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-accent)]">Coach insight</p>
+                <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.nonObviousInsight)}</p>
+              </>
+            ) : null}
+            {verdict.teach ? (
+              <>
+                <p className="mt-3 text-xs uppercase tracking-[0.14em] text-tertiary">Why this matters</p>
+                <p className="mt-2 text-sm text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Part 3: What it means for your plan */}
         <div className="px-5 py-4">
           <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What this means for your plan</p>

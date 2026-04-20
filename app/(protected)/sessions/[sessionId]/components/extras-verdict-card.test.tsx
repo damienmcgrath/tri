@@ -264,6 +264,52 @@ describe("ExtrasVerdictCard", () => {
     expect(screen.queryByText("Strength session")).not.toBeInTheDocument();
   });
 
+  test("renders Coach insight with nonObviousInsight", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict({
+          nonObviousInsight: "HR drift 7% vs. your last three threshold sessions points at durability."
+        })}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+      />
+    );
+
+    expect(screen.getByText("Coach insight")).toBeInTheDocument();
+    expect(
+      screen.getByText("HR drift 7% vs. your last three threshold sessions points at durability.")
+    ).toBeInTheDocument();
+  });
+
+  test("renders 'Why this matters' block when teach is present", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict({
+          teach: "HR climbing while pace drops inside a set flags aerobic inefficiency."
+        })}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+      />
+    );
+
+    expect(screen.getByText("Why this matters")).toBeInTheDocument();
+    expect(
+      screen.getByText("HR climbing while pace drops inside a set flags aerobic inefficiency.")
+    ).toBeInTheDocument();
+  });
+
+  test("hides 'Why this matters' block when teach is null", () => {
+    render(
+      <ExtrasVerdictCard
+        verdict={makeVerdict({ teach: null })}
+        intentCategory="easy endurance"
+        narrativeSource="ai"
+      />
+    );
+
+    expect(screen.queryByText("Why this matters")).not.toBeInTheDocument();
+  });
+
   test("marks current intent as disabled in dropdown", () => {
     render(
       <ExtrasVerdictCard

@@ -1139,7 +1139,9 @@ export function createPreviewDatabase(): PreviewDatabase {
           carryForward: [
             "Protect the brick slot next week — even a shortened 20-minute transition run off the bike will rebuild the missing stimulus without requiring a full make-up session.",
             "In the next FTP Build, start 5 watts lower to hold form through all three reps rather than letting the last one fade."
-          ]
+          ],
+          nonObviousInsight: "Bike power has faded in the final rep of threshold work two weeks running — the pattern is emerging against a steady CTL climb, which points at durability catching up with the intensity ceiling rather than a top-end issue.",
+          teach: "When final-rep fade repeats at stable power but climbing HR, the aerobic system is losing efficiency late — the fix is more sub-threshold volume, not harder intervals."
         },
         coach_share: {
           headline: "Bookend quality held despite mid-week disruption",
@@ -1418,7 +1420,10 @@ export function createPreviewDatabase(): PreviewDatabase {
         affected_session_ids: null,
         discipline: "bike",
         feel_data: { overall_feel: 4, energy_level: "normal", motivation: "fired_up" },
-        raw_ai_response: null,
+        raw_ai_response: {
+          non_obvious_insight: "Power held 237 W across all three intervals with HR drift under 2% — your FTP-at-HR has improved 3 bpm vs. the same session four weeks ago at the same load.",
+          teach: "Stable HR at matched power across weeks is the clearest fitness signal for FTP work: the aerobic cost of the ceiling is dropping, so the ceiling can move up next block."
+        },
         ai_model_used: "preview",
         ai_prompt_version: "v1",
         created_at: "2026-03-10T08:05:00.000Z",
@@ -1449,7 +1454,10 @@ export function createPreviewDatabase(): PreviewDatabase {
         affected_session_ids: ["77777777-7777-4777-8777-777777777774"],
         discipline: "run",
         feel_data: { overall_feel: 2, energy_level: "low", legs_feel: "heavy" },
-        raw_ai_response: null,
+        raw_ai_response: {
+          non_obvious_insight: "HR ran 8 bpm hot at easy pace with a 12 s/km fade in the last third — two sleep-under-6h nights preceded this run, which explains the cardiac drift better than any fitness regression does.",
+          teach: "An easy-day HR that sits 5+ bpm above band with late fade points at recovery debt, not aerobic decline — the next easy day should be shortened or moved, not pushed."
+        },
         ai_model_used: "preview",
         ai_prompt_version: "v1",
         created_at: "2026-03-15T10:05:00.000Z",
