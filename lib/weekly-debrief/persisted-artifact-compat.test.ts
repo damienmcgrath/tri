@@ -1,4 +1,4 @@
-import { normalizePersistedArtifact } from "./deterministic";
+import { normalizePersistedArtifact, LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER } from "./deterministic";
 import type { WeeklyDebriefRecord } from "./types";
 
 /**
@@ -83,6 +83,16 @@ describe("normalizePersistedArtifact — legacy shape compatibility", () => {
     expect(artifact.narrative.nonObviousInsight).toBeTruthy();
     expect(artifact.narrative.nonObviousInsight).toMatch(/saved before this field existed/i);
     expect(artifact.narrative.executiveSummary).toBe("A mostly intact week.");
+  });
+
+  test("injects the exact LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER sentinel so render sites can detect and hide it", () => {
+    const record = buildLegacyRecord();
+    const artifact = normalizePersistedArtifact(record, "ready");
+    // The UI sentinel-checks against this exact constant to suppress the
+    // Coach insight card for legacy rows. If the placeholder string is
+    // changed here without updating the render site, legacy rows will
+    // surface it as real athlete copy.
+    expect(artifact.narrative.nonObviousInsight).toBe(LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER);
   });
 
   test("preserves a present nonObviousInsight on newly-generated narratives", () => {
