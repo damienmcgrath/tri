@@ -115,8 +115,11 @@ export async function getLatestPersistedProgressReport(args: {
 }
 
 /**
- * Max `updated_at` across the athlete's completed_activities in the block range
- * — used as the source-of-truth signal for report staleness.
+ * Max `created_at` across the athlete's completed_activities in the block range
+ * — used as the source-of-truth signal for report staleness. The table only
+ * stores `created_at`, so this catches new uploads/imports but not in-place
+ * re-parses of existing rows (acceptable: a re-parse without a new activity
+ * is not a meaningful block-level signal).
  */
 export async function getProgressReportSourceUpdatedAt(args: {
   supabase: SupabaseClient;
@@ -126,15 +129,15 @@ export async function getProgressReportSourceUpdatedAt(args: {
 }): Promise<string> {
   const { data, error } = await args.supabase
     .from("completed_activities")
-    .select("updated_at")
+    .select("created_at")
     .eq("user_id", args.athleteId)
     .gte("start_time_utc", `${args.priorBlockStart}T00:00:00.000Z`)
     .lte("start_time_utc", `${args.blockEnd}T23:59:59.999Z`)
-    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`progress-report source_updated_at: ${error.message}`);
-  if (data?.updated_at) return data.updated_at as string;
+  if (data?.created_at) return data.created_at as string;
   return PROGRESS_REPORT_EMPTY_SOURCE_UPDATED_AT;
 }
 

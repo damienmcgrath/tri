@@ -142,7 +142,7 @@ describe("getProgressReportReadiness", () => {
       completed_activities: {
         onAwait: async () => ({ data: null, error: null, count: 3 }),
         onMaybeSingle: async () => ({
-          data: { updated_at: "2026-04-18T10:00:00.000Z" },
+          data: { created_at: "2026-04-18T10:00:00.000Z" },
           error: null
         })
       }
