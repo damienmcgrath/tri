@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis, type SessionDiagnosisInput, type SplitMetrics } from "@/lib/coach/session-diagnosis";
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
-import { fetchSessionPriorHeadlines } from "@/lib/ai/session-variance-corpus";
+import { fetchExecutionReviewPriorHeadlines } from "@/lib/ai/session-variance-corpus";
 import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
 import { inferExtraIntent } from "@/lib/workouts/infer-extra-intent";
 import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
@@ -599,10 +599,10 @@ export async function syncSessionExecutionFromActivityLink(args: {
     }
   }
   evidence.extendedSignals = extendedSignals;
-  let priorHeadlines: Awaited<ReturnType<typeof fetchSessionPriorHeadlines>> = [];
+  let priorHeadlines: Awaited<ReturnType<typeof fetchExecutionReviewPriorHeadlines>> = [];
   if (session.date) {
     try {
-      priorHeadlines = await fetchSessionPriorHeadlines(
+      priorHeadlines = await fetchExecutionReviewPriorHeadlines(
         args.supabase,
         session.athlete_id ?? args.userId,
         session.date
@@ -936,10 +936,10 @@ export async function syncExtraActivityExecution(args: {
   }
   evidence.extendedSignals = extraExtendedSignals;
 
-  let extraPriorHeadlines: Awaited<ReturnType<typeof fetchSessionPriorHeadlines>> = [];
+  let extraPriorHeadlines: Awaited<ReturnType<typeof fetchExecutionReviewPriorHeadlines>> = [];
   if (activityStartDate) {
     try {
-      extraPriorHeadlines = await fetchSessionPriorHeadlines(
+      extraPriorHeadlines = await fetchExecutionReviewPriorHeadlines(
         args.supabase,
         args.userId,
         activityStartDate

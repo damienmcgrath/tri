@@ -1,14 +1,25 @@
 /**
  * Variance corpus for session-level AI verdicts.
  *
- * Prior verdicts are summarised into a compact list of phrasings the athlete
- * has already seen — the coach headline (when execution-review populated it),
- * the purpose statement, the execution summary, and the non-obvious insight.
- * The session-verdict and execution-review generators consume this list and
- * are instructed not to reuse the same framings so verdicts stop feeling
- * templated week-over-week.
+ * Two generators produce session-level verdicts and they write to different
+ * tables: the structured `session-verdict` flow writes to `session_verdicts`
+ * (dedicated columns + full payload in `raw_ai_response`), while the
+ * `execution-review` flow writes a `PersistedExecutionReview` JSONB into
+ * `sessions.execution_result` for planned sessions and into
+ * `completed_activities.execution_result` for extra (unplanned) activities.
  *
- * Mirrors the weekly-debrief variance-corpus pattern at
+ * Each generator therefore needs to see its *own* prior output to avoid
+ * repeating itself. This module provides two fetchers:
+ *
+ *   - `fetchSessionVerdictPriorHeadlines` — reads `session_verdicts`
+ *     (used by the session-verdict generator)
+ *   - `fetchExecutionReviewPriorHeadlines` — reads `sessions` + extras
+ *     (used by the execution-review generator; covers both planned sessions
+ *     and extra workouts)
+ *
+ * Both return the same `SessionPriorHeadline` shape so a single
+ * `SESSION_VARIANCE_PROMPT` can instruct either generator. Mirrors the
+ * weekly-debrief variance-corpus pattern at
  * `lib/weekly-debrief/variance-corpus.ts`.
  */
 
@@ -21,14 +32,23 @@ export type SessionPriorHeadline = {
   purposeHeadline: string | null;
   executionSummary: string | null;
   nonObviousInsight: string | null;
+  teach: string | null;
 };
 
+/** Row shape returned from `session_verdicts` joined to `sessions.date`. */
 export type PriorSessionVerdictRow = {
   session_id: string;
   purpose_statement?: unknown;
   execution_summary?: unknown;
   raw_ai_response?: unknown;
   sessions?: { date?: unknown } | Array<{ date?: unknown }> | null;
+};
+
+/** Row shape for `sessions.execution_result` or `completed_activities.execution_result`. */
+export type PriorExecutionReviewRow = {
+  id: string;
+  date: string;
+  execution_result: unknown;
 };
 
 function readString(source: unknown, key: string): string | null {
@@ -69,11 +89,11 @@ function readTopLevelString(source: unknown, key: string): string | null {
 }
 
 /**
- * Convert prior session_verdicts rows into a variance corpus for the next
- * generation. Ordered most-recent-first so the model weights the freshest
- * phrasings highest. Rows with no reusable phrasings are dropped.
+ * Convert prior `session_verdicts` rows into the variance corpus. Ordered
+ * most-recent-first by the caller. Rows with no reusable phrasings are
+ * dropped.
  */
-export function extractSessionPriorHeadlines(
+export function extractSessionVerdictPriorHeadlines(
   rows: PriorSessionVerdictRow[]
 ): SessionPriorHeadline[] {
   return rows
@@ -91,6 +111,7 @@ export function extractSessionPriorHeadlines(
         nonObviousInsight:
           readString(row.raw_ai_response, "non_obvious_insight") ??
           readString(row.raw_ai_response, "nonObviousInsight"),
+        teach: readString(row.raw_ai_response, "teach"),
       };
     })
     .filter((entry): entry is SessionPriorHeadline =>
@@ -98,18 +119,56 @@ export function extractSessionPriorHeadlines(
       (entry.coachHeadline != null ||
         entry.purposeHeadline != null ||
         entry.executionSummary != null ||
-        entry.nonObviousInsight != null)
+        entry.nonObviousInsight != null ||
+        entry.teach != null)
     );
 }
 
 /**
- * Fetch the most recent ready verdicts preceding a given session date, joined
- * to `sessions` for the date ordering. Returns up to `limit` rows.
- *
- * Note: uses `any` on the supabase client result because the generated types
- * don't model the join; the extractor validates the row shape at runtime.
+ * Convert prior `execution_result` blobs (from `sessions` or
+ * `completed_activities`) into the variance corpus. The verdict lives at
+ * `execution_result.verdict` under the `PersistedExecutionReview` shape.
  */
-export async function fetchSessionPriorHeadlines(
+export function extractExecutionReviewPriorHeadlines(
+  rows: PriorExecutionReviewRow[]
+): SessionPriorHeadline[] {
+  return rows
+    .map((row) => {
+      if (!row.id || !row.date || !row.execution_result) return null;
+      const verdict =
+        row.execution_result && typeof row.execution_result === "object" && !Array.isArray(row.execution_result)
+          ? (row.execution_result as Record<string, unknown>).verdict
+          : null;
+      if (!verdict || typeof verdict !== "object") return null;
+      return {
+        sessionId: row.id,
+        sessionDate: row.date,
+        coachHeadline: readNestedString(verdict, ["sessionVerdict", "headline"]),
+        purposeHeadline: readNestedString(verdict, ["explanation", "sessionIntent"]),
+        executionSummary:
+          readNestedString(verdict, ["explanation", "whatHappened"]) ??
+          readNestedString(verdict, ["sessionVerdict", "summary"]),
+        nonObviousInsight: readString(verdict, "nonObviousInsight"),
+        teach: readString(verdict, "teach"),
+      };
+    })
+    .filter((entry): entry is SessionPriorHeadline =>
+      entry !== null &&
+      (entry.coachHeadline != null ||
+        entry.purposeHeadline != null ||
+        entry.executionSummary != null ||
+        entry.nonObviousInsight != null ||
+        entry.teach != null)
+    );
+}
+
+/**
+ * Fetch the most recent `session_verdicts` rows preceding a given session
+ * date, joined to `sessions` for the date ordering. Orders by the joined
+ * `sessions.date` via the `referencedTable` option — without that option the
+ * URL key would be malformed and PostgREST would silently drop the sort.
+ */
+export async function fetchSessionVerdictPriorHeadlines(
   supabase: SupabaseClient,
   userId: string,
   beforeDate: string,
@@ -122,11 +181,70 @@ export async function fetchSessionPriorHeadlines(
     )
     .eq("user_id", userId)
     .lt("sessions.date", beforeDate)
-    .order("sessions(date)", { ascending: false })
+    .order("date", { referencedTable: "sessions", ascending: false })
     .limit(limit);
 
   if (!data) return [];
-  return extractSessionPriorHeadlines(data as PriorSessionVerdictRow[]);
+  return extractSessionVerdictPriorHeadlines(data as PriorSessionVerdictRow[]);
+}
+
+/**
+ * Fetch the most recent `execution_result` blobs the athlete has seen,
+ * combining planned sessions (`sessions.execution_result`) and extra
+ * workouts (`completed_activities.execution_result`). Both queries run in
+ * parallel and are merged, sorted most-recent-first, and capped at `limit`.
+ *
+ * `beforeDate` is a YYYY-MM-DD session date. Extras use `start_time_utc`
+ * and are converted to a YYYY-MM-DD date string for merging.
+ */
+export async function fetchExecutionReviewPriorHeadlines(
+  supabase: SupabaseClient,
+  userId: string,
+  beforeDate: string,
+  limit: number = 4
+): Promise<SessionPriorHeadline[]> {
+  const [sessionsResult, extrasResult] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("id, date, execution_result")
+      .eq("user_id", userId)
+      .lt("date", beforeDate)
+      .not("execution_result", "is", null)
+      .order("date", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("completed_activities")
+      .select("id, start_time_utc, execution_result")
+      .eq("user_id", userId)
+      .lt("start_time_utc", `${beforeDate}T00:00:00.000Z`)
+      .not("execution_result", "is", null)
+      .order("start_time_utc", { ascending: false })
+      .limit(limit),
+  ]);
+
+  const sessionRows = (sessionsResult.data ?? []) as Array<{
+    id: string;
+    date: string;
+    execution_result: unknown;
+  }>;
+  const extraRows = (extrasResult.data ?? []) as Array<{
+    id: string;
+    start_time_utc: string;
+    execution_result: unknown;
+  }>;
+
+  const normalized: PriorExecutionReviewRow[] = [
+    ...sessionRows,
+    ...extraRows.map((row) => ({
+      id: row.id,
+      date: typeof row.start_time_utc === "string" ? row.start_time_utc.slice(0, 10) : "",
+      execution_result: row.execution_result,
+    })),
+  ];
+
+  return extractExecutionReviewPriorHeadlines(normalized)
+    .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
+    .slice(0, limit);
 }
 
 /**
@@ -136,7 +254,8 @@ export async function fetchSessionPriorHeadlines(
  */
 export const SESSION_VARIANCE_PROMPT = [
   "Variance (priorHeadlines):",
-  "- priorHeadlines is a list of the athlete's most recent session verdicts (coachHeadline, purposeHeadline, executionSummary, nonObviousInsight). Treat it as a \"do not repeat\" corpus — not as evidence about this session.",
-  "- Your headline, purpose_statement, execution_summary, and non_obvious_insight must avoid reusing the opening phrasings, metaphors, or framings that appear in priorHeadlines. If this session genuinely echoes a prior pattern, describe the continuation in fresh language rather than restating the previous phrasing.",
+  "- priorHeadlines is a list of the athlete's most recent session verdicts (coachHeadline, purposeHeadline, executionSummary, nonObviousInsight, teach). Treat it as a \"do not repeat\" corpus — not as evidence about this session.",
+  "- Your headline, purpose_statement, execution_summary, non_obvious_insight, and teach must avoid reusing the opening phrasings, metaphors, or framings that appear in priorHeadlines. If this session genuinely echoes a prior pattern, describe the continuation in fresh language rather than restating the previous phrasing.",
+  "- In particular: rotate the teach mechanism. If recent priorHeadlines taught aerobic decoupling, prefer a different mechanism this time unless the evidence genuinely repeats.",
   "- Reusing concrete numbers, dates, or session names is fine — only the prose framings must be different."
 ].join("\n");

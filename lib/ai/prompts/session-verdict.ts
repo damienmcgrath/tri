@@ -7,7 +7,7 @@ import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
 import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
 import {
-  fetchSessionPriorHeadlines,
+  fetchSessionVerdictPriorHeadlines,
   SESSION_VARIANCE_PROMPT,
   type SessionPriorHeadline,
 } from "@/lib/ai/session-variance-corpus";
@@ -879,7 +879,7 @@ export async function generateSessionVerdict(
 
   let priorHeadlines: SessionPriorHeadline[] = [];
   try {
-    priorHeadlines = await fetchSessionPriorHeadlines(supabase, userId, ctx.session.date);
+    priorHeadlines = await fetchSessionVerdictPriorHeadlines(supabase, userId, ctx.session.date);
   } catch {
     priorHeadlines = [];
   }
