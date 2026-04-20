@@ -1,4 +1,5 @@
 import {
+  buildFallbackComparableReference,
   buildFallbackVerdict,
   buildVerdictInstructions,
   humanizeExecutionResult,
@@ -117,6 +118,71 @@ describe("humanizeExecutionResult", () => {
 
   test("returns null for null input", () => {
     expect(humanizeExecutionResult(null)).toBeNull();
+  });
+
+  test("surfaces cadence halves when both halves are present", () => {
+    const result = humanizeExecutionResult({
+      firstHalfAvgCadence: 178,
+      lastHalfAvgCadence: 172,
+    });
+    expect(result).toHaveProperty("cadence_drift_first_to_second_half");
+    expect(result!.cadence_drift_first_to_second_half).toMatch(/178 → 172 spm.*-6/);
+  });
+
+  test("surfaces swim pace halves", () => {
+    const result = humanizeExecutionResult({
+      firstHalfPacePer100mSec: 115,
+      lastHalfPacePer100mSec: 120,
+    });
+    expect(result).toHaveProperty("swim_pace_fade_first_to_second_half");
+    expect(result!.swim_pace_fade_first_to_second_half).toMatch(/1:55\/100m → 2:00\/100m/);
+  });
+
+  test("surfaces power halves with signed delta", () => {
+    const result = humanizeExecutionResult({
+      firstHalfAvgPower: 210,
+      lastHalfAvgPower: 198,
+    });
+    expect(result).toHaveProperty("power_drift_first_to_second_half");
+    expect(result!.power_drift_first_to_second_half).toMatch(/210 → 198 W/);
+  });
+
+  test("skips halves when only one side is populated", () => {
+    const result = humanizeExecutionResult({
+      firstHalfAvgCadence: 178,
+      lastHalfAvgCadence: null,
+    });
+    expect(result).not.toHaveProperty("cadence_drift_first_to_second_half");
+  });
+});
+
+describe("buildFallbackComparableReference", () => {
+  test("returns null when no comparables are available", () => {
+    expect(buildFallbackComparableReference([])).toBeNull();
+  });
+
+  test("returns a dated reference when a comparable is available", () => {
+    const ref = buildFallbackComparableReference([
+      {
+        sessionId: "prior-1",
+        date: "2026-04-06",
+        title: "Threshold bike",
+        durationMin: 60,
+        avgHr: 168,
+        avgPower: 245,
+        avgPaceSPerKm: null,
+        avgPacePer100mSec: null,
+        intentMatch: "on_target",
+        executionScore: 86,
+        takeaway: "Controlled, repeatable."
+      }
+    ]);
+    expect(ref).not.toBeNull();
+    expect(ref).toMatch(/2026-04-06/);
+    expect(ref).toMatch(/Threshold bike/);
+    expect(ref).toMatch(/exec 86/);
+    expect(ref).toMatch(/168 bpm/);
+    expect(ref).toMatch(/245 W/);
   });
 });
 

@@ -514,6 +514,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
       nonObviousInsight:
         "Not enough comparative history or extended signals in this preview path to surface a cross-session finding.",
       teach: null,
+      comparableReference: null,
       uncertainty: {
         label: diagnosis.diagnosisConfidence === "high" ? "confident_read" : diagnosis.evidenceCount > 0 ? "early_read" : "insufficient_data",
         detail:

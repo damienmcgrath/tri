@@ -6,6 +6,7 @@ import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
 import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
+import type { HistoricalComparable } from "@/lib/analytics/historical-comparables";
 import {
   fetchSessionVerdictPriorHeadlines,
   SESSION_VARIANCE_PROMPT,
@@ -54,6 +55,14 @@ export const sessionVerdictOutputSchema = z.object({
    * platitudes. Rotate focus across sessions.
    */
   teach: z.string().min(1).max(200).nullable(),
+  /**
+   * Concrete citation of at least one prior same-intent session the reader
+   * can anchor to (date + metric delta). Required non-null whenever
+   * `extendedSignals.historicalComparables` has at least one entry, so the
+   * model cannot ignore the comparables that were injected. Null only when
+   * no comparables are available.
+   */
+  comparable_reference: z.string().min(1).max(240).nullable(),
   adaptation_signal: z.string().min(1).max(800),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
   affected_session_ids: z.array(z.string()).max(5)
@@ -400,6 +409,16 @@ export function buildVerdictInstructions(): string {
     "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
     "- `teach` is separate from `non_obvious_insight`: insight observes *what* is true; teach explains *why* it matters for training.",
     "",
+    "COMPARABLE REFERENCE (`comparable_reference`) — ≤240 chars:",
+    "- When `extendedSignals.historicalComparables` has ≥1 entry, `comparable_reference` MUST be non-null and cite at least one prior session by date + metric delta (HR, pace, power, execution score, or its stored takeaway). Example: \"2026-04-13 threshold run: 168 bpm at 4:15/km; today 172 bpm at 4:15/km over the same 6× 5 min.\"",
+    "- When `historicalComparables` is empty, set `comparable_reference` to null. Do not invent a prior session.",
+    "- `comparable_reference` is the hard-wired proof the injected history was actually used. It complements `non_obvious_insight` rather than duplicating it.",
+    "",
+    "PACING & CADENCE HALVES (`executionResult` human-readable halves):",
+    "- `hr_drift_first_to_second_half`, `pace_fade_first_to_second_half`, `cadence_drift_first_to_second_half`, `swim_pace_fade_first_to_second_half`, `stroke_rate_drift_first_to_second_half`, and `power_drift_first_to_second_half` surface the two halves of the session when available.",
+    "- Cite them in `execution_summary` or `key_deviations` when the halves differ materially (cadence drop ≥3 spm, pace fade ≥3%, power drop ≥5%, stroke-rate drift on swim) — this is the cleanest negative-split / durability read available.",
+    "- When a half comparison is absent from `executionResult`, do not claim a split pattern.",
+    "",
     SESSION_VARIANCE_PROMPT,
     "",
     "FEEL DATA — CRITICAL:",
@@ -487,6 +506,32 @@ function formatPace100m(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}/100m`;
+}
+
+/**
+ * Compose a deterministic `comparable_reference` from the injected history.
+ * Used by the fallback verdict and the post-process enforcement when the
+ * model forgets to cite a comparable. Returns null when no prior session is
+ * available — the schema allows null and fabricating a reference would
+ * violate the "no invented facts" contract.
+ */
+export function buildFallbackComparableReference(
+  comparables: HistoricalComparable[]
+): string | null {
+  if (!Array.isArray(comparables) || comparables.length === 0) return null;
+  const first = comparables[0];
+  if (!first) return null;
+  const titleSegment = first.title ? ` ${first.title}` : "";
+  const metricBits: string[] = [];
+  if (typeof first.executionScore === "number") metricBits.push(`exec ${first.executionScore}`);
+  if (typeof first.avgHr === "number") metricBits.push(`${Math.round(first.avgHr)} bpm`);
+  if (typeof first.avgPower === "number") metricBits.push(`${Math.round(first.avgPower)} W`);
+  const base = metricBits.length > 0
+    ? `${first.date}${titleSegment}: ${metricBits.join(", ")}`
+    : `${first.date}${titleSegment}`;
+  const takeaway = first.takeaway ? ` — ${first.takeaway}` : "";
+  const full = `${base}${takeaway}`;
+  return full.length > 240 ? `${full.slice(0, 237)}...` : full;
 }
 
 export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput {
@@ -606,6 +651,7 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
   const comparables = ctx.extendedSignals?.historicalComparables ?? [];
   const decoupling = ctx.extendedSignals?.aerobicDecoupling ?? null;
   const weatherNotable = ctx.extendedSignals?.weather?.notable ?? [];
+  const comparableReference = buildFallbackComparableReference(comparables);
   let nonObviousInsight: string;
   if (decoupling && (decoupling.severity === "significant_drift" || decoupling.severity === "poor_durability")) {
     nonObviousInsight = `Cardiac-to-output drift of ${decoupling.percent.toFixed(1)}% from first to second half points at aerobic durability — not top-end capacity — as the current limiter.`;
@@ -630,6 +676,7 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
     key_deviations: [],
     non_obvious_insight: nonObviousInsight,
     teach: null,
+    comparable_reference: comparableReference,
     adaptation_signal: adaptationSignal,
     adaptation_type: adaptationType,
     affected_session_ids: []
@@ -704,13 +751,32 @@ export function humanizeExecutionResult(raw: Record<string, unknown> | null): Re
   // Elevation
   if (typeof raw.elevationGainM === "number") result["elevation_gain"] = `${Math.round(raw.elevationGainM)} m`;
 
-  // Split metrics (HR drift, pace fade)
+  // Split metrics (HR drift, pace fade, cadence drift, swim halves, power halves)
   if (typeof raw.firstHalfAvgHr === "number" && typeof raw.lastHalfAvgHr === "number") {
     const drift = ((raw.lastHalfAvgHr - raw.firstHalfAvgHr) / raw.firstHalfAvgHr * 100).toFixed(1);
     result["hr_drift_first_to_second_half"] = `${drift}% (${Math.round(raw.firstHalfAvgHr)} → ${Math.round(raw.lastHalfAvgHr)} bpm)`;
   }
   if (typeof raw.firstHalfPaceSPerKm === "number" && typeof raw.lastHalfPaceSPerKm === "number") {
-    result["pace_fade_first_to_second_half"] = `${formatPacePerKm(raw.firstHalfPaceSPerKm)} → ${formatPacePerKm(raw.lastHalfPaceSPerKm)}`;
+    const fadePct = ((raw.lastHalfPaceSPerKm - raw.firstHalfPaceSPerKm) / raw.firstHalfPaceSPerKm * 100).toFixed(1);
+    result["pace_fade_first_to_second_half"] = `${formatPacePerKm(raw.firstHalfPaceSPerKm)} → ${formatPacePerKm(raw.lastHalfPaceSPerKm)} (${fadePct}%)`;
+  }
+  if (typeof raw.firstHalfAvgCadence === "number" && typeof raw.lastHalfAvgCadence === "number") {
+    const delta = Math.round(raw.lastHalfAvgCadence - raw.firstHalfAvgCadence);
+    const sign = delta >= 0 ? "+" : "";
+    result["cadence_drift_first_to_second_half"] = `${Math.round(raw.firstHalfAvgCadence)} → ${Math.round(raw.lastHalfAvgCadence)} spm (${sign}${delta})`;
+  }
+  if (typeof raw.firstHalfPacePer100mSec === "number" && typeof raw.lastHalfPacePer100mSec === "number") {
+    const fadePct = ((raw.lastHalfPacePer100mSec - raw.firstHalfPacePer100mSec) / raw.firstHalfPacePer100mSec * 100).toFixed(1);
+    result["swim_pace_fade_first_to_second_half"] = `${formatPace100m(raw.firstHalfPacePer100mSec)} → ${formatPace100m(raw.lastHalfPacePer100mSec)} (${fadePct}%)`;
+  }
+  if (typeof raw.firstHalfStrokeRate === "number" && typeof raw.lastHalfStrokeRate === "number") {
+    const delta = Math.round(raw.lastHalfStrokeRate - raw.firstHalfStrokeRate);
+    const sign = delta >= 0 ? "+" : "";
+    result["stroke_rate_drift_first_to_second_half"] = `${Math.round(raw.firstHalfStrokeRate)} → ${Math.round(raw.lastHalfStrokeRate)} spm (${sign}${delta})`;
+  }
+  if (typeof raw.firstHalfAvgPower === "number" && typeof raw.lastHalfAvgPower === "number") {
+    const deltaPct = ((raw.lastHalfAvgPower - raw.firstHalfAvgPower) / raw.firstHalfAvgPower * 100).toFixed(1);
+    result["power_drift_first_to_second_half"] = `${Math.round(raw.firstHalfAvgPower)} → ${Math.round(raw.lastHalfAvgPower)} W (${deltaPct}%)`;
   }
 
   // Scoring — omit execution_score and execution_score_band from model input;
@@ -830,6 +896,7 @@ function normalizeSessionVerdictUnits(verdict: SessionVerdictOutput): SessionVer
     intended_metrics: n(verdict.intended_metrics),
     execution_summary: n(verdict.execution_summary),
     non_obvious_insight: n(verdict.non_obvious_insight),
+    comparable_reference: verdict.comparable_reference ? n(verdict.comparable_reference) : verdict.comparable_reference,
     adaptation_signal: trimToLastSentence(n(verdict.adaptation_signal)),
     metric_comparisons: verdict.metric_comparisons.map(mc => ({
       ...mc,
@@ -925,10 +992,28 @@ export async function generateSessionVerdict(
     normalizePayload: (raw) => {
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
       const record = raw as Record<string, unknown>;
-      if ("teach" in record) return record;
-      return { ...record, teach: null };
+      const patched: Record<string, unknown> = { ...record };
+      if (!("teach" in record)) patched.teach = null;
+      if (!("comparable_reference" in record)) {
+        const camelCase = (record as { comparableReference?: unknown }).comparableReference;
+        patched.comparable_reference = typeof camelCase === "string" && camelCase.length > 0
+          ? camelCase.slice(0, 240)
+          : null;
+      }
+      return patched;
     },
-    postProcess: normalizeSessionVerdictUnits
+    postProcess: (verdict) => {
+      const comparables = ctx.extendedSignals?.historicalComparables ?? [];
+      const expected = comparables.length > 0 ? buildFallbackComparableReference(comparables) : null;
+      if (comparables.length > 0 && !verdict.comparable_reference && expected) {
+        console.warn("[session-verdict] Model omitted comparable_reference despite comparables in context; injecting deterministic reference", {
+          sessionId,
+          comparableCount: comparables.length
+        });
+        verdict = { ...verdict, comparable_reference: expected };
+      }
+      return normalizeSessionVerdictUnits(verdict);
+    }
   });
 
   return {

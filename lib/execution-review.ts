@@ -7,6 +7,7 @@ import {
   type SessionPriorHeadline,
 } from "@/lib/ai/session-variance-corpus";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
+import type { HistoricalComparable } from "@/lib/analytics/historical-comparables";
 import { diagnoseCompletedSession, type SessionDiagnosisInput } from "@/lib/coach/session-diagnosis";
 import {
   type ExecutionEvidence,
@@ -179,6 +180,31 @@ function buildActualEvidence(input: SessionDiagnosisInput): ExecutionEvidence["a
 
 // asObject, asString, asStringArray, clip are now imported from @/lib/openai
 
+/**
+ * Build a deterministic `comparableReference` string from the injected
+ * historical comparables. Used by the fallback verdict and as the sanity-check
+ * replacement when the model forgets the field. Returns null when no
+ * comparables are present — the schema allows null, and fabricating a
+ * reference would violate the "don't invent facts" contract.
+ */
+function buildDeterministicComparableReference(
+  comparables: HistoricalComparable[]
+): string | null {
+  if (!Array.isArray(comparables) || comparables.length === 0) return null;
+  const first = comparables[0];
+  if (!first) return null;
+  const titleSegment = first.title ? ` ${first.title}` : "";
+  const metricBits: string[] = [];
+  if (typeof first.executionScore === "number") metricBits.push(`exec ${first.executionScore}`);
+  if (typeof first.avgHr === "number") metricBits.push(`${Math.round(first.avgHr)} bpm`);
+  if (typeof first.avgPower === "number") metricBits.push(`${Math.round(first.avgPower)} W`);
+  const base = metricBits.length > 0
+    ? `${first.date}${titleSegment}: ${metricBits.join(", ")}`
+    : `${first.date}${titleSegment}`;
+  const takeaway = first.takeaway ? ` — ${first.takeaway}` : "";
+  return clip(`${base}${takeaway}`, 240);
+}
+
 function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["nextCall"] | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -310,6 +336,10 @@ function normalizeCoachVerdictPayload(
           "No comparative history or cross-session signal was strong enough to surface a non-obvious finding for this session.",
         320
       ),
+      comparableReference: (() => {
+        const candidate = asString(root.comparableReference) ?? asString(root.comparable_reference);
+        return candidate ? clip(candidate, 240) : null;
+      })(),
       uncertainty: {
         label: missingEvidence.length > 0 || uncertaintyDetailParts.length > 0 ? "early_read" : "confident_read",
         detail: clip(
@@ -338,7 +368,9 @@ function coerceCoachVerdictPayload(
     nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
   }
 ) {
-  const normalizedPayload = ensureTeachField(normalizeCoachVerdictPayload(payload, defaults));
+  const normalizedPayload = ensureOptionalInsightFields(
+    normalizeCoachVerdictPayload(payload, defaults)
+  );
   const parsed = coachVerdictSchema.safeParse(normalizedPayload);
   return {
     normalizedPayload,
@@ -347,16 +379,23 @@ function coerceCoachVerdictPayload(
 }
 
 /**
- * Inject `teach: null` when the payload does not already carry one. Legacy
- * payloads (DB-stored verdicts pre-teach, hand-written test fixtures, LLM
- * drops) would otherwise fail zod validation now that `teach` is a required
- * nullable field on the schema.
+ * Inject `teach: null` and `comparableReference: null` when the payload does
+ * not already carry them. Legacy payloads (DB-stored verdicts written before
+ * these fields existed, hand-written test fixtures, LLM drops) would
+ * otherwise fail zod validation now that both are required nullable fields.
  */
-function ensureTeachField(payload: unknown): unknown {
+function ensureOptionalInsightFields(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
   const record = payload as Record<string, unknown>;
-  if ("teach" in record) return record;
-  return { ...record, teach: null };
+  const patched: Record<string, unknown> = { ...record };
+  if (!("teach" in record)) patched.teach = null;
+  if (!("comparableReference" in record)) {
+    const snakeCase = (record as { comparable_reference?: unknown }).comparable_reference;
+    patched.comparableReference = typeof snakeCase === "string" && snakeCase.length > 0
+      ? clip(snakeCase, 240)
+      : null;
+  }
+  return patched;
 }
 
 function formatSecondsToDuration(sec: number): string {
@@ -410,6 +449,7 @@ function normalizeVerdictUnits(verdict: CoachVerdict): CoachVerdict {
       whatToDoThisWeek: n(verdict.explanation.whatToDoThisWeek)
     },
     nonObviousInsight: n(verdict.nonObviousInsight),
+    comparableReference: verdict.comparableReference ? n(verdict.comparableReference) : verdict.comparableReference,
     uncertainty: {
       ...verdict.uncertainty,
       detail: n(verdict.uncertainty.detail)
@@ -475,6 +515,15 @@ function buildCoachVerdictInstructions() {
     "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
     "- `teach` is separate from `nonObviousInsight`: insight observes *what* is true; teach explains *why* it matters.",
     "",
+    "comparableReference (≤240 chars):",
+    "- When `extendedSignals.historicalComparables` has ≥1 entry, `comparableReference` MUST be non-null and cite at least one prior session by its date, naming the metric delta (HR, pace, power, execution score, or takeaway). Example: \"2026-04-06 threshold bike: 168 bpm at 245 W; today 172 bpm at 245 W.\"",
+    "- When `historicalComparables` is empty (no prior same-intent session), set `comparableReference` to null. Do not invent a comparable.",
+    "- `comparableReference` is the hard-wired proof that the injected history was actually used; it complements `nonObviousInsight` rather than duplicating it.",
+    "",
+    "Pacing and cadence halves:",
+    "- `actual.splitMetrics` carries first-half vs last-half values for HR, pace, power, cadence, pace-per-100m, and stroke rate. When two halves differ materially (cadence drop ≥3 spm, pace fade ≥3%, power drop ≥5%, stroke-rate drift on swim), cite the split comparison directly in `whatHappened` or `citedEvidence` — this is the cleanest negative-split / durability read available.",
+    "- Do not invent halves that are not present. If `splitMetrics` is null, do not claim a split pattern.",
+    "",
     SESSION_VARIANCE_PROMPT,
     "",
     "Field requirements:",
@@ -491,6 +540,7 @@ function buildCoachVerdictInstructions() {
     "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
     "- `nonObviousInsight`: one finding grounded in an extended signal, max 320 chars. Required.",
     "- `teach`: optional mechanistic explanation, max 200 chars. Null when nothing is worth teaching.",
+    "- `comparableReference`: cite of ≥1 prior session by date + metric delta, max 240 chars. Required non-null when historicalComparables is non-empty; null otherwise.",
     "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
     "- `uncertainty.detail`: explain the confidence level plainly, max 500 chars.",
     "- `uncertainty.missingEvidence`: array of missing evidence strings, max 8 items.",
@@ -546,6 +596,7 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
   const decoupling = evidence.extendedSignals?.aerobicDecoupling ?? null;
   const comparables = evidence.extendedSignals?.historicalComparables ?? [];
   const weatherNotable = evidence.extendedSignals?.weather?.notable ?? [];
+  const comparableReference = buildDeterministicComparableReference(comparables);
   let nonObviousInsight: string;
   if (decoupling && (decoupling.severity === "significant_drift" || decoupling.severity === "poor_durability")) {
     nonObviousInsight = `Cardiac-to-output drift of ${decoupling.percent.toFixed(1)}% from the first half to the second points at aerobic durability, not top-end capacity, as the current limiter.`;
@@ -613,6 +664,7 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
     },
     nonObviousInsight,
     teach: null,
+    comparableReference,
     uncertainty: {
       label: uncertaintyLabel,
       detail:
@@ -750,6 +802,10 @@ export async function generateCoachVerdict(args: {
 
   const reasoningEffort = reasoningEffortForSession(args.evidence.planned.sessionRole);
 
+  const comparables = args.evidence.extendedSignals?.historicalComparables ?? [];
+  const expectedComparableReference =
+    comparables.length > 0 ? buildDeterministicComparableReference(comparables) : null;
+
   const result = await callOpenAIWithFallback<CoachVerdict>({
     logTag: "session-review-ai",
     fallback: deterministicFallback,
@@ -790,7 +846,23 @@ export async function generateCoachVerdict(args: {
       }
       return undefined;
     },
-    postProcess: normalizeVerdictUnits
+    postProcess: (verdict) => {
+      // Enforce 3.4b: when historicalComparables are present, the verdict must
+      // cite at least one. If the model omitted it, splice in a deterministic
+      // reference rather than discarding the rest of its output — the rest of
+      // the verdict is still higher quality than the full fallback.
+      const patched: CoachVerdict =
+        comparables.length > 0 && !verdict.comparableReference && expectedComparableReference
+          ? { ...verdict, comparableReference: expectedComparableReference }
+          : verdict;
+      if (comparables.length > 0 && !verdict.comparableReference) {
+        console.warn("[session-review-ai] Model omitted comparableReference despite comparables in context; injecting deterministic reference", {
+          sessionId: args.evidence.sessionId,
+          comparableCount: comparables.length
+        });
+      }
+      return normalizeVerdictUnits(patched);
+    }
   });
 
   return { verdict: result.value, source: result.source };

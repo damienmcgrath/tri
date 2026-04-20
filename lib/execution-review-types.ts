@@ -184,6 +184,15 @@ export type CoachVerdict = {
    * platitudes. Rotate focus across sessions.
    */
   teach: string | null;
+  /**
+   * Concrete citation of at least one prior same-intent session the reader
+   * can anchor to — date + metric delta (e.g. "2026-04-13 threshold bike:
+   * 172 bpm at 250 W; today 178 bpm at same power"). Required to be non-null
+   * whenever `extendedSignals.historicalComparables` has at least one entry
+   * so the model cannot ignore the comparables that were injected. Null only
+   * when no comparables are available.
+   */
+  comparableReference: string | null;
   uncertainty: {
     label: "confident_read" | "early_read" | "insufficient_data";
     detail: string;
@@ -300,6 +309,7 @@ export const coachVerdictSchema = z.object({
   }),
   nonObviousInsight: z.string().min(1).max(320),
   teach: z.string().min(1).max(200).nullable(),
+  comparableReference: z.string().min(1).max(240).nullable(),
   uncertainty: z.object({
     label: z.enum(["confident_read", "early_read", "insufficient_data"]),
     detail: z.string().min(1).max(500),
@@ -330,6 +340,7 @@ export const COACH_VERDICT_EXAMPLE: CoachVerdict = {
   },
   nonObviousInsight: "HR drifted 7% vs. your last three threshold sessions, which held under 3%. The stimulus still landed, but durability is the next limiter — not top-end power.",
   teach: "HR drift above 5% at steady output flags a durability ceiling: the aerobic system is losing efficiency under load before power drops, so the next gain comes from volume, not intensity.",
+  comparableReference: "2026-04-06 threshold bike: 168 bpm at 245 W with <3% drift — today's 172 bpm at 245 W drifted to 181 bpm by rep 4 at the same target power.",
   uncertainty: {
     label: "early_read",
     detail: "This read is useful, but it is still limited by missing split or interval detail.",

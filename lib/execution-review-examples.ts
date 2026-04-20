@@ -28,6 +28,7 @@ export const COACH_VERDICT_FEW_SHOT: CoachVerdict[] = [
     },
     nonObviousInsight: "Pace-at-138bpm improved 4s/km vs. your 8-week rolling average — the aerobic ceiling is moving up under the same cardiac cost.",
     teach: "HR drift under 2% at steady output over 60 min is the clearest signal that the aerobic system is building capacity: oxygen delivery is keeping pace with demand without creeping effort.",
+    comparableReference: "2026-02-14 Z2 run: 138 bpm at 5:32/km — today 138 bpm at 5:28/km over the same 60 min, 4 s/km faster at the same cardiac cost.",
     uncertainty: {
       label: "confident_read",
       detail: "Full split evidence and HR trace make this a strong read.",
@@ -59,6 +60,7 @@ export const COACH_VERDICT_FEW_SHOT: CoachVerdict[] = [
     },
     nonObviousInsight: "This is the third consecutive long ride where drift spiked after hour two at a similar power — durability, not top-end, is the pattern across the block.",
     teach: "Aerobic decoupling above 5% over a long ride means oxygen supply is outrunning delivery as substrate and thermoregulation load up — volume, fuelling, and pacing are the fixes, not more intensity.",
+    comparableReference: "2026-04-05 long ride: 205 W with 6% drift after hour two; 2026-03-22: 200 W with 5% drift — today's 8% at the same 205 W extends the trend.",
     uncertainty: {
       label: "confident_read",
       detail: "Three prior comparable rides make this a high-confidence trend read.",
