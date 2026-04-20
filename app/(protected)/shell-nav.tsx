@@ -7,7 +7,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "◧" },
   { href: "/plan", label: "Plan", icon: "▦" },
   { href: "/calendar", label: "Calendar", icon: "◫" },
-  { href: "/coach", label: "Coach", icon: "◎", deemphasized: true }
+  { href: "/coach", label: "Coach", icon: "◎", deemphasized: true },
+  { href: "/progress-report", label: "Progress", icon: "↗", deemphasized: true }
 ];
 
 export function ShellNavRail({ compact = false }: { compact?: boolean }) {
@@ -47,7 +48,7 @@ export function MobileBottomTabs() {
 
   return (
     <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-[rgba(10,10,11,0.96)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
