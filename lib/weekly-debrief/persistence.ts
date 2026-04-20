@@ -31,6 +31,7 @@ import {
 } from "./deterministic";
 import { buildWeeklyDebriefFacts } from "./facts";
 import { generateNarrative } from "./narrative";
+import { generateAnalyticFindings } from "./analytic-findings";
 
 async function loadWeeklyDebriefInputs(args: {
   supabase: SupabaseClient;
@@ -338,6 +339,19 @@ export async function computeWeeklyDebrief(args: {
       }))
     : null;
 
+  // Two-pass: analytic findings (gpt-5.4, effort: medium) → narrative (gpt-5-mini).
+  // If the analytic pass falls back, the narrative pass runs single-pass on raw inputs.
+  const analytic = await generateAnalyticFindings({
+    facts: base.facts,
+    evidence: base.evidence,
+    activityEvidence: base.activityEvidence,
+    athleteContext: inputs.athleteContext,
+    checkIn: inputs.checkIn,
+    recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
+    trendsThisWeek,
+    scoreTrajectory,
+  });
+
   const generated = await generateNarrative({
     facts: base.facts,
     evidence: base.evidence,
@@ -348,6 +362,7 @@ export async function computeWeeklyDebrief(args: {
     recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
     trendsThisWeek,
     scoreTrajectory,
+    findings: analytic.findings,
   });
   const narrative = generated.narrative;
   const facts = weeklyDebriefFactsSchema.parse({
