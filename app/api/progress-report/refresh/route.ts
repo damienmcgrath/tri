@@ -3,7 +3,10 @@ import { z } from "zod";
 import { isSameOrigin, getClientIp } from "@/lib/security/request";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { refreshProgressReport } from "@/lib/progress-report";
+import {
+  refreshProgressReport,
+  ProgressReportInsufficientDataError
+} from "@/lib/progress-report";
 import { localIsoDate } from "@/lib/activities/completed-activities";
 
 const refreshInputSchema = z.object({
@@ -59,6 +62,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, artifact });
   } catch (error) {
+    if (error instanceof ProgressReportInsufficientDataError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: "insufficient_data",
+          currentBlockActivityCount: error.currentBlockActivityCount
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       {
         error:

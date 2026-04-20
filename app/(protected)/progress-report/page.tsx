@@ -368,10 +368,15 @@ export default async function ProgressReportPage({
     blockEnd
   });
 
+  // Gate the auto-refresh on readiness. Without this, an athlete with zero
+  // current-block activities would re-trigger AI generation on every page
+  // load because the source_updated_at sentinel plus the refresh path would
+  // never settle into a stable "empty" state.
   const needsRefresh =
-    !snapshot.artifact ||
-    snapshot.stale ||
-    snapshot.artifact.generationVersion < PROGRESS_REPORT_GENERATION_VERSION;
+    snapshot.readiness.hasSufficientData &&
+    (!snapshot.artifact ||
+      snapshot.stale ||
+      snapshot.artifact.generationVersion < PROGRESS_REPORT_GENERATION_VERSION);
 
   if (needsRefresh) {
     try {
@@ -393,11 +398,10 @@ export default async function ProgressReportPage({
   }
 
   if (!snapshot.artifact) {
-    return renderEmptyState(
-      snapshot.blockEnd,
-      snapshot.sourceUpdatedAt,
-      "We need activity data from the last 8 weeks to compare blocks. Log a few sessions and come back."
-    );
+    const reason = snapshot.readiness.hasSufficientData
+      ? "We couldn't assemble a report for this block. Try again shortly."
+      : `We need at least ${snapshot.readiness.currentBlockActivityCount === 0 ? "one activity" : "more activities"} in the current 4-week block to compare it to the prior one. Log a few sessions and come back.`;
+    return renderEmptyState(snapshot.blockEnd, snapshot.sourceUpdatedAt, reason);
   }
 
   return <section className="space-y-4">{renderArtifact(snapshot.artifact, snapshot.stale)}</section>;

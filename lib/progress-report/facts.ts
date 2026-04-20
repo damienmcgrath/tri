@@ -238,8 +238,20 @@ function buildFitnessTrajectory(
       .sort((a, b) => a.date.localeCompare(b.date));
     if (list.length === 0) continue;
 
-    const startRow = list.find((r) => r.date >= blockStart) ?? list[0];
-    const endRow = [...list].reverse().find((r) => r.date <= blockEnd) ?? list[list.length - 1];
+    // Require actual current-block coverage. Otherwise we'd emit prior-block
+    // CTL values as the "current" block, producing a bogus trajectory.
+    const endRow = [...list]
+      .reverse()
+      .find((r) => r.date >= blockStart && r.date <= blockEnd);
+    if (!endRow) continue;
+
+    // Prefer the CTL from the day before the block (true start-of-block
+    // value), falling back to the earliest in-block row if the athlete's
+    // fitness history starts mid-block.
+    const startRow =
+      [...list].reverse().find((r) => r.date < blockStart) ??
+      list.find((r) => r.date >= blockStart && r.date <= blockEnd)!;
+
     const priorEndRow = [...list]
       .reverse()
       .find((r) => r.date <= priorBlockEnd) ?? null;
@@ -706,6 +718,23 @@ export async function buildProgressReportFacts(args: {
         .gte("date", bounds.priorBlockStart)
         .lte("date", bounds.blockEnd)
     ]);
+
+  if (currentActivitiesRes.error) {
+    throw new Error(
+      `progress-report current activities: ${currentActivitiesRes.error.message}`
+    );
+  }
+  if (priorActivitiesRes.error) {
+    throw new Error(
+      `progress-report prior activities: ${priorActivitiesRes.error.message}`
+    );
+  }
+  if (fitnessRes.error) {
+    throw new Error(`progress-report athlete_fitness: ${fitnessRes.error.message}`);
+  }
+  if (sessionsRes.error) {
+    throw new Error(`progress-report sessions: ${sessionsRes.error.message}`);
+  }
 
   const currentActivities = (currentActivitiesRes.data ?? []) as ActivityRow[];
   const priorActivities = (priorActivitiesRes.data ?? []) as ActivityRow[];

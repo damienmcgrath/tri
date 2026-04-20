@@ -7,7 +7,10 @@ import {
   getPersistedProgressReport,
   getLatestPersistedProgressReport,
   getProgressReportSourceUpdatedAt,
-  isProgressReportStale
+  getProgressReportReadiness,
+  isProgressReportStale,
+  PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES,
+  type ProgressReportReadiness
 } from "./persistence";
 import {
   progressReportFactsSchema,
@@ -49,9 +52,31 @@ export {
   getPersistedProgressReport,
   getLatestPersistedProgressReport,
   getProgressReportSourceUpdatedAt,
+  getProgressReportReadiness,
   isProgressReportStale,
-  saveProgressReportFeedback
+  saveProgressReportFeedback,
+  PROGRESS_REPORT_EMPTY_SOURCE_UPDATED_AT,
+  PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES
 } from "./persistence";
+
+export type { ProgressReportReadiness } from "./persistence";
+
+/**
+ * Thrown by refreshProgressReport when the current block has fewer than
+ * PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES activities. Callers (pages, API
+ * routes) should catch this and render an empty state without retrying.
+ */
+export class ProgressReportInsufficientDataError extends Error {
+  readonly currentBlockActivityCount: number;
+  constructor(currentBlockActivityCount: number) {
+    super(
+      `Progress report requires at least ${PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES} ` +
+        `activity in the current block; found ${currentBlockActivityCount}.`
+    );
+    this.name = "ProgressReportInsufficientDataError";
+    this.currentBlockActivityCount = currentBlockActivityCount;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Snapshot: a single high-level loader that pages/API routes can call.
@@ -65,6 +90,7 @@ export type ProgressReportSnapshot = {
   artifact: ProgressReportArtifact | null;
   stale: boolean;
   sourceUpdatedAt: string;
+  readiness: ProgressReportReadiness;
 };
 
 function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportArtifact | null {
@@ -103,15 +129,16 @@ export async function getProgressReportSnapshot(args: {
 }): Promise<ProgressReportSnapshot> {
   const bounds = computeBlockBoundaries(args.blockEnd);
 
-  const [record, sourceUpdatedAt] = await Promise.all([
+  const [record, readiness] = await Promise.all([
     getPersistedProgressReport({
       supabase: args.supabase,
       athleteId: args.athleteId,
       blockStart: bounds.blockStart
     }),
-    getProgressReportSourceUpdatedAt({
+    getProgressReportReadiness({
       supabase: args.supabase,
       athleteId: args.athleteId,
+      blockStart: bounds.blockStart,
       priorBlockStart: bounds.priorBlockStart,
       blockEnd: bounds.blockEnd
     })
@@ -120,7 +147,7 @@ export async function getProgressReportSnapshot(args: {
   const artifact = record ? hydratePersistedArtifact(record) : null;
   const stale = isProgressReportStale({
     persisted: record,
-    sourceUpdatedAt
+    sourceUpdatedAt: readiness.sourceUpdatedAt
   });
 
   return {
@@ -130,7 +157,8 @@ export async function getProgressReportSnapshot(args: {
     priorBlockEnd: bounds.priorBlockEnd,
     artifact,
     stale,
-    sourceUpdatedAt
+    sourceUpdatedAt: readiness.sourceUpdatedAt,
+    readiness
   };
 }
 
@@ -163,6 +191,12 @@ export async function computeProgressReport(args: {
   supabase: SupabaseClient;
   athleteId: string;
   blockEnd: string;
+  /**
+   * Override for the source timestamp (typically supplied by refreshProgressReport
+   * so the readiness and compute passes share one query). Falls back to a fresh
+   * lookup when omitted.
+   */
+  sourceUpdatedAt?: string;
 }): Promise<{
   facts: ProgressReportFacts;
   narrative: ProgressReportNarrative;
@@ -176,12 +210,14 @@ export async function computeProgressReport(args: {
       athleteId: args.athleteId,
       blockEnd: args.blockEnd
     }),
-    getProgressReportSourceUpdatedAt({
-      supabase: args.supabase,
-      athleteId: args.athleteId,
-      priorBlockStart: bounds.priorBlockStart,
-      blockEnd: bounds.blockEnd
-    })
+    args.sourceUpdatedAt !== undefined
+      ? Promise.resolve(args.sourceUpdatedAt)
+      : getProgressReportSourceUpdatedAt({
+          supabase: args.supabase,
+          athleteId: args.athleteId,
+          priorBlockStart: bounds.priorBlockStart,
+          blockEnd: bounds.blockEnd
+        })
   ]);
 
   const deterministic = buildDeterministicNarrative(facts);
@@ -201,6 +237,12 @@ export async function computeProgressReport(args: {
 /**
  * One-call orchestrator: compute and persist the report for the block ending
  * on `blockEnd`. Safe to re-run — upserts on (athlete_id, block_start).
+ *
+ * Throws `ProgressReportInsufficientDataError` when the current block has
+ * fewer than `PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES` activities. Callers
+ * should catch that case and render an empty state; persisting a synthesized
+ * "success" artifact from zero inputs would churn on every refresh and write
+ * fabricated content on every visit.
  */
 export async function refreshProgressReport(args: {
   supabase: SupabaseClient;
@@ -208,10 +250,24 @@ export async function refreshProgressReport(args: {
   blockEnd: string;
 }): Promise<ProgressReportArtifact> {
   const bounds = computeBlockBoundaries(args.blockEnd);
+
+  const readiness = await getProgressReportReadiness({
+    supabase: args.supabase,
+    athleteId: args.athleteId,
+    blockStart: bounds.blockStart,
+    priorBlockStart: bounds.priorBlockStart,
+    blockEnd: bounds.blockEnd
+  });
+
+  if (!readiness.hasSufficientData) {
+    throw new ProgressReportInsufficientDataError(readiness.currentBlockActivityCount);
+  }
+
   const computed = await computeProgressReport({
     supabase: args.supabase,
     athleteId: args.athleteId,
-    blockEnd: args.blockEnd
+    blockEnd: args.blockEnd,
+    sourceUpdatedAt: readiness.sourceUpdatedAt
   });
   return persistProgressReport({
     supabase: args.supabase,

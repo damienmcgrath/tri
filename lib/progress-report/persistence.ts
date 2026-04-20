@@ -18,6 +18,24 @@ export type ProgressReportComputed = {
   sourceUpdatedAt: string;
 };
 
+/**
+ * Stable sentinel used when the athlete has zero activities in the two-block
+ * window. Returning `new Date().toISOString()` here would change every call
+ * and permanently flag any persisted artifact as stale, causing infinite
+ * regeneration (and fabricated AI writes) on empty accounts.
+ */
+export const PROGRESS_REPORT_EMPTY_SOURCE_UPDATED_AT =
+  "1970-01-01T00:00:00.000Z";
+
+/** Current-block activity floor below which we refuse to compute a report. */
+export const PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES = 1;
+
+export type ProgressReportReadiness = {
+  currentBlockActivityCount: number;
+  hasSufficientData: boolean;
+  sourceUpdatedAt: string;
+};
+
 function normalizePersistedRecord(
   record: ProgressReportRecord,
   effectiveStatus: "ready" | "stale" | "failed"
@@ -106,7 +124,7 @@ export async function getProgressReportSourceUpdatedAt(args: {
   priorBlockStart: string;
   blockEnd: string;
 }): Promise<string> {
-  const { data } = await args.supabase
+  const { data, error } = await args.supabase
     .from("completed_activities")
     .select("updated_at")
     .eq("user_id", args.athleteId)
@@ -115,8 +133,47 @@ export async function getProgressReportSourceUpdatedAt(args: {
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) throw new Error(`progress-report source_updated_at: ${error.message}`);
   if (data?.updated_at) return data.updated_at as string;
-  return new Date().toISOString();
+  return PROGRESS_REPORT_EMPTY_SOURCE_UPDATED_AT;
+}
+
+/**
+ * Cheap readiness gate: counts activities in the current block and fetches
+ * the stable `source_updated_at` signal in parallel. Callers use the returned
+ * `hasSufficientData` to decide whether to run the AI generator at all.
+ */
+export async function getProgressReportReadiness(args: {
+  supabase: SupabaseClient;
+  athleteId: string;
+  blockStart: string;
+  priorBlockStart: string;
+  blockEnd: string;
+}): Promise<ProgressReportReadiness> {
+  const [countRes, sourceUpdatedAt] = await Promise.all([
+    args.supabase
+      .from("completed_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", args.athleteId)
+      .gte("start_time_utc", `${args.blockStart}T00:00:00.000Z`)
+      .lte("start_time_utc", `${args.blockEnd}T23:59:59.999Z`),
+    getProgressReportSourceUpdatedAt({
+      supabase: args.supabase,
+      athleteId: args.athleteId,
+      priorBlockStart: args.priorBlockStart,
+      blockEnd: args.blockEnd
+    })
+  ]);
+  if (countRes.error) {
+    throw new Error(`progress-report readiness count: ${countRes.error.message}`);
+  }
+  const currentBlockActivityCount = countRes.count ?? 0;
+  return {
+    currentBlockActivityCount,
+    hasSufficientData:
+      currentBlockActivityCount >= PROGRESS_REPORT_MIN_CURRENT_ACTIVITIES,
+    sourceUpdatedAt
+  };
 }
 
 export async function getPersistedProgressReport(args: {
