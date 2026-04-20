@@ -10,6 +10,7 @@ import type {
   WeeklyDebriefActivityEvidence,
   WeeklyDebriefCheckIn
 } from "./types";
+import type { WeeklyDebriefPriorHeadline } from "./variance-corpus";
 
 export const weeklyFindingsSchema = z.object({
   weekCharacter: z.string().min(1).max(120),
@@ -59,7 +60,13 @@ Hard constraints:
 - primaryInsight.confidence: "high" only if the pattern is supported by ≥3 sessions OR a multi-week trend; "medium" for a 2-session or cross-signal pattern; "low" when the signal is present but under-evidenced.
 - Do not repeat claims verbatim across patterns. Distinct patterns only.
 - If the week has too few completed sessions to detect a meaningful pattern, say so in primaryInsight.insight and set confidence: "low".
-- No hype, no diagnosis, no certainty beyond the data.`;
+- No hype, no diagnosis, no certainty beyond the data.
+
+Variance (priorHeadlines):
+- priorHeadlines is a list of the athlete's most recent weekly debriefs (coachHeadline, executiveSummary, nonObviousInsight, takeawayTitle). Treat it as a "do not repeat" corpus — not as evidence about training.
+- weekCharacter, every patterns[].claim, and primaryInsight.insight must avoid reusing the opening phrasings, metaphors, or framings that appear in priorHeadlines. If this week's signals genuinely match a prior pattern, describe the continuation in fresh language rather than restating the previous phrasing.
+- Specifically do not echo prior takeawayTitle phrases (e.g. "The week had one clear strength and one clear wobble") inside weekCharacter or primaryInsight.
+- Reusing concrete numbers, dates, or session names is fine — only the prose framings must be different.`;
 
 export async function generateAnalyticFindings(args: {
   facts: WeeklyDebriefFacts;
@@ -70,6 +77,7 @@ export async function generateAnalyticFindings(args: {
   recentFeedback?: Array<{ weekStart: string; helpful: boolean | null; accurate: boolean | null; note: string | null }>;
   trendsThisWeek?: Array<{ discipline: string; trend: string; confidence: string; summary: string }> | null;
   scoreTrajectory?: Array<{ date: string; composite: number; execution: number | null; progression: number | null; balance: number | null }> | null;
+  priorHeadlines?: WeeklyDebriefPriorHeadline[];
 }): Promise<{ findings: WeeklyFindings | null; source: "ai" | "fallback" }> {
   const result = await callOpenAIWithFallback<WeeklyFindings>({
     logTag: "weekly-debrief-findings",
@@ -109,7 +117,8 @@ export async function generateAnalyticFindings(args: {
                 } : null,
                 recentFeedback: args.recentFeedback ?? null,
                 trendsThisWeek: args.trendsThisWeek ?? null,
-                scoreTrajectory: args.scoreTrajectory ?? null
+                scoreTrajectory: args.scoreTrajectory ?? null,
+                priorHeadlines: args.priorHeadlines && args.priorHeadlines.length > 0 ? args.priorHeadlines : null
               })
             }
           ]
