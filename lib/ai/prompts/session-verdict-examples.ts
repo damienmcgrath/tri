@@ -86,7 +86,7 @@ export const SESSION_VERDICT_FEW_SHOT: SessionVerdictOutput[] = [
     non_obvious_insight:
       "At 28 °C, your HR at 5:20/km pace runs 6-8 bpm higher than on a 15 °C day — this session's drift reads as heat, not decoupling. The last two long runs at cool temps held HR flat.",
     teach:
-      "Heat raises HR at the same pace because blood is diverted to skin for cooling — judging fitness on hot-day HR alone under-reads the athlete. Look at perceived effort and pace-at-core-HR across days instead.",
+      "Heat raises HR at the same pace because blood diverts to skin for cooling — hot-day HR under-reads fitness. Judge by effort and pace-at-cool-HR, not raw numbers.",
     adaptation_signal:
       "No plan changes. Keep Tuesday's recovery spin easy given the Hard feel late in today's run. Next long run in cooler conditions will give a clean durability read.",
     adaptation_type: "proceed",
