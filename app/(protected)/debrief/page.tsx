@@ -395,6 +395,23 @@ export default async function DebriefPage({
         </div>
       </article>
 
+      {artifact.narrative.nonObviousInsight || artifact.narrative.teach ? (
+        <article className="debrief-section-card p-5">
+          {artifact.narrative.nonObviousInsight ? (
+            <>
+              <p className="debrief-kicker text-accent">Coach insight</p>
+              <p className="mt-3 text-[15px] font-medium leading-7 text-white">{artifact.narrative.nonObviousInsight}</p>
+            </>
+          ) : null}
+          {artifact.narrative.teach ? (
+            <>
+              <p className="debrief-kicker mt-5">Why this matters</p>
+              <p className="mt-3 text-sm leading-6 text-muted">{artifact.narrative.teach}</p>
+            </>
+          ) : null}
+        </article>
+      ) : null}
+
       <Suspense fallback={null}>
         <DebriefTrends supabase={supabase} userId={user.id} />
       </Suspense>

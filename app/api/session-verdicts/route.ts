@@ -22,6 +22,37 @@ function tryParseJson(value: string): unknown {
   }
 }
 
+/**
+ * `session_verdicts` has no dedicated columns for the non-obvious insight or
+ * the teach moment — both live inside the `raw_ai_response` JSONB. Surface
+ * them as top-level fields on the API response so the client component can
+ * render them without having to drill into the blob. Legacy rows (pre-teach,
+ * pre-insight) return null, so the UI renders nothing rather than breaking.
+ */
+function readStringField(source: unknown, key: string): string | null {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const value = (source as Record<string, unknown>)[key];
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function enrichVerdictResponse<T extends Record<string, unknown>>(verdict: T): T & {
+  non_obvious_insight: string | null;
+  teach: string | null;
+} {
+  const raw = (verdict as Record<string, unknown>).raw_ai_response;
+  const nonObviousInsight =
+    typeof verdict.non_obvious_insight === "string" && (verdict.non_obvious_insight as string).trim().length > 0
+      ? (verdict.non_obvious_insight as string)
+      : readStringField(raw, "non_obvious_insight") ?? readStringField(raw, "nonObviousInsight");
+  const teach =
+    typeof verdict.teach === "string" && (verdict.teach as string).trim().length > 0
+      ? (verdict.teach as string)
+      : readStringField(raw, "teach");
+  return { ...verdict, non_obvious_insight: nonObviousInsight, teach };
+}
+
 const requestSchema = z.object({
   sessionId: z.string().uuid(),
   regenerate: z.boolean().optional().default(false)
@@ -62,7 +93,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (existing) {
-        return NextResponse.json({ verdict: existing, source: "cached" });
+        return NextResponse.json({ verdict: enrichVerdictResponse(existing), source: "cached" });
       }
     }
 
@@ -115,8 +146,13 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("[SESSION_VERDICTS] Upsert error:", error.message);
-      // Still return the verdict even if save fails
-      return NextResponse.json({ verdict, source });
+      // Still return the verdict even if save fails. The in-memory verdict
+      // already carries non_obvious_insight + teach at top level, so the
+      // client renders them even when persistence failed.
+      return NextResponse.json({
+        verdict: enrichVerdictResponse(verdict as unknown as Record<string, unknown>),
+        source
+      });
     }
 
     // Auto-trigger adaptation rationale for modify/redistribute verdicts
@@ -149,7 +185,10 @@ export async function POST(request: Request) {
       console.warn("[SESSION_VERDICTS] Comparison trigger failed:", e);
     });
 
-    return NextResponse.json({ verdict: saved ?? verdict, source });
+    return NextResponse.json({
+      verdict: enrichVerdictResponse((saved ?? verdict) as unknown as Record<string, unknown>),
+      source
+    });
   } catch (error) {
     console.error("[SESSION_VERDICTS]", error);
     return NextResponse.json(

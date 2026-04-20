@@ -428,15 +428,34 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     adaptation_signal: string;
     adaptation_type: string | null;
     stale_reason: string | null;
+    non_obvious_insight: string | null;
+    teach: string | null;
   } | null;
   let existingVerdictData: VerdictData = null as VerdictData;
   if (session.status === "completed" && !activityId) {
     const { data: existingVerdict } = await supabase
       .from("session_verdicts")
-      .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type, stale_reason")
+      .select("purpose_statement, training_block_context, execution_summary, verdict_status, metric_comparisons, key_deviations, adaptation_signal, adaptation_type, stale_reason, raw_ai_response")
       .eq("session_id", session.id)
       .maybeSingle();
-    existingVerdictData = existingVerdict as typeof existingVerdictData;
+    if (existingVerdict) {
+      // non_obvious_insight and teach live inside raw_ai_response JSONB (no
+      // dedicated columns on session_verdicts). Surface them at the top level
+      // so SessionVerdictCard can render without drilling into the blob.
+      const raw = existingVerdict.raw_ai_response as Record<string, unknown> | null | undefined;
+      const readStr = (key: string): string | null => {
+        if (!raw || typeof raw !== "object") return null;
+        const value = raw[key];
+        if (typeof value !== "string") return null;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      };
+      existingVerdictData = {
+        ...existingVerdict,
+        non_obvious_insight: readStr("non_obvious_insight") ?? readStr("nonObviousInsight"),
+        teach: readStr("teach"),
+      } as VerdictData;
+    }
   }
 
   // Load session comparison, AI comparisons, and trends for completed sessions
