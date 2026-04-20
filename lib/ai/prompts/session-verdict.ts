@@ -526,12 +526,21 @@ export function buildFallbackComparableReference(
   if (typeof first.executionScore === "number") metricBits.push(`exec ${first.executionScore}`);
   if (typeof first.avgHr === "number") metricBits.push(`${Math.round(first.avgHr)} bpm`);
   if (typeof first.avgPower === "number") metricBits.push(`${Math.round(first.avgPower)} W`);
+  if (typeof first.avgPaceSPerKm === "number") metricBits.push(formatPacePerKmFromSeconds(first.avgPaceSPerKm));
+  if (typeof first.avgPacePer100mSec === "number") metricBits.push(formatPace100m(first.avgPacePer100mSec));
   const base = metricBits.length > 0
     ? `${first.date}${titleSegment}: ${metricBits.join(", ")}`
     : `${first.date}${titleSegment}`;
   const takeaway = first.takeaway ? ` — ${first.takeaway}` : "";
   const full = `${base}${takeaway}`;
   return full.length > 240 ? `${full.slice(0, 237)}...` : full;
+}
+
+function formatPacePerKmFromSeconds(sec: number): string {
+  const totalSec = Math.round(sec);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}/km`;
 }
 
 export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdictOutput {

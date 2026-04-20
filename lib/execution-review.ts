@@ -198,11 +198,20 @@ function buildDeterministicComparableReference(
   if (typeof first.executionScore === "number") metricBits.push(`exec ${first.executionScore}`);
   if (typeof first.avgHr === "number") metricBits.push(`${Math.round(first.avgHr)} bpm`);
   if (typeof first.avgPower === "number") metricBits.push(`${Math.round(first.avgPower)} W`);
+  if (typeof first.avgPaceSPerKm === "number") metricBits.push(formatSecondsToPacePerKm(first.avgPaceSPerKm));
+  if (typeof first.avgPacePer100mSec === "number") metricBits.push(formatSecondsToPacePer100m(first.avgPacePer100mSec));
   const base = metricBits.length > 0
     ? `${first.date}${titleSegment}: ${metricBits.join(", ")}`
     : `${first.date}${titleSegment}`;
   const takeaway = first.takeaway ? ` — ${first.takeaway}` : "";
   return clip(`${base}${takeaway}`, 240);
+}
+
+function formatSecondsToPacePer100m(sec: number): string {
+  const totalSec = Math.round(sec);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}/100m`;
 }
 
 function normalizeNextCall(value: unknown): CoachVerdict["sessionVerdict"]["nextCall"] | null {

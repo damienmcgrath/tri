@@ -184,6 +184,45 @@ describe("buildFallbackComparableReference", () => {
     expect(ref).toMatch(/168 bpm/);
     expect(ref).toMatch(/245 W/);
   });
+
+  test("formats run pace as min:sec/km when avgPaceSPerKm is present", () => {
+    const ref = buildFallbackComparableReference([
+      {
+        sessionId: "prior-1",
+        date: "2026-04-06",
+        title: "Threshold run",
+        durationMin: 45,
+        avgHr: 168,
+        avgPower: null,
+        avgPaceSPerKm: 255,
+        avgPacePer100mSec: null,
+        intentMatch: "on_target",
+        executionScore: 82,
+        takeaway: null
+      }
+    ]);
+    expect(ref).toMatch(/4:15\/km/);
+    expect(ref).toMatch(/168 bpm/);
+  });
+
+  test("formats swim pace as min:sec/100m when avgPacePer100mSec is present", () => {
+    const ref = buildFallbackComparableReference([
+      {
+        sessionId: "prior-1",
+        date: "2026-04-06",
+        title: "Swim CSS",
+        durationMin: 45,
+        avgHr: null,
+        avgPower: null,
+        avgPaceSPerKm: null,
+        avgPacePer100mSec: 95,
+        intentMatch: "on_target",
+        executionScore: 80,
+        takeaway: null
+      }
+    ]);
+    expect(ref).toMatch(/1:35\/100m/);
+  });
 });
 
 describe("sanitizeRawFieldNames", () => {
