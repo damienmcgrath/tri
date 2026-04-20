@@ -698,6 +698,12 @@ export function buildExecutionEvidence(args: {
   };
 }
 
+export function reasoningEffortForSession(
+  sessionRole: ExecutionEvidence["planned"]["sessionRole"]
+): "low" | "medium" {
+  return sessionRole === "key" ? "medium" : "low";
+}
+
 export async function generateCoachVerdict(args: {
   evidence: ExecutionEvidence;
   athleteContext: AthleteContextSnapshot | null;
@@ -710,13 +716,15 @@ export async function generateCoachVerdict(args: {
     nextCall: nextCallFromEvidence(args.evidence.rulesSummary.intentMatch, args.evidence.rulesSummary.executionCost)
   };
 
+  const reasoningEffort = reasoningEffortForSession(args.evidence.planned.sessionRole);
+
   const result = await callOpenAIWithFallback<CoachVerdict>({
     logTag: "session-review-ai",
     fallback: deterministicFallback,
-    logContext: { sessionId: args.evidence.sessionId },
+    logContext: { sessionId: args.evidence.sessionId, reasoningEffort },
     buildRequest: () => ({
       instructions: buildCoachVerdictInstructions(),
-      reasoning: { effort: "low" },
+      reasoning: { effort: reasoningEffort },
       max_output_tokens: 3000,
       text: {
         format: zodTextFormat(coachVerdictSchema, "session_coach_verdict", {
