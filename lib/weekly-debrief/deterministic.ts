@@ -192,7 +192,8 @@ export function buildDeterministicNarrative(args: {
     highlights,
     observations: args.observations.slice(0, Math.max(1, Math.min(3, args.observations.length))),
     carryForward: args.carryForward.slice(0, 2),
-    nonObviousInsight
+    nonObviousInsight,
+    teach: null
   });
 }
 
@@ -256,7 +257,8 @@ export function normalizeNarrativePayload(payload: unknown) {
     carryForward: coerceNarrativeList(record.carryForward, 2, 280),
     nonObviousInsight:
       coerceNarrativeString(record.nonObviousInsight, 360) ??
-      coerceNarrativeString(record.non_obvious_insight, 360)
+      coerceNarrativeString(record.non_obvious_insight, 360),
+    teach: coerceNarrativeString(record.teach, 200)
   };
 }
 
@@ -269,7 +271,8 @@ export function hydrateNarrativePayload(
     highlights: normalized.highlights.length > 0 ? normalized.highlights : fallback.highlights.slice(0, 3),
     observations: normalized.observations.length > 0 ? normalized.observations : fallback.observations.slice(0, 3),
     carryForward: normalized.carryForward.length > 0 ? normalized.carryForward : fallback.carryForward.slice(0, 2),
-    nonObviousInsight: normalized.nonObviousInsight ?? fallback.nonObviousInsight
+    nonObviousInsight: normalized.nonObviousInsight ?? fallback.nonObviousInsight,
+    teach: normalized.teach ?? fallback.teach ?? null
   };
 }
 
@@ -322,8 +325,11 @@ const LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER =
 function ensureNarrativeHasInsight(narrative: unknown): unknown {
   if (!narrative || typeof narrative !== "object" || Array.isArray(narrative)) return narrative;
   const record = narrative as Record<string, unknown>;
-  if (typeof record.nonObviousInsight === "string" && record.nonObviousInsight.trim().length > 0) return record;
-  return { ...record, nonObviousInsight: LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER };
+  const withInsight =
+    typeof record.nonObviousInsight === "string" && record.nonObviousInsight.trim().length > 0
+      ? record
+      : { ...record, nonObviousInsight: LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER };
+  return "teach" in withInsight ? withInsight : { ...withInsight, teach: null };
 }
 
 export function normalizePersistedArtifact(record: WeeklyDebriefRecord, effectiveStatus: "ready" | "stale" | "failed") {

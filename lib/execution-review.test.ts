@@ -1,4 +1,8 @@
-import { coerceCoachVerdictPayloadForTest, normalizeVerdictUnitsForTest } from "./execution-review";
+import {
+  coerceCoachVerdictPayloadForTest,
+  normalizeVerdictUnitsForTest,
+  reasoningEffortForSession,
+} from "./execution-review";
 
 const defaults = {
   intentMatch: "partial" as const,
@@ -198,5 +202,17 @@ describe("normalizeVerdictUnitsForTest", () => {
 
   test("handles mixed sec duration and s/km pace", () => {
     expect(normalizeVerdictUnitsForTest("2700 sec at 341 s/km")).toBe("45 min at 5:41/km");
+  });
+});
+
+describe("reasoningEffortForSession", () => {
+  test("bumps to medium for key sessions", () => {
+    expect(reasoningEffortForSession("key")).toBe("medium");
+  });
+
+  test("keeps low for supporting, recovery, and unknown sessions", () => {
+    expect(reasoningEffortForSession("supporting")).toBe("low");
+    expect(reasoningEffortForSession("recovery")).toBe("low");
+    expect(reasoningEffortForSession("unknown")).toBe("low");
   });
 });

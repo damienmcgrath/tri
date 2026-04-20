@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { diagnoseCompletedSession, type PlannedTargetBand, type SessionDiagnosis, type SessionDiagnosisInput, type SplitMetrics } from "@/lib/coach/session-diagnosis";
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import { buildExecutionEvidence, generateCoachVerdict, refreshObservedPatterns, toPersistedExecutionReview, type PersistedExecutionReview } from "@/lib/execution-review";
+import { fetchExecutionReviewPriorHeadlines } from "@/lib/ai/session-variance-corpus";
 import { getMetricsV2Laps, getNestedNumber as getMetricsNestedNumber } from "@/lib/workouts/metrics-v2";
 import { inferExtraIntent } from "@/lib/workouts/infer-extra-intent";
 import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
@@ -512,6 +513,7 @@ export function buildExecutionResultForSession(session: SessionExecutionSessionR
       },
       nonObviousInsight:
         "Not enough comparative history or extended signals in this preview path to surface a cross-session finding.",
+      teach: null,
       uncertainty: {
         label: diagnosis.diagnosisConfidence === "high" ? "confident_read" : diagnosis.evidenceCount > 0 ? "early_read" : "insufficient_data",
         detail:
@@ -597,10 +599,23 @@ export async function syncSessionExecutionFromActivityLink(args: {
     }
   }
   evidence.extendedSignals = extendedSignals;
+  let priorHeadlines: Awaited<ReturnType<typeof fetchExecutionReviewPriorHeadlines>> = [];
+  if (session.date) {
+    try {
+      priorHeadlines = await fetchExecutionReviewPriorHeadlines(
+        args.supabase,
+        session.athlete_id ?? args.userId,
+        session.date
+      );
+    } catch {
+      priorHeadlines = [];
+    }
+  }
   const generated = await generateCoachVerdict({
     evidence,
     athleteContext,
-    recentReviewedSessions: []
+    recentReviewedSessions: [],
+    priorHeadlines
   });
   const executionResult = toPersistedExecutionReview({
     linkedActivityId: activity.id,
@@ -921,7 +936,19 @@ export async function syncExtraActivityExecution(args: {
   }
   evidence.extendedSignals = extraExtendedSignals;
 
-  const generated = await generateCoachVerdict({ evidence, athleteContext, recentReviewedSessions: [] });
+  let extraPriorHeadlines: Awaited<ReturnType<typeof fetchExecutionReviewPriorHeadlines>> = [];
+  if (activityStartDate) {
+    try {
+      extraPriorHeadlines = await fetchExecutionReviewPriorHeadlines(
+        args.supabase,
+        args.userId,
+        activityStartDate
+      );
+    } catch {
+      extraPriorHeadlines = [];
+    }
+  }
+  const generated = await generateCoachVerdict({ evidence, athleteContext, recentReviewedSessions: [], priorHeadlines: extraPriorHeadlines });
   const executionResult = toPersistedExecutionReview({
     linkedActivityId: activity.id,
     evidence,

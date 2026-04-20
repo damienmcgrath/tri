@@ -176,6 +176,14 @@ export type CoachVerdict = {
    * every verdict so the AI can't fall back to pure summarisation.
    */
   nonObviousInsight: string;
+  /**
+   * Optional one-sentence explanation of *why* a metric exposed by this
+   * session matters (VI spike, aerobic decoupling, negative-split failure,
+   * durability fade, cadence drop, HR↔pace divergence). Null when no
+   * mechanism is worth teaching, so the model does not manufacture
+   * platitudes. Rotate focus across sessions.
+   */
+  teach: string | null;
   uncertainty: {
     label: "confident_read" | "early_read" | "insufficient_data";
     detail: string;
@@ -291,6 +299,7 @@ export const coachVerdictSchema = z.object({
     whatToDoThisWeek: z.string().min(1).max(500)
   }),
   nonObviousInsight: z.string().min(1).max(320),
+  teach: z.string().min(1).max(200).nullable(),
   uncertainty: z.object({
     label: z.enum(["confident_read", "early_read", "insufficient_data"]),
     detail: z.string().min(1).max(500),
@@ -320,6 +329,7 @@ export const COACH_VERDICT_EXAMPLE: CoachVerdict = {
     whatToDoThisWeek: "Keep the next key session on the calendar, but avoid forcing progression if fatigue is still lingering."
   },
   nonObviousInsight: "HR drifted 7% vs. your last three threshold sessions, which held under 3%. The stimulus still landed, but durability is the next limiter — not top-end power.",
+  teach: "HR drift above 5% at steady output flags a durability ceiling: the aerobic system is losing efficiency under load before power drops, so the next gain comes from volume, not intensity.",
   uncertainty: {
     label: "early_read",
     detail: "This read is useful, but it is still limited by missing split or interval detail.",
