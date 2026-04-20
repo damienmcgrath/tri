@@ -3,7 +3,7 @@ import { clip } from "@/lib/openai";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import type { PersistedExecutionReview } from "@/lib/execution-review";
 
-export const WEEKLY_DEBRIEF_GENERATION_VERSION = 7;
+export const WEEKLY_DEBRIEF_GENERATION_VERSION = 8;
 
 /** @deprecated Use clip() from lib/openai.ts — this alias exists only for schema transform compatibility. */
 export const truncateStr = clip;

@@ -32,6 +32,7 @@ import {
 import { buildWeeklyDebriefFacts } from "./facts";
 import { generateNarrative } from "./narrative";
 import { generateAnalyticFindings } from "./analytic-findings";
+import { extractPriorHeadlines } from "./variance-corpus";
 
 async function loadWeeklyDebriefInputs(args: {
   supabase: SupabaseClient;
@@ -280,14 +281,28 @@ export async function computeWeeklyDebrief(args: {
   const inputs = await loadWeeklyDebriefInputs(args);
   const base = buildWeeklyDebriefFacts(inputs);
 
-  // Load recent feedback, session comparison trends, and training scores in parallel
-  const [{ data: feedbackRows }, { data: comparisonRows }, { data: scoreRows }] = await Promise.all([
+  // Load recent feedback, prior headlines (variance corpus), session comparison trends,
+  // and training scores in parallel.
+  const [
+    { data: feedbackRows },
+    { data: priorDebriefRows },
+    { data: comparisonRows },
+    { data: scoreRows }
+  ] = await Promise.all([
     args.supabase
       .from("weekly_debriefs")
       .select("week_start, helpful, accurate, feedback_note")
       .eq("athlete_id", args.athleteId)
       .lt("week_start", args.weekStart)
       .or("helpful.is.not.null,accurate.is.not.null")
+      .order("week_start", { ascending: false })
+      .limit(4),
+    args.supabase
+      .from("weekly_debriefs")
+      .select("week_start, narrative, coach_share, facts")
+      .eq("athlete_id", args.athleteId)
+      .eq("status", "ready")
+      .lt("week_start", args.weekStart)
       .order("week_start", { ascending: false })
       .limit(4),
     args.supabase
@@ -313,6 +328,10 @@ export async function computeWeeklyDebrief(args: {
     accurate: r.accurate as boolean | null,
     note: r.feedback_note as string | null,
   }));
+
+  const priorHeadlines = extractPriorHeadlines(
+    (priorDebriefRows ?? []) as Array<{ week_start: string; narrative?: unknown; coach_share?: unknown; facts?: unknown }>
+  );
 
   // Build trends summary from session comparisons
   type CompRow = { discipline: string; trend_direction: string; trend_confidence: string; comparison_summary: string };
@@ -350,6 +369,7 @@ export async function computeWeeklyDebrief(args: {
     recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
     trendsThisWeek,
     scoreTrajectory,
+    priorHeadlines: priorHeadlines.length > 0 ? priorHeadlines : undefined,
   });
 
   const generated = await generateNarrative({
@@ -363,6 +383,7 @@ export async function computeWeeklyDebrief(args: {
     trendsThisWeek,
     scoreTrajectory,
     findings: analytic.findings,
+    priorHeadlines: priorHeadlines.length > 0 ? priorHeadlines : undefined,
   });
   const narrative = generated.narrative;
   const facts = weeklyDebriefFactsSchema.parse({

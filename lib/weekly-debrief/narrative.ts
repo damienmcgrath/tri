@@ -11,12 +11,13 @@ import type {
 import { weeklyDebriefNarrativeSchema } from "./types";
 import { normalizeNarrativePayload, hydrateNarrativePayload } from "./deterministic";
 import type { WeeklyFindings } from "./analytic-findings";
+import type { WeeklyDebriefPriorHeadline } from "./variance-corpus";
 
 const SINGLE_PASS_INSTRUCTIONS = "You write Weekly Debrief copy for endurance athletes. Use only the provided facts and evidence. Be calm, precise, coach-like, and proportionate to evidence. Read the sport-specific activityEvidence closely: for runs, prioritize splits, HR drift, pace fade, elevation, and zone context over lap-by-lap narration; for swims, prioritize rep structure, rest, pool context, stroke metrics, and second-half fade over generic summary; for rides, prioritize power, load, cadence, and execution control. Distinguish facts, observations, and carry-forward suggestions. Avoid hype, diagnosis, and certainty beyond the data. If trendsThisWeek is provided, weave relevant session-over-session trends into observations (e.g. 'Your threshold run shows steady improvement over the last 3 weeks'). If scoreTrajectory is provided, reference the composite Training Score trajectory where it adds insight (e.g. score direction, which dimension is strongest/weakest). Do not over-emphasise scores — use them to contextualise, not replace, the evidence-based narrative. carryForward items must be complete, self-contained sentences — do not end mid-thought. Each carryForward item has a 280-character limit; use the full space when needed but always end with a complete sentence.\n" +
   "\n" +
   "nonObviousInsight (≤360 chars, required): surface one cross-session pattern the athlete would not see by skimming individual reviews — e.g. 'Every hard session this week was preceded by a poor sleep rating (2/5) — execution is holding but recovery signals are stacking.' or 'Threshold power has held the same 260W ceiling for three weeks while HR at that power has dropped 4bpm — aerobic base is expanding under the ceiling.' Ground every claim in a specific number, date, or trend visible in the facts/evidence/trendsThisWeek/scoreTrajectory. Do not repeat the executiveSummary. If no cross-session signal emerges, say so honestly ('Too few completed sessions this week to surface a cross-session pattern; focus on next week for a trend read.').\n" +
   "\n" +
-  "Voice variance: avoid opening phrasings you have used in prior weeks (if recentFeedback or prior headlines are visible in the context, do not reuse them). Each week should sound distinct.";
+  "Voice variance: priorHeadlines lists the athlete's most recent coachHeadline / executiveSummary / nonObviousInsight / takeawayTitle. Treat it as a 'do not reuse' corpus: do not echo those opening phrasings, metaphors, or framings. Concrete numbers, dates, and session names may repeat — the prose must not. Each week should sound distinct.";
 
 const FINDINGS_DRIVEN_INSTRUCTIONS = "You write Weekly Debrief copy for endurance athletes. An analytic pass has already extracted structured findings — your job is voice and format, not re-analysis.\n" +
   "\n" +
@@ -30,7 +31,7 @@ const FINDINGS_DRIVEN_INSTRUCTIONS = "You write Weekly Debrief copy for enduranc
   "Voice rules:\n" +
   "- Calm, precise, coach-like. No hype. No diagnosis beyond the data.\n" +
   "- Sport-specific: for runs weigh splits, HR drift, pace fade; for swims weigh rep structure, rest, stroke metrics; for rides weigh power, load, cadence.\n" +
-  "- Avoid opening phrasings from prior weeks — each week must sound distinct.\n" +
+  "- Avoid opening phrasings from prior weeks — each week must sound distinct. priorHeadlines (if present) is a 'do not reuse' corpus of the athlete's recent coachHeadline/executiveSummary/nonObviousInsight/takeawayTitle; do not echo those framings.\n" +
   "- If findings.confidenceNote is present, honour it: don't overclaim signals the analytic pass already flagged as under-evidenced.\n" +
   "- Do not repeat the executiveSummary inside nonObviousInsight. They serve different purposes.";
 
@@ -45,6 +46,7 @@ export async function generateNarrative(args: {
   trendsThisWeek?: Array<{ discipline: string; trend: string; confidence: string; summary: string }> | null;
   scoreTrajectory?: Array<{ date: string; composite: number; execution: number | null; progression: number | null; balance: number | null }> | null;
   findings?: WeeklyFindings | null;
+  priorHeadlines?: WeeklyDebriefPriorHeadline[];
 }) {
   let calibrationNote = "";
   if (args.recentFeedback && args.recentFeedback.length > 0) {
@@ -100,7 +102,8 @@ export async function generateNarrative(args: {
                 recentFeedback: args.recentFeedback ?? null,
                 trendsThisWeek: args.trendsThisWeek ?? null,
                 scoreTrajectory: args.scoreTrajectory ?? null,
-                findings: args.findings ?? null
+                findings: args.findings ?? null,
+                priorHeadlines: args.priorHeadlines && args.priorHeadlines.length > 0 ? args.priorHeadlines : null
               })
             }
           ]
