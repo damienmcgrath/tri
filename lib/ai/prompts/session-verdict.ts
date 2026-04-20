@@ -45,6 +45,14 @@ export const sessionVerdictOutputSchema = z.object({
    * summary of this session's numbers.
    */
   non_obvious_insight: z.string().min(1).max(320),
+  /**
+   * Optional one-sentence teach moment explaining *why* a metric exposed by
+   * this session matters (VI spike, aerobic decoupling, negative-split
+   * failure, durability fade, cadence drop, HR↔pace divergence). Null when
+   * no mechanism is worth teaching, so the model does not manufacture
+   * platitudes. Rotate focus across sessions.
+   */
+  teach: z.string().min(1).max(200).nullable(),
   adaptation_signal: z.string().min(1).max(800),
   adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
   affected_session_ids: z.array(z.string()).max(5)
@@ -385,6 +393,12 @@ export function buildVerdictInstructions(): string {
     "- Do not repeat what execution_summary already says. No generic coaching platitudes. Cite a number, date, or signal.",
     "- If no comparable is available and no signal stands out, say that honestly: 'No prior sessions in this intent category yet — next similar session will start to build a comparison.'",
     "",
+    "TEACH (`teach`) — OPTIONAL, ≤200 chars:",
+    "- Use `teach` when this session exposes a mechanistically important metric — variability index spike, aerobic decoupling, negative-split failure, durability fade, cadence drop, HR↔pace divergence, power-per-HR shift, SWOLF trend, or similar. Explain in one sentence *why* that metric matters for this athlete's training.",
+    "- Prefer a different mechanism than the last few `priorHeadlines`. Rotate focus — do not teach the same concept two sessions in a row.",
+    "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
+    "- `teach` is separate from `non_obvious_insight`: insight observes *what* is true; teach explains *why* it matters for training.",
+    "",
     SESSION_VARIANCE_PROMPT,
     "",
     "FEEL DATA — CRITICAL:",
@@ -611,6 +625,7 @@ export function buildFallbackVerdict(ctx: SessionVerdictContext): SessionVerdict
     metric_comparisons: metricComparisons,
     key_deviations: [],
     non_obvious_insight: nonObviousInsight,
+    teach: null,
     adaptation_signal: adaptationSignal,
     adaptation_type: adaptationType,
     affected_session_ids: []
@@ -903,6 +918,12 @@ export async function generateSessionVerdict(
       ]
     }),
     schema: sessionVerdictOutputSchema,
+    normalizePayload: (raw) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+      const record = raw as Record<string, unknown>;
+      if ("teach" in record) return record;
+      return { ...record, teach: null };
+    },
     postProcess: normalizeSessionVerdictUnits
   });
 

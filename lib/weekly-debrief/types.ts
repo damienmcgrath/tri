@@ -90,7 +90,15 @@ export const weeklyDebriefNarrativeSchema = z.object({
    * individual session reviews. Usually a pattern across sessions, a shift in
    * decoupling/readiness over the week, or a historical comparison.
    */
-  nonObviousInsight: z.string().min(1).max(360)
+  nonObviousInsight: z.string().min(1).max(360),
+  /**
+   * Optional one-sentence teach moment explaining *why* a metric exposed by
+   * the week matters (variability index spike, aerobic decoupling,
+   * negative-split failure, durability fade, etc.). Null when nothing
+   * mechanistically worth teaching stands out, so the model does not
+   * manufacture platitudes. Rotate focus across weeks.
+   */
+  teach: z.string().min(1).max(200).nullable()
 });
 
 export type WeeklyDebriefNarrative = z.infer<typeof weeklyDebriefNarrativeSchema>;

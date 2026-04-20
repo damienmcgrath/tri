@@ -337,12 +337,25 @@ function coerceCoachVerdictPayload(
     nextCall: CoachVerdict["sessionVerdict"]["nextCall"];
   }
 ) {
-  const normalizedPayload = normalizeCoachVerdictPayload(payload, defaults);
+  const normalizedPayload = ensureTeachField(normalizeCoachVerdictPayload(payload, defaults));
   const parsed = coachVerdictSchema.safeParse(normalizedPayload);
   return {
     normalizedPayload,
     parsed
   };
+}
+
+/**
+ * Inject `teach: null` when the payload does not already carry one. Legacy
+ * payloads (DB-stored verdicts pre-teach, hand-written test fixtures, LLM
+ * drops) would otherwise fail zod validation now that `teach` is a required
+ * nullable field on the schema.
+ */
+function ensureTeachField(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const record = payload as Record<string, unknown>;
+  if ("teach" in record) return record;
+  return { ...record, teach: null };
 }
 
 function formatSecondsToDuration(sec: number): string {
@@ -455,6 +468,12 @@ function buildCoachVerdictInstructions() {
     "- Do not repeat what is already in `whatHappened`. If you cannot surface something genuinely non-obvious from the evidence, state that honestly (e.g. \"Not enough prior sessions in this intent category to establish a trend yet.\") — but still use this field.",
     "- No generic coaching platitudes. Ground every claim in a specific number, date, or signal.",
     "",
+    "teach (optional, ≤200 chars):",
+    "- Use `teach` when this session exposes a mechanistically important metric — variability index spike, aerobic decoupling, negative-split failure, durability fade, cadence drop, HR↔pace divergence, power-per-HR shift, or similar. Explain in one sentence *why* that metric matters for this athlete's training.",
+    "- Prefer a different mechanism than the last few `priorHeadlines`. Rotate focus — do not teach the same concept two sessions in a row.",
+    "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
+    "- `teach` is separate from `nonObviousInsight`: insight observes *what* is true; teach explains *why* it matters.",
+    "",
     SESSION_VARIANCE_PROMPT,
     "",
     "Field requirements:",
@@ -470,6 +489,7 @@ function buildCoachVerdictInstructions() {
     "- `explanation.whatToDoNextTime`: one practical cue for the next similar session, max 500 chars.",
     "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
     "- `nonObviousInsight`: one finding grounded in an extended signal, max 320 chars. Required.",
+    "- `teach`: optional mechanistic explanation, max 200 chars. Null when nothing is worth teaching.",
     "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
     "- `uncertainty.detail`: explain the confidence level plainly, max 500 chars.",
     "- `uncertainty.missingEvidence`: array of missing evidence strings, max 8 items.",
@@ -588,6 +608,7 @@ function buildDeterministicVerdict(evidence: ExecutionEvidence): CoachVerdict {
               : "Move into the rest of the week as planned."
     },
     nonObviousInsight,
+    teach: null,
     uncertainty: {
       label: uncertaintyLabel,
       detail:

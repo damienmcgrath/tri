@@ -92,7 +92,8 @@ describe("WeeklyDebriefCard", () => {
               highlights: ["one", "two", "three"],
               observations: ["one"],
               carryForward: ["one", "two"],
-              nonObviousInsight: "No cross-session pattern surfaced this week."
+              nonObviousInsight: "No cross-session pattern surfaced this week.",
+              teach: null
             },
             coachShare: {
               headline: "Solid execution with one late-week miss",
