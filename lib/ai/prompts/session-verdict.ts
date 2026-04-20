@@ -6,6 +6,11 @@ import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import { normalizeUnitString } from "@/lib/execution-review";
 import { getMacroContext } from "@/lib/training/macro-context";
 import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } from "@/lib/analytics/extended-signals";
+import {
+  fetchSessionPriorHeadlines,
+  SESSION_VARIANCE_PROMPT,
+  type SessionPriorHeadline,
+} from "@/lib/ai/session-variance-corpus";
 
 export const SESSION_VERDICT_PROMPT_VERSION = "v3";
 
@@ -379,6 +384,8 @@ export function buildVerdictInstructions(): string {
     "- It must surface something the athlete would miss from this session alone — a trend against their own history, a decoupling/weather read, or a pattern across feel and execution.",
     "- Do not repeat what execution_summary already says. No generic coaching platitudes. Cite a number, date, or signal.",
     "- If no comparable is available and no signal stands out, say that honestly: 'No prior sessions in this intent category yet — next similar session will start to build a comparison.'",
+    "",
+    SESSION_VARIANCE_PROMPT,
     "",
     "FEEL DATA — CRITICAL:",
     "- When `feel` is present in the input, you MUST reference it in execution_summary. Name the overall feel label (e.g. 'Terrible', 'Good') and any legs, energy, or life-stress signal the athlete reported.",
@@ -851,6 +858,13 @@ export async function generateSessionVerdict(
     .limit(1);
   const activityId = storageLinks?.[0]?.completed_activity_id ?? null;
 
+  let priorHeadlines: SessionPriorHeadline[] = [];
+  try {
+    priorHeadlines = await fetchSessionPriorHeadlines(supabase, userId, ctx.session.date);
+  } catch {
+    priorHeadlines = [];
+  }
+
   const result = await callOpenAIWithFallback<SessionVerdictOutput>({
     logTag: "session-verdict",
     fallback,
@@ -881,6 +895,7 @@ export async function generateSessionVerdict(
                     ? formatDuration(ctx.activity.durationSec)
                     : null,
                 } : null,
+                priorHeadlines: priorHeadlines.length > 0 ? priorHeadlines : null,
               })
             }
           ]

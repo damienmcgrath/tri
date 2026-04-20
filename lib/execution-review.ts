@@ -2,6 +2,10 @@ import "openai/shims/node";
 import { zodTextFormat } from "openai/helpers/zod";
 import { asObject, asString, asStringArray, clip } from "@/lib/openai";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
+import {
+  SESSION_VARIANCE_PROMPT,
+  type SessionPriorHeadline,
+} from "@/lib/ai/session-variance-corpus";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import { diagnoseCompletedSession, type SessionDiagnosisInput } from "@/lib/coach/session-diagnosis";
 import {
@@ -451,6 +455,8 @@ function buildCoachVerdictInstructions() {
     "- Do not repeat what is already in `whatHappened`. If you cannot surface something genuinely non-obvious from the evidence, state that honestly (e.g. \"Not enough prior sessions in this intent category to establish a trend yet.\") — but still use this field.",
     "- No generic coaching platitudes. Ground every claim in a specific number, date, or signal.",
     "",
+    SESSION_VARIANCE_PROMPT,
+    "",
     "Field requirements:",
     "- `sessionVerdict.headline`: short label, max 160 chars.",
     "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
@@ -708,6 +714,7 @@ export async function generateCoachVerdict(args: {
   evidence: ExecutionEvidence;
   athleteContext: AthleteContextSnapshot | null;
   recentReviewedSessions: Array<{ sessionId: string; headline: string; intentMatch: string }>;
+  priorHeadlines?: SessionPriorHeadline[];
 }) {
   const deterministicFallback = buildDeterministicVerdict(args.evidence);
   const defaults = {
@@ -740,7 +747,8 @@ export async function generateCoachVerdict(args: {
               text: JSON.stringify({
                 sessionEvidence: args.evidence,
                 athleteContext: args.athleteContext,
-                recentReviewedSessions: args.recentReviewedSessions
+                recentReviewedSessions: args.recentReviewedSessions,
+                priorHeadlines: args.priorHeadlines && args.priorHeadlines.length > 0 ? args.priorHeadlines : null
               })
             }
           ]
