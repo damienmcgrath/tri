@@ -465,9 +465,16 @@ export default async function ProgressReportPage({
         stale: false,
         sourceUpdatedAt: artifact.sourceUpdatedAt
       };
-    } catch {
+    } catch (error) {
       // Keep the existing snapshot; render will fall back to the empty state
-      // below if there is still no artifact.
+      // below if there is still no artifact. Log so the root cause is visible
+      // instead of disappearing behind a generic "try again" message.
+      console.error("[progress-report] auto-refresh failed", {
+        athleteId: user.id,
+        blockId: selectedBlock?.id ?? null,
+        blockEnd: snapshot.blockEnd,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
