@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { cache } from "@/lib/shared/react-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { asStringArray } from "@/lib/openai";
