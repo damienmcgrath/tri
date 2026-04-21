@@ -8,9 +8,23 @@ type Plan = {
   duration_weeks: number;
 };
 
+type TrainingBlock = {
+  id: string;
+  plan_id: string | null;
+  season_id: string | null;
+  name: string;
+  block_type: "Base" | "Build" | "Peak" | "Taper" | "Race" | "Recovery" | "Transition";
+  start_date: string;
+  end_date: string;
+  sort_order: number;
+  target_race_id: string | null;
+  notes: string | null;
+};
+
 type TrainingWeek = {
   id: string;
   plan_id: string;
+  block_id: string | null;
   week_index: number;
   week_start_date: string;
   focus: "Build" | "Recovery" | "Taper" | "Race" | "Custom";
@@ -64,7 +78,7 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string } }) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string; block?: string } }) {
   const supabase = await createClient();
   const {
     data: { user }
@@ -86,10 +100,24 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
     await supabase.from("profiles").upsert({ id: user.id, active_plan_id: selectedPlan.id }, { onConflict: "id" });
   }
 
+  let blocksData: TrainingBlock[] = [];
+  if (selectedPlan) {
+    const { data: blockRows, error: blocksError } = await supabase
+      .from("training_blocks")
+      .select("id,plan_id,season_id,name,block_type,start_date,end_date,sort_order,target_race_id,notes")
+      .eq("plan_id", selectedPlan.id)
+      .order("sort_order", { ascending: true });
+
+    if (blocksError && !isMissingTableError(blocksError, "public.training_blocks")) {
+      throw new Error(blocksError.message);
+    }
+    blocksData = (blockRows ?? []) as TrainingBlock[];
+  }
+
   const { data: initialWeeksData, error: weeksError } = selectedPlan
     ? await supabase
         .from("training_weeks")
-        .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+        .select("id,plan_id,block_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
         .eq("plan_id", selectedPlan.id)
         .order("week_index", { ascending: true })
     : { data: [] as TrainingWeek[], error: null };
@@ -111,7 +139,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
 
     const { data: seededWeeksData, error: seededWeeksFetchError } = await supabase
       .from("training_weeks")
-      .select("id,plan_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
+      .select("id,plan_id,block_id,week_index,week_start_date,focus,notes,target_minutes,target_tss")
       .eq("plan_id", selectedPlan.id)
       .order("week_index", { ascending: true });
 
@@ -185,9 +213,26 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
     }
   }
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const explicitBlock = searchParams?.block
+    ? blocksData.find((block) => block.id === searchParams.block)
+    : undefined;
+  const currentBlock = blocksData.find(
+    (block) => block.start_date <= todayIso && todayIso <= block.end_date
+  );
+  const selectedBlock = explicitBlock ?? currentBlock ?? blocksData[0] ?? null;
+
   return (
     <section className="plan-editor-motion-lock">
-      <PlanEditor plans={plans} weeks={weeksData} sessions={sessionsData} selectedPlanId={selectedPlan?.id} initialWeekId={searchParams?.week} />
+      <PlanEditor
+        plans={plans}
+        blocks={blocksData}
+        weeks={weeksData}
+        sessions={sessionsData}
+        selectedPlanId={selectedPlan?.id}
+        selectedBlockId={selectedBlock?.id}
+        initialWeekId={searchParams?.week}
+      />
     </section>
   );
 }

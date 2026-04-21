@@ -7,6 +7,7 @@ import { detectAmbientSignals } from "@/lib/training/ambient-signals";
 import { getLatestFitness, getTsbTrend, getReadinessState } from "@/lib/training/fitness-model";
 import { computeWeeklyDisciplineBalance, detectDisciplineImbalance } from "@/lib/training/discipline-balance";
 import { detectCrossDisciplineFatigue, detectDisciplineSpecificDecline } from "@/lib/training/fatigue-detection";
+import { getBlockMetrics, getBlockComparison } from "@/lib/training/block-metrics";
 import {
   coachToolSchemas,
   type CoachToolName
@@ -443,6 +444,37 @@ async function getTrainingLoad({ supabase, ctx }: ToolDeps) {
   };
 }
 
+async function resolveBlockId(args: unknown, deps: ToolDeps, schema: typeof coachToolSchemas.get_block_summary): Promise<string | null> {
+  const parsed = schema.parse(args ?? {});
+  if (parsed.blockId) return parsed.blockId;
+  const macro = await getMacroContext(deps.supabase, deps.ctx.athleteId).catch(() => null);
+  return macro?.trainingBlockId ?? null;
+}
+
+async function getBlockSummary(args: unknown, deps: ToolDeps) {
+  const blockId = await resolveBlockId(args, deps, coachToolSchemas.get_block_summary);
+  if (!blockId) {
+    return { error: "no_active_block", message: "No active training block for this athlete." };
+  }
+  const metrics = await getBlockMetrics(deps.supabase, blockId);
+  if (!metrics) {
+    return { error: "block_not_found", message: `Block ${blockId} not found.` };
+  }
+  return metrics;
+}
+
+async function getBlockComparisonTool(args: unknown, deps: ToolDeps) {
+  const blockId = await resolveBlockId(args, deps, coachToolSchemas.get_block_comparison);
+  if (!blockId) {
+    return { error: "no_active_block", message: "No active training block for this athlete." };
+  }
+  const comparison = await getBlockComparison(deps.supabase, blockId);
+  if (!comparison) {
+    return { error: "block_not_found", message: `Block ${blockId} not found.` };
+  }
+  return comparison;
+}
+
 export async function executeCoachTool(name: CoachToolName, args: unknown, deps: ToolDeps) {
   logCoachAudit("info", "coach.tool.execute", {
     ctx: deps.ctx,
@@ -478,6 +510,12 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
       case "get_training_load":
         coachToolSchemas.get_training_load.parse(args);
         result = await getTrainingLoad(deps);
+        break;
+      case "get_block_summary":
+        result = await getBlockSummary(args, deps);
+        break;
+      case "get_block_comparison":
+        result = await getBlockComparisonTool(args, deps);
         break;
       case "create_plan_change_proposal":
         result = await createPlanChangeProposal(args, deps);

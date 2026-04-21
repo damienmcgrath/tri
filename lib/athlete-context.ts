@@ -148,6 +148,29 @@ function inferPhase(startDate: string | null, durationWeeks: number | null, toda
   return "build";
 }
 
+/**
+ * Read block_type for today's training week via the FK chain
+ * training_weeks.block_id → training_blocks.block_type. Returns null if no
+ * block is linked; callers fall back to inferPhase().
+ */
+async function getLinkedBlockType(
+  supabase: SupabaseClient,
+  planId: string | null,
+  todayIso: string
+): Promise<string | null> {
+  if (!planId) return null;
+  const { data: week } = await supabase
+    .from("training_weeks")
+    .select("block_id,training_blocks:block_id(block_type)")
+    .eq("plan_id", planId)
+    .lte("week_start_date", todayIso)
+    .order("week_start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const rel = (week as unknown as { training_blocks?: { block_type?: string } | null } | null)?.training_blocks;
+  return rel?.block_type ?? null;
+}
+
 function daysUntil(date: string | null) {
   if (!date) return null;
   const target = new Date(`${date}T00:00:00.000Z`);
@@ -203,6 +226,9 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
   const priorityEventName = context?.priority_event_name ?? profile?.race_name ?? null;
   const priorityEventDate = context?.priority_event_date ?? profile?.race_date ?? null;
   const updatedAt = context?.updated_at ?? null;
+  const planIdForBlock = profile?.active_plan_id ?? activePlan?.id ?? null;
+  const linkedBlockType = await getLinkedBlockType(supabase, planIdForBlock, todayIso).catch(() => null);
+  const phase = linkedBlockType?.toLowerCase() ?? inferPhase(activePlan?.start_date ?? null, activePlan?.duration_weeks ?? null, todayIso);
 
   return {
     identity: {
@@ -232,8 +258,8 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
       coachingPreference: context?.coaching_preference ?? null
     },
     derived: {
-      activePlanId: profile?.active_plan_id ?? activePlan?.id ?? null,
-      phase: inferPhase(activePlan?.start_date ?? null, activePlan?.duration_weeks ?? null, todayIso),
+      activePlanId: planIdForBlock,
+      phase,
       daysToRace: daysUntil(priorityEventDate),
       upcomingKeySessions: (upcomingSessions ?? []).map((session) => (session.session_name ?? session.type ?? "Upcoming session").trim())
     },

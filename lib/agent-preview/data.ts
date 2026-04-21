@@ -18,6 +18,8 @@ const PREVIEW_LINK_SWIM_ID = "66666666-6666-4666-8666-666666666664";
 const PREVIEW_LINK_LONG_RUN_ID = "66666666-6666-4666-8666-666666666665";
 const PREVIEW_WEEK_FOUR_ID = "33333333-3333-4333-8333-333333333334";
 const PREVIEW_WEEK_FIVE_ID = "33333333-3333-4333-8333-333333333335";
+const PREVIEW_BLOCK_BASE_ID = "88888888-8888-4888-8888-888888888881";
+const PREVIEW_BLOCK_BUILD_ID = "88888888-8888-4888-8888-888888888882";
 
 function previewMonday(): string {
   const now = new Date();
@@ -36,6 +38,7 @@ function previewDateOffset(mondayIso: string, offset: number): string {
 type PreviewTableName =
   | "profiles"
   | "training_plans"
+  | "training_blocks"
   | "training_weeks"
   | "sessions"
   | "planned_sessions"
@@ -97,10 +100,41 @@ export function createPreviewDatabase(): PreviewDatabase {
         updated_at: "2026-03-15T08:00:00.000Z"
       }
     ],
+    training_blocks: [
+      {
+        id: PREVIEW_BLOCK_BASE_ID,
+        user_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        season_id: null,
+        name: "Base 1",
+        block_type: "Base",
+        start_date: "2026-03-09",
+        end_date: "2026-03-29",
+        target_race_id: null,
+        emphasis: {},
+        notes: "Aerobic base with controlled intensity touches.",
+        sort_order: 0
+      },
+      {
+        id: PREVIEW_BLOCK_BUILD_ID,
+        user_id: PREVIEW_USER_ID,
+        plan_id: PREVIEW_PLAN_ID,
+        season_id: null,
+        name: "Build 1",
+        block_type: "Build",
+        start_date: "2026-03-30",
+        end_date: "2026-06-21",
+        target_race_id: null,
+        emphasis: {},
+        notes: "Race-pace work anchored by two key sessions per week.",
+        sort_order: 1
+      }
+    ],
     training_weeks: [
       {
         id: PREVIEW_WEEK_ONE_ID,
         plan_id: PREVIEW_PLAN_ID,
+        block_id: PREVIEW_BLOCK_BASE_ID,
         week_index: 1,
         week_start_date: "2026-03-09",
         focus: "Build",
@@ -111,6 +145,7 @@ export function createPreviewDatabase(): PreviewDatabase {
       {
         id: PREVIEW_WEEK_TWO_ID,
         plan_id: PREVIEW_PLAN_ID,
+        block_id: PREVIEW_BLOCK_BASE_ID,
         week_index: 2,
         week_start_date: "2026-03-16",
         focus: "Build",
@@ -121,6 +156,7 @@ export function createPreviewDatabase(): PreviewDatabase {
       {
         id: PREVIEW_WEEK_THREE_ID,
         plan_id: PREVIEW_PLAN_ID,
+        block_id: PREVIEW_BLOCK_BASE_ID,
         week_index: 3,
         week_start_date: "2026-03-23",
         focus: "Recovery",
@@ -131,6 +167,7 @@ export function createPreviewDatabase(): PreviewDatabase {
       {
         id: PREVIEW_WEEK_FOUR_ID,
         plan_id: PREVIEW_PLAN_ID,
+        block_id: PREVIEW_BLOCK_BUILD_ID,
         week_index: 4,
         week_start_date: "2026-03-30",
         focus: "Build",
@@ -141,6 +178,7 @@ export function createPreviewDatabase(): PreviewDatabase {
       {
         id: PREVIEW_WEEK_FIVE_ID,
         plan_id: PREVIEW_PLAN_ID,
+        block_id: PREVIEW_BLOCK_BUILD_ID,
         week_index: 5,
         week_start_date: previewMonday(),
         focus: "Build",

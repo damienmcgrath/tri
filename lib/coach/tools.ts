@@ -7,6 +7,8 @@ export const getWeekProgressArgsSchema = z.object({}).strict();
 export const getWeeklyBriefArgsSchema = z.object({}).strict();
 export const getActivityDetailsArgsSchema = z.object({ activityId: z.string().uuid() }).strict();
 export const getTrainingLoadArgsSchema = z.object({}).strict();
+export const getBlockSummaryArgsSchema = z.object({ blockId: z.string().uuid().optional() }).strict();
+export const getBlockComparisonArgsSchema = z.object({ blockId: z.string().uuid().optional() }).strict();
 
 export const createPlanChangeProposalArgsSchema = z.object({
   title: z.string().trim().min(3).max(160),
@@ -25,6 +27,8 @@ export const coachToolSchemas = {
   get_weekly_brief: getWeeklyBriefArgsSchema,
   get_activity_details: getActivityDetailsArgsSchema,
   get_training_load: getTrainingLoadArgsSchema,
+  get_block_summary: getBlockSummaryArgsSchema,
+  get_block_comparison: getBlockComparisonArgsSchema,
   create_plan_change_proposal: createPlanChangeProposalArgsSchema
 } as const;
 
@@ -111,6 +115,32 @@ export const coachTools = [
       type: "object",
       additionalProperties: false,
       properties: {}
+    }
+  },
+  {
+    type: "function" as const,
+    name: "get_block_summary",
+    description: "Return planned/completed volume, completion %, key-session progress, and discipline mix for a training block. Defaults to the current block when blockId is omitted.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        blockId: { type: "string", format: "uuid" }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    name: "get_block_comparison",
+    description: "Compare the given training block to the block immediately preceding it (by sort_order) in the same plan. Returns both summaries and per-metric deltas. Defaults to the current block when blockId is omitted.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        blockId: { type: "string", format: "uuid" }
+      }
     }
   },
   {
