@@ -176,12 +176,22 @@ async function run(args: Args): Promise<void> {
   const keeper = await resolveKeeper(db, args.userId, planRows, args);
   const victims = planRows.filter((p) => p.id !== keeper.id);
 
+  const { data: profileRow } = await db.from("profiles").select("active_plan_id").eq("id", args.userId).maybeSingle();
+  const currentActiveId = profileRow?.active_plan_id ?? null;
+  const activeMismatch = currentActiveId !== null && currentActiveId !== keeper.id;
+
   console.log(`\nPrune plans for user ${args.userId}`);
   console.log(`Mode: ${args.mode}\n`);
   console.log(`All plans (${planRows.length}):`);
   for (const p of planRows) {
     const tag = p.id === keeper.id ? "  KEEP →" : "  prune  ";
     console.log(`${tag} ${p.id}  ${p.start_date ?? "—"}  ${String(p.duration_weeks ?? "—").padStart(2)}w  ${p.name}`);
+  }
+
+  if (activeMismatch) {
+    const activeName = planRows.find((p) => p.id === currentActiveId)?.name ?? "(unknown)";
+    console.log(`\nNote: profiles.active_plan_id currently points at "${activeName}" (${currentActiveId}).`);
+    console.log(`      Will be updated to the keeper on --apply.`);
   }
 
   if (victims.length === 0) {
@@ -234,7 +244,17 @@ async function run(args: Args): Promise<void> {
     return;
   }
 
-  // apply
+  // apply — fix active_plan_id first so there's never a window where it
+  // points at a row we're about to delete.
+  if (activeMismatch) {
+    const { error } = await db
+      .from("profiles")
+      .update({ active_plan_id: keeper.id })
+      .eq("id", args.userId);
+    if (error) die(`active_plan_id update failed: ${error.message}`);
+    console.log(`\nUpdated profiles.active_plan_id → "${keeper.name}".`);
+  }
+
   console.log(`\nDeleting ${deletable.length} plan(s)...`);
   for (const c of deletable) {
     const { error } = await db.from("training_plans").delete().eq("id", c.plan.id).eq("user_id", args.userId);
