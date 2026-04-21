@@ -76,6 +76,28 @@ Both paths write to `completed_activities` and then auto-match against the
 seeded planned sessions (threshold 0.85). The seed's sport + date grid gives
 the matcher plenty to work with.
 
+### 4b. Bulk-link suggested activities (skip the "Assign" click)
+
+The app suggests the right session but still requires a manual click per
+activity. For a historical backfill, script that:
+
+```bash
+# Preview which activities would link
+npx tsx --env-file=.env.local scripts/bulk-link-activities.ts --user=$USER --dry-run
+
+# Apply — only links when exactly one planned session matches date+sport
+npx tsx --env-file=.env.local scripts/bulk-link-activities.ts --user=$USER --apply
+
+# Restrict to a window
+npx tsx --env-file=.env.local scripts/bulk-link-activities.ts \
+  --user=$USER --from=2025-11-03 --to=2026-06-07 --apply
+```
+
+The link is written as `link_type=manual`, `match_method=manual_override`,
+`confirmation_status=confirmed`, `confidence=1.00` — same shape as a manual
+click in the UI. Ambiguous days (>1 planned session for the same sport) are
+skipped for manual review.
+
 ### 5. Generate AI content (session reviews + weekly debriefs)
 
 After sessions + activities + links are in place, backfill all AI content in
