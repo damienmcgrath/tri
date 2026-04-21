@@ -114,10 +114,10 @@ function resolveInitialWeekId(weeks: TrainingWeek[], explicitWeekId?: string) {
 
 function disciplineChipTone(sport: string) {
   const tones: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    swim: { bg: "rgba(99,179,237,0.10)", text: "var(--color-swim)", dot: "var(--color-swim)", border: "transparent" },
-    bike: { bg: "rgba(52,211,153,0.10)", text: "var(--color-bike)", dot: "var(--color-bike)", border: "transparent" },
-    run: { bg: "rgba(255,90,40,0.10)", text: "var(--color-run)", dot: "var(--color-run)", border: "transparent" },
-    strength: { bg: "rgba(167,139,250,0.10)", text: "var(--color-strength)", dot: "var(--color-strength)", border: "transparent" },
+    swim: { bg: "color-mix(in oklch, var(--color-swim) 10%, transparent)", text: "var(--color-swim)", dot: "var(--color-swim)", border: "transparent" },
+    bike: { bg: "color-mix(in oklch, var(--color-bike) 10%, transparent)", text: "var(--color-bike)", dot: "var(--color-bike)", border: "transparent" },
+    run: { bg: "color-mix(in oklch, var(--color-run) 10%, transparent)", text: "var(--color-run)", dot: "var(--color-run)", border: "transparent" },
+    strength: { bg: "color-mix(in oklch, var(--color-strength) 10%, transparent)", text: "var(--color-strength)", dot: "var(--color-strength)", border: "transparent" },
     other: { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.65)", dot: "rgba(255,255,255,0.65)", border: "transparent" }
   };
 

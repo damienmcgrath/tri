@@ -130,13 +130,14 @@
     color: var(--color-text-primary);
   }
 
-  /* Focus ring — two-layer box-shadow so it stays visible on any fill,
-     including lime CTAs where a lime outline would disappear. */
+  /* Focus ring — use `outline` (not box-shadow) so Tailwind `shadow-*`
+     utilities in the later utilities layer cannot override it. White
+     outline stays visible on any fill, including lime CTAs where a lime
+     outline would disappear; `outline-offset` exposes a 2px gap of the
+     underlying surface for contrast against the element itself. */
   *:focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--color-base),
-      0 0 0 4px rgba(255, 255, 255, 0.9);
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 2px;
   }
 
   /* Heading baseline — overridable by Tailwind `font-*` classes.
