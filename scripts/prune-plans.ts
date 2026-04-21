@@ -17,6 +17,16 @@
  *   --keep=<plan-uuid>
  *   --keep-name="Ironman Warsaw 70.3 2026"
  *
+ *   # Preserve sessions attached to victim plans by re-parenting them into
+ *   # the keeper plan (picks the covering week by date). Activity links
+ *   # stay intact. Sessions become "extras" alongside seeded ones.
+ *   --migrate-sessions
+ *
+ *   # Allow cascade-delete even when victim plans still have sessions
+ *   # (sessions and their activity links go with the plan). Mutually
+ *   # exclusive with --migrate-sessions in spirit — pick one.
+ *   --force
+ *
  * Safety checks (every non-keeper plan must pass before it's deleted):
  *   1. No sessions with plan_id pointing at it (would be cascade-deleted).
  *   2. No sessions whose week_id belongs to one of its weeks. (week_id is
@@ -41,6 +51,7 @@ type Args = {
   keepId: string | null;
   keepName: string | null;
   force: boolean;
+  migrateSessions: boolean;
 };
 
 type PlanRow = {
@@ -80,6 +91,7 @@ function parseArgs(argv: string[]): Args {
     keepId: map.get("keep") ?? null,
     keepName: map.get("keep-name") ?? null,
     force: flags.has("force"),
+    migrateSessions: flags.has("migrate-sessions"),
   };
 }
 
@@ -133,6 +145,91 @@ type BlockedSession = {
   duration_minutes: number | null;
   linkCount: number;
 };
+
+type KeeperWeek = { id: string; week_start_date: string; plan_id: string };
+
+async function loadKeeperWeeks(db: SupabaseClient, keeperPlanId: string): Promise<KeeperWeek[]> {
+  const { data, error } = await db
+    .from("training_weeks")
+    .select("id, week_start_date, plan_id")
+    .eq("plan_id", keeperPlanId)
+    .order("week_start_date", { ascending: true });
+  if (error) die(`failed to load keeper weeks: ${error.message}`);
+  return (data ?? []) as KeeperWeek[];
+}
+
+function weekForDate(weeks: KeeperWeek[], date: string): KeeperWeek | null {
+  // Each week covers [week_start_date, week_start_date + 6 days]. Pick the one
+  // whose window contains `date`. Fall back to nearest week if slightly outside.
+  for (const w of weeks) {
+    const start = new Date(`${w.week_start_date}T00:00:00Z`).getTime();
+    const end = start + 6 * 86_400_000;
+    const t = new Date(`${date}T00:00:00Z`).getTime();
+    if (t >= start && t <= end) return w;
+  }
+  return null;
+}
+
+async function migrateBlockedSessions(
+  db: SupabaseClient,
+  userId: string,
+  keeperPlanId: string,
+  blocked: PruneCheck[],
+  dry: boolean,
+): Promise<{ migrated: number; skipped: number }> {
+  if (blocked.length === 0) return { migrated: 0, skipped: 0 };
+
+  const weeks = await loadKeeperWeeks(db, keeperPlanId);
+
+  let migrated = 0;
+  let skipped = 0;
+
+  for (const c of blocked) {
+    console.log(`  Migrating sessions from "${c.plan.name}" → keeper:`);
+    for (const s of c.blockedSessions) {
+      const week = weekForDate(weeks, s.date);
+      if (!week) {
+        console.log(`    SKIP ${s.date} ${s.sport} — no keeper week covers this date`);
+        skipped++;
+        continue;
+      }
+
+      // day_order: put after existing sessions for that day to avoid collision.
+      const { data: existing } = await db
+        .from("sessions")
+        .select("day_order")
+        .eq("user_id", userId)
+        .eq("date", s.date)
+        .eq("plan_id", keeperPlanId)
+        .order("day_order", { ascending: false })
+        .limit(1);
+      const nextDayOrder = existing && existing.length > 0 ? ((existing[0].day_order ?? 0) + 1) : 0;
+
+      if (!dry) {
+        const { error } = await db
+          .from("sessions")
+          .update({
+            plan_id: keeperPlanId,
+            week_id: week.id,
+            day_order: nextDayOrder,
+            source_metadata: {
+              migrated_from_plan: c.plan.name,
+              migrated_from_plan_id: c.plan.id,
+              migrated_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", s.id)
+          .eq("user_id", userId);
+        if (error) die(`session migrate failed (${s.id}): ${error.message}`);
+      }
+      const linkNote = s.linkCount > 0 ? `  (keeps ${s.linkCount} activity link)` : "";
+      console.log(`    ${dry ? "would move" : "moved"}  ${s.date}  ${s.sport.padEnd(8)} ${String(s.duration_minutes ?? "—").padStart(3)}m  ${s.session_name ?? "(unnamed)"}${linkNote}`);
+      migrated++;
+    }
+  }
+
+  return { migrated, skipped };
+}
 
 async function checkPlan(db: SupabaseClient, userId: string, plan: PlanRow): Promise<PruneCheck> {
   const { data: sessions } = await db
@@ -234,12 +331,37 @@ async function run(args: Args): Promise<void> {
   }
 
   console.log(`\nSafety checks:`);
-  const checks: PruneCheck[] = [];
+  let checks: PruneCheck[] = [];
   for (const plan of victims) {
     const c = await checkPlan(db, args.userId, plan);
     checks.push(c);
     const blockerLabel = c.sessionCount > 0 ? "  BLOCKED" : c.orphanedSessionCount > 0 ? "  warn   " : "  ok     ";
     console.log(`${blockerLabel} "${plan.name}"  sessions=${c.sessionCount}  weeks=${c.weekCount}  session-via-week=${c.orphanedSessionCount}  blocks=${c.blockCount}`);
+  }
+
+  // --migrate-sessions: re-parent victim sessions into the keeper plan before
+  // the safety check. After migration, re-compute checks so the blocked plans
+  // show 0 sessions and become safely deletable.
+  if (args.migrateSessions) {
+    const blockedForMigration = checks.filter((c) => c.sessionCount > 0);
+    if (blockedForMigration.length > 0) {
+      const label = args.mode === "apply" ? "\nMigrating sessions:" : "\nWould migrate sessions (dry-run / inspect):";
+      console.log(label);
+      const dry = args.mode !== "apply";
+      const { migrated, skipped } = await migrateBlockedSessions(db, args.userId, keeper.id, blockedForMigration, dry);
+      console.log(`  total: ${dry ? "would move" : "moved"} ${migrated}, skipped ${skipped}`);
+      if (args.mode === "apply" && migrated > 0) {
+        // Recompute checks — migrated plans should now have 0 sessions
+        console.log(`\nRe-running safety checks after migration:`);
+        checks = [];
+        for (const plan of victims) {
+          const c = await checkPlan(db, args.userId, plan);
+          checks.push(c);
+          const blockerLabel = c.sessionCount > 0 ? "  BLOCKED" : c.orphanedSessionCount > 0 ? "  warn   " : "  ok     ";
+          console.log(`${blockerLabel} "${plan.name}"  sessions=${c.sessionCount}  weeks=${c.weekCount}  session-via-week=${c.orphanedSessionCount}  blocks=${c.blockCount}`);
+        }
+      }
+    }
   }
 
   const blocked = checks.filter((c) => c.sessionCount > 0);
