@@ -40,6 +40,7 @@ type Args = {
   mode: Mode;
   keepId: string | null;
   keepName: string | null;
+  force: boolean;
 };
 
 type PlanRow = {
@@ -78,6 +79,7 @@ function parseArgs(argv: string[]): Args {
     mode,
     keepId: map.get("keep") ?? null,
     keepName: map.get("keep-name") ?? null,
+    force: flags.has("force"),
   };
 }
 
@@ -116,18 +118,49 @@ async function resolveKeeper(
 
 type PruneCheck = {
   plan: PlanRow;
-  sessionCount: number;       // sessions with plan_id = this plan → blocker
+  sessionCount: number;       // sessions with plan_id = this plan → blocker (unless --force)
   orphanedSessionCount: number; // sessions whose week belongs to this plan → soft warning
   weekCount: number;
   blockCount: number;
+  blockedSessions: BlockedSession[];
+};
+
+type BlockedSession = {
+  id: string;
+  date: string;
+  sport: string;
+  session_name: string | null;
+  duration_minutes: number | null;
+  linkCount: number;
 };
 
 async function checkPlan(db: SupabaseClient, userId: string, plan: PlanRow): Promise<PruneCheck> {
-  const { count: sessionCount } = await db
+  const { data: sessions } = await db
     .from("sessions")
-    .select("id", { count: "exact", head: true })
+    .select("id, date, sport, session_name, duration_minutes")
     .eq("user_id", userId)
-    .eq("plan_id", plan.id);
+    .eq("plan_id", plan.id)
+    .order("date", { ascending: true });
+  const sessionRows = (sessions ?? []) as Array<Omit<BlockedSession, "linkCount">>;
+
+  // Count confirmed links per session (ones that will be cascade-deleted with
+  // the session). Completed_activities survive, but lose their planned link.
+  const blockedSessions: BlockedSession[] = [];
+  if (sessionRows.length > 0) {
+    const sessionIds = sessionRows.map((s) => s.id);
+    const { data: links } = await db
+      .from("session_activity_links")
+      .select("planned_session_id")
+      .eq("user_id", userId)
+      .in("planned_session_id", sessionIds);
+    const linkCountBySession = new Map<string, number>();
+    for (const l of (links ?? []) as Array<{ planned_session_id: string }>) {
+      linkCountBySession.set(l.planned_session_id, (linkCountBySession.get(l.planned_session_id) ?? 0) + 1);
+    }
+    for (const s of sessionRows) {
+      blockedSessions.push({ ...s, linkCount: linkCountBySession.get(s.id) ?? 0 });
+    }
+  }
 
   const { data: weeks } = await db
     .from("training_weeks")
@@ -153,10 +186,11 @@ async function checkPlan(db: SupabaseClient, userId: string, plan: PlanRow): Pro
 
   return {
     plan,
-    sessionCount: sessionCount ?? 0,
+    sessionCount: sessionRows.length,
     orphanedSessionCount,
     weekCount: weekIds.length,
     blockCount: blockCount ?? 0,
+    blockedSessions,
   };
 }
 
@@ -209,13 +243,24 @@ async function run(args: Args): Promise<void> {
   }
 
   const blocked = checks.filter((c) => c.sessionCount > 0);
-  const deletable = checks.filter((c) => c.sessionCount === 0);
+  const deletable = args.force ? checks : checks.filter((c) => c.sessionCount === 0);
 
   if (blocked.length > 0) {
-    console.log(`\n${blocked.length} plan(s) BLOCKED — sessions still reference them via plan_id.`);
-    console.log(`Re-run scripts/seed-plan.ts --apply (or manually re-parent) before pruning.`);
+    console.log(`\n${blocked.length} plan(s) with ${blocked.reduce((s, c) => s + c.sessionCount, 0)} session(s) attached:`);
     for (const c of blocked) {
-      console.log(`  "${c.plan.name}" has ${c.sessionCount} sessions that would be CASCADE-DELETED.`);
+      const linkedSessions = c.blockedSessions.filter((s) => s.linkCount > 0).length;
+      console.log(`  "${c.plan.name}" — ${c.sessionCount} sessions (${linkedSessions} with activity links)`);
+      for (const s of c.blockedSessions) {
+        const linkTag = s.linkCount > 0 ? `  ⚠ ${s.linkCount} link(s)` : "";
+        console.log(`    ${s.date}  ${s.sport.padEnd(8)} ${String(s.duration_minutes ?? "—").padStart(3)}m  ${s.session_name ?? "(unnamed)"}${linkTag}`);
+      }
+    }
+
+    if (!args.force) {
+      console.log(`\nBLOCKED — pass --force to cascade-delete these sessions along with the plan.`);
+      console.log(`Activity links pointing at them will also be deleted (completed_activities survive).`);
+    } else {
+      console.log(`\n--force set — these sessions will be CASCADE-DELETED with the plan.`);
     }
   }
 
