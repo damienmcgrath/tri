@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { cache } from "@/lib/shared/react-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNestedNumber } from "@/lib/workouts/metrics-v2";
 import { classifyActivityStatus } from "@/lib/activities/activity-status";
