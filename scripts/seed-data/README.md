@@ -117,7 +117,7 @@ flagged inline in `notes:`:
   weekly totals balance).
 - Race durations (`Joe Hannon Olympic`, `Lusk 4 Miler`, `Half IM`) are
   approximate.
-- Skiing days encoded as 240 min/day of `sport: 'other'` — these won't match
-  any Strava activity unless you log skiing to Strava.
+- Skiing days (Thu–Sun of week 15 and Mon–Tue of week 16) are encoded as rest
+  days with no sessions.
 
 Edit the file and re-run `--apply`; updates are idempotent.
