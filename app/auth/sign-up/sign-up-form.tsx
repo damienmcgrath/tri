@@ -43,6 +43,10 @@ export function SignUpForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="input-base"
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
         />
       </div>
 
@@ -58,6 +62,8 @@ export function SignUpForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           className="input-base"
+          autoComplete="new-password"
+          enterKeyHint="go"
         />
       </div>
 

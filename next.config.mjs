@@ -1,7 +1,21 @@
 import withSerwist from "@serwist/next";
 import createNextIntlPlugin from "next-intl/plugin";
+import createBundleAnalyzer from "@next/bundle-analyzer";
 
 const withNextIntl = createNextIntlPlugin("./i18n.ts");
+const withBundleAnalyzer = createBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+const supabaseHost = (() => {
+  try {
+    return process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+      : undefined;
+  } catch {
+    return undefined;
+  }
+})();
 
 const withSerwistConfig = withSerwist({
   swSrc: "app/sw.ts",
@@ -41,7 +55,13 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    optimizePackageImports: ["openai", "zod", "@supabase/supabase-js"]
+    optimizePackageImports: ["openai", "zod", "@supabase/supabase-js", "@supabase/ssr"]
+  },
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: supabaseHost
+      ? [{ protocol: "https", hostname: supabaseHost }]
+      : []
   },
   async headers() {
     const headers = [...securityHeaders];
@@ -62,4 +82,4 @@ const nextConfig = {
   }
 };
 
-export default withSerwistConfig(withNextIntl(nextConfig));
+export default withSerwistConfig(withNextIntl(withBundleAnalyzer(nextConfig)));

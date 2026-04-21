@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 
@@ -14,6 +14,65 @@ type Message = {
   failed?: boolean;
   retryText?: string;
 };
+
+type CoachMessageProps = {
+  message: Message;
+  onRetry: (message: Message) => void;
+};
+
+// Message bubbles rarely change once rendered; only the streaming tail updates.
+// Memoising with a field-level comparator stops every bubble from re-rendering
+// on every keystroke in the input below.
+const CoachMessage = memo(
+  function CoachMessage({ message, onRetry }: CoachMessageProps) {
+    return (
+      <div className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+        <div
+          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
+            message.role === "user"
+              ? "bg-[hsl(var(--ai-accent-core))] text-[#0A0A0B]"
+              : message.failed
+                ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
+                : "border border-[rgba(255,255,255,0.06)] bg-[#1F1F25] px-4 py-3.5 text-[rgba(255,255,255,0.8)]"
+          }`}
+        >
+          {message.pending && message.content.trim().length === 0 ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
+              <span className="ml-1">Coach is thinking</span>
+            </span>
+          ) : (
+            <>
+              {message.content}
+              {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
+            </>
+          )}
+          {message.failed && message.role === "assistant" && message.retryText ? (
+            <div className="mt-2">
+              <button type="button" onClick={() => onRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+                Retry
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  },
+  (prev, next) => {
+    const a = prev.message;
+    const b = next.message;
+    return (
+      a.id === b.id &&
+      a.role === b.role &&
+      a.content === b.content &&
+      a.pending === b.pending &&
+      a.failed === b.failed &&
+      a.retryText === b.retryText
+    );
+  }
+);
 
 type CoachSummary = {
   plannedMinutes: number;
@@ -1004,7 +1063,7 @@ export function CoachChat({
       ) : null}
 
       <section id="coaching-chat" className="surface overflow-hidden">
-        <div className="flex min-h-[420px] h-[calc(100dvh-213px)] flex-col lg:grid lg:h-[68vh] lg:max-h-[780px] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
+        <div className="flex min-h-[420px] h-[calc(100dvh-var(--mobile-chrome)-80px)] flex-col lg:grid lg:h-[68vh] lg:max-h-[780px] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
           <aside className="hidden min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5 lg:flex">
             <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
               New conversation
@@ -1056,39 +1115,8 @@ export function CoachChat({
               }}
               className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
             >
-              {messages.map((message, index) => (
-                <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
-                      message.role === "user"
-                        ? "bg-[hsl(var(--ai-accent-core))] text-[#0A0A0B]"
-                        : message.failed
-                          ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
-                          : "border border-[rgba(255,255,255,0.06)] bg-[#1F1F25] px-4 py-3.5 text-[rgba(255,255,255,0.8)]"
-                    }`}
-                  >
-                    {message.pending && message.content.trim().length === 0 ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
-                        <span className="ml-1">Coach is thinking</span>
-                      </span>
-                    ) : (
-                      <>
-                        {message.content}
-                        {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
-                      </>
-                    )}
-                    {message.failed && message.role === "assistant" && message.retryText ? (
-                      <div className="mt-2">
-                        <button type="button" onClick={() => handleRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
-                          Retry
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+              {messages.map((message) => (
+                <CoachMessage key={message.id} message={message} onRetry={handleRetry} />
               ))}
             </div>
 
@@ -1116,6 +1144,10 @@ export function CoachChat({
                   placeholder="Ask how to execute better and what to adjust next..."
                   className="w-full min-w-0 rounded-md border border-[rgba(255,255,255,0.08)] bg-[#18181C] px-3 py-2 text-[rgba(255,255,255,0.8)] placeholder:text-[rgba(255,255,255,0.25)] focus:border-[rgba(190,255,0,0.30)]"
                   disabled={isLoading}
+                  inputMode="text"
+                  enterKeyHint="send"
+                  autoComplete="off"
+                  autoCapitalize="sentences"
                 />
                 <button type="submit" disabled={isLoading} aria-label="Send" className="btn-primary inline-flex shrink-0 items-center justify-center px-3 disabled:opacity-70 sm:px-4">
                   <span className="hidden sm:inline">Send</span>
