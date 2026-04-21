@@ -22,7 +22,7 @@ export const PLAN_2026: SeedPlan = {
   seasonName: "2026 Half Ironman",
   raceName: "Half IM",
   raceDate: "2026-06-07",
-  planName: "D McG Tri Training Programme 2026",
+  planName: "Ironman Warsaw 70.3 2026",
   planStartDate: "2025-11-03",
   durationWeeks: 31,
   blocks: [
