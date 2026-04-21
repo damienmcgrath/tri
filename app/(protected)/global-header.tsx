@@ -29,7 +29,10 @@ export function GlobalHeader({
           {previewMode ? <Link href="/dev/agent-preview" className="status-badge-passive"><span aria-hidden="true">⌁</span><span className="stat">Agent preview</span></Link> : null}
           {daysToRace !== null ? (
             <span role="status" aria-live="polite" className="status-badge-passive">
-              <span aria-hidden="true">◷</span>
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="6.25" />
+                <path d="M8 4.5v3.5l2.25 1.5" />
+              </svg>
               <span className="stat">
                 <span className="hidden sm:inline">{raceName} • </span>
                 {daysToRace} days

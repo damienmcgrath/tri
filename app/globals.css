@@ -23,9 +23,11 @@
   --color-info: #63b3ed;
   --color-info-muted: rgba(99, 179, 237, 0.12);
 
-  --color-run: #ff5a28;
+  /* Sport colors — intentionally distinct from severity colors.
+     Run is desaturated amber (not the danger red); bike is teal (not the success green). */
+  --color-run: oklch(0.70 0.14 45);
   --color-swim: #63b3ed;
-  --color-bike: #34d399;
+  --color-bike: oklch(0.72 0.09 180);
   --color-strength: #a78bfa;
 
   --color-text-primary: rgba(255, 255, 255, 1);
@@ -128,20 +130,27 @@
     color: var(--color-text-primary);
   }
 
+  /* Focus ring — use `outline` (not box-shadow) so Tailwind `shadow-*`
+     utilities in the later utilities layer cannot override it. White
+     outline stays visible on any fill, including lime CTAs where a lime
+     outline would disappear; `outline-offset` exposes a 2px gap of the
+     underlying surface for contrast against the element itself. */
   *:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid rgba(255, 255, 255, 0.9);
     outline-offset: 2px;
   }
 
+  /* Heading baseline — overridable by Tailwind `font-*` classes.
+     Historical override forced everything to 500 with !important, which
+     collapsed hierarchy across the product. Restored explicit scale. */
   h1,
   h2,
   h3,
   h4,
   h5,
-  h6,
-  .font-semibold,
-  .font-bold {
-    font-weight: 500 !important;
+  h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .tabular-nums,
@@ -291,6 +300,8 @@
     color: var(--color-accent);
   }
 
+  /* Kicker baseline — neutral tertiary text. Reserve lime accent for
+     live/new/alert states only; use `.priority-kicker--accent` for those. */
   .priority-kicker,
   .label,
   .label-base {
@@ -300,11 +311,56 @@
     line-height: 1;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--color-accent);
+    color: var(--color-text-tertiary);
   }
 
   .label-base {
     color: var(--color-text-secondary);
+  }
+
+  .priority-kicker--accent,
+  .label--accent {
+    color: var(--color-accent);
+  }
+
+  /* Explicit type-scale utilities — the audit's recommended replacement for
+     the old `font-weight: 500 !important` sledgehammer. */
+  .text-title-xl {
+    font-size: 28px;
+    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .text-title-lg {
+    font-size: 20px;
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .text-stat {
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Unified card padding scale. Sprint 2 consumers can adopt these to
+     replace raw `p-4 md:p-5 lg:p-6` callsites. */
+  .card-sm {
+    padding: 20px;
+  }
+
+  .card-md {
+    padding: 28px;
+  }
+
+  /* Shared UI transition — applies motion tokens to buttons, chips, cards,
+     and expand/collapse elements. */
+  .transition-ui {
+    transition: all var(--motion-standard) var(--motion-ease);
   }
 
   .motif-lab {
@@ -649,15 +705,15 @@
   .discipline-bike,
   .chip--bike {
     color: var(--color-bike);
-    background: rgba(52, 211, 153, 0.1);
-    border: 1px solid rgba(52, 211, 153, 0.18);
+    background: color-mix(in oklch, var(--color-bike) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--color-bike) 18%, transparent);
   }
 
   .discipline-run,
   .chip--run {
     color: var(--color-run);
-    background: rgba(255, 90, 40, 0.1);
-    border: 1px solid rgba(255, 90, 40, 0.18);
+    background: color-mix(in oklch, var(--color-run) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--color-run) 18%, transparent);
   }
 
   .discipline-strength,
