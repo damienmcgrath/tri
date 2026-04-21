@@ -84,33 +84,47 @@ export async function persistProgressReport(args: {
     narrative: args.computed.narrative
   };
 
-  const payload: Record<string, unknown> =
-    args.blockId != null ? { ...basePayload, block_id: args.blockId } : basePayload;
+  const selectClause =
+    "block_start,block_end,status,source_updated_at,generated_at,generation_version,facts,narrative,helpful,accurate,feedback_note,feedback_updated_at";
+
+  // Prefer the block-id conflict target when we have a real block. This
+  // survives block date edits that would otherwise shift `block_start` and
+  // leak a duplicate past the `(athlete_id, block_start)` target, tripping
+  // the `(athlete_id, block_id)` unique index on the next INSERT.
+  if (args.blockId != null) {
+    const payload = { ...basePayload, block_id: args.blockId };
+    const { data, error } = await args.supabase
+      .from("progress_reports")
+      .upsert(payload, { onConflict: "athlete_id,block_id" })
+      .select(selectClause)
+      .maybeSingle();
+
+    if (error) {
+      // Schema predates block_id (column or index missing). Fall back to the
+      // legacy block_start conflict target so older dev DBs keep working.
+      if (isMissingBlockIdError(error)) {
+        const { data: retryData, error: retryError } = await args.supabase
+          .from("progress_reports")
+          .upsert(basePayload, { onConflict: "athlete_id,block_start" })
+          .select(selectClause)
+          .maybeSingle();
+        if (retryError) throw new Error(retryError.message);
+        if (!retryData) throw new Error("Could not persist progress report.");
+        return normalizePersistedRecord(retryData as ProgressReportRecord, "ready");
+      }
+      throw new Error(error.message);
+    }
+    if (!data) throw new Error("Could not persist progress report.");
+    return normalizePersistedRecord(data as ProgressReportRecord, "ready");
+  }
 
   const { data, error } = await args.supabase
     .from("progress_reports")
-    .upsert(payload, { onConflict: "athlete_id,block_start" })
-    .select(
-      "block_start,block_end,status,source_updated_at,generated_at,generation_version,facts,narrative,helpful,accurate,feedback_note,feedback_updated_at"
-    )
+    .upsert(basePayload, { onConflict: "athlete_id,block_start" })
+    .select(selectClause)
     .maybeSingle();
 
-  if (error) {
-    // Older schemas predate the `block_id` column. Retry without it.
-    if (args.blockId != null && isMissingBlockIdError(error)) {
-      const { data: retryData, error: retryError } = await args.supabase
-        .from("progress_reports")
-        .upsert(basePayload, { onConflict: "athlete_id,block_start" })
-        .select(
-          "block_start,block_end,status,source_updated_at,generated_at,generation_version,facts,narrative,helpful,accurate,feedback_note,feedback_updated_at"
-        )
-        .maybeSingle();
-      if (retryError) throw new Error(retryError.message);
-      if (!retryData) throw new Error("Could not persist progress report.");
-      return normalizePersistedRecord(retryData as ProgressReportRecord, "ready");
-    }
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
   if (!data) throw new Error("Could not persist progress report.");
 
   return normalizePersistedRecord(data as ProgressReportRecord, "ready");
@@ -120,9 +134,14 @@ function isMissingBlockIdError(error: { code?: string; message?: string } | null
   if (!error) return false;
   const message = (error.message ?? "").toLowerCase();
   return (
+    // column missing
     error.code === "PGRST204" ||
-    message.includes("column \"block_id\"") ||
-    message.includes("'block_id'")
+    message.includes('column "block_id"') ||
+    message.includes("'block_id'") ||
+    // no unique/exclusion constraint matching ON CONFLICT — schema only
+    // has the old partial index that PostgREST cannot express.
+    error.code === "42P10" ||
+    message.includes("no unique or exclusion constraint")
   );
 }
 

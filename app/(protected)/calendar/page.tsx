@@ -301,7 +301,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   if (profile?.active_plan_id) {
     const { data: weekRow } = await supabase
       .from("training_weeks")
-      .select("week_index,focus,training_block_id")
+      .select("week_index,focus,block_id")
       .eq("plan_id", profile.active_plan_id)
       .lte("week_start_date", weekStart)
       .gte("week_start_date", addDays(weekStart, -6))
@@ -309,17 +309,17 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .limit(1)
       .maybeSingle();
 
-    if (weekRow?.training_block_id) {
+    if (weekRow?.block_id) {
       const [{ data: block }, { count: blockWeekCount }] = await Promise.all([
         supabase
           .from("training_blocks")
           .select("block_type,emphasis")
-          .eq("id", weekRow.training_block_id)
+          .eq("id", weekRow.block_id)
           .maybeSingle(),
         supabase
           .from("training_weeks")
           .select("id", { count: "exact", head: true })
-          .eq("training_block_id", weekRow.training_block_id)
+          .eq("block_id", weekRow.block_id)
       ]);
 
       if (block) {
