@@ -676,45 +676,113 @@ function buildConfidenceNote(args: {
 // Main builder
 // ---------------------------------------------------------------------------
 
+type BlockBoundaries = {
+  blockStart: string;
+  blockEnd: string;
+  priorBlockStart: string;
+  priorBlockEnd: string;
+};
+
+async function loadBlockBoundariesFromIds(
+  supabase: SupabaseClient,
+  blockId: string,
+  priorBlockId?: string | null
+): Promise<BlockBoundaries | null> {
+  const { data: block, error } = await supabase
+    .from("training_blocks")
+    .select("id,start_date,end_date,plan_id,sort_order")
+    .eq("id", blockId)
+    .maybeSingle();
+  if (error || !block) return null;
+
+  let prior: { start_date: string; end_date: string } | null = null;
+  if (priorBlockId) {
+    const { data: priorRow } = await supabase
+      .from("training_blocks")
+      .select("start_date,end_date")
+      .eq("id", priorBlockId)
+      .maybeSingle();
+    prior = (priorRow as { start_date: string; end_date: string } | null) ?? null;
+  } else if (block.plan_id != null && block.sort_order != null) {
+    const { data: priorRow } = await supabase
+      .from("training_blocks")
+      .select("start_date,end_date")
+      .eq("plan_id", block.plan_id)
+      .lt("sort_order", block.sort_order)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    prior = (priorRow as { start_date: string; end_date: string } | null) ?? null;
+  }
+
+  const fallback = computeBlockBoundaries(block.end_date);
+  return {
+    blockStart: block.start_date,
+    blockEnd: block.end_date,
+    priorBlockStart: prior?.start_date ?? fallback.priorBlockStart,
+    priorBlockEnd: prior?.end_date ?? fallback.priorBlockEnd,
+  };
+}
+
+export async function buildProgressReportFactsForBlock(args: {
+  supabase: SupabaseClient;
+  athleteId: string;
+  blockId: string;
+  priorBlockId?: string | null;
+}): Promise<ProgressReportFacts> {
+  const bounds = await loadBlockBoundariesFromIds(args.supabase, args.blockId, args.priorBlockId);
+  if (!bounds) {
+    throw new Error(`progress-report: block ${args.blockId} not found`);
+  }
+  return buildFactsForBounds(args.supabase, args.athleteId, bounds);
+}
+
 export async function buildProgressReportFacts(args: {
   supabase: SupabaseClient;
   athleteId: string;
   blockEnd: string;
 }): Promise<ProgressReportFacts> {
   const bounds = computeBlockBoundaries(args.blockEnd);
+  return buildFactsForBounds(args.supabase, args.athleteId, bounds);
+}
 
+async function buildFactsForBounds(
+  supabase: SupabaseClient,
+  athleteId: string,
+  bounds: BlockBoundaries
+): Promise<ProgressReportFacts> {
   const [currentActivitiesRes, priorActivitiesRes, fitnessRes, sessionsRes] =
     await Promise.all([
-      args.supabase
+      supabase
         .from("completed_activities")
         .select(
           "id,user_id,sport_type,start_time_utc,duration_sec,moving_duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,metrics_v2"
         )
-        .eq("user_id", args.athleteId)
+        .eq("user_id", athleteId)
         .gte("start_time_utc", `${bounds.blockStart}T00:00:00.000Z`)
         .lte("start_time_utc", `${bounds.blockEnd}T23:59:59.999Z`)
         .order("start_time_utc", { ascending: true }),
-      args.supabase
+      supabase
         .from("completed_activities")
         .select(
           "id,user_id,sport_type,start_time_utc,duration_sec,moving_duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,metrics_v2"
         )
-        .eq("user_id", args.athleteId)
+        .eq("user_id", athleteId)
         .gte("start_time_utc", `${bounds.priorBlockStart}T00:00:00.000Z`)
         .lte("start_time_utc", `${bounds.priorBlockEnd}T23:59:59.999Z`)
         .order("start_time_utc", { ascending: true }),
-      args.supabase
+      supabase
         .from("athlete_fitness")
         .select("date,sport,ctl,atl,tsb,ramp_rate")
-        .eq("user_id", args.athleteId)
+        .eq("user_id", athleteId)
         .in("sport", ["run", "bike", "swim", "total"])
         .gte("date", bounds.priorBlockStart)
         .lte("date", bounds.blockEnd)
         .order("date", { ascending: true }),
-      args.supabase
+      supabase
         .from("sessions")
         .select("id,date,sport,duration_minutes,status,is_key,session_role")
-        .eq("user_id", args.athleteId)
+        .eq("user_id", athleteId)
         .gte("date", bounds.priorBlockStart)
         .lte("date", bounds.blockEnd)
     ]);

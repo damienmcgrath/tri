@@ -438,13 +438,40 @@ export async function shiftWeekAction(formData: FormData) {
   const deltaDays = parsed.direction === "forward" ? 7 : -7;
   const newWeekStart = new Date(`${week.week_start_date}T00:00:00.000Z`);
   newWeekStart.setUTCDate(newWeekStart.getUTCDate() + deltaDays);
+  const newWeekStartIso = newWeekStart.toISOString().slice(0, 10);
+
+  const { data: planBlocks, error: planBlocksError } = await supabase
+    .from("training_blocks")
+    .select("id,start_date,end_date")
+    .eq("plan_id", parsed.planId);
+
+  if (planBlocksError && !isMissingTableError(planBlocksError, "public.training_blocks")) {
+    throw new Error(planBlocksError.message);
+  }
+
+  const containingBlock = (planBlocks ?? []).find(
+    (b: { start_date: string; end_date: string }) =>
+      newWeekStartIso >= b.start_date && newWeekStartIso <= b.end_date
+  );
+  const weekUpdatePayload: Record<string, unknown> = { week_start_date: newWeekStartIso };
+  if (planBlocks) {
+    weekUpdatePayload.block_id = containingBlock?.id ?? null;
+  }
 
   const { error: weekUpdateError } = await supabase
     .from("training_weeks")
-    .update({ week_start_date: newWeekStart.toISOString().slice(0, 10) })
+    .update(weekUpdatePayload)
     .eq("id", week.id);
 
-  if (weekUpdateError) {
+  if (weekUpdateError && isMissingColumnError(weekUpdateError, "block_id")) {
+    const { error: retryError } = await supabase
+      .from("training_weeks")
+      .update({ week_start_date: newWeekStartIso })
+      .eq("id", week.id);
+    if (retryError) {
+      throw new Error(retryError.message);
+    }
+  } else if (weekUpdateError) {
     throw new Error(weekUpdateError.message);
   }
 

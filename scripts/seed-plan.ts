@@ -123,6 +123,13 @@ async function inspect(db: SupabaseClient, userId: string, plan: SeedPlan): Prom
     console.log(`  ${b.start_date}→${b.end_date}  ${b.block_type.padEnd(11)}  ${b.name}`);
   }
 
+  const { count: unlinkedWeekCount } = await db
+    .from("training_weeks")
+    .select("id", { count: "exact", head: true })
+    .in("plan_id", (plans ?? []).map((p) => p.id))
+    .is("block_id", null);
+  console.log(`\ntraining_weeks without block_id: ${unlinkedWeekCount ?? 0}`);
+
   const { count: sessionCount } = await db
     .from("sessions")
     .select("id", { count: "exact", head: true })
@@ -276,6 +283,7 @@ async function apply(db: SupabaseClient, userId: string, plan: SeedPlan, mode: M
   }
 
   // --- Blocks (upsert by plan_id + name) ---------------------------------
+  const blockIdByName = new Map<string, string>();
   for (let i = 0; i < plan.blocks.length; i++) {
     const block = plan.blocks[i];
     const { data: existingBlock } = await db
@@ -287,21 +295,27 @@ async function apply(db: SupabaseClient, userId: string, plan: SeedPlan, mode: M
 
     if (!existingBlock) {
       if (!dry && planId && seasonId) {
-        const { error } = await db.from("training_blocks").insert({
-          season_id: seasonId,
-          plan_id: planId,
-          user_id: userId,
-          name: block.name,
-          block_type: block.blockType,
-          start_date: block.startDate,
-          end_date: block.endDate,
-          emphasis: { focus: block.emphasis },
-          sort_order: i,
-        });
+        const { data, error } = await db
+          .from("training_blocks")
+          .insert({
+            season_id: seasonId,
+            plan_id: planId,
+            user_id: userId,
+            name: block.name,
+            block_type: block.blockType,
+            start_date: block.startDate,
+            end_date: block.endDate,
+            emphasis: { focus: block.emphasis },
+            sort_order: i,
+          })
+          .select("id")
+          .single();
         if (error) die(`block insert failed (${block.name}): ${error.message}`);
+        blockIdByName.set(block.name, data!.id);
       }
       stats.blocksInserted++;
     } else {
+      blockIdByName.set(block.name, existingBlock.id as string);
       if (!dry && planId && seasonId) {
         const { error } = await db
           .from("training_blocks")
@@ -323,6 +337,7 @@ async function apply(db: SupabaseClient, userId: string, plan: SeedPlan, mode: M
 
   // --- Weeks + Sessions --------------------------------------------------
   for (const block of plan.blocks) {
+    const blockId = blockIdByName.get(block.name) ?? null;
     for (const week of block.weeks) {
       // Upsert week by (plan_id, week_index)
       const { data: existingWeek } = planId
@@ -341,6 +356,7 @@ async function apply(db: SupabaseClient, userId: string, plan: SeedPlan, mode: M
             .from("training_weeks")
             .insert({
               plan_id: planId,
+              block_id: blockId,
               week_index: week.weekIndex,
               week_start_date: week.weekStartDate,
               focus: week.focus,
@@ -357,6 +373,7 @@ async function apply(db: SupabaseClient, userId: string, plan: SeedPlan, mode: M
           const { error } = await db
             .from("training_weeks")
             .update({
+              block_id: blockId,
               week_start_date: week.weekStartDate,
               focus: week.focus,
               notes: week.notes ?? null,

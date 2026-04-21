@@ -8,6 +8,8 @@ import { computeSessionIntensityProfile, computeWeeklyIntensitySummary, getVisua
 import { computeTssFromDuration } from "@/lib/training/load";
 import { IntensityBar } from "./components/intensity-bar";
 import { WeeklyIntensityHeader } from "./components/weekly-intensity-header";
+import { BlockContextCard } from "./components/block-context-card";
+import { BlockOverview } from "./components/block-overview";
 import {
   createSessionAction,
   deleteSessionAction,
@@ -20,9 +22,22 @@ import {
 import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
+type TrainingBlock = {
+  id: string;
+  plan_id: string | null;
+  season_id: string | null;
+  name: string;
+  block_type: "Base" | "Build" | "Peak" | "Taper" | "Race" | "Recovery" | "Transition";
+  start_date: string;
+  end_date: string;
+  sort_order: number;
+  target_race_id: string | null;
+  notes: string | null;
+};
 type TrainingWeek = {
   id: string;
   plan_id: string;
+  block_id: string | null;
   week_index: number;
   week_start_date: string;
   focus: "Build" | "Recovery" | "Taper" | "Race" | "Custom";
@@ -58,9 +73,11 @@ type Session = {
 
 type PlanEditorProps = {
   plans: Plan[];
+  blocks?: TrainingBlock[];
   weeks: TrainingWeek[];
   sessions: Session[];
   selectedPlanId?: string;
+  selectedBlockId?: string;
   initialWeekId?: string;
 };
 
@@ -267,9 +284,37 @@ function derivedWeekFocusLabel(
   return "";
 }
 
-export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeekId }: PlanEditorProps) {
+export function PlanEditor({
+  plans,
+  blocks = [],
+  weeks,
+  sessions,
+  selectedPlanId,
+  selectedBlockId,
+  initialWeekId
+}: PlanEditorProps) {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0];
-  const planWeeks = weeks.filter((week) => week.plan_id === selectedPlan?.id).sort((a, b) => a.week_index - b.week_index);
+  const planBlocks = blocks
+    .filter((block) => block.plan_id === selectedPlan?.id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const allPlanWeeks = weeks
+    .filter((week) => week.plan_id === selectedPlan?.id)
+    .sort((a, b) => a.week_index - b.week_index);
+
+  const [currentBlockId, setCurrentBlockId] = useState<string | null>(selectedBlockId ?? null);
+  useEffect(() => {
+    if (!planBlocks.length) {
+      setCurrentBlockId(null);
+      return;
+    }
+    if (currentBlockId && planBlocks.some((block) => block.id === currentBlockId)) return;
+    setCurrentBlockId(selectedBlockId ?? planBlocks[0].id);
+  }, [planBlocks, selectedBlockId, currentBlockId]);
+
+  const activeBlock = planBlocks.find((block) => block.id === currentBlockId) ?? null;
+  const planWeeks = activeBlock
+    ? allPlanWeeks.filter((week) => week.block_id === activeBlock.id)
+    : allPlanWeeks;
   const [selectedWeekId, setSelectedWeekId] = useState(() => resolveInitialWeekId(planWeeks, initialWeekId));
   const [quickAddDay, setQuickAddDay] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -344,6 +389,59 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
 
   const totalMinutes = weekSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const keySessions = weekSessions.filter((session) => getOptionalSessionRoleLabel(session) === "Key").length;
+
+  const blockOverviewWeeks = useMemo(() => {
+    if (!activeBlock) return [];
+    return planWeeks.map((week) => {
+      const weekSess = sessions.filter((s) => s.week_id === week.id);
+      const rawProfiles = weekSess.map((s) =>
+        computeSessionIntensityProfile({
+          id: s.id,
+          sport: s.sport,
+          type: s.type,
+          target: s.target,
+          notes: s.notes,
+          durationMinutes: s.duration_minutes,
+          intentCategory: s.intent_category ?? null
+        })
+      );
+      const maxStress = Math.max(...rawProfiles.map((p) => p.rawStress), 1);
+      const profiles: SessionIntensityProfile[] = rawProfiles.map((p) => ({
+        ...p,
+        visualWeight: getVisualWeight(p.rawStress, maxStress)
+      }));
+      const summary = profiles.length
+        ? computeWeeklyIntensitySummary(profiles, week.week_start_date)
+        : null;
+      return {
+        weekIndex: week.week_index,
+        weekStartDate: week.week_start_date,
+        focus: week.focus,
+        summary
+      };
+    });
+  }, [activeBlock, planWeeks, sessions]);
+
+  const blockSummary = useMemo(() => {
+    if (!activeBlock) return null;
+    const weekIds = new Set(planWeeks.map((w) => w.id));
+    const blockSessions = sessions.filter((s) => weekIds.has(s.week_id));
+    const planned = blockSessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+    const completed = blockSessions
+      .filter((s) => s.status === "completed")
+      .reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+    const completionPct = planned > 0 ? Math.round((completed / planned) * 100) : 0;
+    const todayIso = getLocalTodayIso();
+    const weeksTotal = planWeeks.length;
+    const weeksElapsed = planWeeks.filter((w) => w.week_start_date <= todayIso).length;
+    return {
+      plannedMinutes: planned,
+      completedMinutes: completed,
+      completionPct,
+      weeksTotal,
+      weeksElapsed: Math.min(weeksElapsed, weeksTotal)
+    };
+  }, [activeBlock, planWeeks, sessions]);
 
   const previousWeekTotalMinutes = useMemo(() => {
     if (!previousWeek) return null;
@@ -498,6 +596,78 @@ export function PlanEditor({ plans, weeks, sessions, selectedPlanId, initialWeek
           </div>
         </div>
       </header>
+
+      {planBlocks.length > 0 ? (
+        <section className="surface-subtle px-4 py-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="card-kicker">Training blocks</p>
+            <p className="text-[11px] text-tertiary">{planBlocks.length} block{planBlocks.length === 1 ? "" : "s"}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {planBlocks.map((block) => {
+              const isActive = block.id === currentBlockId;
+              const blockWeeksCount = allPlanWeeks.filter((w) => w.block_id === block.id).length;
+              return (
+                <button
+                  key={block.id}
+                  type="button"
+                  onClick={() => setCurrentBlockId(block.id)}
+                  className={`rounded-full border px-3 py-1.5 text-left text-xs transition ${
+                    isActive
+                      ? "border-[rgba(190,255,0,0.4)] bg-[rgba(190,255,0,0.1)] text-white"
+                      : "border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.26)]"
+                  }`}
+                >
+                  <span className="font-medium">{block.name}</span>
+                  <span className="ml-2 text-[10px] text-tertiary">
+                    {block.block_type} · {blockWeeksCount} wk
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {activeBlock ? (
+        <BlockContextCard
+          blockType={activeBlock.block_type}
+          blockWeek={Math.max(1, Math.min(blockSummary?.weeksElapsed ?? 1, blockSummary?.weeksTotal ?? 1))}
+          blockTotalWeeks={blockSummary?.weeksTotal ?? 0}
+          raceName={null}
+          daysToRace={null}
+          notes={activeBlock.notes}
+        />
+      ) : null}
+
+      {activeBlock && blockSummary ? (
+        <section className="surface-subtle px-4 py-3">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div>
+              <p className="card-kicker">Block dates</p>
+              <p className="mt-1 text-sm font-medium text-white">
+                {weekRangeLabel(activeBlock.start_date)} – {weekRangeLabel(activeBlock.end_date)}
+              </p>
+            </div>
+            <div>
+              <p className="card-kicker">Planned volume</p>
+              <p className="mt-1 text-sm font-medium text-white">{blockSummary.plannedMinutes} min</p>
+            </div>
+            <div>
+              <p className="card-kicker">Completed</p>
+              <p className="mt-1 text-sm font-medium text-white">{blockSummary.completedMinutes} min</p>
+            </div>
+            <div>
+              <p className="card-kicker">Completion</p>
+              <p className="mt-1 text-sm font-medium text-white">{blockSummary.completionPct}%</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {activeBlock && blockOverviewWeeks.length > 0 ? (
+        <BlockOverview weeks={blockOverviewWeeks} currentWeekStart={selectedWeek?.week_start_date} />
+      ) : null}
 
       <section className="surface-subtle px-4 py-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">

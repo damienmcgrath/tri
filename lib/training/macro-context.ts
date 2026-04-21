@@ -83,6 +83,56 @@ function deriveBlockPosition(weeks: Array<{ week_index: number; focus: string }>
   };
 }
 
+type FkBlockPosition = {
+  id: string;
+  blockType: string;
+  targetRaceId: string | null;
+  seasonId: string | null;
+  blockWeek: number;
+  blockTotalWeeks: number;
+};
+
+async function getBlockPositionViaFk(
+  supabase: SupabaseClient,
+  planId: string,
+  currentPlanWeek: number
+): Promise<FkBlockPosition | null> {
+  const { data: weeks } = await supabase
+    .from("training_weeks")
+    .select("week_index,block_id")
+    .eq("plan_id", planId)
+    .not("block_id", "is", null)
+    .order("week_index", { ascending: true });
+
+  const rows = (weeks ?? []) as Array<{ week_index: number; block_id: string | null }>;
+  if (rows.length === 0) return null;
+
+  const currentRow = rows.find((w) => w.week_index === currentPlanWeek) ?? rows[rows.length - 1];
+  const blockId = currentRow?.block_id;
+  if (!blockId) return null;
+
+  const peers = rows.filter((w) => w.block_id === blockId).sort((a, b) => a.week_index - b.week_index);
+  const blockWeek = Math.max(1, peers.findIndex((w) => w.week_index === currentRow.week_index) + 1);
+  const blockTotalWeeks = peers.length;
+
+  const { data: block } = await supabase
+    .from("training_blocks")
+    .select("id,block_type,target_race_id,season_id")
+    .eq("id", blockId)
+    .maybeSingle();
+
+  if (!block) return null;
+
+  return {
+    id: block.id as string,
+    blockType: block.block_type as string,
+    targetRaceId: (block.target_race_id as string | null) ?? null,
+    seasonId: (block.season_id as string | null) ?? null,
+    blockWeek,
+    blockTotalWeeks,
+  };
+}
+
 export async function getMacroContext(supabase: SupabaseClient, athleteId: string): Promise<MacroContext> {
   const todayIso = getTodayUtc();
 
@@ -105,8 +155,10 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
   const totalPlanWeeks = activePlan?.duration_weeks ?? 12;
   const currentPlanWeek = activePlan?.start_date ? getCurrentPlanWeek(activePlan.start_date, todayIso) : 1;
 
-  // Phase 3: check for formal training blocks first
-  const formalBlock = await getBlockForDate(supabase, athleteId, todayIso).catch(() => null);
+  // Prefer FK path (training_weeks.block_id → training_blocks). Fall back to
+  // date-range lookup for legacy plans where weeks aren't yet linked.
+  const fkBlock = planId ? await getBlockPositionViaFk(supabase, planId, currentPlanWeek).catch(() => null) : null;
+  const formalBlock = fkBlock ? null : await getBlockForDate(supabase, athleteId, todayIso).catch(() => null);
 
   if (!planId) {
     return {
@@ -131,7 +183,6 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
   }
 
   // Fetch training weeks and all sessions up to today in parallel
-  const weekStart = activePlan?.start_date ?? todayIso;
   const [{ data: trainingWeeks }, { data: allSessions }] = await Promise.all([
     supabase.from("training_weeks").select("week_index,focus").eq("plan_id", planId).order("week_index", { ascending: true }),
     supabase
@@ -143,7 +194,7 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
   ]);
 
   const weeks = (trainingWeeks ?? []) as Array<{ week_index: number; focus: string }>;
-  const blockPosition = deriveBlockPosition(weeks, currentPlanWeek);
+  const inferredBlockPosition = deriveBlockPosition(weeks, currentPlanWeek);
 
   // Compute cumulative volume by discipline from plan start to today
   const sessions = allSessions ?? [];
@@ -162,22 +213,27 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
     })
   ) as MacroContext["cumulativeVolumeByDiscipline"];
 
-  void weekStart; // suppress unused warning
+  // FK > date-range fallback > focus-inference fallback
+  const currentBlock = fkBlock?.blockType ?? formalBlock?.blockType ?? inferredBlockPosition.currentBlock;
+  const blockWeek = fkBlock?.blockWeek
+    ?? (formalBlock ? weekInBlock(formalBlock.startDate, todayIso) : inferredBlockPosition.blockWeek);
+  const blockTotalWeeks = fkBlock?.blockTotalWeeks
+    ?? (formalBlock ? totalBlockWeeks(formalBlock.startDate, formalBlock.endDate) : inferredBlockPosition.blockTotalWeeks);
 
   return {
     raceName,
     raceDate,
     daysToRace,
-    currentBlock: formalBlock?.blockType ?? blockPosition.currentBlock,
-    blockWeek: formalBlock ? weekInBlock(formalBlock.startDate, todayIso) : blockPosition.blockWeek,
-    blockTotalWeeks: formalBlock ? totalBlockWeeks(formalBlock.startDate, formalBlock.endDate) : blockPosition.blockTotalWeeks,
+    currentBlock,
+    blockWeek,
+    blockTotalWeeks,
     totalPlanWeeks,
     currentPlanWeek,
     cumulativeVolumeByDiscipline,
-    trainingBlockId: formalBlock?.id ?? null,
-    trainingBlockType: formalBlock?.blockType ?? null,
-    targetRaceId: formalBlock?.targetRaceId ?? null,
-    seasonId: formalBlock?.seasonId ?? null,
+    trainingBlockId: fkBlock?.id ?? formalBlock?.id ?? null,
+    trainingBlockType: fkBlock?.blockType ?? formalBlock?.blockType ?? null,
+    targetRaceId: fkBlock?.targetRaceId ?? formalBlock?.targetRaceId ?? null,
+    seasonId: fkBlock?.seasonId ?? formalBlock?.seasonId ?? null,
   };
 }
 
