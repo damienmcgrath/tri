@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PROGRESS_REPORT_GENERATION_VERSION,
   getProgressReportSnapshot,
+  listAthleteTrainingBlocks,
   refreshProgressReport,
   type ProgressReportArtifact,
   type ProgressReportFacts
@@ -9,6 +10,55 @@ import {
 import { localIsoDate } from "@/lib/activities/completed-activities";
 import { ProgressReportRefreshButton } from "./progress-report-refresh-button";
 import { ProgressReportFeedbackCard } from "./progress-report-feedback-card";
+
+type AthleteTrainingBlock = Awaited<
+  ReturnType<typeof listAthleteTrainingBlocks>
+>[number];
+
+function formatShortRange(start: string, end: string) {
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00.000Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC"
+    });
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+function renderBlockSelector(
+  blocks: AthleteTrainingBlock[],
+  selectedBlockId: string | null
+) {
+  if (blocks.length === 0) return null;
+  return (
+    <nav
+      aria-label="Training blocks"
+      className="surface flex flex-wrap gap-2 overflow-x-auto p-3"
+    >
+      {blocks.map((block) => {
+        const isSelected = block.id === selectedBlockId;
+        return (
+          <a
+            key={block.id}
+            href={`/progress-report?block=${block.id}`}
+            aria-current={isSelected ? "page" : undefined}
+            className={
+              isSelected
+                ? "debrief-pill border-[hsl(var(--accent)/0.55)] bg-[hsl(var(--accent)/0.16)] text-white"
+                : "debrief-pill hover:border-[hsl(var(--accent)/0.5)] hover:text-white"
+            }
+          >
+            <span className="font-medium">{block.name}</span>
+            <span className="ml-2 text-[11px] text-muted">· {block.block_type}</span>
+            <span className="ml-2 text-[11px] text-tertiary">
+              {formatShortRange(block.start_date, block.end_date)}
+            </span>
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +122,11 @@ function renderFactsHeader(facts: ProgressReportFacts, stale: boolean) {
   );
 }
 
-function renderArtifact(artifact: ProgressReportArtifact, stale: boolean) {
+function renderArtifact(
+  artifact: ProgressReportArtifact,
+  stale: boolean,
+  blockId?: string
+) {
   const { facts, narrative } = artifact;
   const totalFitness = facts.fitnessTrajectory.find((f) => f.sport === "total");
 
@@ -95,7 +149,7 @@ function renderArtifact(artifact: ProgressReportArtifact, stale: boolean) {
             ) : null}
           </div>
           <div className="relative z-10 flex min-w-[180px] flex-col items-end gap-3">
-            <ProgressReportRefreshButton blockEnd={facts.blockEnd} />
+            <ProgressReportRefreshButton blockId={blockId} blockEnd={facts.blockEnd} />
           </div>
         </div>
 
@@ -315,32 +369,35 @@ function renderArtifact(artifact: ProgressReportArtifact, stale: boolean) {
 function renderEmptyState(
   blockEnd: string,
   sourceUpdatedAt: string,
-  reason: string
+  reason: string,
+  blockId?: string
 ) {
   return (
-    <section className="space-y-4">
-      <article className="surface p-5">
-        <p className="label">Progress Report</p>
-        <h1 className="mt-1 text-2xl font-semibold">No block-over-block data yet</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted">{reason}</p>
-        <p className="mt-2 max-w-2xl text-xs text-tertiary">
-          Block ending {blockEnd}. Data last changed {sourceUpdatedAt.slice(0, 10)}.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ProgressReportRefreshButton blockEnd={blockEnd} label="Try again" />
-          <a href="/dashboard" className="btn-secondary px-3 text-xs">
-            Back to dashboard
-          </a>
-        </div>
-      </article>
-    </section>
+    <article className="surface p-5">
+      <p className="label">Progress Report</p>
+      <h1 className="mt-1 text-2xl font-semibold">No block-over-block data yet</h1>
+      <p className="mt-2 max-w-2xl text-sm text-muted">{reason}</p>
+      <p className="mt-2 max-w-2xl text-xs text-tertiary">
+        Block ending {blockEnd}. Data last changed {sourceUpdatedAt.slice(0, 10)}.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <ProgressReportRefreshButton
+          blockId={blockId}
+          blockEnd={blockEnd}
+          label="Try again"
+        />
+        <a href="/dashboard" className="btn-secondary px-3 text-xs">
+          Back to dashboard
+        </a>
+      </div>
+    </article>
   );
 }
 
 export default async function ProgressReportPage({
   searchParams
 }: {
-  searchParams?: Promise<{ blockEnd?: string }>;
+  searchParams?: Promise<{ blockEnd?: string; block?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -356,16 +413,32 @@ export default async function ProgressReportPage({
     Intl.DateTimeFormat().resolvedOptions().timeZone ||
     "UTC";
   const todayIso = localIsoDate(new Date().toISOString(), timeZone);
-  const requestedBlockEnd = (await searchParams)?.blockEnd;
-  const blockEnd =
+  const params = (await searchParams) ?? {};
+  const requestedBlockEnd = params.blockEnd;
+  const blockEndFallback =
     requestedBlockEnd && /^\d{4}-\d{2}-\d{2}$/.test(requestedBlockEnd)
       ? requestedBlockEnd
       : todayIso;
 
+  const blocks = await listAthleteTrainingBlocks({
+    supabase,
+    athleteId: user.id
+  });
+
+  const requestedBlockId = params.block;
+  const explicitBlock = requestedBlockId
+    ? blocks.find((b) => b.id === requestedBlockId)
+    : undefined;
+  const currentBlock = blocks.find(
+    (b) => b.start_date <= todayIso && todayIso <= b.end_date
+  );
+  const selectedBlock = explicitBlock ?? currentBlock ?? blocks[0] ?? null;
+
   let snapshot = await getProgressReportSnapshot({
     supabase,
     athleteId: user.id,
-    blockEnd
+    blockId: selectedBlock?.id,
+    blockEnd: selectedBlock ? undefined : blockEndFallback
   });
 
   // Gate the auto-refresh on readiness. Without this, an athlete with zero
@@ -383,7 +456,8 @@ export default async function ProgressReportPage({
       const artifact = await refreshProgressReport({
         supabase,
         athleteId: user.id,
-        blockEnd
+        blockId: selectedBlock?.id,
+        blockEnd: selectedBlock ? undefined : snapshot.blockEnd
       });
       snapshot = {
         ...snapshot,
@@ -397,12 +471,29 @@ export default async function ProgressReportPage({
     }
   }
 
+  const selector = renderBlockSelector(blocks, selectedBlock?.id ?? null);
+
   if (!snapshot.artifact) {
     const reason = snapshot.readiness.hasSufficientData
       ? "We couldn't assemble a report for this block. Try again shortly."
-      : `We need at least ${snapshot.readiness.currentBlockActivityCount === 0 ? "one activity" : "more activities"} in the current 4-week block to compare it to the prior one. Log a few sessions and come back.`;
-    return renderEmptyState(snapshot.blockEnd, snapshot.sourceUpdatedAt, reason);
+      : `We need at least ${snapshot.readiness.currentBlockActivityCount === 0 ? "one activity" : "more activities"} in the current block to compare it to the prior one. Log a few sessions and come back.`;
+    return (
+      <section className="space-y-4">
+        {selector}
+        {renderEmptyState(
+          snapshot.blockEnd,
+          snapshot.sourceUpdatedAt,
+          reason,
+          selectedBlock?.id
+        )}
+      </section>
+    );
   }
 
-  return <section className="space-y-4">{renderArtifact(snapshot.artifact, snapshot.stale)}</section>;
+  return (
+    <section className="space-y-4">
+      {selector}
+      {renderArtifact(snapshot.artifact, snapshot.stale, selectedBlock?.id)}
+    </section>
+  );
 }

@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 
 type Props = {
   blockEnd?: string;
+  blockId?: string;
   label?: string;
 };
 
-export function ProgressReportRefreshButton({ blockEnd, label = "Refresh" }: Props) {
+export function ProgressReportRefreshButton({ blockEnd, blockId, label = "Refresh" }: Props) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,10 +19,13 @@ export function ProgressReportRefreshButton({ blockEnd, label = "Refresh" }: Pro
     setError(null);
 
     try {
+      const body: Record<string, string> = {};
+      if (blockId) body.blockId = blockId;
+      else if (blockEnd) body.blockEnd = blockEnd;
       const response = await fetch("/api/progress-report/refresh", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(blockEnd ? { blockEnd } : {})
+        body: JSON.stringify(body)
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {

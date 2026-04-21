@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildProgressReportFacts, computeBlockBoundaries } from "./facts";
+import {
+  buildProgressReportFacts,
+  buildProgressReportFactsForBlock,
+  computeBlockBoundaries
+} from "./facts";
 import { buildDeterministicNarrative } from "./deterministic";
 import { generateProgressReportNarrative } from "./narrative";
 import {
   persistProgressReport,
   getPersistedProgressReport,
+  getPersistedProgressReportByBlockId,
   getLatestPersistedProgressReport,
   getProgressReportSourceUpdatedAt,
   getProgressReportReadiness,
@@ -41,6 +46,7 @@ export type {
 
 export {
   buildProgressReportFacts,
+  buildProgressReportFactsForBlock,
   computeBlockBoundaries
 } from "./facts";
 
@@ -50,6 +56,7 @@ export { generateProgressReportNarrative } from "./narrative";
 export {
   persistProgressReport,
   getPersistedProgressReport,
+  getPersistedProgressReportByBlockId,
   getLatestPersistedProgressReport,
   getProgressReportSourceUpdatedAt,
   getProgressReportReadiness,
@@ -87,11 +94,77 @@ export type ProgressReportSnapshot = {
   blockEnd: string;
   priorBlockStart: string;
   priorBlockEnd: string;
+  /** The training_blocks.id used to drive this snapshot, if any. */
+  blockId: string | null;
+  /** The prior block's id used for comparison, if resolvable. */
+  priorBlockId: string | null;
   artifact: ProgressReportArtifact | null;
   stale: boolean;
   sourceUpdatedAt: string;
   readiness: ProgressReportReadiness;
 };
+
+type ResolvedBlockBounds = {
+  blockStart: string;
+  blockEnd: string;
+  priorBlockStart: string;
+  priorBlockEnd: string;
+  blockId: string | null;
+  priorBlockId: string | null;
+};
+
+/**
+ * Resolve block bounds either from a real training_blocks row (preferred) or
+ * from the legacy 28-day rolling window keyed on blockEnd. Returns null when
+ * the caller asked for a blockId that doesn't exist.
+ */
+async function resolveBlockBounds(args: {
+  supabase: SupabaseClient;
+  blockId?: string;
+  blockEnd?: string;
+}): Promise<ResolvedBlockBounds | null> {
+  if (args.blockId) {
+    const { data: block, error } = await args.supabase
+      .from("training_blocks")
+      .select("id,plan_id,start_date,end_date,sort_order")
+      .eq("id", args.blockId)
+      .maybeSingle();
+    if (error || !block) return null;
+
+    let priorBlockStart: string | null = null;
+    let priorBlockEnd: string | null = null;
+    let priorBlockId: string | null = null;
+    if (block.plan_id != null && block.sort_order != null) {
+      const { data: priorRow } = await args.supabase
+        .from("training_blocks")
+        .select("id,start_date,end_date")
+        .eq("plan_id", block.plan_id)
+        .lt("sort_order", block.sort_order)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (priorRow) {
+        priorBlockId = (priorRow as { id: string }).id;
+        priorBlockStart = (priorRow as { start_date: string }).start_date;
+        priorBlockEnd = (priorRow as { end_date: string }).end_date;
+      }
+    }
+
+    const fallback = computeBlockBoundaries(block.end_date);
+    return {
+      blockStart: block.start_date,
+      blockEnd: block.end_date,
+      priorBlockStart: priorBlockStart ?? fallback.priorBlockStart,
+      priorBlockEnd: priorBlockEnd ?? fallback.priorBlockEnd,
+      blockId: block.id,
+      priorBlockId
+    };
+  }
+
+  if (!args.blockEnd) return null;
+  const bounds = computeBlockBoundaries(args.blockEnd);
+  return { ...bounds, blockId: null, priorBlockId: null };
+}
 
 function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportArtifact | null {
   try {
@@ -119,22 +192,50 @@ function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportA
 }
 
 /**
- * Load the snapshot for the block ending on `blockEnd`. Returns the persisted
- * artifact (if any) plus a staleness flag against the current source data.
+ * Load the snapshot for the block ending on `blockEnd` (legacy rolling window)
+ * or for the real training_blocks row identified by `blockId` (preferred).
+ * Returns the persisted artifact (if any) plus a staleness flag against the
+ * current source data.
  */
 export async function getProgressReportSnapshot(args: {
   supabase: SupabaseClient;
   athleteId: string;
-  blockEnd: string;
+  blockEnd?: string;
+  blockId?: string;
 }): Promise<ProgressReportSnapshot> {
-  const bounds = computeBlockBoundaries(args.blockEnd);
+  const bounds = await resolveBlockBounds({
+    supabase: args.supabase,
+    blockId: args.blockId,
+    blockEnd: args.blockEnd
+  });
+  if (!bounds) {
+    throw new Error(
+      args.blockId
+        ? `progress-report: block ${args.blockId} not found`
+        : "progress-report: blockEnd or blockId is required"
+    );
+  }
 
   const [record, readiness] = await Promise.all([
-    getPersistedProgressReport({
-      supabase: args.supabase,
-      athleteId: args.athleteId,
-      blockStart: bounds.blockStart
-    }),
+    bounds.blockId
+      ? getPersistedProgressReportByBlockId({
+          supabase: args.supabase,
+          athleteId: args.athleteId,
+          blockId: bounds.blockId
+        }).then(
+          (row) =>
+            row ??
+            getPersistedProgressReport({
+              supabase: args.supabase,
+              athleteId: args.athleteId,
+              blockStart: bounds.blockStart
+            })
+        )
+      : getPersistedProgressReport({
+          supabase: args.supabase,
+          athleteId: args.athleteId,
+          blockStart: bounds.blockStart
+        }),
     getProgressReportReadiness({
       supabase: args.supabase,
       athleteId: args.athleteId,
@@ -155,6 +256,8 @@ export async function getProgressReportSnapshot(args: {
     blockEnd: bounds.blockEnd,
     priorBlockStart: bounds.priorBlockStart,
     priorBlockEnd: bounds.priorBlockEnd,
+    blockId: bounds.blockId,
+    priorBlockId: bounds.priorBlockId,
     artifact,
     stale,
     sourceUpdatedAt: readiness.sourceUpdatedAt,
@@ -184,13 +287,62 @@ export async function getLatestProgressReportSnapshot(args: {
 }
 
 /**
- * Assemble facts + narrative for a given block end. Returns the AI narrative
- * when available, otherwise the deterministic fallback.
+ * List the athlete's training blocks newest-first for use in a picker.
+ * Gracefully returns an empty array when the table is unavailable.
+ */
+export async function listAthleteTrainingBlocks(args: {
+  supabase: SupabaseClient;
+  athleteId: string;
+}): Promise<
+  Array<{
+    id: string;
+    name: string;
+    block_type: string;
+    start_date: string;
+    end_date: string;
+    plan_id: string | null;
+    sort_order: number;
+  }>
+> {
+  const { data, error } = await args.supabase
+    .from("training_blocks")
+    .select("id,name,block_type,start_date,end_date,plan_id,sort_order")
+    .eq("user_id", args.athleteId)
+    .order("start_date", { ascending: false });
+
+  if (error) {
+    const message = (error.message ?? "").toLowerCase();
+    if (
+      error.code === "PGRST205" ||
+      message.includes("could not find the table 'public.training_blocks'")
+    ) {
+      return [];
+    }
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as Array<{
+    id: string;
+    name: string;
+    block_type: string;
+    start_date: string;
+    end_date: string;
+    plan_id: string | null;
+    sort_order: number;
+  }>;
+}
+
+/**
+ * Assemble facts + narrative for a given block end (legacy rolling window) or
+ * training_blocks id (preferred). Returns the AI narrative when available,
+ * otherwise the deterministic fallback.
  */
 export async function computeProgressReport(args: {
   supabase: SupabaseClient;
   athleteId: string;
-  blockEnd: string;
+  blockEnd?: string;
+  blockId?: string;
+  priorBlockId?: string | null;
   /**
    * Override for the source timestamp (typically supplied by refreshProgressReport
    * so the readiness and compute passes share one query). Falls back to a fresh
@@ -203,13 +355,34 @@ export async function computeProgressReport(args: {
   source: "ai" | "fallback";
   sourceUpdatedAt: string;
 }> {
-  const bounds = computeBlockBoundaries(args.blockEnd);
+  const bounds = await resolveBlockBounds({
+    supabase: args.supabase,
+    blockId: args.blockId,
+    blockEnd: args.blockEnd
+  });
+  if (!bounds) {
+    throw new Error(
+      args.blockId
+        ? `progress-report: block ${args.blockId} not found`
+        : "progress-report: blockEnd or blockId is required"
+    );
+  }
+
+  const factsPromise = bounds.blockId
+    ? buildProgressReportFactsForBlock({
+        supabase: args.supabase,
+        athleteId: args.athleteId,
+        blockId: bounds.blockId,
+        priorBlockId: args.priorBlockId ?? bounds.priorBlockId ?? undefined
+      })
+    : buildProgressReportFacts({
+        supabase: args.supabase,
+        athleteId: args.athleteId,
+        blockEnd: bounds.blockEnd
+      });
+
   const [facts, sourceUpdatedAt] = await Promise.all([
-    buildProgressReportFacts({
-      supabase: args.supabase,
-      athleteId: args.athleteId,
-      blockEnd: args.blockEnd
-    }),
+    factsPromise,
     args.sourceUpdatedAt !== undefined
       ? Promise.resolve(args.sourceUpdatedAt)
       : getProgressReportSourceUpdatedAt({
@@ -247,9 +420,21 @@ export async function computeProgressReport(args: {
 export async function refreshProgressReport(args: {
   supabase: SupabaseClient;
   athleteId: string;
-  blockEnd: string;
+  blockEnd?: string;
+  blockId?: string;
 }): Promise<ProgressReportArtifact> {
-  const bounds = computeBlockBoundaries(args.blockEnd);
+  const bounds = await resolveBlockBounds({
+    supabase: args.supabase,
+    blockId: args.blockId,
+    blockEnd: args.blockEnd
+  });
+  if (!bounds) {
+    throw new Error(
+      args.blockId
+        ? `progress-report: block ${args.blockId} not found`
+        : "progress-report: blockEnd or blockId is required"
+    );
+  }
 
   const readiness = await getProgressReportReadiness({
     supabase: args.supabase,
@@ -266,7 +451,9 @@ export async function refreshProgressReport(args: {
   const computed = await computeProgressReport({
     supabase: args.supabase,
     athleteId: args.athleteId,
-    blockEnd: args.blockEnd,
+    blockEnd: bounds.blockEnd,
+    blockId: bounds.blockId ?? undefined,
+    priorBlockId: bounds.priorBlockId,
     sourceUpdatedAt: readiness.sourceUpdatedAt
   });
   return persistProgressReport({
@@ -274,6 +461,7 @@ export async function refreshProgressReport(args: {
     athleteId: args.athleteId,
     blockStart: bounds.blockStart,
     blockEnd: bounds.blockEnd,
+    blockId: bounds.blockId,
     computed: {
       facts: computed.facts,
       narrative: computed.narrative,

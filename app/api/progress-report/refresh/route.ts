@@ -10,7 +10,8 @@ import {
 import { localIsoDate } from "@/lib/activities/completed-activities";
 
 const refreshInputSchema = z.object({
-  blockEnd: z.string().date().optional()
+  blockEnd: z.string().date().optional(),
+  blockId: z.string().uuid().optional()
 });
 
 export async function POST(request: Request) {
@@ -57,7 +58,8 @@ export async function POST(request: Request) {
     const artifact = await refreshProgressReport({
       supabase,
       athleteId: user.id,
-      blockEnd: body.blockEnd ?? todayIso
+      blockId: body.blockId,
+      blockEnd: body.blockId ? undefined : body.blockEnd ?? todayIso
     });
 
     return NextResponse.json({ ok: true, artifact });
