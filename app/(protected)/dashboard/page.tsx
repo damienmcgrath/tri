@@ -23,6 +23,7 @@ import { TrainingScoreCard } from "./components/training-score-card";
 import { ReadinessIndicator } from "./components/readiness-indicator";
 import { RecentUploadCard } from "./components/recent-upload-card";
 import { DisciplineBalanceCompact } from "./components/discipline-balance-compact";
+import { DashboardCardSkeleton } from "./components/dashboard-skeletons";
 import { getLatestFitness, getReadinessState, getTsbTrend } from "@/lib/training/fitness-model";
 import { computeWeeklyDisciplineBalance, detectDisciplineImbalance } from "@/lib/training/discipline-balance";
 import { detectTrends } from "@/lib/training/trends";
@@ -581,7 +582,7 @@ export default async function DashboardPage({
 
       {/* Recent Upload Card — actionable, not a text wall, stays above grid */}
       {isCurrentWeek ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<DashboardCardSkeleton />}>
           <DashboardRecentUpload supabase={supabase} userId={user.id} />
         </Suspense>
       ) : null}
@@ -763,7 +764,7 @@ export default async function DashboardPage({
       {/* Narrative cards — collapsed by default so the grid stays above the fold */}
       {/* Morning Brief */}
       {isCurrentWeek ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<DashboardCardSkeleton />}>
           <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
         </Suspense>
       ) : null}
@@ -771,11 +772,11 @@ export default async function DashboardPage({
       {/* Transition Briefing / Monday Unified Flow */}
       {showTransitionBriefing ? (
         dashboardMoment === "monday_transition" ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<DashboardCardSkeleton />}>
             <DashboardMondayTransition supabase={supabase} userId={user.id} weekStart={weekStart} todayIso={todayIso} />
           </Suspense>
         ) : (
-          <Suspense fallback={null}>
+          <Suspense fallback={<DashboardCardSkeleton />}>
             <DashboardTransitionBriefing supabase={supabase} userId={user.id} weekStart={weekStart} />
           </Suspense>
         )
@@ -784,11 +785,11 @@ export default async function DashboardPage({
       {/* Context-aware section: end_of_week promotes debrief before week ahead */}
       {dashboardMoment === "end_of_week" ? (
         <>
-          <Suspense fallback={null}>
+          <Suspense fallback={<DashboardCardSkeleton />}>
             <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
           </Suspense>
           {showWeekAheadCard ? (
-            <Suspense fallback={null}>
+            <Suspense fallback={<DashboardCardSkeleton />}>
               <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
             </Suspense>
           ) : null}
@@ -796,11 +797,11 @@ export default async function DashboardPage({
       ) : (
         <>
           {showWeekAheadCard ? (
-            <Suspense fallback={null}>
+            <Suspense fallback={<DashboardCardSkeleton />}>
               <DashboardWeekAhead supabase={supabase} userId={user.id} weekStart={weekStart} />
             </Suspense>
           ) : null}
-          <Suspense fallback={null}>
+          <Suspense fallback={<DashboardCardSkeleton />}>
             <DashboardDebrief supabase={supabase} userId={user.id} weekStart={weekStart} timeZone={timeZone} todayIso={todayIso} />
           </Suspense>
         </>
@@ -809,21 +810,21 @@ export default async function DashboardPage({
       {/* Readiness (at-a-glance) → Training Score + Balance */}
       {isCurrentWeek ? (
         <>
-          <Suspense fallback={null}>
+          <Suspense fallback={<DashboardCardSkeleton />}>
             <DashboardReadiness supabase={supabase} userId={user.id} />
           </Suspense>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Suspense fallback={null}>
+            <Suspense fallback={<DashboardCardSkeleton />}>
               <DashboardTrainingScore supabase={supabase} userId={user.id} todayIso={todayIso} />
             </Suspense>
-            <Suspense fallback={null}>
+            <Suspense fallback={<DashboardCardSkeleton />}>
               <DashboardDisciplineBalance supabase={supabase} userId={user.id} weekStart={weekStart} />
             </Suspense>
           </div>
         </>
       ) : null}
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<DashboardCardSkeleton />}>
         <DashboardTrends supabase={supabase} userId={user.id} />
       </Suspense>
     </section>

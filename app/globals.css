@@ -51,6 +51,12 @@
   --motion-standard: 180ms;
   --motion-ease: ease;
 
+  /* Mobile chrome heights — single source of truth for full-height views
+     that need to account for the sticky header and bottom nav. */
+  --mobile-header-h: 61px;
+  --mobile-nav-h: 72px;
+  --mobile-chrome: calc(var(--mobile-header-h) + var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+
   /* Compatibility aliases for existing inline Tailwind usage. */
   --surface: 240 5% 4%;
   --surface-elevated: 240 8% 7%;

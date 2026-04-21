@@ -1,6 +1,6 @@
 export default function CoachLoading() {
   return (
-    <section className="flex h-[calc(100dvh-8rem)] flex-col animate-pulse">
+    <section className="flex h-[calc(100dvh-var(--mobile-chrome))] flex-col animate-pulse">
       {/* Chat header */}
       <div className="surface border-b border-[hsl(var(--border))] p-4">
         <div className="h-4 w-32 rounded bg-[hsl(var(--surface-2))]" />

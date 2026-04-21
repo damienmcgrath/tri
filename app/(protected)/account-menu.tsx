@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -39,8 +40,14 @@ export function AccountMenu({ avatarUrl, initials, displayName, email, signOutAc
     <details className="group relative" ref={detailsRef}>
       <summary aria-label="Open account menu" className="list-none cursor-pointer rounded-full border border-[var(--border-default)] bg-[var(--color-surface)] p-0.5 transition hover:border-[var(--border-accent)] focus-visible:outline-none">
         {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="User avatar" className="h-9 w-9 rounded-full object-cover" />
+          <Image
+            src={avatarUrl}
+            alt="User avatar"
+            width={36}
+            height={36}
+            sizes="36px"
+            className="h-9 w-9 rounded-full object-cover"
+          />
         ) : (
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-xs font-medium text-accent">
             {initials}

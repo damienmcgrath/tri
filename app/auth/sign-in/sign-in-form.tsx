@@ -96,6 +96,10 @@ export function SignInForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="input-base"
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
         />
       </div>
 
@@ -110,6 +114,8 @@ export function SignInForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           className="input-base"
+          autoComplete="current-password"
+          enterKeyHint="go"
         />
       </div>
 

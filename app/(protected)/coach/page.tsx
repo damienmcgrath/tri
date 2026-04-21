@@ -138,7 +138,7 @@ async function getDiagnosisSessions(supabase: Awaited<ReturnType<typeof createCl
     .lte("date", weekEnd)
     .not("execution_result", "is", null)
     .order("date", { ascending: false })
-    .limit(12);
+    .limit(8);
 
   if (error) {
     return [] as CoachDiagnosisSession[];
@@ -163,7 +163,7 @@ const getBriefingContext = cache(async function getBriefingContext(supabase: Awa
   }
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const [{ data: activities }, { data: weeklySessions }, { data: links }, { data: reviewedSessions }, { data: upcomingKeySessions }] = await Promise.all([
+  const [{ data: activities }, { data: weeklySessions }, { data: reviewedSessions }, { data: upcomingKeySessions }] = await Promise.all([
     supabase
       .from("completed_activities")
       .select("id")
@@ -176,10 +176,6 @@ const getBriefingContext = cache(async function getBriefingContext(supabase: Awa
       .eq("user_id", userId)
       .gte("date", weekStart)
       .lte("date", weekEnd),
-    supabase
-      .from("session_activity_links")
-      .select("planned_session_id,completed_activity_id,confirmation_status")
-      .eq("user_id", userId),
     supabase
       .from("sessions")
       .select("id")
@@ -199,24 +195,46 @@ const getBriefingContext = cache(async function getBriefingContext(supabase: Awa
       .limit(3)
   ]);
 
-  const weeklySessionIds = new Set(((weeklySessions ?? []) as Array<{ id: string }>).map((session) => session.id));
+  const weeklyActivityIdList = ((activities ?? []) as Array<{ id: string }>).map((a) => a.id);
+  const weeklySessionIdList = ((weeklySessions ?? []) as Array<{ id: string }>).map((s) => s.id);
+  const weeklySessionIds = new Set(weeklySessionIdList);
+
+  // Only fetch links that touch this week's activities or planned sessions. Without this scope,
+  // athletes with a year of history transfer the entire links table on every coach page load.
+  let links: Array<{ planned_session_id: string | null; completed_activity_id: string | null; confirmation_status: string | null }> = [];
+  if (weeklyActivityIdList.length > 0 || weeklySessionIdList.length > 0) {
+    const orFilters: string[] = [];
+    if (weeklyActivityIdList.length > 0) {
+      orFilters.push(`completed_activity_id.in.(${weeklyActivityIdList.join(",")})`);
+    }
+    if (weeklySessionIdList.length > 0) {
+      orFilters.push(`planned_session_id.in.(${weeklySessionIdList.join(",")})`);
+    }
+    const { data: scopedLinks } = await supabase
+      .from("session_activity_links")
+      .select("planned_session_id,completed_activity_id,confirmation_status")
+      .eq("user_id", userId)
+      .or(orFilters.join(","))
+      .limit(500);
+    links = (scopedLinks ?? []) as typeof links;
+  }
+
   const confirmedLinkedActivityIds = new Set(
-    (links ?? [])
-      .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-      .map((link: any) => link.completed_activity_id as string)
-      .filter(Boolean)
+    links
+      .filter((link) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link) => link.completed_activity_id)
+      .filter((id): id is string => Boolean(id))
   );
   const confirmedLinkedSessionIds = new Set(
-    (links ?? [])
-      .filter((link: any) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
-      .map((link: any) => link.planned_session_id as string)
+    links
+      .filter((link) => link.planned_session_id && weeklySessionIds.has(link.planned_session_id as string) && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
+      .map((link) => link.planned_session_id as string)
   );
 
   const reviewedSessionIds = new Set(((reviewedSessions ?? []) as Array<{ id: string }>).map((session) => session.id));
   const pendingReviewCount = [...confirmedLinkedSessionIds].filter((sessionId) => !reviewedSessionIds.has(sessionId as string)).length;
 
-  const allActivityIds = ((activities ?? []) as Array<{ id: string }>).map((a) => a.id);
-  const extraActivityCount = allActivityIds.filter((id) => !confirmedLinkedActivityIds.has(id)).length;
+  const extraActivityCount = weeklyActivityIdList.filter((id) => !confirmedLinkedActivityIds.has(id)).length;
 
   const upcomingKeyNames = ((upcomingKeySessions ?? []) as Array<{ session_name: string | null; type: string; sport: string }>)
     .map((s) => s.session_name || `${s.type} ${s.sport}`)

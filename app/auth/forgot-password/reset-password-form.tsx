@@ -58,6 +58,11 @@ export function ForgotPasswordForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="input-base"
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          enterKeyHint="send"
         />
       </div>
 
