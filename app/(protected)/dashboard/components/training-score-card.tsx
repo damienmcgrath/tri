@@ -18,12 +18,6 @@ function getScoreRingColour(score: number): string {
   return "hsl(35, 90%, 55%)";
 }
 
-function getDeltaLabel(delta: number | null): string | null {
-  if (delta === null) return null;
-  if (delta === 0) return "steady";
-  return delta > 0 ? `+${delta}` : `${delta}`;
-}
-
 function getDeltaClass(delta: number | null): string {
   if (delta === null || delta === 0) return "text-tertiary";
   return delta > 0 ? "text-success" : "text-danger";
@@ -71,11 +65,29 @@ function getWeakestComponent(score: TrainingScore): WeakestComponent | null {
   return candidates[0];
 }
 
+type SubScore = {
+  label: string;
+  value: number | null;
+  active: boolean;
+  fillClass: string;
+};
+
+function trendGlyph(delta: number | null): string {
+  if (delta === null || delta === 0) return "→";
+  return delta > 0 ? "↑" : "↓";
+}
+
+function trendText(delta: number | null): string {
+  if (delta === null) return "first week of data";
+  if (delta === 0) return "steady this week";
+  const signed = delta > 0 ? `+${delta}` : `${delta}`;
+  return `${signed} this week`;
+}
+
 export function TrainingScoreCard({ score }: Props) {
   const ringPct = Math.max(0, Math.min(100, score.compositeScore));
   const circumference = 2 * Math.PI * 40;
   const strokeDashoffset = circumference - (ringPct / 100) * circumference;
-  const delta7d = getDeltaLabel(score.scoreDelta7d);
   const weakest = getWeakestComponent(score);
   const coachPrompt =
     weakest !== null
@@ -83,28 +95,34 @@ export function TrainingScoreCard({ score }: Props) {
       : `Explain my training score of ${Math.round(score.compositeScore)}. What's driving each dimension and what should I focus on to improve it?`;
   const coachLabel = weakest !== null ? weakest.linkLabel : "Explain my score";
 
+  const subScores: SubScore[] = [
+    {
+      label: "Execution",
+      value: score.executionQuality,
+      active: true,
+      fillClass: "bg-[var(--color-success)]"
+    },
+    {
+      label: "Progression",
+      value: score.progressionActive ? score.progressionSignal : null,
+      active: score.progressionActive,
+      fillClass: "bg-[var(--color-accent)]"
+    },
+    {
+      label: "Balance",
+      value: score.balanceScore,
+      active: true,
+      fillClass: "bg-[var(--color-info)]"
+    }
+  ];
+
   return (
     <article className="surface p-4 md:p-5">
-      {/* Header row: label + delta */}
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Training score</p>
-        {delta7d ? (
-          <span className={`text-[11px] font-medium ${getDeltaClass(score.scoreDelta7d)}`}>
-            {score.scoreDelta7d! > 0 ? "↑" : score.scoreDelta7d! < 0 ? "↓" : ""}{delta7d} this week
-          </span>
-        ) : null}
-      </div>
-
-      {/* Score ring — centered */}
-      <div className="mt-3 flex flex-col items-center">
-        <div className="relative h-24 w-24">
+      {/* Hero row: ring + label + trend */}
+      <div className="flex items-center gap-4">
+        <div className="relative h-24 w-24 shrink-0">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-            <circle
-              cx="50" cy="50" r="40"
-              fill="none"
-              stroke="rgba(255,255,255,0.08)"
-              strokeWidth="6"
-            />
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
             <circle
               cx="50" cy="50" r="40"
               fill="none"
@@ -116,86 +134,50 @@ export function TrainingScoreCard({ score }: Props) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-2xl font-bold ${getScoreColour(score.compositeScore)}`}>
+            <span className={`text-2xl font-semibold ${getScoreColour(score.compositeScore)}`}>
               {Math.round(score.compositeScore)}
             </span>
           </div>
         </div>
-
-        {!score.progressionActive ? (
-          <p className="mt-2 text-center text-[11px] text-tertiary">Progression tracking builds with 2+ weeks of data</p>
-        ) : null}
+        <div className="min-w-0 flex-1">
+          <p className="card-kicker">Training score</p>
+          <p className={`mt-1 text-[15px] font-medium ${getDeltaClass(score.scoreDelta7d)}`}>
+            <span aria-hidden="true" className="mr-1">{trendGlyph(score.scoreDelta7d)}</span>
+            {trendText(score.scoreDelta7d)}
+          </p>
+          {!score.progressionActive ? (
+            <p className="mt-1 text-[11px] text-tertiary">Progression builds with 2+ weeks of data</p>
+          ) : null}
+        </div>
       </div>
 
-      {/* Inline component breakdown — always visible */}
-      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[rgba(255,255,255,0.08)] pt-3">
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-1">
-            <span className="text-[11px]">✓</span>
-            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Execution</span>
-          </div>
-          <span className="text-sm font-semibold text-white">
-            {score.executionQuality !== null ? Math.round(score.executionQuality) : "—"}
-          </span>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-            <div
-              className="h-full rounded-full bg-white/60"
-              style={{ width: `${score.executionQuality ?? 0}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-1">
-            <span className="text-[11px]">↗</span>
-            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Progression</span>
-          </div>
-          {score.progressionActive ? (
-            <>
-              <span className="text-sm font-semibold text-white">
-                {score.progressionSignal !== null ? Math.round(score.progressionSignal) : "—"}
-              </span>
-              <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+      {/* Sub-score tracks — labeled horizontal bars, color-coded by component */}
+      <div className="mt-4 space-y-2.5 border-t border-[rgba(255,255,255,0.08)] pt-3">
+        {subScores.map((sub) => {
+          const pct = sub.active && sub.value !== null ? Math.max(0, Math.min(100, sub.value)) : 0;
+          const display = sub.active && sub.value !== null ? Math.round(sub.value) : "—";
+          return (
+            <div key={sub.label} className="grid grid-cols-[88px_1fr_auto] items-center gap-3">
+              <span className="text-[11px] uppercase tracking-[0.08em] text-tertiary">{sub.label}</span>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
                 <div
-                  className="h-full rounded-full bg-white/60"
-                  style={{ width: `${score.progressionSignal ?? 0}%` }}
+                  className={`h-full rounded-full transition-ui ${sub.active ? sub.fillClass : "bg-white/20"}`}
+                  style={{ width: `${pct}%` }}
                 />
               </div>
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-semibold text-tertiary">—</span>
-              <span className="text-[9px] text-tertiary">Building</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-1">
-            <span className="text-[11px]">⚖</span>
-            <span className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Balance</span>
-          </div>
-          <span className="text-sm font-semibold text-white">
-            {score.balanceScore !== null ? Math.round(score.balanceScore) : "—"}
-          </span>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-            <div
-              className="h-full rounded-full bg-white/60"
-              style={{ width: `${score.balanceScore ?? 0}%` }}
-            />
-          </div>
-        </div>
+              <span className="w-6 text-right text-sm font-medium tabular-nums text-white">{display}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Coach hand-off */}
-      <div className="mt-3 flex items-center justify-center">
-        <a
-          href={`/coach?prompt=${encodeURIComponent(coachPrompt)}`}
-          className="text-[11px] font-medium text-cyan-400 transition hover:text-cyan-300"
-        >
-          {coachLabel}
-        </a>
-      </div>
+      {/* Coach handoff — inline muted link, not a block */}
+      <a
+        href={`/coach?prompt=${encodeURIComponent(coachPrompt)}`}
+        className="mt-3 inline-flex text-[12px] text-tertiary transition hover:text-white"
+      >
+        {coachLabel} →
+      </a>
     </article>
   );
 }

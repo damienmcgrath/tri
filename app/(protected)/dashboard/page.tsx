@@ -9,6 +9,7 @@ import {
 } from "@/lib/activities/completed-activities";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
+import { SESSION_INTENT_LABELS } from "@/lib/training/semantics";
 import { computeWeekMinuteTotals, computeWeekShape } from "@/lib/training/week-metrics";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
 import { getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
@@ -364,7 +365,11 @@ export default async function DashboardPage({
       microLabel = "";
     }
 
-    return { iso, label, tone, stateLabel, microLabel };
+    // Distinct sports for this day's sessions — surfaced as dots on the day chip
+    // so the week's sport shape is legible at a glance.
+    const sports = Array.from(new Set(daySessions.map((session) => session.sport).filter(Boolean))) as string[];
+
+    return { iso, label, tone, stateLabel, microLabel, sports };
   });
 
   const overdueKeySession = sessions
@@ -488,12 +493,14 @@ export default async function DashboardPage({
   const isRaceWeekSuppressed = raceWeekCtx?.taperStatus.inTaper ||
     dashboardMoment === "race_day" || dashboardMoment === "race_eve" || dashboardMoment === "post_race";
 
-  // Show at most one signal. Attention takes priority; focus only shows when there is no attention item,
-  // or when attention is about a missed key session (structural) while focus is about a different sport gap.
+  // F12: the attention signal ("You are behind", "Missed key session", etc.) is the
+  // left-column "This week" card's new inline status row. The right column's
+  // contextualItems list only carries *forward-looking* focus items now — otherwise
+  // the user sees the same warning described three different ways.
   const attentionIsAboutKeySession = attentionItem?.title.startsWith("Missed key session");
   const showFocusItem = !isRaceWeekSuppressed && resolvedFocusItem && (!attentionItem || attentionIsAboutKeySession);
+  const leftStatusRow = isRaceWeekSuppressed ? null : attentionItem;
   const contextualItems = [
-    isRaceWeekSuppressed ? null : attentionItem,
     showFocusItem ? resolvedFocusItem : null
   ].filter((item): item is ContextualItem => Boolean(item));
 
@@ -515,19 +522,10 @@ export default async function DashboardPage({
     );
   }
 
+  const showWeekNavigator = weekOptions.length > 1;
+
   return (
     <section className="space-y-4">
-      {/* Week Navigation */}
-      {weekOptions.length > 1 ? (
-        <WeekNavigator
-          weekStart={weekStart}
-          currentWeekStart={currentWeekStart}
-          weekOptions={weekOptions}
-          blockLabel={currentBlockLabel}
-          weekNumber={currentWeekNumber}
-        />
-      ) : null}
-
       {/* Race-week hero cards — take priority over everything else */}
       {dashboardMoment === "race_day" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(251,191,36,0.5)] bg-[rgba(251,191,36,0.08)] px-5 py-5">
@@ -588,15 +586,48 @@ export default async function DashboardPage({
       ) : null}
 
 
-      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr] lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-4 md:grid-cols-[1fr_1.4fr] lg:grid-cols-[1fr_1.6fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
-              <p className="mt-1 text-sm text-[rgba(255,255,255,0.68)]">{weekRangeLabel(weekStart)}</p>
+              {/* F20: the week pager lives inside the This Week card now, not as a
+                  detached strip above the hero cards. When there's only one week the
+                  pager collapses to a plain date range. */}
+              {showWeekNavigator ? (
+                <div className="mt-1">
+                  <WeekNavigator
+                    weekStart={weekStart}
+                    currentWeekStart={currentWeekStart}
+                    weekOptions={weekOptions}
+                    blockLabel={currentBlockLabel}
+                    weekNumber={currentWeekNumber}
+                  />
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-[rgba(255,255,255,0.68)]">{weekRangeLabel(weekStart)}</p>
+              )}
             </div>
-            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
+            {leftStatusRow ? null : (
+              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
+            )}
           </div>
+
+          {leftStatusRow ? (
+            <div
+              role="status"
+              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.1)] px-3 py-2.5"
+            >
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--color-warning)]" />
+              <p className="min-w-0 flex-1 text-sm text-white">
+                <span className="font-medium">{leftStatusRow.title}</span>
+                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.72)]"> · {leftStatusRow.detail}</span> : null}
+              </p>
+              <Link href={leftStatusRow.href} className="text-xs font-medium text-[var(--color-warning)] transition hover:text-white">
+                {leftStatusRow.cta} →
+              </Link>
+            </div>
+          ) : null}
 
           <div className="mt-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="min-w-0">
@@ -613,9 +644,23 @@ export default async function DashboardPage({
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {dailyStates.map((day) => {
               const chip = getDayChipContent(day);
+              const chipSports = day.sports.slice(0, 3);
               return (
                 <div key={day.iso} className={`min-h-[52px] overflow-hidden rounded-2xl border px-3 py-2 sm:min-h-[60px] ${getDayToneClass(day.tone)}`}>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[rgba(255,255,255,0.6)]">{day.label}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[rgba(255,255,255,0.6)]">{day.label}</p>
+                    {chipSports.length > 0 ? (
+                      <div aria-hidden="true" className="flex items-center gap-0.5">
+                        {chipSports.map((sport) => (
+                          <span
+                            key={sport}
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: `var(--color-${sport})` }}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   <p className={getDayChipTitleClass(day)}>{chip.title}</p>
                   {chip.meta ? <p className="mt-0.5 truncate text-[11px] leading-tight text-[rgba(255,255,255,0.62)]">{chip.meta}</p> : null}
                 </div>
@@ -623,17 +668,26 @@ export default async function DashboardPage({
             })}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[rgba(255,255,255,0.08)] pt-3 text-sm">
-            <p className="px-1 text-[rgba(255,255,255,0.68)]">Completed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(totals.completed)}</span></p>
-            <p className="px-1 text-[rgba(255,255,255,0.68)]">Remaining <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(remainingMinutes)}</span></p>
-            <p className="px-1 text-[rgba(255,255,255,0.68)]">Missed <span className="mt-0.5 block text-sm font-semibold text-white">{toHoursAndMinutes(missedMinutes)}</span></p>
-          </div>
+          {/* F11: flatten the Completed/Remaining/Missed trio — they're redundant with
+              the percentage above. One inline summary line instead. */}
+          <p className="mt-3 text-xs text-[rgba(255,255,255,0.62)]">
+            <span className="text-white">{toHoursAndMinutes(totals.completed)} done</span>
+            <span> · {toHoursAndMinutes(remainingMinutes)} left</span>
+            {missedMinutes > 0 ? <span> · {toHoursAndMinutes(missedMinutes)} missed</span> : null}
+          </p>
         </article>
 
         <article className="surface p-4 md:p-5 lg:p-6">
+          {/* F16: morning brief opens the "What matters" column. Coach-authored
+              context is the first thing the user reads, before the session list. */}
+          {isCurrentWeek ? (
+            <Suspense fallback={null}>
+              <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
+            </Suspense>
+          ) : null}
           {pendingTodaySessions.length > 0 ? (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)]">Today</p>
+              <p className={`text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)] ${isCurrentWeek ? "mt-4" : ""}`}>Today</p>
               <h2 className="mt-2 text-xl font-semibold">What matters right now</h2>
               <p className="mt-1 text-xs text-[rgba(255,255,255,0.56)]">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length + extraTodayActivities.length} completed`}</p>
               {todayCue ? <p className="mt-2 text-xs text-[rgba(255,255,255,0.68)]">Cue: {todayCue}</p> : null}
@@ -642,12 +696,27 @@ export default async function DashboardPage({
                 <div>
                   <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.62)]">Remaining today</p>
                   <div className="space-y-2">
-                    {pendingTodaySessions.map((session) => (
-                      <div key={session.id} className="rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5">
-                        <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                        <p className="text-xs text-[rgba(255,255,255,0.72)]">{session.duration_minutes} min{session.is_key ? " • Key" : ""} • Remaining</p>
-                      </div>
-                    ))}
+                    {pendingTodaySessions.map((session) => {
+                      // Prefer the AI-classified intent category for the meta line; fall back to
+                      // the planner-authored subtype (e.g. "Sweet Spot Intervals") so the row
+                      // still teaches the user *what* the session is for rather than repeating
+                      // the section's "Remaining" header.
+                      const intentLabel =
+                        (session.intent_category &&
+                          SESSION_INTENT_LABELS[
+                            session.intent_category as keyof typeof SESSION_INTENT_LABELS
+                          ]) ||
+                        session.subtype?.trim() ||
+                        null;
+                      return (
+                        <div key={session.id} className="rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5">
+                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
+                          <p className="text-xs text-[rgba(255,255,255,0.72)]">
+                            {session.duration_minutes} min{session.is_key ? " • Key" : ""}{intentLabel ? ` • ${intentLabel}` : ""}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -672,9 +741,15 @@ export default async function DashboardPage({
                 ) : null}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {nextPendingTodaySession ? <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary px-3 text-xs">Open session</Link> : null}
-                <Link href="/calendar" className="btn-secondary px-3 text-xs">View plan</Link>
+              <div className="mt-4 space-y-2">
+                {nextPendingTodaySession ? (
+                  <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary w-full text-sm">
+                    Open session
+                  </Link>
+                ) : null}
+                <Link href="/calendar" className="block text-center text-[12px] text-tertiary transition hover:text-white">
+                  or view the full plan
+                </Link>
               </div>
 
               {contextualItems.length > 0 ? (
@@ -701,10 +776,10 @@ export default async function DashboardPage({
                 {nextImportantSession ? <p className="text-sm text-[rgba(255,255,255,0.64)]">{getUpcomingSessionMeta(nextImportantSession)}</p> : null}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 space-y-2">
                 <Link
                   href={nextImportantSession ? `/calendar?focus=${nextImportantSession.id}` : "/calendar"}
-                  className="btn-primary px-3 text-xs"
+                  className="btn-primary w-full text-sm"
                 >
                   {nextImportantSession ? `Prepare ${getSessionDisplayName(nextImportantSession)}` : "Open weekly plan"}
                 </Link>
@@ -716,9 +791,9 @@ export default async function DashboardPage({
                         ? `/sessions/activity/${extraTodayActivities[0].id}`
                         : "/calendar"
                   }
-                  className="btn-secondary px-3 text-xs"
+                  className="block text-center text-[12px] text-tertiary transition hover:text-white"
                 >
-                  Review today
+                  or review today&rsquo;s work
                 </Link>
               </div>
 
@@ -761,13 +836,8 @@ export default async function DashboardPage({
         </article>
       </div>
 
-      {/* Narrative cards — collapsed by default so the grid stays above the fold */}
-      {/* Morning Brief */}
-      {isCurrentWeek ? (
-        <Suspense fallback={<DashboardCardSkeleton />}>
-          <DashboardMorningBrief supabase={supabase} userId={user.id} todayIso={todayIso} />
-        </Suspense>
-      ) : null}
+      {/* Narrative cards — collapsed by default so the grid stays above the fold
+          (Morning Brief moved inside the What Matters column header — see F16.) */}
 
       {/* Transition Briefing / Monday Unified Flow */}
       {showTransitionBriefing ? (
