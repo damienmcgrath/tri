@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { addDays } from "../week-context";
+import { DebriefAutoRefresh } from "./debrief-auto-refresh";
 import { DebriefFeedbackCard } from "./debrief-feedback-card";
 import { DebriefRefreshButton } from "./debrief-refresh-button";
 import { DetailsAccordion } from "../details-accordion";
-import { WEEKLY_DEBRIEF_GENERATION_VERSION, getAdjacentWeeklyDebriefs, getWeeklyDebriefSnapshot, refreshWeeklyDebrief } from "@/lib/weekly-debrief";
+import { WEEKLY_DEBRIEF_GENERATION_VERSION, getAdjacentWeeklyDebriefs, getWeeklyDebriefSnapshot } from "@/lib/weekly-debrief";
 import { LEGACY_NARRATIVE_INSIGHT_PLACEHOLDER } from "@/lib/weekly-debrief/deterministic";
 import { localIsoDate } from "@/lib/activities/completed-activities";
 import { getMacroContext } from "@/lib/training/macro-context";
@@ -129,7 +130,7 @@ export default async function DebriefPage({
   const requestedWeekStart = (await searchParams)?.weekStart;
   const weekStart = requestedWeekStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart) ? requestedWeekStart : currentWeekStart;
 
-  let snapshot = await getWeeklyDebriefSnapshot({
+  const snapshot = await getWeeklyDebriefSnapshot({
     supabase,
     athleteId: user.id,
     weekStart,
@@ -137,26 +138,35 @@ export default async function DebriefPage({
     todayIso
   });
 
-  const needsRefresh =
+  const shouldAutoRefresh = Boolean(
     (snapshot.readiness.isReady && !snapshot.artifact) ||
-    (snapshot.artifact && (snapshot.stale || snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION));
+      (snapshot.artifact && (snapshot.stale || snapshot.artifact.generationVersion < WEEKLY_DEBRIEF_GENERATION_VERSION))
+  );
 
-  if (needsRefresh) {
-    const refreshed = await refreshWeeklyDebrief({
-      supabase,
-      athleteId: user.id,
-      weekStart,
-      timeZone,
-      todayIso
-    });
-    snapshot = {
-      readiness: refreshed.readiness,
-      artifact: refreshed.artifact,
-      stale: false,
-      sourceUpdatedAt: refreshed.artifact?.sourceUpdatedAt ?? snapshot.sourceUpdatedAt,
-      weekStart,
-      weekEnd: addDays(weekStart, 6)
-    };
+  if (snapshot.readiness.isReady && !snapshot.artifact) {
+    return (
+      <section className="space-y-6">
+        <article className="surface p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="label">Weekly Debrief</p>
+              <h1 className="mt-1 text-2xl font-semibold">Generating your debrief…</h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted">
+                We&rsquo;re pulling this week&rsquo;s sessions together. This usually takes 20–40 seconds — the page will update automatically when it&rsquo;s ready.
+              </p>
+            </div>
+            <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary">
+              {formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}
+            </span>
+          </div>
+
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--border))] border-t-[hsl(var(--accent-performance))]" />
+            <DebriefAutoRefresh weekStart={weekStart} enabled={shouldAutoRefresh} />
+          </div>
+        </article>
+      </section>
+    );
   }
 
   if (!snapshot.readiness.isReady || !snapshot.artifact) {
@@ -278,6 +288,7 @@ export default async function DebriefPage({
                 Coach brief
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
+              <DebriefAutoRefresh weekStart={artifact.weekStart} enabled={shouldAutoRefresh} />
             </div>
             <ShareSummaryButton weekOf={artifact.weekStart} displayName={athleteDisplayName} />
             <a
