@@ -189,6 +189,32 @@ async function findCandidateSessions(
   return (data ?? []) as SessionRow[];
 }
 
+async function updateActivityScheduled(
+  db: SupabaseClient,
+  userId: string,
+  activityId: string,
+): Promise<void> {
+  // Try the full shape first (matches the UI action). If is_unplanned hasn't
+  // been migrated, PostgREST throws a schema-cache error — fall back to just
+  // updating schedule_status, which is enough for the UI classification.
+  const { error } = await db
+    .from("completed_activities")
+    .update({ schedule_status: "scheduled", is_unplanned: false })
+    .eq("id", activityId)
+    .eq("user_id", userId);
+  if (!error) return;
+
+  const missingColumn = /schema cache|column .* does not exist|is_unplanned/i.test(error.message ?? "");
+  if (!missingColumn) die(`schedule_status update failed (${activityId}): ${error.message}`);
+
+  const { error: retryErr } = await db
+    .from("completed_activities")
+    .update({ schedule_status: "scheduled" })
+    .eq("id", activityId)
+    .eq("user_id", userId);
+  if (retryErr) die(`schedule_status update failed (${activityId}): ${retryErr.message}`);
+}
+
 async function linkActivity(
   db: SupabaseClient,
   userId: string,
@@ -209,12 +235,39 @@ async function linkActivity(
   });
   if (insertErr) die(`link insert failed (activity=${activityId} session=${plannedSessionId}): ${insertErr.message}`);
 
-  const { error: updErr } = await db
+  await updateActivityScheduled(db, userId, activityId);
+}
+
+/**
+ * Repair pass: find linked activities whose schedule_status is still
+ * 'unscheduled' (e.g. a prior run was interrupted between the link insert and
+ * the status update) and set them to 'scheduled'.
+ */
+async function repairStaleScheduleStatus(db: SupabaseClient, userId: string): Promise<number> {
+  const { data: links, error } = await db
+    .from("session_activity_links")
+    .select("completed_activity_id")
+    .eq("user_id", userId)
+    .not("planned_session_id", "is", null)
+    .neq("confirmation_status", "rejected");
+  if (error) die(`repair: failed to load links: ${error.message}`);
+
+  const linkedIds = (links ?? []).map((l: { completed_activity_id: string }) => l.completed_activity_id);
+  if (linkedIds.length === 0) return 0;
+
+  const { data: stale, error: staleErr } = await db
     .from("completed_activities")
-    .update({ schedule_status: "scheduled", is_unplanned: false })
-    .eq("id", activityId)
-    .eq("user_id", userId);
-  if (updErr) die(`schedule_status update failed (${activityId}): ${updErr.message}`);
+    .select("id")
+    .eq("user_id", userId)
+    .eq("schedule_status", "unscheduled")
+    .in("id", linkedIds);
+  if (staleErr) die(`repair: failed to load stale activities: ${staleErr.message}`);
+
+  const staleIds = (stale ?? []).map((r: { id: string }) => r.id);
+  for (const id of staleIds) {
+    await updateActivityScheduled(db, userId, id);
+  }
+  return staleIds.length;
 }
 
 async function run(args: Args): Promise<void> {
@@ -227,6 +280,11 @@ async function run(args: Args): Promise<void> {
   const rangeLabel = from || to ? `${from ?? "−∞"} → ${to ?? "+∞"}` : "(all time)";
   console.log(`\nBulk-link activities for ${profile!.display_name ?? userId} in ${rangeLabel}`);
   console.log(`Mode: ${mode}\n`);
+
+  if (mode === "apply") {
+    const repaired = await repairStaleScheduleStatus(db, userId);
+    if (repaired > 0) console.log(`Repaired schedule_status on ${repaired} previously-linked activities.\n`);
+  }
 
   const activities = await loadUnlinkedActivities(db, userId, from, to);
   console.log(`Unlinked completed_activities: ${activities.length}`);
