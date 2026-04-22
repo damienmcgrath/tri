@@ -391,18 +391,39 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[hsl(var(--border))]">
-                    {visibleMetrics.map((mc, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-2 text-muted">{sanitizeText(mc.metric)}</td>
-                        <td className="px-3 py-2 text-right text-tertiary">{sanitizeText(mc.target)}</td>
-                        <td className={`px-3 py-2 text-right font-medium ${
-                          mc.assessment === "on_target" ? "text-success" :
-                          mc.assessment === "missing" ? "text-tertiary" : "text-warning"
-                        }`}>
-                          {sanitizeText(mc.actual)}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleMetrics.map((mc, i) => {
+                      const rawTarget = sanitizeText(mc.target).trim();
+                      // Em-dash-only target reads as "data failed to load".
+                      // Render "Not set" in muted italic so users parse it as
+                      // "no plan target for this metric" instead.
+                      const targetIsMissing = rawTarget === "" || /^[—–-]+\s*$/.test(rawTarget);
+                      const targetIsMissingWithNote = /^[—–-]+\s*\(.+\)\s*$/.test(rawTarget);
+                      const targetNote = targetIsMissingWithNote
+                        ? rawTarget.replace(/^[—–-]+\s*\((.+)\)\s*$/, "$1")
+                        : null;
+                      return (
+                        <tr key={i}>
+                          <td className="px-3 py-2 text-muted">{sanitizeText(mc.metric)}</td>
+                          <td className="px-3 py-2 text-right text-tertiary">
+                            {targetIsMissing ? (
+                              <span className="italic text-muted">Not set</span>
+                            ) : targetIsMissingWithNote ? (
+                              <span className="italic text-muted">
+                                Not set <span className="text-[11px] not-italic text-tertiary">({targetNote})</span>
+                              </span>
+                            ) : (
+                              rawTarget
+                            )}
+                          </td>
+                          <td className={`px-3 py-2 text-right font-medium ${
+                            mc.assessment === "on_target" ? "text-success" :
+                            mc.assessment === "missing" ? "text-tertiary" : "text-warning"
+                          }`}>
+                            {sanitizeText(mc.actual)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -412,7 +433,9 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                   onClick={() => setShowAllMetrics(!showAllMetrics)}
                   className="mt-2 text-xs text-tertiary hover:text-white"
                 >
-                  {showAllMetrics ? "Show fewer" : `Show all ${verdict.metric_comparisons.length} metrics`}
+                  {showAllMetrics
+                    ? "Show fewer ↑"
+                    : `Show ${verdict.metric_comparisons.length - 3} more metric${verdict.metric_comparisons.length - 3 === 1 ? "" : "s"} ↓`}
                 </button>
               )}
             </div>

@@ -626,9 +626,6 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             <p className="mt-1 text-sm text-muted">
               {disciplineLabel} · {sessionDateLabel} · {actualDurationLabel}
             </p>
-            {blockContext ? (
-              <p className="mt-1 text-xs text-tertiary">{blockContext}</p>
-            ) : null}
           </div>
           <div className="flex flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
             {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
@@ -641,6 +638,14 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           {reviewVm.isReviewable ? (
             <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
               {narrativeSourceLabel(reviewVm.narrativeSource)}
+            </span>
+          ) : null}
+          {blockContext ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.78)]">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" className="text-tertiary" aria-hidden="true">
+                <path d="M6 1L10.5 3.5V8.5L6 11L1.5 8.5V3.5L6 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              </svg>
+              {blockContext}
             </span>
           ) : null}
         </div>
@@ -839,89 +844,112 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       )}
 
       {/* ── Section 4: Score Breakdown (visible by default) ── */}
-      {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (
-        <article className="surface p-4 md:p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Score breakdown</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {reviewVm.scoreBand ? (
-                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
-                  {reviewVm.scoreBand}
-                </span>
-              ) : null}
-              {reviewVm.executionCostLabel ? (
-                <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
-                  Execution cost: {reviewVm.executionCostLabel}
-                </span>
-              ) : null}
+      {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
+        const breakdownRows = [
+          { key: "intentMatch", label: "Intent match", component: reviewVm.componentScores.intentMatch },
+          { key: "pacingExecution", label: "Pacing & execution", component: reviewVm.componentScores.pacingExecution },
+          { key: "completion", label: "Completion", component: reviewVm.componentScores.completion },
+          { key: "recoveryCompliance", label: "Recovery compliance", component: reviewVm.componentScores.recoveryCompliance }
+        ];
+        // Refinement: flag the single lowest sub-score so the user's eye
+        // lands on the metric pulling the headline down. Only highlight
+        // when the lowest is actually weak (< 85) and genuinely trails the
+        // rest (≥ 5 pts below the next-lowest) — otherwise a pack of
+        // similar 90s would still render one as "bad".
+        const sortedByScore = [...breakdownRows].sort((a, b) => a.component.score - b.component.score);
+        const lowest = sortedByScore[0];
+        const nextLowest = sortedByScore[1];
+        const lowestKey =
+          lowest && lowest.component.score < 85 && nextLowest && nextLowest.component.score - lowest.component.score >= 5
+            ? lowest.key
+            : null;
+        return (
+          <article className="surface p-4 md:p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Score breakdown</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {reviewVm.scoreBand ? (
+                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                    {reviewVm.scoreBand}
+                  </span>
+                ) : null}
+                {reviewVm.executionCostLabel ? (
+                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                    Execution cost: {reviewVm.executionCostLabel}
+                  </span>
+                ) : null}
+              </div>
             </div>
-          </div>
-          {/* F40: 2-column layout at md+, faint 50 tick at each bar to
-              anchor "halfway" so the user has a scale reference. 100 is
-              implicit at the right edge. */}
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-4">
-            {[
-              { label: "Intent match", weightLabel: "40%", component: reviewVm.componentScores.intentMatch },
-              { label: "Pacing & execution", weightLabel: "25%", component: reviewVm.componentScores.pacingExecution },
-              { label: "Completion", weightLabel: "20%", component: reviewVm.componentScores.completion },
-              { label: "Recovery compliance", weightLabel: "15%", component: reviewVm.componentScores.recoveryCompliance }
-            ].map(({ label, weightLabel, component }) => {
-              const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
-                : component.score >= 60 ? "bg-[hsl(var(--warning))]"
-                : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
-                : "bg-[hsl(var(--signal-risk))]";
-              const cappedUpperPct = component.capped && typeof component.uncappedScore === "number"
-                ? Math.max(0, Math.min(100, component.uncappedScore) - component.score)
-                : 0;
-              return (
-                <div key={label}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-white">{label}</span>
-                      <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[9px] text-tertiary">{weightLabel}</span>
-                      {component.capped ? (
-                        <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Capped</span>
-                      ) : null}
-                    </div>
-                    <span className="text-xs font-mono font-medium text-white">{component.score}</span>
-                  </div>
-                  <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                    {/* 50-point tick mark so the bar has a legible scale anchor */}
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-y-0 left-1/2 w-px bg-[rgba(255,255,255,0.25)]"
-                    />
-                    <div className="flex h-full w-full">
-                      <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
-                      {cappedUpperPct > 0 ? (
-                        <div
-                          className="h-full border-l border-warning/40"
-                          style={{
-                            width: `${cappedUpperPct}%`,
-                            backgroundImage:
-                              "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
-                          }}
-                          aria-label="uncertainty band"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-muted">{component.detail}</p>
-                </div>
-              );
-            })}
-          </div>
-          {cappedDominantMetric ? (
-            <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
-              {cappedDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
+            {/* Refinement: weights collapse to a single explainer line so
+                they stop fighting the sub-score numbers for attention. */}
+            <p className="mt-1 text-[11px] text-tertiary">
+              Weighted: Intent 40 · Pacing 25 · Completion 20 · Recovery 15
             </p>
-          ) : missingCriticalData.length > 0 ? (
-            <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
-              {missingCriticalData[0]} missing — pair the right sensor next time to unlock a confirmed read.
-            </p>
-          ) : null}
-        </article>
-      ) : null}
+            {/* F40: 2-column layout at md+, faint 50 tick at each bar to
+                anchor "halfway" so the user has a scale reference. 100 is
+                implicit at the right edge. */}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-4">
+              {breakdownRows.map(({ key, label, component }) => {
+                const isLowest = key === lowestKey;
+                const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
+                  : component.score >= 60 ? "bg-[hsl(var(--warning))]"
+                  : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
+                  : "bg-[hsl(var(--signal-risk))]";
+                const cappedUpperPct = component.capped && typeof component.uncappedScore === "number"
+                  ? Math.max(0, Math.min(100, component.uncappedScore) - component.score)
+                  : 0;
+                return (
+                  <div key={label}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${isLowest ? "text-warning" : "text-white"}`}>{label}</span>
+                        {isLowest ? (
+                          <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Lowest</span>
+                        ) : null}
+                        {component.capped ? (
+                          <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Capped</span>
+                        ) : null}
+                      </div>
+                      <span className={`font-mono tabular-nums ${isLowest ? "text-sm font-semibold text-warning" : "text-xs font-medium text-white"}`}>{component.score}</span>
+                    </div>
+                    <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                      {/* 50-point tick mark so the bar has a legible scale anchor */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-0 left-1/2 w-px bg-[rgba(255,255,255,0.25)]"
+                      />
+                      <div className="flex h-full w-full">
+                        <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
+                        {cappedUpperPct > 0 ? (
+                          <div
+                            className="h-full border-l border-warning/40"
+                            style={{
+                              width: `${cappedUpperPct}%`,
+                              backgroundImage:
+                                "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
+                            }}
+                            aria-label="uncertainty band"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-snug text-muted">{component.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+            {cappedDominantMetric ? (
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+                {cappedDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
+              </p>
+            ) : missingCriticalData.length > 0 ? (
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+                {missingCriticalData[0]} missing — pair the right sensor next time to unlock a confirmed read.
+              </p>
+            ) : null}
+          </article>
+        );
+      })() : null}
 
       {/* ── Section 5: Compared to Previous ── */}
       {sessionComparison ? <SessionComparisonCard comparison={sessionComparison} trends={sessionTrends ?? []} aiComparisons={storedComparisons} sport={session.sport} /> : null}

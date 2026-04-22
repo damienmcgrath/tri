@@ -129,9 +129,9 @@ function FeelSummary({
   if (!option) return null;
 
   return (
-    // F39: clickable summary — primary feel sits large and loud, secondary
-    // signals render as a small chip row below, whole surface opens the
-    // editor on click.
+    // F39 / refinement: clickable summary — kicker labels the row as a
+    // self-report rather than system status. Primary feel sits large and
+    // loud; secondary signals render as a small chip row below.
     <button
       type="button"
       onClick={onEdit}
@@ -142,7 +142,8 @@ function FeelSummary({
         <div className="flex items-center gap-2.5">
           <span className="text-2xl leading-none" aria-hidden="true">{option.icon}</span>
           <div>
-            <p className="text-base font-semibold leading-none" style={{ color: option.color.text }}>
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Your rating</p>
+            <p className="mt-0.5 text-base font-semibold leading-none" style={{ color: option.color.text }}>
               {option.label}
             </p>
             {feel.note ? (
