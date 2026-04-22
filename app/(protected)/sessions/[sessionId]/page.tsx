@@ -873,19 +873,9 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             <p className="mt-1 text-[11px] text-tertiary">
               Weighted: Intent 40 · Pacing 25 · Completion 20 · Recovery 15
             </p>
-            {/* F40: 2-column layout at md+, faint 50 tick at each bar to
-                anchor "halfway" so the user has a scale reference. 100 is
-                implicit at the right edge. */}
             <div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-4">
               {breakdownRows.map(({ key, label, component }) => {
                 const isLowest = key === lowestKey;
-                const barColor = component.score >= 80 ? "bg-[hsl(var(--success))]"
-                  : component.score >= 60 ? "bg-[hsl(var(--warning))]"
-                  : component.score >= 40 ? "bg-[hsl(35,100%,50%)]"
-                  : "bg-[hsl(var(--signal-risk))]";
-                const cappedUpperPct = component.capped && typeof component.uncappedScore === "number"
-                  ? Math.max(0, Math.min(100, component.uncappedScore) - component.score)
-                  : 0;
                 return (
                   <div key={label}>
                     <div className="flex items-center justify-between gap-2">
@@ -900,28 +890,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                       </div>
                       <span className={`font-mono tabular-nums ${isLowest ? "text-sm font-semibold text-warning" : "text-xs font-medium text-white"}`}>{component.score}</span>
                     </div>
-                    <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                      {/* 50-point tick mark so the bar has a legible scale anchor */}
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-0 left-1/2 w-px bg-[rgba(255,255,255,0.25)]"
-                      />
-                      <div className="flex h-full w-full">
-                        <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
-                        {cappedUpperPct > 0 ? (
-                          <div
-                            className="h-full border-l border-warning/40"
-                            style={{
-                              width: `${cappedUpperPct}%`,
-                              backgroundImage:
-                                "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
-                            }}
-                            aria-label="uncertainty band"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                    <p className="mt-1 text-[11px] leading-snug text-muted">{component.detail}</p>
+                    <p className="mt-1.5 text-[11px] leading-snug text-muted">{component.detail}</p>
                   </div>
                 );
               })}
