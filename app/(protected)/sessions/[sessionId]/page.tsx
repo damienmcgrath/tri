@@ -477,48 +477,36 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const sessionMonday = getMonday(new Date(`${session.date}T00:00:00.000Z`));
   const weekStartIso = sessionMonday.toISOString().slice(0, 10);
 
-  // Query for next session in the same week for forward navigation
-  // Uses gte + neq to include same-day sessions, filters out skipped, and
-  // orders by date then created_at so double-session days resolve correctly.
+  // F41: fetch the ordered week in one query, then pick the siblings by
+  // index. This makes same-day doubles resolve correctly — `gte`/`lte` on
+  // date alone loses the ordering for rows that share `session.date`, so
+  // the old prev/next pair would disagree about which same-day session
+  // comes first. Indexing a single ordered list can't disagree.
   type NextSessionInfo = { id: string; session_name: string | null; type: string; date: string } | null;
   let nextSession: NextSessionInfo = null as NextSessionInfo;
-  // F41: mirror query for the previous session in the same week so the
-  // footer can offer a "← Prev" alongside "Next →", letting users walk
-  // the week without jumping back to the calendar between sessions.
   let prevSession: NextSessionInfo = null as NextSessionInfo;
   if (!activityId) {
     try {
       const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
       const weekStartIsoForNav = sessionMonday.toISOString().slice(0, 10);
-      const { data: nextCandidates } = await supabase
-        .from("sessions")
-        .select("id,session_name,type,date,created_at")
-        .eq("user_id", user.id)
-        .gte("date", session.date)
-        .lte("date", weekEndIso)
-        .in("status", ["planned", "completed"])
-        .neq("id", session.id)
-        .order("date", { ascending: true })
-        .order("created_at", { ascending: true })
-        .limit(5);
-      // The query already excludes the current session (neq) and orders by date + created_at,
-      // so the first candidate is the correct next session, even for same-day doubles.
-      nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
-
-      const { data: prevCandidates } = await supabase
+      const { data: weekRows } = await supabase
         .from("sessions")
         .select("id,session_name,type,date,created_at")
         .eq("user_id", user.id)
         .gte("date", weekStartIsoForNav)
-        .lte("date", session.date)
+        .lte("date", weekEndIso)
         .in("status", ["planned", "completed"])
-        .neq("id", session.id)
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(5);
-      prevSession = (prevCandidates?.[0] ?? null) as typeof prevSession;
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (Array.isArray(weekRows)) {
+        const idx = weekRows.findIndex((row) => row.id === session.id);
+        if (idx >= 0) {
+          prevSession = (weekRows[idx - 1] ?? null) as typeof prevSession;
+          nextSession = (weekRows[idx + 1] ?? null) as typeof nextSession;
+        }
+      }
     } catch {
-      // Agent preview mock client may not support .neq() — degrade gracefully
+      // Agent preview mock client may not support this shape — degrade gracefully
     }
   }
 

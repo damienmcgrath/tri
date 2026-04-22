@@ -328,6 +328,18 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
           type="button"
           onClick={() => {
             if (editing) {
+              // Cancel discards the draft — reset every field back to the
+              // persisted server values so a subsequent Edit doesn't
+              // resurrect changes the user just abandoned.
+              setSelectedFeel((existingFeel?.overall_feel ?? null) as FeelLevel | null);
+              setEnergyLevel(existingFeel?.energy_level ?? null);
+              setLegsFeel(existingFeel?.legs_feel ?? null);
+              setMotivation(existingFeel?.motivation ?? null);
+              setSleepQuality(existingFeel?.sleep_quality ?? null);
+              setLifeStress(existingFeel?.life_stress ?? null);
+              setNote(existingFeel?.note ?? "");
+              setShowSecondary(hasExistingFeel);
+              interactionStartRef.current = null;
               setEditing(false);
               setSaveError(null);
             } else {
