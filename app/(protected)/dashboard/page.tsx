@@ -444,21 +444,25 @@ export default async function DashboardPage({
       .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
     : null;
 
+  // F12.1: copy is kept compact here so the single-line status row inside
+  // This Week can render without wrapping. Keep titles ≤ 22 chars and details
+  // ≤ 30 chars where possible — this row annotates the progress bar, it
+  // doesn't need to re-state what the bar already shows visually.
   const attentionItem: ContextualItem | null = overdueKeySession
     ? {
         kicker: "Needs attention",
-        title: `Missed key session: ${getSessionDisplayName(overdueKeySession)}`,
-        detail: "Missing this key session shifts too much load into the back half of the week.",
-        cta: "Reschedule key session",
+        title: "Missed key session",
+        detail: getSessionDisplayName(overdueKeySession),
+        cta: "Reschedule",
         href: `/calendar?focus=${overdueKeySession.id}`,
         ctaStyle: "primary"
       }
     : behindAlertActive
       ? {
           kicker: "Needs attention",
-          title: "You are behind this week",
-          detail: `${toHoursAndMinutes(behindByMinutes)} behind expected progress today.`,
-          cta: "Open weekly plan",
+          title: "Behind schedule",
+          detail: `${toHoursAndMinutes(behindByMinutes)} gap`,
+          cta: "Open plan",
           href: "/calendar",
           ctaStyle: "primary"
         }
@@ -466,8 +470,8 @@ export default async function DashboardPage({
         ? {
             kicker: "Needs attention",
             title: `${missedSessionsCount} missed session${missedSessionsCount > 1 ? "s" : ""}`,
-            detail: `${toHoursAndMinutes(missedMinutes)} still open from earlier this week.`,
-            cta: "Review missed work",
+            detail: `${toHoursAndMinutes(missedMinutes)} open`,
+            cta: "Review",
             href: "/calendar",
             ctaStyle: "primary"
           }
@@ -698,23 +702,23 @@ export default async function DashboardPage({
             {missedMinutes > 0 ? <span> · {toHoursAndMinutes(missedMinutes)} missed</span> : null}
           </p>
 
-          {/* F11.1/F12.1: the "you are behind" status row lives INSIDE This Week,
-              under the stats line where it annotates the percentage directly
-              instead of floating awkwardly above the 12% it references. */}
+          {/* F12 (final): single-line clickable status row under the progress bar.
+              Annotates the percentage — doesn't re-state it. The whole row is
+              the affordance, so there's no secondary lime CTA competing with
+              "Open session" in the right column. */}
           {leftStatusRow ? (
-            <div
+            <Link
+              href={leftStatusRow.href}
               role="status"
-              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.1)] px-3 py-2.5"
+              className="mt-3 flex items-center gap-2 rounded-lg border border-[rgba(255,180,60,0.24)] bg-[rgba(255,180,60,0.06)] px-2.5 py-1.5 text-xs transition-ui hover:border-[rgba(255,180,60,0.45)] hover:bg-[rgba(255,180,60,0.12)]"
             >
-              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--color-warning)]" />
-              <p className="min-w-0 flex-1 text-sm text-white">
+              <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-warning)]" />
+              <span className="min-w-0 flex-1 truncate text-[rgba(255,255,255,0.92)]">
                 <span className="font-medium">{leftStatusRow.title}</span>
-                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.72)]"> · {leftStatusRow.detail}</span> : null}
-              </p>
-              <Link href={leftStatusRow.href} className="text-xs font-medium text-[var(--color-warning)] transition hover:text-white">
-                {leftStatusRow.cta} →
-              </Link>
-            </div>
+                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.65)]"> · {leftStatusRow.detail}</span> : null}
+              </span>
+              <span aria-hidden="true" className="shrink-0 text-[var(--color-warning)]">→</span>
+            </Link>
           ) : null}
         </article>
 
