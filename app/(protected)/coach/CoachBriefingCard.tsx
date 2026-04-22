@@ -7,27 +7,46 @@ type Props = {
   brief: WeeklyExecutionBrief;
   athleteContext: AthleteContextSnapshot | null;
   briefingContext: CoachBriefingContext;
+  /**
+   * F36: when this card renders inside the outer "This week at a glance"
+   * disclosure, the disclosure already owns the headline — suppress the
+   * internal one to avoid "Execution is on track" appearing twice.
+   */
+  suppressHeader?: boolean;
 };
 
-export function CoachBriefingCard({ brief, athleteContext, briefingContext }: Props) {
+export function CoachBriefingCard({ brief, athleteContext, briefingContext, suppressHeader = false }: Props) {
   const recurringPattern = athleteContext?.observed.recurringPatterns[0]?.detail ?? null;
 
   return (
     <article className="surface p-4 md:p-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="label">Coach Briefing</p>
-          <h2 className="mt-1 text-xl font-semibold sm:text-2xl">{brief.weekHeadline}</h2>
-          {brief.trend.reviewedCount === 0 ? <p className="mt-1.5 text-sm text-muted">{brief.weekSummary}</p> : null}
+      {suppressHeader ? (
+        brief.trend.reviewedCount === 0 ? (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-sm text-muted">{brief.weekSummary}</p>
+            <Link
+              href="/settings/athlete-context"
+              className="shrink-0 inline-flex min-h-[44px] items-center rounded-full border border-[hsl(var(--border))] px-3 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground lg:min-h-0 lg:py-1.5"
+            >
+              Edit athlete context
+            </Link>
+          </div>
+        ) : null
+      ) : (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="label">Coach Briefing</p>
+            <h2 className="mt-1 text-xl font-semibold sm:text-2xl">{brief.weekHeadline}</h2>
+            {brief.trend.reviewedCount === 0 ? <p className="mt-1.5 text-sm text-muted">{brief.weekSummary}</p> : null}
+          </div>
+          <Link
+            href="/settings/athlete-context"
+            className="shrink-0 inline-flex min-h-[44px] items-center rounded-full border border-[hsl(var(--border))] px-3 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground lg:min-h-0 lg:py-1.5"
+          >
+            Edit athlete context
+          </Link>
         </div>
-        <Link
-          href="/settings/athlete-context"
-          className="shrink-0 inline-flex min-h-[44px] items-center rounded-full border border-[hsl(var(--border))] px-3 text-xs text-muted transition hover:border-[hsl(var(--accent)/0.5)] hover:text-foreground lg:min-h-0 lg:py-1.5"
-        >
-          Edit athlete context
-        </Link>
-      </div>
+      )}
 
       {/* Trend strip — compact metadata row, only when there's data */}
       {brief.trend.reviewedCount > 0 ? (

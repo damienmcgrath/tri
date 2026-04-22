@@ -566,37 +566,49 @@ export function WeekCalendar({
 
   return (
     <section className="space-y-3">
-      <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
+      {/* F31: three logical groups — range nav, filters, action — split
+          by vertical dividers so the eye doesn't have to parse a flat
+          pile of controls. Completion counts move down into the per-day
+          headers (F29) where they already sit next to the load numbers. */}
+      <header className="surface-subtle flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2">
+        <div
+          role="group"
+          aria-label="Week range"
+          className="flex flex-wrap items-center gap-2 text-xs"
+        >
           <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
-          <Link href={withWeek(addDays(activeWeekStart, -7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Prev</Link>
-          <Link
-            href={withWeek(currentWeekStart)}
-            className={`rounded-md border bg-[var(--color-surface-raised)] px-2 py-1 text-xs ${
-              activeWeekStart === currentWeekStart
-                ? "border-[rgba(190,255,0,0.40)] text-[var(--color-accent)]"
-                : "border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.6)]"
-            }`}
-          >
-            This week
-          </Link>
-          <Link href={withWeek(addDays(activeWeekStart, 7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Next</Link>
+          <div className="flex items-center gap-1.5 border-l border-[hsl(var(--border)/0.6)] pl-3">
+            <Link href={withWeek(addDays(activeWeekStart, -7))} aria-label="Previous week" className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)] hover:text-white">Prev</Link>
+            <Link
+              href={withWeek(currentWeekStart)}
+              className={`rounded-md border bg-[var(--color-surface-raised)] px-2 py-1 text-xs ${
+                activeWeekStart === currentWeekStart
+                  ? "border-[rgba(190,255,0,0.40)] text-[var(--color-accent)]"
+                  : "border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.6)] hover:text-white"
+              }`}
+            >
+              This week
+            </Link>
+            <Link href={withWeek(addDays(activeWeekStart, 7))} aria-label="Next week" className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)] hover:text-white">Next</Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div
+            role="group"
+            aria-label="Filters"
+            className="flex items-center gap-2 text-xs"
+          >
             <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
-            <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="flex-1 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:flex-none sm:py-1">
+            <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:py-1">
               <option value="all">All disciplines</option><option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
             </select>
             <label className="sr-only" htmlFor="status-filter">Status filter</label>
-            <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="flex-1 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:flex-none sm:py-1">
+            <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FilterStatus)} className="rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:py-1">
               <option value="all">All statuses</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="skipped">Skipped</option><option value="moved">Moved</option><option value="extra">Extra</option>
             </select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border-l border-[hsl(var(--border)/0.6)] pl-4">
             <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-3 text-xs">Add session</button>
-            <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
-            <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
           </div>
         </div>
       </header>
@@ -828,32 +840,43 @@ export function WeekCalendar({
               ? `${metrics.skipped} session${metrics.skipped > 1 ? "s" : ""} skipped`
               : `${metrics.remainingPlanned} min not done`
             : null;
-          const dayLabel = isToday
-            ? getDayStateLabel("today")
-            : needsAttention
-              ? getDayStateLabel("needs_attention")
-              : metrics?.fullyDone
-                ? getDayStateLabel("complete")
-                : metrics?.isRest
-                  ? getDayStateLabel("rest_day")
-                  : metrics?.availableDay
-                    ? getDayStateLabel("available")
-                    : metrics?.openCapacity
-                      ? getDayStateLabel("open_capacity")
-                      : isFuture && metrics?.hasPlanned
-                        ? getDayStateLabel("planned")
-                        : getDayStateLabel("planned");
-          const dayTone = needsAttention ? "text-[hsl(var(--signal-risk))]" : isToday ? "text-accent" : "text-muted";
-
-          // Day context note — single-line contextual hint per the spec
+          // F29: condense day state into a single colored dot. Dot does
+          // the state-at-a-glance work; text underneath carries the
+          // "this many minutes planned / done" reading in tabular-nums.
           const hasKeySession = daySessions.some((s) => s.is_key || s.role === "key");
           const allRecovery = daySessions.length > 0 && daySessions.every((s) => s.role === "recovery" || s.role === "optional");
+          const dotState =
+            needsAttention ? "risk"
+            : isToday ? "today"
+            : metrics?.fullyDone ? "complete"
+            : metrics?.isRest ? "rest"
+            : metrics?.hasPlanned ? "planned"
+            : "open";
+          const dotClass: Record<typeof dotState, string> = {
+            risk: "bg-[hsl(var(--signal-risk))]",
+            today: "bg-[var(--color-accent)]",
+            complete: "bg-success",
+            planned: "bg-[rgba(255,255,255,0.3)]",
+            rest: "bg-transparent border border-[rgba(255,255,255,0.2)]",
+            open: "bg-transparent border border-dashed border-[rgba(255,255,255,0.18)]"
+          };
+          const dotTitle: Record<typeof dotState, string> = {
+            risk: attentionReason ?? "Needs attention",
+            today: "Today",
+            complete: "Fully done",
+            planned: "Planned",
+            rest: "Rest day",
+            open: "Open capacity"
+          };
+          // F30: future-day planned-only load stays muted — red means
+          // "missed" only, and a planned-not-yet-done Saturday is neither.
+          const loadClass = needsAttention ? "text-[hsl(var(--signal-risk))]" : "text-muted";
           const dayContextNote = hasKeySession
-            ? "Key session today"
+            ? "Key session"
             : daySessions.length === 0 && !needsAttention
               ? "Rest day"
               : allRecovery
-                ? "Recovery day"
+                ? "Recovery"
                 : null;
 
           return (
@@ -866,18 +889,30 @@ export function WeekCalendar({
                 borderTopWidth: isToday ? "2px" : "1px"
               }}
             >
-              <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[11px] text-accent">Today</span> : null}
+              <div className="mb-2 border-b border-[hsl(var(--border))] pb-2">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    title={dotTitle[dotState]}
+                    className={`h-2 w-2 flex-shrink-0 rounded-full ${dotClass[dotState]}`}
+                  />
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
+                  <span className="text-xs text-tertiary">·</span>
+                  <p className="text-xs font-medium text-white">{day.label}</p>
+                  {isToday ? (
+                    <span className="ml-auto rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-1.5 py-0.5 text-[10px] text-accent">Today</span>
+                  ) : null}
                 </div>
-                <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
-                <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
-                {dayContextNote ? (
-                  <p className={`text-[11px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
+                {(metrics?.plannedMin ?? 0) > 0 || (metrics?.completedMin ?? 0) > 0 ? (
+                  <p className={`mt-1.5 text-[11px] tabular-nums ${loadClass}`}>
+                    {metrics?.plannedMin ?? 0}m planned
+                    {(metrics?.completedMin ?? 0) > 0 ? ` · ${metrics?.completedMin ?? 0}m done` : ""}
+                  </p>
                 ) : null}
-                {attentionReason ? <p className="text-[11px] text-muted">{attentionReason}</p> : null}
+                {dayContextNote ? (
+                  <p className={`mt-0.5 text-[11px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
+                ) : null}
+                {attentionReason ? <p className="mt-0.5 text-[11px] text-[hsl(var(--signal-risk))]">{attentionReason}</p> : null}
               </div>
 
               <div className="space-y-1.5 pt-0.5">
@@ -896,12 +931,35 @@ export function WeekCalendar({
                   const cardBackground = isNeedsAttentionCard ? "rgba(255,90,40,0.04)" : "#18181C";
                   const leftBorderColor = isNeedsAttentionCard ? "#FF5A28" : calendarDisciplineBorderColor(session.sport);
 
+                  // F28: completed sessions surface their execution score
+                  // as the state badge so the card communicates "how did
+                  // it go" at a glance. Falls back to the neutral status
+                  // chip when the score hasn't been computed yet.
+                  const cardScoreRaw =
+                    session.executionResult?.executionScore ??
+                    session.executionResult?.execution_score;
+                  const cardScore = typeof cardScoreRaw === "number" ? Math.round(cardScoreRaw) : null;
+                  const cardScoreClass =
+                    cardScore !== null
+                      ? cardScore >= 85
+                        ? "border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.12)] text-success"
+                        : cardScore >= 70
+                          ? "border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.12)] text-warning"
+                          : "border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.12)] text-danger"
+                      : "";
                   const stateBadge =
                     state === "extra" ? null
                     : state === "unmatched_upload" ? (
                       <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
                     ) : state === "moved" ? (
                       <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
+                    ) : session.status === "completed" && cardScore !== null ? (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums ${cardScoreClass}`}
+                        title={session.executionResult?.executionScoreBand ?? "Execution score"}
+                      >
+                        {cardScore}
+                      </span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
@@ -994,12 +1052,28 @@ export function WeekCalendar({
                         </div>
                       ) : null}
                       {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
-                            <span aria-hidden="true">✓</span>
-                            {state === "extra" ? "Extra" : "Completed"}
-                          </span>
-                        </div>
+                        // F28: when the completed session has an execution
+                        // score, promote it into the footer chip. "Completed"
+                        // alone told the user nothing they didn't already see
+                        // from the green check; the score band ("On target",
+                        // "Partial match"…) is the actionable signal.
+                        state !== "extra" && cardScore !== null ? (
+                          <div className={`mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]`}>
+                            <span className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-[10px] py-[3px] text-[11px] font-medium ${cardScoreClass}`}>
+                              <span className="font-mono tabular-nums">{cardScore}</span>
+                              <span>
+                                {session.executionResult?.executionScoreBand ?? "Completed"}
+                              </span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
+                            <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
+                              <span aria-hidden="true">✓</span>
+                              {state === "extra" ? "Extra" : "Completed"}
+                            </span>
+                          </div>
+                        )
                       ) : state === "unmatched_upload" ? (
                         <div className="mt-2 border-t border-[hsl(var(--accent-performance)/0.18)] pt-1.5">
                           <button

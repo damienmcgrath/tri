@@ -63,9 +63,9 @@ const TRIGGER_COLORS: Partial<Record<TriggerType, TriggerColors>> = {
 };
 
 /**
- * Summarize a multi-sentence rationale into a single coach-note headline:
- * - First sentence, capped at 140 characters
- * - If no sentence break, first 140 chars with ellipsis
+ * Summarize a multi-sentence rationale into a single coach-note headline.
+ * First sentence, capped at 140 characters; falls back to a 140-char
+ * ellipsis when no sentence terminator lands inside that budget.
  */
 function summarizeRationale(text: string): { summary: string; hasMore: boolean } {
   const cleaned = text.trim();
@@ -81,8 +81,12 @@ function summarizeRationale(text: string): { summary: string; hasMore: boolean }
   return { summary: `${cleaned.slice(0, 137).trimEnd()}…`, hasMore: true };
 }
 
-function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: AdaptationRationale; defaultCollapsed?: boolean }) {
-  const [expanded, setExpanded] = useState(!defaultCollapsed);
+// F27: single note renders as a 1-line banner by default. Clicking the
+// banner expands into the full card (rationale prose + changes table +
+// preserved elements + Got-it/Discuss actions). This stops the block
+// from crowding the calendar grid below the fold.
+function CoachNoteRow({ rationale, startExpanded = false }: { rationale: AdaptationRationale; startExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(startExpanded);
   const [acknowledging, setAcknowledging] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -93,8 +97,7 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
   const colors = TRIGGER_COLORS[triggerType] ?? DEFAULT_TRIGGER_COLORS;
   const changes = Array.isArray(rationale.changes_summary) ? rationale.changes_summary : [];
   const preserved = rationale.preserved_elements ?? [];
-  const { summary: summaryLine, hasMore } = summarizeRationale(rationale.rationale_text);
-  const canCollapse = hasMore || changes.length > 0 || preserved.length > 0;
+  const { summary: summaryLine } = summarizeRationale(rationale.rationale_text);
 
   async function handleAcknowledge() {
     setAcknowledging(true);
@@ -108,6 +111,24 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
     } finally {
       setAcknowledging(false);
     }
+  }
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded="false"
+        className="group flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition hover:border-[rgba(255,255,255,0.2)]"
+        style={{ borderColor: colors.border, backgroundColor: colors.bg }}
+      >
+        <span className="flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider" style={{ borderColor: colors.border, color: colors.text }}>
+          {triggerLabel}
+        </span>
+        <span className="truncate text-xs text-white">{summaryLine}</span>
+        <span className="ml-auto flex-shrink-0 text-[11px] text-tertiary transition-colors group-hover:text-white">Read →</span>
+      </button>
+    );
   }
 
   return (
@@ -124,23 +145,19 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
             {triggerLabel}
           </span>
         </div>
-      </div>
-
-      <p className="mt-2 text-sm text-white">
-        {expanded ? rationale.rationale_text : summaryLine}
-      </p>
-
-      {canCollapse ? (
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="mt-2 text-xs text-tertiary hover:text-white"
+          onClick={() => setExpanded(false)}
+          aria-label="Collapse coach note"
+          className="text-[11px] text-tertiary hover:text-white"
         >
-          {expanded ? "Show less" : "Show full reasoning"}
+          Collapse ↑
         </button>
-      ) : null}
+      </div>
 
-      {expanded && (changes.length > 0 || preserved.length > 0) && (
+      <p className="mt-2 text-sm text-white">{rationale.rationale_text}</p>
+
+      {(changes.length > 0 || preserved.length > 0) && (
         <div className="mt-3 space-y-3 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
           {changes.length > 0 && (
             <div>
@@ -171,7 +188,6 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
         </div>
       )}
 
-      {/* Actions */}
       <div className="mt-3 flex items-center gap-3">
         <button
           type="button"
@@ -193,34 +209,23 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
 }
 
 export function CoachNoteCards({ rationales }: Props) {
-  const [showAll, setShowAll] = useState(false);
-
   if (rationales.length === 0) return null;
 
-  const firstNote = rationales[0];
-  const restNotes = rationales.slice(1);
-
+  // F27: count header — the user's mental model is "this week's coach
+  // notes", not "the first note is special and the rest are buried".
   return (
-    <div className="space-y-3">
-      <SingleCoachNote key={firstNote.id} rationale={firstNote} />
-
-      {restNotes.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowAll((prev) => !prev)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-xs text-tertiary transition hover:border-[rgba(255,255,255,0.16)] hover:text-white"
-        >
-          {showAll
-            ? "Hide older notes"
-            : `${restNotes.length} more coach note${restNotes.length > 1 ? "s" : ""}`}
-          <span className="text-[10px]">{showAll ? "\u25B2" : "\u25BC"}</span>
-        </button>
-      )}
-
-      {showAll &&
-        restNotes.map((r) => (
-          <SingleCoachNote key={r.id} rationale={r} />
+    <section className="space-y-2" aria-label="Coach notes for this week">
+      <div className="flex items-center gap-2">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-tertiary">Coach notes</p>
+        <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1.5 py-0.5 text-[10px] tabular-nums text-muted">
+          {rationales.length}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {rationales.map((rationale) => (
+          <CoachNoteRow key={rationale.id} rationale={rationale} />
         ))}
-    </div>
+      </div>
+    </section>
   );
 }
