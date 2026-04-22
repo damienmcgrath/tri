@@ -482,9 +482,14 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // orders by date then created_at so double-session days resolve correctly.
   type NextSessionInfo = { id: string; session_name: string | null; type: string; date: string } | null;
   let nextSession: NextSessionInfo = null as NextSessionInfo;
+  // F41: mirror query for the previous session in the same week so the
+  // footer can offer a "← Prev" alongside "Next →", letting users walk
+  // the week without jumping back to the calendar between sessions.
+  let prevSession: NextSessionInfo = null as NextSessionInfo;
   if (!activityId) {
     try {
       const weekEndIso = new Date(sessionMonday.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+      const weekStartIsoForNav = sessionMonday.toISOString().slice(0, 10);
       const { data: nextCandidates } = await supabase
         .from("sessions")
         .select("id,session_name,type,date,created_at")
@@ -499,6 +504,19 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       // The query already excludes the current session (neq) and orders by date + created_at,
       // so the first candidate is the correct next session, even for same-day doubles.
       nextSession = (nextCandidates?.[0] ?? null) as typeof nextSession;
+
+      const { data: prevCandidates } = await supabase
+        .from("sessions")
+        .select("id,session_name,type,date,created_at")
+        .eq("user_id", user.id)
+        .gte("date", weekStartIsoForNav)
+        .lte("date", session.date)
+        .in("status", ["planned", "completed"])
+        .neq("id", session.id)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(5);
+      prevSession = (prevCandidates?.[0] ?? null) as typeof prevSession;
     } catch {
       // Agent preview mock client may not support .neq() — degrade gracefully
     }
@@ -596,12 +614,16 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         <span className="truncate text-[rgba(255,255,255,0.6)]">{sessionTitle}</span>
       </nav>
 
-      {/* ── Section 1: Header ── */}
+      {/* ── Section 1: Header + score hero ──
+          F38: score is the page's title — render it at 72px tabular-nums
+          with an inline verdict label. The first 2-3 usefulMetrics sit
+          beside the score so the user gets the headline stats without
+          opening any accordion. */}
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold">{sessionTitle}</h1>
-            <p className="mt-1.5 text-sm text-muted">
+            <h1 className="text-xl font-semibold text-[rgba(255,255,255,0.92)] sm:text-2xl">{sessionTitle}</h1>
+            <p className="mt-1 text-sm text-muted">
               {disciplineLabel} · {sessionDateLabel} · {actualDurationLabel}
             </p>
             {blockContext ? (
@@ -613,7 +635,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className={sessionStatusBadgeClass}>{reviewVm.sessionStatusLabel}</span>
           <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
           {reviewVm.isReviewable ? (
@@ -624,17 +646,34 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </div>
 
         {reviewVm.isReviewable && reviewVm.score !== null ? (
-          <div className="mt-4 flex items-baseline gap-3">
-            <span className={`font-mono text-3xl font-semibold ${toneToTextClass(reviewVm.scoreTone)}`}>
-              {reviewVm.score}
-            </span>
-            <span className={`text-base font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
-              {reviewVm.scoreBand}
-            </span>
-            {confidenceQualifier ? (
-              <span className="rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-2 py-0.5 text-[10px] text-tertiary">
-                {confidenceQualifier}
+          <div className="mt-5 flex flex-col gap-4 border-t border-[hsl(var(--border))] pt-5 sm:flex-row sm:items-center sm:gap-6">
+            <div className="flex items-baseline gap-3">
+              <span
+                className={`font-mono text-6xl font-semibold leading-none tabular-nums tracking-[-0.02em] sm:text-7xl ${toneToTextClass(reviewVm.scoreTone)}`}
+              >
+                {reviewVm.score}
               </span>
+              <div className="min-w-0">
+                <p className={`text-lg font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
+                  {reviewVm.scoreBand}
+                </p>
+                {confidenceQualifier ? (
+                  <p className="text-[11px] text-tertiary">{confidenceQualifier}</p>
+                ) : null}
+              </div>
+            </div>
+            {reviewVm.usefulMetrics.length > 0 ? (
+              <div className="grid flex-1 grid-cols-3 gap-2">
+                {reviewVm.usefulMetrics.slice(0, 3).map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2"
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">{metric.label}</p>
+                    <p className="mt-1 text-sm font-medium tabular-nums text-white">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -642,14 +681,43 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
 
-      {/* ── Section 2: The Numbers (promoted to hero position) ── */}
-      {session.status === "completed" && !activityId ? (
-        <SessionVerdictCard
-          sessionId={session.id}
-          existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
-          sessionCompleted={true}
-          discipline={session.discipline ?? session.sport}
-        />
+      {/* ── Section 2: "One thing" hero ──
+          F37: promote this out of the old Coach's Take stack so the
+          single most actionable takeaway gets its own emphasised card.
+          The long-form analysis (purpose, execution assessment, metric
+          table, why-it-matters, etc.) moves into the accordion below. */}
+      {reviewVm.isReviewable && reviewVm.oneThingToChange ? (
+        <article
+          className={`rounded-2xl border-l-[3px] p-5 ${
+            isKeepDoingAdvice
+              ? "border-l-[var(--color-success)] bg-[rgba(52,211,153,0.05)]"
+              : "border-l-[var(--color-accent)] bg-[rgba(190,255,0,0.04)]"
+          } border-y border-r border-[hsl(var(--border))]`}
+        >
+          <p className={`text-[11px] font-medium uppercase tracking-[0.14em] ${isKeepDoingAdvice ? "text-success" : "text-[var(--color-accent)]"}`}>
+            {oneThingLabel}
+          </p>
+          <p className="mt-2 text-base font-medium leading-snug text-white">{reviewVm.oneThingToChange}</p>
+          {reviewVm.whyItMatters ? (
+            <p className="mt-2 text-sm text-[rgba(255,255,255,0.68)]">{reviewVm.whyItMatters}</p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: how do I apply "${reviewVm.oneThingToChange}" to my next session?`)}`}
+              className="btn-primary px-3 text-xs"
+            >
+              Apply to next session
+            </Link>
+            {nextSession ? (
+              <Link
+                href={`/sessions/${nextSession.id}`}
+                className="inline-flex items-center rounded-lg border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-tertiary transition-ui hover:border-[rgba(255,255,255,0.2)] hover:text-white"
+              >
+                Next: {nextSession.session_name ?? nextSession.type} →
+              </Link>
+            ) : null}
+          </div>
+        </article>
       ) : null}
 
       {/* Extras verdict card — reads from the CoachVerdict stored in execution_result */}
@@ -686,46 +754,41 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </article>
       ) : null}
 
-      {/* ── Section 3: Coach's Take (consolidated narrative) ── */}
-      <section className="surface p-4 md:p-5">
-        {reviewVm.isReviewable ? (
+      {/* ── Section 3: Read full analysis (accordion) ──
+          F37: everything long-form that used to live between the score
+          and the sub-score breakdown now collapses here. Default closed.
+          The SessionVerdictCard is rendered inside so its fetch still
+          runs on mount, just behind a disclosure. */}
+      {reviewVm.isReviewable ? (
+        <DetailsAccordion
+          title="Read full analysis"
+          summaryDetail={
+            <span className="text-[11px] text-muted">
+              Verdict · purpose · metric deltas · plan impact
+            </span>
+          }
+        >
           <div className="space-y-4">
-            {/* Execution diagnosis — shown for reviewable sessions without a verdict card (skipped, planned-sync) */}
-            {session.status !== "completed" ? (
-              <>
-                {reviewVm.actualExecutionSummary ? (
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
-                    <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
-                  </div>
-                ) : null}
-                {reviewVm.mainGap ? (
-                  <div className="border-t border-[hsl(var(--border))] pt-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
-                    <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
-                  </div>
-                ) : null}
-              </>
+            {session.status === "completed" && !activityId ? (
+              <SessionVerdictCard
+                sessionId={session.id}
+                existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
+                sessionCompleted={true}
+                discipline={session.discipline ?? session.sport}
+              />
             ) : null}
 
-            {/* One thing to change / Keep doing */}
-            {reviewVm.oneThingToChange ? (
-              <div className={`rounded-xl border p-4 ${isKeepDoingAdvice
-                ? "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.06)]"
-                : "border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)]"
-              }`}>
-                <p className={`text-xs uppercase tracking-[0.14em] ${isKeepDoingAdvice ? "text-success" : "text-[hsl(var(--accent))]"}`}>
-                  {oneThingLabel}
-                </p>
-                <p className="mt-2 text-sm font-medium text-white">{reviewVm.oneThingToChange}</p>
+            {/* Execution diagnosis — shown for reviewable sessions without a verdict card (skipped, planned-sync) */}
+            {session.status !== "completed" && reviewVm.actualExecutionSummary ? (
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
+                <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
               </div>
             ) : null}
-
-            {/* Why it matters */}
-            {reviewVm.whyItMatters ? (
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Why it matters</p>
-                <p className="mt-2 text-sm text-muted">{reviewVm.whyItMatters}</p>
+            {session.status !== "completed" && reviewVm.mainGap ? (
+              <div className="border-t border-[hsl(var(--border))] pt-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
+                <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
               </div>
             ) : null}
 
@@ -743,12 +806,14 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               ) : null}
             </div>
 
-            {/* Metrics grid — pulled from right sidebar to be inline */}
-            {reviewVm.usefulMetrics.length > 0 ? (
+            {/* Full metrics grid — 3 are already shown inline with the score,
+                this exposes the rest (plus the first 3 for a consolidated view). */}
+            {reviewVm.usefulMetrics.length > 3 ? (
               <div className="border-t border-[hsl(var(--border))] pt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.14em] text-tertiary">All metrics</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {reviewVm.usefulMetrics.map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
+                    <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
                       <p className="text-xs text-muted">{metric.label}</p>
                       <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
                     </div>
@@ -757,7 +822,9 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               </div>
             ) : null}
           </div>
-        ) : (
+        </DetailsAccordion>
+      ) : (
+        <section className="surface p-4 md:p-5">
           <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned intent</p>
@@ -768,8 +835,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               <p className="mt-2 text-sm">{reviewVm.unlockDetail}</p>
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── Section 4: Score Breakdown (visible by default) ── */}
       {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (
@@ -789,7 +856,10 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               ) : null}
             </div>
           </div>
-          <div className="mt-3 space-y-3">
+          {/* F40: 2-column layout at md+, faint 50 tick at each bar to
+              anchor "halfway" so the user has a scale reference. 100 is
+              implicit at the right edge. */}
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-4">
             {[
               { label: "Intent match", weightLabel: "40%", component: reviewVm.componentScores.intentMatch },
               { label: "Pacing & execution", weightLabel: "25%", component: reviewVm.componentScores.pacingExecution },
@@ -815,21 +885,28 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                     </div>
                     <span className="text-xs font-mono font-medium text-white">{component.score}</span>
                   </div>
-                  <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                    <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
-                    {cappedUpperPct > 0 ? (
-                      <div
-                        className="h-full border-l border-warning/40"
-                        style={{
-                          width: `${cappedUpperPct}%`,
-                          backgroundImage:
-                            "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
-                        }}
-                        aria-label="uncertainty band"
-                      />
-                    ) : null}
+                  <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                    {/* 50-point tick mark so the bar has a legible scale anchor */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-1/2 w-px bg-[rgba(255,255,255,0.25)]"
+                    />
+                    <div className="flex h-full w-full">
+                      <div className={`h-full ${barColor} transition-all`} style={{ width: `${component.score}%` }} />
+                      {cappedUpperPct > 0 ? (
+                        <div
+                          className="h-full border-l border-warning/40"
+                          style={{
+                            width: `${cappedUpperPct}%`,
+                            backgroundImage:
+                              "repeating-linear-gradient(45deg, hsl(var(--warning) / 0.25) 0 4px, transparent 4px 8px)"
+                          }}
+                          aria-label="uncertainty band"
+                        />
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-1 text-[11px] text-muted">{component.detail}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted">{component.detail}</p>
                 </div>
               );
             })}
@@ -889,10 +966,16 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </div>
       </section>
 
-      {/* Navigation footer */}
-      <nav className="flex flex-wrap items-center gap-3 border-t border-[hsl(var(--border))] pt-4">
+      {/* F41: footer walks the week — prev on the left, next on the right.
+          Breadcrumb at the top of the page handles back-to-calendar, and
+          the Ask-coach section above already has the primary coach CTA,
+          so no "Back to Calendar" or "Ask Coach about this" here. The
+          post-upload flow keeps its dedicated Dashboard + Calendar pair
+          because the user just arrived from a fresh upload and hasn't
+          seen either yet. */}
+      <nav className="flex flex-wrap items-center justify-between gap-3 border-t border-[hsl(var(--border))] pt-4">
         {isPostUpload ? (
-          <>
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
@@ -905,31 +988,27 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             >
               View Calendar
             </Link>
-          </>
+          </div>
         ) : (
           <>
-            <Link
-              href={`/calendar?weekStart=${weekStartIso}`}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
-            >
-              ← Back to Calendar
-            </Link>
+            {prevSession ? (
+              <Link
+                href={`/sessions/${prevSession.id}`}
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-tertiary transition-ui hover:text-white lg:min-h-0"
+              >
+                ← Prev: {prevSession.session_name ?? prevSession.type}
+              </Link>
+            ) : <span />}
             {nextSession ? (
               <Link
                 href={`/sessions/${nextSession.id}`}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-tertiary transition-ui hover:text-white lg:min-h-0"
               >
                 Next: {nextSession.session_name ?? nextSession.type} →
               </Link>
-            ) : null}
+            ) : <span />}
           </>
         )}
-        <Link
-          href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: What should I focus on for my next session?`)}`}
-          className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 lg:min-h-0"
-        >
-          Ask Coach about this
-        </Link>
       </nav>
     </section>
   );
