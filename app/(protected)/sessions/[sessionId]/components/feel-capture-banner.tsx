@@ -114,30 +114,29 @@ function FeelSummary({
   // Legacy RPE-only rows: show RPE value directly
   if (!option && feel.rpe) {
     return (
-      <button
-        type="button"
-        onClick={onEdit}
-        className="surface flex w-full items-center justify-between border border-[hsl(var(--border))] px-4 py-3 text-left transition-ui hover:border-[rgba(255,255,255,0.2)]"
-      >
+      <div className="surface flex w-full items-center justify-between border border-[hsl(var(--border))] px-4 py-3">
         <span className="text-sm font-medium text-muted">RPE {feel.rpe}/10</span>
         {feel.note ? <p className="text-xs italic text-muted">{feel.note}</p> : null}
-        <span className="text-[11px] text-tertiary">Edit →</span>
-      </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] text-tertiary transition-ui hover:border-[rgba(255,255,255,0.2)] hover:text-white"
+        >
+          Edit
+        </button>
+      </div>
     );
   }
 
   if (!option) return null;
 
   return (
-    // F39 / refinement: clickable summary — kicker labels the row as a
-    // self-report rather than system status. Primary feel sits large and
-    // loud; secondary signals render as a small chip row below.
-    <button
-      type="button"
-      onClick={onEdit}
-      aria-label="Edit how this session felt"
-      className="surface group flex w-full flex-col gap-2 border border-[hsl(var(--border))] px-4 py-3 text-left transition-ui hover:border-[rgba(255,255,255,0.2)]"
-    >
+    // F39 / refinement: read-only summary with an explicit Edit button
+    // — the previous pattern wrapped the whole surface in a button,
+    // which worked but buried the edit action inside a huge clickable
+    // row. Splitting the container from the control makes the Edit
+    // affordance unmistakable and keeps the screen-reader tree clean.
+    <article className="surface flex w-full flex-col gap-2 border border-[hsl(var(--border))] px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="text-2xl leading-none" aria-hidden="true">{option.icon}</span>
@@ -151,7 +150,14 @@ function FeelSummary({
             ) : null}
           </div>
         </div>
-        <span className="text-[11px] text-tertiary transition-ui group-hover:text-white">Edit →</span>
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Edit how this session felt"
+          className="rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] text-tertiary transition-ui hover:border-[rgba(255,255,255,0.2)] hover:text-white"
+        >
+          Edit
+        </button>
       </div>
       {secondaryItems.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -166,7 +172,7 @@ function FeelSummary({
           ))}
         </div>
       ) : null}
-    </button>
+    </article>
   );
 }
 
