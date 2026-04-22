@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AccountMenu } from "./account-menu";
 
@@ -20,8 +21,21 @@ export function GlobalHeader({
     signOutAction: (formData: FormData) => void;
   };
 }) {
+  // Apr-22 audit showstopper: when the page is at the top the header reads
+  // airy (mostly transparent), but once the user scrolls we need a solid
+  // fill so it doesn't bleed through the hero cards. Toggle a class based
+  // on window.scrollY with a low threshold so the state change kicks in
+  // on the first scroll event.
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <div className="shell-header">
+    <div className={`shell-header ${isScrolled ? "is-scrolled" : ""}`}>
       <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between gap-2 px-4 py-3 md:px-6">
         <span className="tracking-tight text-white" style={{ fontSize: "2rem", fontWeight: 600 }}>tri.ai</span>
 

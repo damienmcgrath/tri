@@ -201,6 +201,38 @@ export function getDayChipTitleClass(day: { tone: DayTone; stateLabel: string })
   return "mt-1 line-clamp-2 text-[13px] font-medium leading-tight text-white";
 }
 
+// F11 (revised): small status pip color per day tone. The pip is a 6px dot
+// at the top-right of each chip in the week-shape strip — it answers "is
+// this day done, missed, or upcoming?" without any numbers.
+export function getDayPipClass(tone: DayTone) {
+  switch (tone) {
+    case "today-remaining":
+    case "today-complete":
+      return "bg-[var(--color-accent)]";
+    case "completed":
+      return "bg-[var(--color-success)]";
+    case "missed":
+      return "bg-[var(--color-danger)]";
+    case "adapted":
+      return "bg-[var(--color-warning)]";
+    case "upcoming":
+      return "bg-[rgba(255,255,255,0.4)]";
+    default:
+      return "bg-[rgba(255,255,255,0.18)]";
+  }
+}
+
+export function buildDayChipTooltip(
+  day: { label: string; stateLabel: string; microLabel: string; totalMinutes: number },
+  chipContent: { title: string; meta: string }
+) {
+  const parts: string[] = [day.label];
+  if (day.totalMinutes > 0) parts.push(`${day.totalMinutes}m`);
+  if (chipContent.title && chipContent.title !== day.label) parts.push(chipContent.title);
+  if (chipContent.meta) parts.push(chipContent.meta);
+  return parts.filter(Boolean).join(" · ");
+}
+
 export function getSessionStatus(session: Session, completionLedger: Record<string, number>) {
   if (session.status === "completed" || session.status === "skipped") {
     return session.status;

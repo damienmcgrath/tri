@@ -265,7 +265,9 @@ describe("DashboardPage", () => {
 
       render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
 
-      expect(screen.getByText("You are behind this week")).toBeInTheDocument();
+      // F12.1: attention copy tightened to "Behind schedule" for the single-
+      // line status row under the progress bar.
+      expect(screen.getByText("Behind schedule")).toBeInTheDocument();
     });
 
     it("shows an attention alert when a past session is missed even if today is done", async () => {
@@ -286,7 +288,9 @@ describe("DashboardPage", () => {
 
       render(await DashboardPage({ searchParams: { weekStart: "2026-03-09" } }));
 
-      expect(screen.getByText("Needs attention")).toBeInTheDocument();
+      // F12: the attention signal is now the inline status row in This Week,
+      // surfaced by title rather than a "Needs attention" kicker.
+      expect(screen.getByText(/1 missed session/)).toBeInTheDocument();
     });
   });
 
