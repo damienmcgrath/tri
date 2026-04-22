@@ -39,39 +39,6 @@ function formatDelta(pct: number | null): string | null {
   return pct > 0 ? `+${pct}%` : `${pct}%`;
 }
 
-// F23: classify the week's intensity shape so the distribution bar gets
-// a verdict instead of just four percentages. Polarized = ≥65% easy
-// (Z1-2) + ≥10% hard (Z4+Z5) with little Z3 glue. Pyramidal = lots of
-// easy + significant Z3 with moderate Z4+. Threshold-heavy = Z3+Z4
-// dominates. Everything else is "mixed".
-function classifyDistribution(dist: Record<ZoneKey, number>): { label: string; tone: "success" | "warning" | "info" | "muted" } {
-  const easy = (dist.z1 ?? 0) + (dist.z2 ?? 0);
-  const tempo = dist.z3 ?? 0;
-  const hard = (dist.z4 ?? 0) + (dist.z5 ?? 0);
-  const threshold = (dist.z3 ?? 0) + (dist.z4 ?? 0);
-
-  if (easy >= 0.65 && hard >= 0.1 && tempo < 0.2) {
-    return { label: "Polarized", tone: "success" };
-  }
-  if (easy >= 0.5 && tempo >= 0.15 && hard >= 0.05 && tempo >= hard) {
-    return { label: "Pyramidal", tone: "info" };
-  }
-  if (threshold >= 0.35 && easy < 0.55) {
-    return { label: "Threshold-heavy", tone: "warning" };
-  }
-  if (easy >= 0.8) {
-    return { label: "Aerobic-dominant", tone: "success" };
-  }
-  return { label: "Mixed", tone: "muted" };
-}
-
-const VERDICT_TONE_CLASS: Record<"success" | "warning" | "info" | "muted", string> = {
-  success: "border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.08)] text-success",
-  warning: "border-[rgba(251,191,36,0.3)] bg-[rgba(251,191,36,0.08)] text-warning",
-  info: "border-[rgba(96,165,250,0.3)] bg-[rgba(96,165,250,0.08)] text-[rgb(147,197,253)]",
-  muted: "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-tertiary"
-};
-
 export function WeeklyIntensityHeader({ summary }: Props) {
   const zones = DISPLAY_ZONES
     .map((zone) => ({
@@ -82,60 +49,78 @@ export function WeeklyIntensityHeader({ summary }: Props) {
     }))
     .filter((z) => z.fraction > 0.02);
 
+  // Merge z1 and z2 for display
   const endurancePct = Math.round(
     ((summary.zoneDistribution.z1 ?? 0) + (summary.zoneDistribution.z2 ?? 0)) * 100
   );
-  const hardPct = Math.round(
-    ((summary.zoneDistribution.z4 ?? 0) + (summary.zoneDistribution.z5 ?? 0)) * 100
-  );
-
-  const verdict = classifyDistribution(summary.zoneDistribution);
+  const tempoPct = Math.round((summary.zoneDistribution.z3 ?? 0) * 100);
+  const thresholdPct = Math.round((summary.zoneDistribution.z4 ?? 0) * 100);
+  const vo2Pct = Math.round((summary.zoneDistribution.z5 ?? 0) * 100);
 
   const hoursDelta = formatDelta(summary.hoursDeltaPct);
+  const stressDelta = formatDelta(summary.stressDeltaPct);
 
   return (
-    <div className="space-y-2.5">
-      {/* F23: distribution verdict — the pedagogically interesting number */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${VERDICT_TONE_CLASS[verdict.tone]}`}>
-          {verdict.label} this week
+    <div className="space-y-2">
+      {/* Stacked zone bar */}
+      <div className="flex h-2 overflow-hidden rounded-full">
+        {zones.map((z) => (
+          <div
+            key={z.zone}
+            title={`${z.label}: ${Math.round(z.fraction * 100)}%`}
+            style={{
+              width: `${Math.round(z.fraction * 100)}%`,
+              backgroundColor: z.colour
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Zone breakdown text */}
+      <div className="flex flex-wrap gap-3 text-[10px] text-tertiary">
+        {endurancePct > 0 ? (
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ZONE_COLOURS.z2 }} />
+            Z1-2: {endurancePct}%
+          </span>
+        ) : null}
+        {tempoPct > 0 ? (
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ZONE_COLOURS.z3 }} />
+            Z3: {tempoPct}%
+          </span>
+        ) : null}
+        {thresholdPct > 0 ? (
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ZONE_COLOURS.z4 }} />
+            Z4: {thresholdPct}%
+          </span>
+        ) : null}
+        {vo2Pct > 0 ? (
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ZONE_COLOURS.z5 }} />
+            Z5: {vo2Pct}%
+          </span>
+        ) : null}
+      </div>
+
+      {/* Totals */}
+      <div className="flex flex-wrap gap-4 text-xs text-muted">
+        <span>
+          {formatHours(summary.totalPlannedHours)}
+          {hoursDelta ? (
+            <span className={`ml-1 ${(summary.hoursDeltaPct ?? 0) > 0 ? "text-tertiary" : "text-tertiary"}`}>
+              ({hoursDelta} vs last week)
+            </span>
+          ) : null}
         </span>
-        <p className="text-[11px] text-tertiary">
-          {endurancePct}% easy · {hardPct}% hard
-        </p>
+        {summary.totalStressScore ? (
+          <span>
+            Stress: {summary.totalStressScore}
+            {stressDelta ? <span className="ml-1 text-tertiary">({stressDelta})</span> : null}
+          </span>
+        ) : null}
       </div>
-
-      {/* F23: 20px stacked zone bar with inline labels on any segment
-          wide enough to read. Anything <10% gets only its colour. */}
-      <div className="flex h-5 overflow-hidden rounded-md">
-        {zones.map((z) => {
-          const pct = Math.round(z.fraction * 100);
-          const showLabel = pct >= 10;
-          return (
-            <div
-              key={z.zone}
-              title={`${z.label}: ${pct}%`}
-              className="flex items-center justify-center text-[10px] font-medium leading-none"
-              style={{
-                width: `${pct}%`,
-                backgroundColor: z.colour,
-                color: "rgba(0,0,0,0.78)"
-              }}
-            >
-              {showLabel ? `${z.label} ${pct}%` : null}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Totals — kept lean; stress moves into the Daily Load Shape
-          subtitle where it belongs with the TSS per-day chart. */}
-      {summary.totalPlannedHours > 0 || hoursDelta ? (
-        <p className="text-[11px] text-tertiary">
-          {formatHours(summary.totalPlannedHours)} planned
-          {hoursDelta ? ` · ${hoursDelta} vs last week` : ""}
-        </p>
-      ) : null}
     </div>
   );
 }
