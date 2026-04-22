@@ -366,28 +366,13 @@ export default async function DashboardPage({
       microLabel = "";
     }
 
-    // Distinct sports on this day, and the one carrying the most minutes —
-    // the chip bar uses the dominant sport for its color.
-    const sports = Array.from(new Set(daySessions.map((session) => session.sport).filter(Boolean))) as string[];
-    const minutesBySport = new Map<string, number>();
-    daySessions.forEach((session) => {
-      if (!session.sport) return;
-      minutesBySport.set(session.sport, (minutesBySport.get(session.sport) ?? 0) + (session.duration_minutes ?? 0));
-    });
-    let dominantSport: string | null = null;
-    let dominantSportMinutes = 0;
-    minutesBySport.forEach((mins, sport) => {
-      if (mins > dominantSportMinutes) {
-        dominantSport = sport;
-        dominantSportMinutes = mins;
-      }
-    });
+    // `totalMinutes` is exposed for the chip tooltip ("MON · 145m · Done").
+    // Sport breakdown was used by an earlier sport-bar experiment that was
+    // removed — card tone + text already carry all three chip states.
     const totalMinutes = plannedMinutes + extraMinutesOnDay;
 
-    return { iso, label, tone, stateLabel, microLabel, sports, dominantSport, totalMinutes };
+    return { iso, label, tone, stateLabel, microLabel, totalMinutes };
   });
-
-  const maxChipMinutes = dailyStates.reduce((max, d) => Math.max(max, d.totalMinutes), 0);
 
   const overdueKeySession = sessions
     .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
@@ -672,7 +657,6 @@ export default async function DashboardPage({
               strip iteration. */}
           <div className="mt-4 grid grid-cols-7 gap-1.5">
             {dailyStates.map((day) => {
-              const widthPct = maxChipMinutes > 0 ? Math.min(100, (day.totalMinutes / maxChipMinutes) * 100) : 0;
               const pipClass = getDayPipClass(day.tone);
               const chipContent = getDayChipContent(day);
               const tooltip = buildDayChipTooltip(day, chipContent);
@@ -684,7 +668,7 @@ export default async function DashboardPage({
                   title={tooltip}
                   aria-label={tooltip}
                   aria-current={isToday ? "date" : undefined}
-                  className={`relative flex min-h-[78px] flex-col overflow-hidden rounded-xl border px-2 pb-0 pt-2 ${getDayToneClass(day.tone)} ${isToday ? "ring-1 ring-[var(--color-accent)]" : ""}`}
+                  className={`relative flex min-h-[78px] flex-col rounded-xl border px-2 py-2 ${getDayToneClass(day.tone)} ${isToday ? "ring-1 ring-[var(--color-accent)]" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
@@ -702,14 +686,6 @@ export default async function DashboardPage({
                   {chipContent.meta ? (
                     <p className="mt-0.5 truncate text-[10px] leading-tight text-[rgba(255,255,255,0.6)]">{chipContent.meta}</p>
                   ) : null}
-                  <div className="mt-auto h-1 overflow-hidden bg-[rgba(255,255,255,0.06)]">
-                    {day.dominantSport && day.totalMinutes > 0 ? (
-                      <div
-                        className="h-full"
-                        style={{ width: `${widthPct}%`, backgroundColor: `var(--color-${day.dominantSport})` }}
-                      />
-                    ) : null}
-                  </div>
                 </div>
               );
             })}
