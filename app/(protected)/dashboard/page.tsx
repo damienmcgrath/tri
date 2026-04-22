@@ -614,17 +614,29 @@ export default async function DashboardPage({
           const pipClass = getDayPipClass(day.tone);
           const chipContent = getDayChipContent(day);
           const tooltip = buildDayChipTooltip(day, chipContent);
+          const isToday = day.tone === "today-remaining" || day.tone === "today-complete";
+          // F11.1: two-letter weekday abbreviation (Mo, Tu, We…) disambiguates
+          // Tue/Thu and Sat/Sun at near-zero horizontal cost.
+          const dayLabelShort = day.label.slice(0, 2);
           return (
             <div
               key={day.iso}
               title={tooltip}
               aria-label={tooltip}
-              className={`flex min-h-[52px] flex-col justify-between rounded-xl border px-2 py-2 ${getDayToneClass(day.tone)}`}
+              aria-current={isToday ? "date" : undefined}
+              className={`flex min-h-[52px] flex-col justify-between rounded-xl border px-2 py-2 ${getDayToneClass(day.tone)} ${isToday ? "ring-1 ring-[var(--color-accent)]" : ""}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.7)]">
-                  {day.label.slice(0, 1)}
-                </span>
+                {isToday ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">
+                    <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--color-accent)]" />
+                    {dayLabelShort}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.7)]">
+                    {dayLabelShort}
+                  </span>
+                )}
                 <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${pipClass}`} />
               </div>
               <div className="mt-2 h-1 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
@@ -667,22 +679,6 @@ export default async function DashboardPage({
             )}
           </div>
 
-          {leftStatusRow ? (
-            <div
-              role="status"
-              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.1)] px-3 py-2.5"
-            >
-              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--color-warning)]" />
-              <p className="min-w-0 flex-1 text-sm text-white">
-                <span className="font-medium">{leftStatusRow.title}</span>
-                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.72)]"> · {leftStatusRow.detail}</span> : null}
-              </p>
-              <Link href={leftStatusRow.href} className="text-xs font-medium text-[var(--color-warning)] transition hover:text-white">
-                {leftStatusRow.cta} →
-              </Link>
-            </div>
-          ) : null}
-
           <div className="mt-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="min-w-0">
               <p className="text-4xl font-semibold leading-none tracking-[-0.03em] sm:text-5xl lg:text-6xl">{completionPct}%</p>
@@ -701,6 +697,25 @@ export default async function DashboardPage({
             <span> · {toHoursAndMinutes(remainingMinutes)} left</span>
             {missedMinutes > 0 ? <span> · {toHoursAndMinutes(missedMinutes)} missed</span> : null}
           </p>
+
+          {/* F11.1/F12.1: the "you are behind" status row lives INSIDE This Week,
+              under the stats line where it annotates the percentage directly
+              instead of floating awkwardly above the 12% it references. */}
+          {leftStatusRow ? (
+            <div
+              role="status"
+              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.1)] px-3 py-2.5"
+            >
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--color-warning)]" />
+              <p className="min-w-0 flex-1 text-sm text-white">
+                <span className="font-medium">{leftStatusRow.title}</span>
+                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.72)]"> · {leftStatusRow.detail}</span> : null}
+              </p>
+              <Link href={leftStatusRow.href} className="text-xs font-medium text-[var(--color-warning)] transition hover:text-white">
+                {leftStatusRow.cta} →
+              </Link>
+            </div>
+          ) : null}
         </article>
 
         <article className="surface p-4 md:p-5 lg:p-6">
