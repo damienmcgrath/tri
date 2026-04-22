@@ -586,7 +586,7 @@ export default async function DashboardPage({
       ) : null}
 
 
-      <div className="grid gap-4 md:grid-cols-[1fr_1.4fr] lg:grid-cols-[1fr_1.6fr]">
+      <div className="grid gap-4 md:grid-cols-[1fr_1.2fr] lg:grid-cols-[1fr_1.3fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -633,7 +633,6 @@ export default async function DashboardPage({
             <div className="min-w-0">
               <p className="text-4xl font-semibold leading-none tracking-[-0.03em] sm:text-5xl lg:text-6xl">{completionPct}%</p>
               <p className="mt-3 text-lg font-medium leading-tight text-[rgba(255,255,255,0.94)] sm:text-xl">{toHoursAndMinutes(remainingMinutes)} left this week</p>
-              <p className="mt-1 text-sm text-[rgba(255,255,255,0.74)]">{toHoursAndMinutes(totals.completed)} completed of {toHoursAndMinutes(totals.planned)} planned</p>
             </div>
           </div>
 
