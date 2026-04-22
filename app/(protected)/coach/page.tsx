@@ -306,26 +306,17 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
     (transitionBriefing && !transitionBriefing.dismissedAt) || weeklyBrief || Boolean(athleteContext);
 
   return (
-    // F32: chat-first layout. Chat takes the main column; briefing,
-    // check-in, and profile fold into a right-rail "Context" panel at
-    // desktop widths, stacking below the chat on narrower viewports.
-    // The rail remains a collapsible disclosure so the chat always has
-    // breathing room even when a user wants the briefing visible.
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-      <div className="min-w-0">
-        <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
-      </div>
+    <section className="space-y-4">
+      {/* ── Chat-first layout: chat renders above the briefing ──── */}
+      <CoachChat diagnosisSessions={diagnosisSessions} briefingContext={briefingContext} initialPrompt={searchParams?.prompt} showBriefingPanel={false} />
 
-      {/* F36: Coach Briefing owns its own collapsible headline — the
-          old "This week at a glance" kicker duplicated the briefing's
-          headline verbatim on the expanded view. One headline now. */}
-      <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+      {/* ── Briefing bundle (collapsed by default) ──────────────── */}
       {hasBriefingContent ? (
         <details className="surface group rounded-xl">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Coach briefing</p>
-              <p className="mt-0.5 truncate text-sm font-medium text-white">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">This week at a glance</p>
+              <p className="mt-0.5 truncate text-sm text-white">
                 {weeklyBrief?.weekHeadline
                   ?? (athleteContext?.goals.priorityEventName
                     ? `Priority: ${athleteContext.goals.priorityEventName}`
@@ -345,69 +336,51 @@ export default async function CoachPage({ searchParams }: { searchParams?: { pro
                 brief={weeklyBrief}
                 athleteContext={athleteContext}
                 briefingContext={briefingContext}
-                suppressHeader
               />
             ) : null}
 
             {athleteContext ? (
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <WeeklyCheckinCard weekStart={weekStart} snapshot={athleteContext} />
 
                 <article className="surface p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
+                    <div>
                       <p className="label">Coaching profile</p>
                       <h2 className="mt-1 text-lg font-semibold">{contextIncomplete ? "Profile needs a few details" : "Profile is ready"}</h2>
-                      {/* F35: prose summary reads as "Coach understands
-                          you". The old pill row read as tags, which
-                          invited "why don't these link anywhere?" */}
-                      {contextIncomplete ? (
-                        <p className="mt-1 text-sm text-muted">
-                          Finish a few fields so Coach can personalize advice.
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-sm text-[rgba(255,255,255,0.78)] leading-relaxed">
-                          {(() => {
-                            const parts: string[] = [];
-                            const experience = athleteContext.declared.experienceLevel.value;
-                            const event = athleteContext.goals.priorityEventName;
-                            const goal = athleteContext.goals.goalType;
-                            const limiters = athleteContext.declared.limiters.slice(0, 2).map((l) => l.value);
-                            if (event && experience) {
-                              parts.push(`Training for ${event} as a${/^[aeiou]/i.test(experience) ? "n" : ""} ${experience.toLowerCase()} athlete.`);
-                            } else if (event) {
-                              parts.push(`Training for ${event}.`);
-                            } else if (experience) {
-                              parts.push(`${experience[0].toUpperCase()}${experience.slice(1)} athlete.`);
-                            }
-                            if (goal) parts.push(`Goal: ${goal.toLowerCase()}.`);
-                            if (limiters.length > 0) {
-                              parts.push(`Current focus — ${limiters.join(" and ").toLowerCase()}.`);
-                            }
-                            return parts.join(" ") || "Coach has your baseline context for briefing, reviews, and chat.";
-                          })()}
-                        </p>
-                      )}
+                      <p className="mt-1 text-sm text-muted">
+                        {contextIncomplete
+                          ? "Finish a few fields so Coach can personalize advice."
+                          : "Coach has your baseline context for briefing, reviews, and chat."}
+                      </p>
                     </div>
                     <Link href="/settings/athlete-context" className={contextIncomplete ? "btn-primary px-3 py-1.5 text-xs" : "border border-[rgba(255,255,255,0.20)] bg-transparent px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)] rounded-md"}>
                       {contextIncomplete ? "Complete profile" : "Edit profile"}
                     </Link>
                   </div>
 
-                  {contextIncomplete ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {missingContextLabels.map((label) => (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {contextIncomplete
+                      ? missingContextLabels.map((label) => (
                         <span key={label} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{label}</span>
-                      ))}
-                    </div>
-                  ) : null}
+                      ))
+                      : (
+                        <>
+                          {athleteContext.goals.priorityEventName ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.priorityEventName}</span> : null}
+                          {athleteContext.goals.goalType ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.goals.goalType}</span> : null}
+                          {athleteContext.declared.experienceLevel.value ? <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{athleteContext.declared.experienceLevel.value}</span> : null}
+                          {athleteContext.declared.limiters.slice(0, 2).map((limiter) => (
+                            <span key={limiter.value} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">{limiter.value}</span>
+                          ))}
+                        </>
+                      )}
+                  </div>
                 </article>
               </div>
             ) : null}
           </div>
         </details>
       ) : null}
-      </aside>
     </section>
   );
 }

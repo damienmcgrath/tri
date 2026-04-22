@@ -1124,25 +1124,18 @@ export function CoachChat({
               <label htmlFor="coach-input" className="sr-only">
                 Ask your triathlon coach
               </label>
-              {/* F33: suggestion chips compete with the input cursor if
-                  they stay visible after the thread starts. Show them
-                  only while the thread is empty (opener only, no user
-                  turn yet). Dynamic follow-ups belong to a future
-                  iteration once the last-response parser exists. */}
-              {messages.filter((m) => m.role === "user").length === 0 ? (
-                <div className="-mx-4 mb-1.5 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-                  {quickPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => setInput(prompt)}
-                      className="shrink-0 whitespace-nowrap rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1 text-[12px] font-medium text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="-mx-4 mb-1.5 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setInput(prompt)}
+                    className="shrink-0 whitespace-nowrap rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1 text-[12px] font-medium text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <input
                   id="coach-input"
@@ -1167,12 +1160,6 @@ export function CoachChat({
                   </button>
                 ) : null}
               </div>
-              {/* F33: keyboard hint — single-line input takes Enter to
-                  send by default, so the hint calls that out and gives
-                  users a nudge toward the send button otherwise. */}
-              <p className="mt-1.5 hidden text-right text-[10px] text-tertiary sm:block">
-                <kbd className="rounded border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-1 py-0.5 text-[10px] font-mono">⏎</kbd> to send
-              </p>
               {error ? <p className="mt-2 text-sm text-rose-400">{error}</p> : null}
             </form>
           </div>
