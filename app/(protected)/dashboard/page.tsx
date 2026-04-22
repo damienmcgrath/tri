@@ -1199,7 +1199,7 @@ async function DashboardDisciplineBalance(props: {
     const imbalances = detectDisciplineImbalance(balance);
     // Only show if there's actual data
     if (balance.totalActualTss === 0 && balance.totalPlannedTss === 0) return null;
-    return <DisciplineBalanceCompact balance={balance} imbalances={imbalances} />;
+    return <DisciplineBalanceCompact balance={balance} />;
   } catch {
     return null;
   }
