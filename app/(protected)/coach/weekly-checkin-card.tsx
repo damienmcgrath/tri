@@ -154,13 +154,16 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
 
   const completionLabel = completedCount === METRICS.length ? "Ready" : `${completedCount}/${METRICS.length} set`;
 
-  const summaryChips = useMemo(
+  // F34: only the metrics with a value surface as chips. Unset metrics
+  // collapse into an aggregate progress indicator so the card doesn't
+  // open with "Not set" repeated five times.
+  const setChips = useMemo(
     () =>
-      METRICS.map((metric) => ({
-        key: metric.key,
-        label: metric.label,
-        value: metric.choices.find((choice) => choice.value === values[metric.key])?.label ?? "Not set"
-      })),
+      METRICS.flatMap((metric) => {
+        const selection = metric.choices.find((choice) => choice.value === values[metric.key]);
+        if (!selection) return [];
+        return [{ key: metric.key, label: metric.label, value: selection.label }];
+      }),
     [values]
   );
 
@@ -244,18 +247,45 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
         </div>
 
         <div className="mt-3 rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3.5">
-          <div className="flex flex-wrap gap-2">
-            {summaryChips.map((chip) => (
-              <span key={chip.key} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)]">
-                <span className="text-[rgba(255,255,255,0.35)]">{chip.label}:</span> <span className="text-[rgba(255,255,255,0.8)]">{chip.value}</span>
-              </span>
-            ))}
-            {note.trim() ? (
-              <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">
-                Note added
-              </span>
-            ) : null}
+          {/* F34: aggregate progress row — one dot per signal, filled
+              when captured. A 2/5 row reads as "made progress", not
+              "three things failed". */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1" aria-label={`${completedCount} of ${METRICS.length} signals captured`}>
+              {METRICS.map((metric) => {
+                const isSet = values[metric.key] !== null;
+                return (
+                  <span
+                    key={metric.key}
+                    title={metric.label}
+                    className={`h-2 w-2 rounded-full ${isSet ? "bg-success" : "border border-[rgba(255,255,255,0.18)]"}`}
+                  />
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted">
+              {completedCount === 0
+                ? `0 of ${METRICS.length} signals captured — takes under a minute.`
+                : completedCount === METRICS.length
+                  ? "All signals captured for this week."
+                  : `${completedCount} of ${METRICS.length} signals captured.`}
+            </p>
           </div>
+
+          {setChips.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {setChips.map((chip) => (
+                <span key={chip.key} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)]">
+                  <span className="text-[rgba(255,255,255,0.35)]">{chip.label}:</span> <span className="text-[rgba(255,255,255,0.8)]">{chip.value}</span>
+                </span>
+              ))}
+              {note.trim() ? (
+                <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">
+                  Note added
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-3">
