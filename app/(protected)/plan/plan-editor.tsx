@@ -567,32 +567,52 @@ export function PlanEditor({
             <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
             <p className="text-sm text-muted">{weekRangeLabel(selectedWeek.week_start_date)} · Planned {totalMinutes} min</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              aria-label="Previous week"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
-              onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
-              disabled={!previousWeek}
+          {/* F25: week pager (prev / select / next) is one group, Save
+              and Actions are week-scoped commands. A visual gap keeps
+              Tab from overshooting from "→" straight onto "Actions". */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div
+              role="group"
+              aria-label="Week pager"
+              className="flex flex-wrap items-center gap-2"
             >
-              ←
-            </button>
-            <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base flex-1 py-1.5 text-xs sm:flex-none sm:w-auto" aria-label="Select plan week">
-              {planWeeks.map((week) => (
-                <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              aria-label="Next week"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
-              onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
-              disabled={!nextWeek}
-            >
-              →
-            </button>
-            {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 text-xs">Save</button> : null}
-            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="inline-flex min-h-[44px] items-center rounded-md border border-[rgba(255,255,255,0.20)] bg-transparent px-3 text-xs text-[rgba(255,255,255,0.7)] lg:min-h-0 lg:py-1.5">Actions</button>
+              <button
+                type="button"
+                aria-label="Previous week"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
+                onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
+                disabled={!previousWeek}
+              >
+                ←
+              </button>
+              <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base flex-1 py-1.5 text-xs sm:flex-none sm:w-auto" aria-label="Select plan week">
+                {planWeeks.map((week) => (
+                  <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                aria-label="Next week"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
+                onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
+                disabled={!nextWeek}
+              >
+                →
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 text-xs">Save</button> : null}
+              <button
+                type="button"
+                onClick={() => setWeekActionOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={weekActionOpen}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[rgba(255,255,255,0.20)] bg-transparent px-3 text-xs text-[rgba(255,255,255,0.7)] lg:min-h-0 lg:py-1.5"
+              >
+                Actions
+                <span aria-hidden="true" className={`text-[10px] transition-transform ${weekActionOpen ? "rotate-180" : ""}`}>▾</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -669,42 +689,72 @@ export function PlanEditor({
         <BlockOverview weeks={blockOverviewWeeks} currentWeekStart={selectedWeek?.week_start_date} />
       ) : null}
 
+      {/* F24: provenance moves to a tooltip — the user doesn't need to
+          know whether the focus was planner-set or derived, they need
+          to know *what the focus is*. Rest / Key counts fold into a
+          compact inline line so the big-label treatment is reserved for
+          the focus itself. */}
       <section className="surface-subtle px-4 py-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-[1fr_1.6fr]">
           <div>
             <p className="card-kicker">Block</p>
             <p className="mt-1 text-sm font-medium text-white">{weekDraft.focus}</p>
           </div>
           {displayWeekFocus ? (
-            <div className="md:col-span-2">
-              <p className="card-kicker">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
+            <div>
+              <p className="card-kicker inline-flex items-center gap-1.5">
+                Week focus
+                {weekFocusSource === "Derived focus" ? (
+                  <span
+                    title="AI-derived from this week's session mix — not an explicit planner setting."
+                    aria-label="AI-derived"
+                    className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[rgba(190,255,0,0.35)] text-[9px] leading-none text-[var(--color-accent)]"
+                  >
+                    ✦
+                  </span>
+                ) : null}
+              </p>
               <p className="mt-1 text-sm font-medium text-white">{displayWeekFocus}</p>
             </div>
           ) : null}
-          <div>
-            <p className="card-kicker">Rest days</p>
-            <p className="mt-1 text-sm font-medium text-white">{restDays}</p>
-          </div>
-          {keySessions > 0 ? (
-            <div>
-              <p className="card-kicker">Key sessions</p>
-              <p className="mt-1 text-sm font-medium text-white">{keySessions}</p>
-            </div>
-          ) : null}
         </div>
+        <p className="mt-2 text-[11px] text-tertiary">
+          {restDays} rest day{restDays === 1 ? "" : "s"}
+          {keySessions > 0 ? ` · ${keySessions} key session${keySessions === 1 ? "" : "s"}` : ""}
+        </p>
         {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
       </section>
 
       {weekDays.some((d) => d.totalMinutes > 0) ? (
         <section className="surface-subtle px-4 py-3">
-          <div className="mb-2.5 flex items-center justify-between">
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="card-kicker">Daily load shape</p>
-            {volumeDelta !== null ? (
-              <p className={`text-[11px] font-medium ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
-                {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta} min vs last week
-              </p>
-            ) : null}
+            {/* F22: inline sport legend — bar segments encode sport, so
+                the reader needs a key to decode "mostly blue Monday". */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-tertiary">
+              {(["swim", "bike", "run", "strength"] as const).map((sport) => (
+                <span key={sport} className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `var(--color-${sport})` }} aria-hidden="true" />
+                  {getDisciplineMeta(sport).label}
+                </span>
+              ))}
+            </div>
           </div>
+          {/* F26: week total + delta as the chart's subtitle — the
+              "+150 min vs last week" figure was the most interesting
+              takeaway on the chart and it was floating unattached. */}
+          <p className="mb-2.5 text-[11px] text-muted">
+            <span className="tabular-nums text-[rgba(255,255,255,0.78)]">{Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m total</span>
+            {volumeDelta !== null ? (
+              <>
+                {" · "}
+                <span className={`tabular-nums ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
+                  {volumeDelta > 0 ? "▲ " : volumeDelta < 0 ? "▼ " : ""}
+                  {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta}m vs last week
+                </span>
+              </>
+            ) : null}
+          </p>
           <div className="flex items-end gap-1.5">
             {(() => {
               // Estimate per-session stress using the duration+intent heuristic so
@@ -755,7 +805,7 @@ export function PlanEditor({
               });
             })()}
           </div>
-          <p className="mt-1 text-[10px] text-tertiary">Bar height reflects estimated training stress (TSS) per day, not duration.</p>
+          <p className="mt-1 text-[10px] text-tertiary">Bar height = estimated training stress (TSS) · color = sport.</p>
         </section>
       ) : null}
 
@@ -789,158 +839,11 @@ export function PlanEditor({
         <input type="hidden" name="notes" value={weekDraft.notes} />
       </form>
 
-      <article className="surface p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-[rgba(255,255,255,0.5)]">Week board (Mon–Sun)</h3>
-          <p className="text-xs text-tertiary">For scheduling changes, use Calendar.</p>
-        </div>
-
-        <div className="hidden gap-3 lg:grid lg:grid-cols-7">
-          {weekDays.map((day) => (
-            <section key={day.iso} className={`group/day flex min-h-[236px] min-w-0 flex-col p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
-              <div className="mb-1.5 flex items-start justify-between border-b border-[hsl(var(--border))] pb-1.5">
-                <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
-                <div className="text-right">
-                  <p className="text-xs text-muted">{day.totalMinutes} min</p>
-                  {day.isRest ? <p className="text-[11px] text-muted/90">Rest</p> : null}
-                  {!day.isRest && day.roleCounts.key > 0 ? <p className="text-[11px] text-accent">Key day</p> : null}
-                  {!day.isRest && day.roleCounts.key === 0 && day.roleCounts.recovery > 0 ? <p className="text-[11px] text-emerald-200">Recovery-biased</p> : null}
-                </div>
-              </div>
-              <div className="flex-1 space-y-1.5">
-                {day.sessions.map((session) => {
-                  const meta = getDisciplineMeta(session.sport);
-                  const role = getOptionalSessionRoleLabel(session);
-                  const roleCue = getSessionRoleCue(role);
-                  const intentCue = getSessionIntentCue(session.intent_category);
-
-                  const sessionProfile = sessionProfileMap.get(session.id);
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => setActiveSessionId(session.id)}
-                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.06)",
-                        borderLeftWidth: "3px",
-                        borderLeftColor: disciplineBorderColor(session.sport)
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
-                          style={{
-                            backgroundColor: disciplineChipTone(session.sport).bg,
-                            color: disciplineChipTone(session.sport).text
-                          }}
-                        >
-                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
-                          <span>{meta.label}</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {session.is_key ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
-                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
-                              Key
-                            </span>
-                          ) : null}
-                          {roleCue ? (
-                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
-                      {intentCue ? (
-                        <p className="text-[11px] text-muted">
-                          Intent: {intentCue}
-                        </p>
-                      ) : null}
-                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
-                      {(() => {
-                        const profile = sessionProfileMap.get(session.id);
-                        return profile ? <IntensityBar zoneDistribution={profile.zoneDistribution} height={4} className="mt-1" /> : null;
-                      })()}
-                    </button>
-                  );
-                })}
-                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery window</p> : null}
-              </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
-            </section>
-          ))}
-        </div>
-
-        <div className="space-y-3 lg:hidden">
-          {weekDays.map((day) => (
-            <section key={day.iso} className={`group/day p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
-              <div className="mb-1.5 flex items-center justify-between border-b border-[hsl(var(--border))] pb-1.5">
-                <p className="text-sm font-semibold">{day.label} · {day.date}</p>
-                <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.roleCounts.key > 0 ? " · Key day" : day.roleCounts.recovery > 0 ? " · Recovery-biased" : ""}</p>
-              </div>
-              <div className="space-y-1.5">
-                {day.sessions.map((session) => {
-                  const role = getOptionalSessionRoleLabel(session);
-                  const roleCue = getSessionRoleCue(role);
-                  const intentCue = getSessionIntentCue(session.intent_category);
-
-                  const mobileProfile = sessionProfileMap.get(session.id);
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => setActiveSessionId(session.id)}
-                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left text-xs"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.06)",
-                        borderLeftWidth: "3px",
-                        borderLeftColor: disciplineBorderColor(session.sport)
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
-                          style={{
-                            backgroundColor: disciplineChipTone(session.sport).bg,
-                            color: disciplineChipTone(session.sport).text
-                          }}
-                        >
-                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineChipTone(session.sport).dot }} />
-                          <span>{getDisciplineMeta(session.sport).label}</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {session.is_key ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
-                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
-                              Key
-                            </span>
-                          ) : null}
-                          {roleCue ? (
-                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
-                      {intentCue ? (
-                        <p className="text-[11px] text-muted">
-                          Intent: {intentCue}
-                        </p>
-                      ) : null}
-                      <p className="text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
-                      {(() => {
-                        const profile = sessionProfileMap.get(session.id);
-                        return profile ? <IntensityBar zoneDistribution={profile.zoneDistribution} height={4} className="mt-1" /> : null;
-                      })()}
-                    </button>
-                  );
-                })}
-                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
-              </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 inline-flex min-h-[44px] items-center text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)] lg:min-h-0">＋ Add</button>
-            </section>
-          ))}
-        </div>
-      </article>
+      {/* F21: Week board removed. It duplicated Calendar's week grid while
+          explicitly saying "use Calendar for scheduling" — so it was a
+          lookup surface at best. Daily Load Shape (above) already shows
+          the 7-column duration-by-sport summary in one row, which is
+          the only thing Plan-view adds over Calendar. */}
 
       <details className="surface-subtle p-3">
         <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-medium lg:min-h-0">Week notes & settings</summary>
