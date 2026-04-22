@@ -179,13 +179,31 @@
       var(--color-base);
   }
 
+  /* Apr-22 showstopper fix: header is transparent at the top of the page
+     (airy feel) and gains a solid fill + bottom border once the user
+     scrolls more than 8px. The GlobalHeader component toggles `.is-scrolled`
+     on scroll. */
   .shell-header {
     position: sticky;
     top: 0;
     z-index: 30;
-    border-bottom: 1px solid var(--border-subtle);
-    background: rgba(10, 10, 11, 0.9);
-    backdrop-filter: blur(16px);
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    transition:
+      background-color var(--motion-standard) var(--motion-ease),
+      border-color var(--motion-standard) var(--motion-ease);
+  }
+
+  .shell-header.is-scrolled {
+    border-bottom-color: var(--border-subtle);
+    background: var(--color-base);
+  }
+
+  @supports (backdrop-filter: blur(16px)) {
+    .shell-header.is-scrolled {
+      background: rgba(10, 10, 11, 0.82);
+      backdrop-filter: blur(16px) saturate(1.2);
+    }
   }
 
   /* Main content grid — enough bottom padding to clear fixed mobile nav + home bar */

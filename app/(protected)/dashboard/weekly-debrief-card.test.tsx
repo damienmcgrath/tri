@@ -28,8 +28,10 @@ describe("WeeklyDebriefCard", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Not enough signal yet" })).toBeInTheDocument();
-    expect(screen.getByText("1/2 resolved")).toBeInTheDocument();
+    expect(screen.getByLabelText("Weekly debrief status")).toBeInTheDocument();
+    expect(
+      screen.getByText(/unlocks after 1 more key session · 3hr of 6hr/)
+    ).toBeInTheDocument();
   });
 
   test("renders saved stale debrief state with refresh affordance", () => {
