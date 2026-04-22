@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 /** Sanitize raw camelCase field names that may exist in stored verdict text. */
 function sanitizeText(text: string): string {
@@ -186,6 +187,27 @@ const ADAPTATION_LABELS: Record<string, string> = {
   redistribute: "Redistribution suggested"
 };
 
+// F42: builds a specific coach prompt pre-loaded with the session's
+// discipline, verdict status, and key deviations — so the Explain link
+// opens a conversation grounded in *this* session instead of a blank
+// "what should I ask?" state.
+function buildCoachPrompt(
+  discipline: string | null | undefined,
+  verdictStatus: VerdictStatus,
+  deviations: Deviation[] | null
+): string {
+  const sport = discipline?.trim() || "this";
+  const statusWord = verdictStatus === "achieved" ? "hit"
+    : verdictStatus === "partial" ? "partially hit"
+    : verdictStatus === "missed" ? "missed"
+    : "drifted off";
+  const topDeviations = deviations?.slice(0, 2).map((d) => d.metric).filter(Boolean) ?? [];
+  if (topDeviations.length > 0) {
+    return `My ${sport} session ${statusWord} its target. Walk me through what ${topDeviations.join(" and ")} is telling me and what to adjust next time.`;
+  }
+  return `My ${sport} session ${statusWord} its target. Walk me through what the numbers are telling me and what to adjust next time.`;
+}
+
 function getContextualExplanation(verdictStatus: VerdictStatus, discipline: string | null | undefined, deviations: Deviation[] | null): string {
   const statusExplanation: Record<VerdictStatus, string> = {
     achieved: "The session delivered its intended physiological stimulus — the training effect you planned for landed.",
@@ -369,18 +391,39 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[hsl(var(--border))]">
-                    {visibleMetrics.map((mc, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-2 text-muted">{sanitizeText(mc.metric)}</td>
-                        <td className="px-3 py-2 text-right text-tertiary">{sanitizeText(mc.target)}</td>
-                        <td className={`px-3 py-2 text-right font-medium ${
-                          mc.assessment === "on_target" ? "text-success" :
-                          mc.assessment === "missing" ? "text-tertiary" : "text-warning"
-                        }`}>
-                          {sanitizeText(mc.actual)}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleMetrics.map((mc, i) => {
+                      const rawTarget = sanitizeText(mc.target).trim();
+                      // Em-dash-only target reads as "data failed to load".
+                      // Render "Not set" in muted italic so users parse it as
+                      // "no plan target for this metric" instead.
+                      const targetIsMissing = rawTarget === "" || /^[—–-]+\s*$/.test(rawTarget);
+                      const targetIsMissingWithNote = /^[—–-]+\s*\(.+\)\s*$/.test(rawTarget);
+                      const targetNote = targetIsMissingWithNote
+                        ? rawTarget.replace(/^[—–-]+\s*\((.+)\)\s*$/, "$1")
+                        : null;
+                      return (
+                        <tr key={i}>
+                          <td className="px-3 py-2 text-muted">{sanitizeText(mc.metric)}</td>
+                          <td className="px-3 py-2 text-right text-tertiary">
+                            {targetIsMissing ? (
+                              <span className="italic text-muted">Not set</span>
+                            ) : targetIsMissingWithNote ? (
+                              <span className="italic text-muted">
+                                Not set <span className="text-[11px] not-italic text-tertiary">({targetNote})</span>
+                              </span>
+                            ) : (
+                              rawTarget
+                            )}
+                          </td>
+                          <td className={`px-3 py-2 text-right font-medium ${
+                            mc.assessment === "on_target" ? "text-success" :
+                            mc.assessment === "missing" ? "text-tertiary" : "text-warning"
+                          }`}>
+                            {sanitizeText(mc.actual)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -390,7 +433,9 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                   onClick={() => setShowAllMetrics(!showAllMetrics)}
                   className="mt-2 text-xs text-tertiary hover:text-white"
                 >
-                  {showAllMetrics ? "Show fewer" : `Show all ${verdict.metric_comparisons.length} metrics`}
+                  {showAllMetrics
+                    ? "Show fewer ↑"
+                    : `Show ${verdict.metric_comparisons.length - 3} more metric${verdict.metric_comparisons.length - 3 === 1 ? "" : "s"} ↓`}
                 </button>
               )}
             </div>
@@ -408,19 +453,30 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
             </div>
           )}
 
-          {/* Expandable explanation */}
+          {/* F42: inline contextual explanation + coach hand-off. Label
+              specifies what will be explained (not the vague "this"), and
+              the expanded panel ends with a specific coach prompt pre-
+              loaded with the session's deviation context. */}
           <button
             type="button"
             onClick={() => setShowExplanation(!showExplanation)}
             className="mt-3 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
           >
-            {showExplanation ? "Hide explanation" : "What does this mean?"}
+            {showExplanation ? "Hide explanation" : "Explain these metrics"}
           </button>
           {showExplanation && (
             <div className="mt-2 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
               <p className="text-sm text-muted leading-relaxed">
                 {getContextualExplanation(verdict.verdict_status, discipline, verdict.key_deviations)}
               </p>
+              <Link
+                href={`/coach?prompt=${encodeURIComponent(
+                  buildCoachPrompt(discipline, verdict.verdict_status, verdict.key_deviations)
+                )}`}
+                className="mt-2 inline-flex items-center text-[11px] text-[var(--color-accent)] transition-ui hover:text-white"
+              >
+                Dig in with coach →
+              </Link>
             </div>
           )}
         </div>

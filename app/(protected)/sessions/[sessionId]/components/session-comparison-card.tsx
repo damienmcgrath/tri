@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { SessionComparison } from "@/lib/training/session-comparison";
 import type { WeeklyTrend } from "@/lib/training/trends";
 import type { StoredComparison } from "@/lib/training/session-comparison-engine";
@@ -38,6 +41,85 @@ function trendBadge(direction: string, confidence?: string) {
   return { label: "Stable", className: "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] text-tertiary" };
 }
 
+// Refinement: split an AI narrative into a 2-line lead + the remainder so
+// the "Compared to previous" block stops reading like a wall of prose.
+// First sentence is the lead; anything after it lives behind "More detail".
+function splitNarrative(text: string): { lead: string; rest: string | null } {
+  const trimmed = text.trim();
+  // Match the first sentence ending with . ! or ? followed by whitespace.
+  // Falls back to the whole thing if no terminator is found.
+  const match = trimmed.match(/^([^.!?]+[.!?])\s+(.+)$/s);
+  if (!match) return { lead: trimmed, rest: null };
+  const lead = match[1].trim();
+  const rest = match[2].trim();
+  return { lead, rest: rest.length > 0 ? rest : null };
+}
+
+// Refinement: draw an actual sparkline instead of a row of number cells.
+// ~84×20px, points normalised to the trend's value range, flat fallback
+// when all points are identical so we don't render a zero-height line.
+function TrendSparkline({
+  points,
+  direction
+}: {
+  points: Array<{ weekStart: string; value: number; label: string }>;
+  direction: WeeklyTrend["direction"];
+}) {
+  const width = 84;
+  const height = 20;
+  const pad = 2;
+  const validPoints = points.filter((p) => Number.isFinite(p.value));
+  if (validPoints.length < 2) return null;
+  const values = validPoints.map((p) => p.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = (width - pad * 2) / (validPoints.length - 1);
+  const coords = validPoints.map((p, i) => {
+    const x = pad + i * stepX;
+    const y = pad + (height - pad * 2) * (1 - (p.value - min) / range);
+    return { x, y };
+  });
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const strokeColor = direction === "improving" ? "var(--color-success)" : direction === "declining" ? "var(--color-danger)" : "rgba(255,255,255,0.45)";
+  const last = coords[coords.length - 1];
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      <path d={path} stroke={strokeColor} strokeWidth="1.25" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="1.75" fill={strokeColor} />
+    </svg>
+  );
+}
+
+function ComparisonNarrative({ text }: { text: string }) {
+  const { lead, rest } = splitNarrative(text);
+  const [expanded, setExpanded] = useState(false);
+  if (!rest) {
+    return <p className="mt-3 text-sm text-white">{lead}</p>;
+  }
+  return (
+    <div className="mt-3">
+      <p className="text-sm text-white">{lead}</p>
+      {expanded ? (
+        <p className="mt-2 text-sm text-muted">{rest}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="mt-2 text-xs text-tertiary hover:text-white"
+      >
+        {expanded ? "Less detail ↑" : "More detail ↓"}
+      </button>
+    </div>
+  );
+}
+
 export function SessionComparisonCard({ comparison, trends = [], aiComparisons = [], sport }: Props) {
   const previousDateLabel = comparisonDateFormatter.format(new Date(`${comparison.previousDate}T00:00:00.000Z`));
 
@@ -63,9 +145,10 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
         <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
       </div>
 
-      {/* AI narrative */}
+      {/* AI narrative — 2-line lead + More detail disclosure so the block
+          doesn't read as a wall of prose. */}
       {bestAiComparison ? (
-        <p className="mt-3 text-sm text-white">{bestAiComparison.comparisonSummary}</p>
+        <ComparisonNarrative text={bestAiComparison.comparisonSummary} />
       ) : null}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -96,31 +179,26 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
         <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
           <p className="mb-3 text-[10px] uppercase tracking-[0.08em] text-tertiary">Multi-week trend</p>
           <div className="space-y-2.5">
-            {matchedTrends.map((trend) => (
-              <div key={trend.metric} className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted whitespace-nowrap">{trend.metric}</span>
-                <div className="flex items-center gap-1.5">
-                  {trend.dataPoints.slice(-4).map((pt, idx) => {
-                    const isLatest = idx === trend.dataPoints.slice(-4).length - 1;
-                    return (
-                      <span
-                        key={pt.weekStart}
-                        className={`rounded border px-2 py-1 text-xs tabular-nums ${
-                          isLatest
-                            ? "border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] text-white font-medium"
-                            : "border-[hsl(var(--border))] text-tertiary"
-                        }`}
-                      >
-                        {pt.label}
+            {matchedTrends.map((trend) => {
+              const recent = trend.dataPoints.slice(-5);
+              const latest = recent[recent.length - 1];
+              const directionGlyph = trend.direction === "improving" ? "▲" : trend.direction === "declining" ? "▼" : "—";
+              const directionClass = trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary";
+              return (
+                <div key={trend.metric} className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted whitespace-nowrap">{trend.metric}</span>
+                  <div className="flex items-center gap-2">
+                    <TrendSparkline points={recent} direction={trend.direction} />
+                    {latest ? (
+                      <span className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs font-medium tabular-nums text-white">
+                        {latest.label}
                       </span>
-                    );
-                  })}
-                  <span className={`ml-0.5 text-sm font-medium ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
-                    {trend.direction === "improving" ? "▲" : trend.direction === "declining" ? "▼" : "—"}
-                  </span>
+                    ) : null}
+                    <span className={`ml-0.5 text-sm font-medium ${directionClass}`}>{directionGlyph}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}

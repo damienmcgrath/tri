@@ -92,7 +92,13 @@ function PillSelector({ label, options, value, onChange }: {
 
 type SecondaryItem = { label: string; value: string };
 
-function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["existingFeel"]> }) {
+function FeelSummary({
+  feel,
+  onEdit
+}: {
+  feel: NonNullable<FeelCaptureBannerProps["existingFeel"]>;
+  onEdit: () => void;
+}) {
   // Support both new overall_feel (1-5) and legacy rpe (1-10) rows
   const option = feel.overall_feel
     ? FEEL_OPTIONS.find((o) => o.value === feel.overall_feel)
@@ -108,64 +114,86 @@ function FeelSummary({ feel }: { feel: NonNullable<FeelCaptureBannerProps["exist
   // Legacy RPE-only rows: show RPE value directly
   if (!option && feel.rpe) {
     return (
-      <article className="surface border border-[hsl(var(--border))] p-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted">RPE {feel.rpe}/10</span>
-        </div>
-        {feel.note && <p className="mt-1.5 text-xs text-muted">{feel.note}</p>}
-      </article>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="surface flex w-full items-center justify-between border border-[hsl(var(--border))] px-4 py-3 text-left transition-ui hover:border-[rgba(255,255,255,0.2)]"
+      >
+        <span className="text-sm font-medium text-muted">RPE {feel.rpe}/10</span>
+        {feel.note ? <p className="text-xs italic text-muted">{feel.note}</p> : null}
+        <span className="text-[11px] text-tertiary">Edit →</span>
+      </button>
     );
   }
 
   if (!option) return null;
 
   return (
-    <article className="surface border border-[hsl(var(--border))] px-4 py-2.5">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {/* Primary feel */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-base" aria-hidden="true">{option.icon}</span>
-          <span className="text-sm font-semibold" style={{ color: option.color.text }}>{option.label}</span>
-        </div>
-
-        {/* Secondary attributes — inline */}
-        {secondaryItems.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            {secondaryItems.map((item) => (
-              <span key={item.label} className="text-xs text-tertiary">
-                {item.label} <span className="font-medium text-muted">{item.value}</span>
-              </span>
-            ))}
+    // F39 / refinement: clickable summary — kicker labels the row as a
+    // self-report rather than system status. Primary feel sits large and
+    // loud; secondary signals render as a small chip row below.
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label="Edit how this session felt"
+      className="surface group flex w-full flex-col gap-2 border border-[hsl(var(--border))] px-4 py-3 text-left transition-ui hover:border-[rgba(255,255,255,0.2)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="text-2xl leading-none" aria-hidden="true">{option.icon}</span>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Your rating</p>
+            <p className="mt-0.5 text-base font-semibold leading-none" style={{ color: option.color.text }}>
+              {option.label}
+            </p>
+            {feel.note ? (
+              <p className="mt-1 max-w-[60ch] truncate text-xs italic text-muted">{feel.note}</p>
+            ) : null}
           </div>
-        )}
-
-        {/* Note — inline after attributes */}
-        {feel.note && (
-          <p className="text-xs text-muted italic">{feel.note}</p>
-        )}
+        </div>
+        <span className="text-[11px] text-tertiary transition-ui group-hover:text-white">Edit →</span>
       </div>
-    </article>
+      {secondaryItems.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {secondaryItems.map((item) => (
+            <span
+              key={item.label}
+              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px]"
+            >
+              <span className="text-tertiary">{item.label}</span>
+              <span className="font-medium text-[rgba(255,255,255,0.78)]">{item.value}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </button>
   );
 }
 
 export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBannerProps) {
-  const [selectedFeel, setSelectedFeel] = useState<FeelLevel | null>(null);
-  const [showSecondary, setShowSecondary] = useState(false);
-  const [energyLevel, setEnergyLevel] = useState<string | null>(null);
-  const [legsFeel, setLegsFeel] = useState<string | null>(null);
-  const [motivation, setMotivation] = useState<string | null>(null);
-  const [sleepQuality, setSleepQuality] = useState<string | null>(null);
-  const [lifeStress, setLifeStress] = useState<string | null>(null);
-  const [note, setNote] = useState("");
+  const hasExistingFeel = Boolean(existingFeel?.overall_feel || existingFeel?.rpe);
+  const [selectedFeel, setSelectedFeel] = useState<FeelLevel | null>(
+    (existingFeel?.overall_feel ?? null) as FeelLevel | null
+  );
+  const [showSecondary, setShowSecondary] = useState(hasExistingFeel);
+  const [energyLevel, setEnergyLevel] = useState<string | null>(existingFeel?.energy_level ?? null);
+  const [legsFeel, setLegsFeel] = useState<string | null>(existingFeel?.legs_feel ?? null);
+  const [motivation, setMotivation] = useState<string | null>(existingFeel?.motivation ?? null);
+  const [sleepQuality, setSleepQuality] = useState<string | null>(existingFeel?.sleep_quality ?? null);
+  const [lifeStress, setLifeStress] = useState<string | null>(existingFeel?.life_stress ?? null);
+  const [note, setNote] = useState(existingFeel?.note ?? "");
   const [dismissed, setDismissed] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const promptShownAt = useRef(new Date().toISOString());
   const interactionStartRef = useRef<number | null>(null);
 
-  // Show summary if feel already captured (either new overall_feel or legacy rpe)
-  if (existingFeel?.overall_feel || existingFeel?.rpe) {
-    return <FeelSummary feel={existingFeel} />;
+  // F39: show the compact summary for already-captured feels; tapping the
+  // summary flips into edit mode so the same capture form re-opens
+  // prefilled with the existing values.
+  if (hasExistingFeel && !editing && existingFeel) {
+    return <FeelSummary feel={existingFeel} onEdit={() => setEditing(true)} />;
   }
 
   if (dismissed) return null;
@@ -203,6 +231,12 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error || "Failed to save \u2014 please try again.");
+      }
+      // F39: on successful edit, flip back to the summary. Soft reload so
+      // the server-rendered `existingFeel` prop reflects the new values.
+      if (editing) {
+        window.location.reload();
+        return;
       }
       setDismissed(true);
     } catch (err) {
@@ -292,10 +326,29 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
         </button>
         <button
           type="button"
-          onClick={() => setDismissed(true)}
+          onClick={() => {
+            if (editing) {
+              // Cancel discards the draft — reset every field back to the
+              // persisted server values so a subsequent Edit doesn't
+              // resurrect changes the user just abandoned.
+              setSelectedFeel((existingFeel?.overall_feel ?? null) as FeelLevel | null);
+              setEnergyLevel(existingFeel?.energy_level ?? null);
+              setLegsFeel(existingFeel?.legs_feel ?? null);
+              setMotivation(existingFeel?.motivation ?? null);
+              setSleepQuality(existingFeel?.sleep_quality ?? null);
+              setLifeStress(existingFeel?.life_stress ?? null);
+              setNote(existingFeel?.note ?? "");
+              setShowSecondary(hasExistingFeel);
+              interactionStartRef.current = null;
+              setEditing(false);
+              setSaveError(null);
+            } else {
+              setDismissed(true);
+            }
+          }}
           className="text-sm text-tertiary hover:text-white"
         >
-          Skip
+          {editing ? "Cancel" : "Skip"}
         </button>
       </div>
     </article>
