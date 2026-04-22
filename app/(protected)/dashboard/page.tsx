@@ -607,60 +607,31 @@ export default async function DashboardPage({
       ) : null}
 
 
-      {/* F11 (revised): week-shape chip strip as its own full-width row so the
-          data isn't squashed into the narrower 35% "This week" column. Each
-          chip shows just the day letter + a sport-colored duration bar + a
-          status pip; the full detail is revealed on hover via the title
-          attribute. */}
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-        {dailyStates.map((day) => {
-          const widthPct = maxChipMinutes > 0 ? Math.min(100, (day.totalMinutes / maxChipMinutes) * 100) : 0;
-          const pipClass = getDayPipClass(day.tone);
-          const chipContent = getDayChipContent(day);
-          const tooltip = buildDayChipTooltip(day, chipContent);
-          const isToday = day.tone === "today-remaining" || day.tone === "today-complete";
-          // F11.1: two-letter weekday abbreviation (Mo, Tu, We…) disambiguates
-          // Tue/Thu and Sat/Sun at near-zero horizontal cost.
-          const dayLabelShort = day.label.slice(0, 2);
-          return (
-            <div
-              key={day.iso}
-              title={tooltip}
-              aria-label={tooltip}
-              aria-current={isToday ? "date" : undefined}
-              className={`flex min-h-[52px] flex-col justify-between rounded-xl border px-2 py-2 ${getDayToneClass(day.tone)} ${isToday ? "ring-1 ring-[var(--color-accent)]" : ""}`}
-            >
-              <div className="flex items-center justify-between">
-                {isToday ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">
-                    <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--color-accent)]" />
-                    {dayLabelShort}
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.7)]">
-                    {dayLabelShort}
-                  </span>
-                )}
-                <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${pipClass}`} />
-              </div>
-              <div className="mt-2 h-1 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                {day.dominantSport && day.totalMinutes > 0 ? (
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${widthPct}%`, backgroundColor: `var(--color-${day.dominantSport})` }}
-                  />
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-[1fr_1.6fr] lg:grid-cols-[1fr_1.8fr]">
-        <article className="surface p-4 md:p-5 lg:p-6">
+      {/* F11 (hybrid per Apr 22 review): 55/45 ratio keeps the data-rich
+          This Week card (chips + progress + trio) at ~580px while What
+          Matters still reads as the right-side hero at ~450px. Chips live
+          back inside This Week so the percentage, progress bar, chip
+          strip, and trio summary are all one glance. */}
+      <div className="grid gap-4 md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
+        <article className="surface p-4 md:p-5 lg:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
+                {/* F12.2: when the week is behind / has a missed key session /
+                    missed sessions, show a compact pill next to the kicker
+                    instead of a separate sub-card below the progress bar. */}
+                {leftStatusRow ? (
+                  <span
+                    role="status"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,180,60,0.32)] bg-[rgba(255,180,60,0.12)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-warning)]"
+                  >
+                    <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--color-warning)]" />
+                    {leftStatusRow.title}
+                    {leftStatusRow.detail ? <span className="tabular-nums text-[rgba(255,180,60,0.72)]">· {leftStatusRow.detail}</span> : null}
+                  </span>
+                ) : null}
+              </div>
               {/* F20: the week pager lives inside the This Week card now, not as a
                   detached strip above the hero cards. When there's only one week the
                   pager collapses to a plain date range. */}
@@ -694,6 +665,56 @@ export default async function DashboardPage({
             <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${totals.planned > 0 ? (totals.completed / totals.planned) * 100 : 0}%` }} />
           </div>
 
+          {/* F11 (hybrid): day chips live adjacent to the progress bar + trio
+              so the whole "how's the week going" glance is a single scan.
+              Each chip carries the richer old content (day, title, meta) AND
+              the new sport-bar + status-pip treatment from the pulled-out
+              strip iteration. */}
+          <div className="mt-4 grid grid-cols-7 gap-1.5">
+            {dailyStates.map((day) => {
+              const widthPct = maxChipMinutes > 0 ? Math.min(100, (day.totalMinutes / maxChipMinutes) * 100) : 0;
+              const pipClass = getDayPipClass(day.tone);
+              const chipContent = getDayChipContent(day);
+              const tooltip = buildDayChipTooltip(day, chipContent);
+              const isToday = day.tone === "today-remaining" || day.tone === "today-complete";
+              const dayLabelShort = day.label.slice(0, 2);
+              return (
+                <div
+                  key={day.iso}
+                  title={tooltip}
+                  aria-label={tooltip}
+                  aria-current={isToday ? "date" : undefined}
+                  className={`relative flex min-h-[78px] flex-col overflow-hidden rounded-xl border px-2 pb-0 pt-2 ${getDayToneClass(day.tone)} ${isToday ? "ring-1 ring-[var(--color-accent)]" : ""}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                        isToday ? "text-[var(--color-accent)]" : "text-[rgba(255,255,255,0.7)]"
+                      }`}
+                    >
+                      {dayLabelShort}
+                    </span>
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${pipClass}`} />
+                  </div>
+                  {chipContent.title ? (
+                    <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-tight text-white">{chipContent.title}</p>
+                  ) : null}
+                  {chipContent.meta ? (
+                    <p className="mt-0.5 truncate text-[10px] leading-tight text-[rgba(255,255,255,0.6)]">{chipContent.meta}</p>
+                  ) : null}
+                  <div className="mt-auto h-1 overflow-hidden bg-[rgba(255,255,255,0.06)]">
+                    {day.dominantSport && day.totalMinutes > 0 ? (
+                      <div
+                        className="h-full"
+                        style={{ width: `${widthPct}%`, backgroundColor: `var(--color-${day.dominantSport})` }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           {/* F11: flatten the Completed/Remaining/Missed trio — they're redundant with
               the percentage above. One inline summary line instead. */}
           <p className="mt-3 text-xs text-[rgba(255,255,255,0.62)]">
@@ -702,22 +723,15 @@ export default async function DashboardPage({
             {missedMinutes > 0 ? <span> · {toHoursAndMinutes(missedMinutes)} missed</span> : null}
           </p>
 
-          {/* F12 (final): single-line clickable status row under the progress bar.
-              Annotates the percentage — doesn't re-state it. The whole row is
-              the affordance, so there's no secondary lime CTA competing with
-              "Open session" in the right column. */}
+          {/* F12.2: when a status pill is shown in the kicker, expose the CTA
+              here as a muted link so it doesn't compete with the lime
+              "Open session" primary in the right column. */}
           {leftStatusRow ? (
             <Link
               href={leftStatusRow.href}
-              role="status"
-              className="mt-3 flex items-center gap-2 rounded-lg border border-[rgba(255,180,60,0.24)] bg-[rgba(255,180,60,0.06)] px-2.5 py-1.5 text-xs transition-ui hover:border-[rgba(255,180,60,0.45)] hover:bg-[rgba(255,180,60,0.12)]"
+              className="mt-2 inline-flex text-[11px] text-tertiary transition hover:text-white"
             >
-              <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-warning)]" />
-              <span className="min-w-0 flex-1 truncate text-[rgba(255,255,255,0.92)]">
-                <span className="font-medium">{leftStatusRow.title}</span>
-                {leftStatusRow.detail ? <span className="text-[rgba(255,255,255,0.65)]"> · {leftStatusRow.detail}</span> : null}
-              </span>
-              <span aria-hidden="true" className="shrink-0 text-[var(--color-warning)]">→</span>
+              {leftStatusRow.cta} →
             </Link>
           ) : null}
         </article>
