@@ -47,7 +47,8 @@ import {
   getUpcomingSessionMeta,
   getDayToneClass,
   getDayChipContent,
-  getDayChipTitleClass,
+  getDayPipClass,
+  buildDayChipTooltip,
   getSessionStatus,
   getStatusChip,
   getDefaultStatusInterpretation,
@@ -365,12 +366,28 @@ export default async function DashboardPage({
       microLabel = "";
     }
 
-    // Distinct sports for this day's sessions — surfaced as dots on the day chip
-    // so the week's sport shape is legible at a glance.
+    // Distinct sports on this day, and the one carrying the most minutes —
+    // the chip bar uses the dominant sport for its color.
     const sports = Array.from(new Set(daySessions.map((session) => session.sport).filter(Boolean))) as string[];
+    const minutesBySport = new Map<string, number>();
+    daySessions.forEach((session) => {
+      if (!session.sport) return;
+      minutesBySport.set(session.sport, (minutesBySport.get(session.sport) ?? 0) + (session.duration_minutes ?? 0));
+    });
+    let dominantSport: string | null = null;
+    let dominantSportMinutes = 0;
+    minutesBySport.forEach((mins, sport) => {
+      if (mins > dominantSportMinutes) {
+        dominantSport = sport;
+        dominantSportMinutes = mins;
+      }
+    });
+    const totalMinutes = plannedMinutes + extraMinutesOnDay;
 
-    return { iso, label, tone, stateLabel, microLabel, sports };
+    return { iso, label, tone, stateLabel, microLabel, sports, dominantSport, totalMinutes };
   });
+
+  const maxChipMinutes = dailyStates.reduce((max, d) => Math.max(max, d.totalMinutes), 0);
 
   const overdueKeySession = sessions
     .filter((session) => session.is_key && session.status === "planned" && session.date < todayIso)
@@ -586,7 +603,44 @@ export default async function DashboardPage({
       ) : null}
 
 
-      <div className="grid gap-4 md:grid-cols-[1fr_1.2fr] lg:grid-cols-[1fr_1.3fr]">
+      {/* F11 (revised): week-shape chip strip as its own full-width row so the
+          data isn't squashed into the narrower 35% "This week" column. Each
+          chip shows just the day letter + a sport-colored duration bar + a
+          status pip; the full detail is revealed on hover via the title
+          attribute. */}
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+        {dailyStates.map((day) => {
+          const widthPct = maxChipMinutes > 0 ? Math.min(100, (day.totalMinutes / maxChipMinutes) * 100) : 0;
+          const pipClass = getDayPipClass(day.tone);
+          const chipContent = getDayChipContent(day);
+          const tooltip = buildDayChipTooltip(day, chipContent);
+          return (
+            <div
+              key={day.iso}
+              title={tooltip}
+              aria-label={tooltip}
+              className={`flex min-h-[52px] flex-col justify-between rounded-xl border px-2 py-2 ${getDayToneClass(day.tone)}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(255,255,255,0.7)]">
+                  {day.label.slice(0, 1)}
+                </span>
+                <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${pipClass}`} />
+              </div>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                {day.dominantSport && day.totalMinutes > 0 ? (
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${widthPct}%`, backgroundColor: `var(--color-${day.dominantSport})` }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-[1fr_1.6fr] lg:grid-cols-[1fr_1.8fr]">
         <article className="surface p-4 md:p-5 lg:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -638,33 +692,6 @@ export default async function DashboardPage({
 
           <div className="mt-3 h-[4px] overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]" aria-hidden>
             <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${totals.planned > 0 ? (totals.completed / totals.planned) * 100 : 0}%` }} />
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-            {dailyStates.map((day) => {
-              const chip = getDayChipContent(day);
-              const chipSports = day.sports.slice(0, 3);
-              return (
-                <div key={day.iso} className={`min-h-[52px] overflow-hidden rounded-2xl border px-3 py-2 sm:min-h-[60px] ${getDayToneClass(day.tone)}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[rgba(255,255,255,0.6)]">{day.label}</p>
-                    {chipSports.length > 0 ? (
-                      <div aria-hidden="true" className="flex items-center gap-0.5">
-                        {chipSports.map((sport) => (
-                          <span
-                            key={sport}
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: `var(--color-${sport})` }}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <p className={getDayChipTitleClass(day)}>{chip.title}</p>
-                  {chip.meta ? <p className="mt-0.5 truncate text-[11px] leading-tight text-[rgba(255,255,255,0.62)]">{chip.meta}</p> : null}
-                </div>
-              );
-            })}
           </div>
 
           {/* F11: flatten the Completed/Remaining/Missed trio — they're redundant with
