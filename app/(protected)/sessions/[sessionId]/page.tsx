@@ -93,12 +93,12 @@ function narrativeSourceLabel(source: "ai" | "fallback" | "legacy_unknown") {
 
 function narrativeSourcePillClass(source: "ai" | "fallback" | "legacy_unknown") {
   if (source === "ai") {
-    return "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-accent)]";
+    return "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-kicker text-[var(--color-accent)]";
   }
   if (source === "fallback") {
-    return "rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--warning))]";
+    return "rounded-full border border-[rgba(255,180,60,0.3)] bg-[rgba(255,180,60,0.12)] px-2.5 py-1 text-kicker text-[hsl(var(--warning))]";
   }
-  return "rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
+  return "rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-kicker text-tertiary";
 }
 
 async function loadActivityReviewRow(params: {
@@ -584,17 +584,17 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   // Badge classes
   const sessionStatusBadgeClass =
     reviewVm.sessionStatusLabel.toLowerCase() === "completed"
-      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-success"
-      : "rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-tertiary";
+      ? "rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-2.5 py-1 text-kicker text-success"
+      : "rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-kicker text-tertiary";
   const intentBadgeClass =
     reviewVm.intent.label === "Matched intent"
-      ? "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-accent)]"
-      : `rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${toneToBadgeClass(reviewVm.intent.tone)}`;
+      ? "rounded-full border border-[rgba(190,255,0,0.25)] bg-[rgba(190,255,0,0.10)] px-2.5 py-1 text-kicker text-[var(--color-accent)]"
+      : `rounded-full border px-2.5 py-1 text-kicker ${toneToBadgeClass(reviewVm.intent.tone)}`;
 
   return (
     <section className="space-y-4">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-tertiary" aria-label="Breadcrumb">
+      <nav className="flex items-center gap-1.5 text-body text-tertiary" aria-label="Breadcrumb">
         <Link href="/dashboard" className="text-cyan-400 hover:text-cyan-300">Dashboard</Link>
         <span className="text-[rgba(255,255,255,0.3)]">/</span>
         <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">Calendar</Link>
@@ -610,8 +610,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-[rgba(255,255,255,0.92)] sm:text-2xl">{sessionTitle}</h1>
-            <p className="mt-1 text-sm text-muted">
+            <h1 className="text-page-title font-semibold text-[rgba(255,255,255,0.92)]">{sessionTitle}</h1>
+            <p className="mt-1 text-body text-muted">
               {disciplineLabel} · {sessionDateLabel} · {actualDurationLabel}
             </p>
           </div>
@@ -629,7 +629,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </span>
           ) : null}
           {blockContext ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.78)]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-ui-label text-[rgba(255,255,255,0.78)]">
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" className="text-tertiary" aria-hidden="true">
                 <path d="M6 1L10.5 3.5V8.5L6 11L1.5 8.5V3.5L6 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
               </svg>
@@ -647,11 +647,11 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                 {reviewVm.score}
               </span>
               <div className="min-w-0">
-                <p className={`text-lg font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
+                <p className={`text-section-title font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
                   {reviewVm.scoreBand}
                 </p>
                 {confidenceQualifier ? (
-                  <p className="text-[11px] text-tertiary">{confidenceQualifier}</p>
+                  <p className="text-ui-label text-tertiary">{confidenceQualifier}</p>
                 ) : null}
               </div>
             </div>
@@ -662,8 +662,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                     key={metric.label}
                     className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2"
                   >
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">{metric.label}</p>
-                    <p className="mt-1 text-sm font-medium tabular-nums text-white">{metric.value}</p>
+                    <p className="text-kicker text-tertiary">{metric.label}</p>
+                    <p className="mt-1 text-body font-medium tabular-nums text-white">{metric.value}</p>
                   </div>
                 ))}
               </div>
@@ -687,24 +687,24 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               : "border-l-[var(--color-accent)] bg-[rgba(190,255,0,0.04)]"
           } border-y border-r border-[hsl(var(--border))]`}
         >
-          <p className={`text-[11px] font-medium uppercase tracking-[0.14em] ${isKeepDoingAdvice ? "text-success" : "text-[var(--color-accent)]"}`}>
+          <p className={`text-kicker font-medium ${isKeepDoingAdvice ? "text-success" : "text-[var(--color-accent)]"}`}>
             {oneThingLabel}
           </p>
-          <p className="mt-2 text-base font-medium leading-snug text-white">{reviewVm.oneThingToChange}</p>
+          <p className="mt-2 text-body font-medium leading-snug text-white">{reviewVm.oneThingToChange}</p>
           {reviewVm.whyItMatters ? (
-            <p className="mt-2 text-sm text-[rgba(255,255,255,0.68)]">{reviewVm.whyItMatters}</p>
+            <p className="mt-2 text-body text-[rgba(255,255,255,0.68)]">{reviewVm.whyItMatters}</p>
           ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: how do I apply "${reviewVm.oneThingToChange}" to my next session?`)}`}
-              className="btn-primary px-3 text-xs"
+              className="btn-primary px-3 text-ui-label"
             >
               Apply to next session
             </Link>
             {nextSession ? (
               <Link
                 href={`/sessions/${nextSession.id}`}
-                className="inline-flex items-center rounded-lg border border-[hsl(var(--border))] px-3 py-1.5 text-xs text-tertiary transition-ui hover:border-[rgba(255,255,255,0.2)] hover:text-white"
+                className="inline-flex items-center rounded-lg border border-[hsl(var(--border))] px-3 py-1.5 text-ui-label text-tertiary transition-ui hover:border-[rgba(255,255,255,0.2)] hover:text-white"
               >
                 Next: {nextSession.session_name ?? nextSession.type} →
               </Link>
@@ -727,20 +727,20 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       {/* Post-upload: Impact on your week */}
       {isPostUpload && weekTotalCount > 0 ? (
         <article className="surface p-4 md:p-5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">Impact on your week</p>
-          <p className="mt-2 text-sm text-white">
+          <p className="text-kicker font-medium text-tertiary">Impact on your week</p>
+          <p className="mt-2 text-body text-white">
             {weekCompletedCount} of {weekTotalCount} session{weekTotalCount === 1 ? "" : "s"} complete this week
           </p>
           {verdictAdaptationType === "modify" || verdictAdaptationType === "redistribute" ? (
-            <p className="mt-2 text-sm text-[hsl(var(--warning))]">
+            <p className="mt-2 text-body text-[hsl(var(--warning))]">
               This session has triggered an adjustment to your upcoming training.{" "}
               <Link href={`/calendar?weekStart=${weekStartIso}`} className="text-cyan-400 hover:text-cyan-300">View adaptation →</Link>
             </p>
           ) : verdictAdaptationType === "proceed" ? (
-            <p className="mt-2 text-sm text-muted">No changes needed — your plan continues as prescribed.</p>
+            <p className="mt-2 text-body text-muted">No changes needed — your plan continues as prescribed.</p>
           ) : null}
           {nextSession ? (
-            <p className="mt-2 text-sm text-muted">
+            <p className="mt-2 text-body text-muted">
               Next up: <Link href={`/sessions/${nextSession.id}`} className="text-cyan-400 hover:text-cyan-300">{nextSession.session_name ?? nextSession.type}</Link> on {new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${nextSession.date}T00:00:00Z`))}
             </p>
           ) : null}
@@ -756,7 +756,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         <DetailsAccordion
           title="Read full analysis"
           summaryDetail={
-            <span className="text-[11px] text-muted">
+            <span className="text-ui-label text-muted">
               Verdict · purpose · metric deltas · plan impact
             </span>
           }
@@ -774,23 +774,23 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             {/* Execution diagnosis — shown for reviewable sessions without a verdict card (skipped, planned-sync) */}
             {session.status !== "completed" && reviewVm.actualExecutionSummary ? (
               <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Execution quality</p>
-                <p className="mt-2 text-sm">{reviewVm.actualExecutionSummary}</p>
+                <p className="text-kicker text-tertiary">Execution quality</p>
+                <p className="mt-2 text-body">{reviewVm.actualExecutionSummary}</p>
               </div>
             ) : null}
             {session.status !== "completed" && reviewVm.mainGap ? (
               <div className="border-t border-[hsl(var(--border))] pt-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.mainGapLabel}</p>
-                <p className="mt-2 text-sm">{reviewVm.mainGap}</p>
+                <p className="text-kicker text-tertiary">{reviewVm.mainGapLabel}</p>
+                <p className="mt-2 text-body">{reviewVm.mainGap}</p>
               </div>
             ) : null}
 
             {/* This week — consolidated from old "This week" + "What this means for your plan" */}
             <div className="border-t border-[hsl(var(--border))] pt-4">
               <p className={quietLabelClass}>This week</p>
-              <p className="mt-2 text-sm text-muted">{reviewVm.weekAction}</p>
+              <p className="mt-2 text-body text-muted">{reviewVm.weekAction}</p>
               {reviewVm.loadContribution?.sessionTss != null ? (
-                <p className="mt-1.5 text-xs text-tertiary">
+                <p className="mt-1.5 text-ui-label text-tertiary">
                   {Math.round(reviewVm.loadContribution.sessionTss)} TSS
                   {reviewVm.loadContribution.weekTssPct != null
                     ? ` · ${Math.round(reviewVm.loadContribution.weekTssPct * 100)}% of weekly target`
@@ -803,12 +803,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                 this exposes the rest (plus the first 3 for a consolidated view). */}
             {reviewVm.usefulMetrics.length > 3 ? (
               <div className="border-t border-[hsl(var(--border))] pt-4">
-                <p className="mb-2 text-xs uppercase tracking-[0.14em] text-tertiary">All metrics</p>
+                <p className="mb-2 text-kicker text-tertiary">All metrics</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {reviewVm.usefulMetrics.map((metric) => (
                     <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-                      <p className="text-xs text-muted">{metric.label}</p>
-                      <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
+                      <p className="text-ui-label text-muted">{metric.label}</p>
+                      <p className="mt-1 text-body font-semibold text-white">{metric.value}</p>
                     </div>
                   ))}
                 </div>
@@ -820,12 +820,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         <section className="surface p-4 md:p-5">
           <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
             <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Planned intent</p>
-              <p className="mt-2 text-sm">{reviewVm.plannedIntent}</p>
+              <p className="text-kicker text-tertiary">Planned intent</p>
+              <p className="mt-2 text-body">{reviewVm.plannedIntent}</p>
             </div>
             <div className="border-l border-[hsl(var(--border))] pl-5">
-              <p className="text-xs uppercase tracking-[0.14em] text-tertiary">{reviewVm.unlockTitle}</p>
-              <p className="mt-2 text-sm">{reviewVm.unlockDetail}</p>
+              <p className="text-kicker text-tertiary">{reviewVm.unlockTitle}</p>
+              <p className="mt-2 text-body">{reviewVm.unlockDetail}</p>
             </div>
           </div>
         </section>
@@ -854,15 +854,15 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         return (
           <article className="surface p-4 md:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Score breakdown</p>
+              <p className="text-kicker font-medium text-tertiary">Score breakdown</p>
               <div className="flex flex-wrap items-center gap-2">
                 {reviewVm.scoreBand ? (
-                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-muted">
                     {reviewVm.scoreBand}
                   </span>
                 ) : null}
                 {reviewVm.executionCostLabel ? (
-                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-muted">
+                  <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-muted">
                     Execution cost: {reviewVm.executionCostLabel}
                   </span>
                 ) : null}
@@ -870,7 +870,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </div>
             {/* Refinement: weights collapse to a single explainer line so
                 they stop fighting the sub-score numbers for attention. */}
-            <p className="mt-1 text-[11px] text-tertiary">
+            <p className="mt-1 text-ui-label text-tertiary">
               Weighted: Intent 40 · Pacing 25 · Completion 20 · Recovery 15
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-4">
@@ -880,7 +880,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                   <div key={label}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium ${isLowest ? "text-warning" : "text-white"}`}>{label}</span>
+                        <span className={`text-ui-label font-medium ${isLowest ? "text-warning" : "text-white"}`}>{label}</span>
                         {isLowest ? (
                           <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Lowest</span>
                         ) : null}
@@ -888,19 +888,19 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                           <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Capped</span>
                         ) : null}
                       </div>
-                      <span className={`font-mono tabular-nums ${isLowest ? "text-sm font-semibold text-warning" : "text-xs font-medium text-white"}`}>{component.score}</span>
+                      <span className={`font-mono tabular-nums ${isLowest ? "text-body font-semibold text-warning" : "text-ui-label font-medium text-white"}`}>{component.score}</span>
                     </div>
-                    <p className="mt-1.5 text-[11px] leading-snug text-muted">{component.detail}</p>
+                    <p className="mt-1.5 text-ui-label leading-snug text-muted">{component.detail}</p>
                   </div>
                 );
               })}
             </div>
             {cappedDominantMetric ? (
-              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-ui-label text-warning">
                 {cappedDominantMetric} data missing — Intent Match is capped because the primary effort signal for this session isn&apos;t there to confirm.
               </p>
             ) : missingCriticalData.length > 0 ? (
-              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-ui-label text-warning">
                 {missingCriticalData[0]} missing — pair the right sensor next time to unlock a confirmed read.
               </p>
             ) : null}
@@ -915,11 +915,11 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
       {reviewVm.uncertaintyDetail && dataCompletenessPct < 0.6 ? (
         <DetailsAccordion title="Data confidence" summaryDetail={
-          <span className="text-[11px] text-muted">{reviewVm.uncertaintyTitle ?? "Limited data"}</span>
+          <span className="text-ui-label text-muted">{reviewVm.uncertaintyTitle ?? "Limited data"}</span>
         }>
-          <p className="text-sm text-muted">{reviewVm.uncertaintyDetail}</p>
+          <p className="text-body text-muted">{reviewVm.uncertaintyDetail}</p>
           {reviewVm.missingEvidence.length > 0 ? (
-            <p className="mt-2 text-sm text-muted">Missing: {reviewVm.missingEvidence.join(", ")}.</p>
+            <p className="mt-2 text-body text-muted">Missing: {reviewVm.missingEvidence.join(", ")}.</p>
           ) : null}
         </DetailsAccordion>
       ) : null}
@@ -928,12 +928,12 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       <section className="border-t border-[hsl(var(--border))] pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-            <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
+            <h2 className="text-section-title font-semibold">Ask coach follow-up</h2>
+            <p className="mt-1 text-body text-muted">{reviewVm.followUpIntro}</p>
           </div>
           <Link
             href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
-            className="btn-primary px-3 text-xs"
+            className="btn-primary px-3 text-ui-label"
           >
             Ask coach
           </Link>
@@ -943,7 +943,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             <Link
               key={prompt}
               href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
+              className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-ui-label text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
             >
               {prompt}
             </Link>
@@ -963,13 +963,13 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] px-4 py-2 text-body font-medium text-white hover:bg-[rgba(255,255,255,0.14)] lg:min-h-0"
             >
               Back to Dashboard
             </Link>
             <Link
               href={`/calendar?weekStart=${weekStartIso}`}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-sm text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.12)] px-4 py-2 text-body text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] hover:text-white lg:min-h-0"
             >
               View Calendar
             </Link>
@@ -979,7 +979,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             {prevSession ? (
               <Link
                 href={`/sessions/${prevSession.id}`}
-                className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-tertiary transition-ui hover:text-white lg:min-h-0"
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-body text-tertiary transition-ui hover:text-white lg:min-h-0"
               >
                 ← Prev: {prevSession.session_name ?? prevSession.type}
               </Link>
@@ -987,7 +987,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             {nextSession ? (
               <Link
                 href={`/sessions/${nextSession.id}`}
-                className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-tertiary transition-ui hover:text-white lg:min-h-0"
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-body text-tertiary transition-ui hover:text-white lg:min-h-0"
               >
                 Next: {nextSession.session_name ?? nextSession.type} →
               </Link>
