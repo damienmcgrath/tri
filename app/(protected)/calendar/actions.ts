@@ -108,7 +108,36 @@ async function persistExtraActivityMarker(params: {
     throw new Error(loadLinksError.message ?? "Could not load existing activity links.");
   }
 
+  const nowIso = new Date().toISOString();
+
   if (!existingLinks || existingLinks.length === 0) {
+    const { error: insertError } = await supabase.from("session_activity_links").insert({
+      user_id: userId,
+      completed_activity_id: activityId,
+      planned_session_id: null,
+      link_type: "manual",
+      confirmation_status: "rejected",
+      matched_by: userId,
+      matched_at: nowIso,
+      match_method: "unmatched",
+      match_reason: { source: "mark_as_extra" }
+    });
+
+    if (insertError) {
+      // Schema drift: on DBs that haven't run migration 202602220006
+      // planned_session_id is still NOT NULL, so the sentinel insert fails with
+      // 23502. Log and continue — the upload.status="matched" write still runs,
+      // so the settings page stays correct; the calendar card will only fully
+      // recover once the missing migration (plus 202602220007 for is_unplanned)
+      // is applied.
+      if (insertError.code === "23502" || isMissingColumnError(insertError)) {
+        console.warn(
+          `[mark-extra] Skipping rejected-link sentinel (schema drift): ${insertError.message}`
+        );
+        return;
+      }
+      throw new Error(insertError.message ?? "Could not persist extra workout state.");
+    }
     return;
   }
 
@@ -116,8 +145,9 @@ async function persistExtraActivityMarker(params: {
     .from("session_activity_links")
     .update({
       confirmation_status: "rejected",
+      planned_session_id: null,
       matched_by: userId,
-      matched_at: new Date().toISOString(),
+      matched_at: nowIso,
       match_method: "unmatched"
     })
     .eq("user_id", userId)

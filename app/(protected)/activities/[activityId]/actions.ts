@@ -119,20 +119,34 @@ export async function markUnplannedAction(activityId: string) {
     .filter((link: any) => link.planned_session_id && (link.confirmation_status === "confirmed" || link.confirmation_status === null))
     .map((link: any) => link.planned_session_id as string);
 
-  // Mark links as rejected instead of deleting — preserves audit trail and
-  // provides a fallback signal for classifyActivityStatus (mirrors the
-  // persistExtraActivityMarker logic in calendar/actions.ts).
+  // Upsert a rejected link so classifyActivityStatus has a persistent signal
+  // even when the `is_unplanned` column write silently no-ops. Mirrors the
+  // persistExtraActivityMarker logic in calendar/actions.ts.
+  const nowIso = new Date().toISOString();
   if (existingLinks && existingLinks.length > 0) {
     await supabase
       .from("session_activity_links")
       .update({
         confirmation_status: "rejected",
+        planned_session_id: null,
         matched_by: user.id,
-        matched_at: new Date().toISOString(),
+        matched_at: nowIso,
         match_method: "unmatched"
       })
       .eq("user_id", user.id)
       .eq("completed_activity_id", activityId);
+  } else {
+    await supabase.from("session_activity_links").insert({
+      user_id: user.id,
+      completed_activity_id: activityId,
+      planned_session_id: null,
+      link_type: "manual",
+      confirmation_status: "rejected",
+      matched_by: user.id,
+      matched_at: nowIso,
+      match_method: "unmatched",
+      match_reason: { source: "mark_as_extra" }
+    });
   }
 
   const { error } = await supabase.from("completed_activities").update({ is_unplanned: true, schedule_status: "unscheduled" }).eq("id", activityId).eq("user_id", user.id);
