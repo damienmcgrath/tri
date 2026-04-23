@@ -26,7 +26,7 @@ export function CitationChip({ citation }: Props) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-400 transition hover:bg-cyan-500/20"
+      className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-ui-label text-cyan-400 transition hover:bg-cyan-500/20"
     >
       <span className="opacity-60">{citation.type === "session" ? "S" : citation.type === "activity" ? "A" : "D"}</span>
       <span className="max-w-[120px] truncate">{citation.label}</span>

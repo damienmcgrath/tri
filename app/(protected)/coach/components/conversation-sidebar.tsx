@@ -72,11 +72,11 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onNew }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search conversations…"
-          className="flex-1 rounded-md border border-white/10 bg-surface px-2 py-1 text-xs text-surface-foreground placeholder:text-muted-foreground"
+          className="flex-1 rounded-md border border-white/10 bg-surface px-2 py-1 text-ui-label text-surface-foreground placeholder:text-muted-foreground"
         />
         <button
           onClick={onNew}
-          className="shrink-0 rounded-md bg-accent/20 px-2 py-1 text-xs font-medium text-accent transition hover:bg-accent/30"
+          className="shrink-0 rounded-md bg-accent/20 px-2 py-1 text-ui-label text-accent transition hover:bg-accent/30"
         >
           New
         </button>
@@ -85,7 +85,7 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onNew }
       <div className="flex-1 overflow-y-auto">
         {Array.from(grouped.entries()).map(([label, entries]) => (
           <div key={label}>
-            <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 pb-1 pt-3 text-ui-label font-semibold uppercase tracking-wider text-muted-foreground">
               {label}
             </div>
             {entries.map((entry) => (
@@ -97,7 +97,7 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onNew }
                 }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-xs text-surface-foreground">
+                  <span className="truncate text-ui-label text-surface-foreground">
                     {entry.title}
                   </span>
                   {entry.topicClassification && (
@@ -107,7 +107,7 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onNew }
                   )}
                 </div>
                 {entry.summary && (
-                  <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                  <p className="mt-0.5 truncate text-ui-label text-muted-foreground">
                     {entry.summary}
                   </p>
                 )}
@@ -117,7 +117,7 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onNew }
         ))}
 
         {filtered.length === 0 && (
-          <p className="p-4 text-center text-xs text-muted-foreground">
+          <p className="p-4 text-center text-ui-label text-muted-foreground">
             {search ? "No matching conversations" : "No conversations yet"}
           </p>
         )}

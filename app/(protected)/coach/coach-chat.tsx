@@ -28,7 +28,7 @@ const CoachMessage = memo(
     return (
       <div className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
         <div
-          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
+          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-body ${
             message.role === "user"
               ? "bg-[hsl(var(--ai-accent-core))] text-[#0A0A0B]"
               : message.failed
@@ -37,7 +37,7 @@ const CoachMessage = memo(
           }`}
         >
           {message.pending && message.content.trim().length === 0 ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+            <span className="inline-flex items-center gap-1.5 text-ui-label text-tertiary">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
@@ -51,7 +51,7 @@ const CoachMessage = memo(
           )}
           {message.failed && message.role === "assistant" && message.retryText ? (
             <div className="mt-2">
-              <button type="button" onClick={() => onRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
+              <button type="button" onClick={() => onRetry(message)} className="text-ui-label text-[hsl(var(--ai-accent-core))] hover:underline">
                 Retry
               </button>
             </div>
@@ -932,14 +932,14 @@ export function CoachChat({
       <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
         <div className="flex items-start justify-between gap-1">
           <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-            <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
+            <p className={`truncate pr-1 text-ui-label font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
               {conversationTitle(conversation, idx)}
             </p>
-            <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
+            <p className="mt-1 text-ui-label text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
           </button>
           <details className="relative">
-            <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-white">⋯</summary>
-            <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
+            <summary className="cursor-pointer list-none px-1 text-body text-tertiary hover:text-white">⋯</summary>
+            <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-ui-label shadow-md">
               <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
               <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
             </div>
@@ -953,13 +953,13 @@ export function CoachChat({
     <>
       {memoizedGroups.thisWeek.length > 0 ? (
         <div>
-          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">This week</p>
+          <p className="mb-1 px-2 text-kicker text-[rgba(255,255,255,0.28)]">This week</p>
           <div className="space-y-1">{memoizedGroups.thisWeek.slice(0, 5).map(renderConversationItem)}</div>
         </div>
       ) : null}
       {memoizedGroups.lastWeek.length > 0 ? (
         <div>
-          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">Last week</p>
+          <p className="mb-1 px-2 text-kicker text-[rgba(255,255,255,0.28)]">Last week</p>
           <div className="space-y-1">{memoizedGroups.lastWeek.slice(0, 3).map(renderConversationItem)}</div>
         </div>
       ) : null}
@@ -968,7 +968,7 @@ export function CoachChat({
           <button
             type="button"
             onClick={() => setShowOlderConversations((prev) => !prev)}
-            className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
+            className="mb-1 flex w-full items-center justify-between px-2 text-kicker text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
           >
             <span>Older</span>
             <span className="rounded-full border border-[rgba(255,255,255,0.12)] px-1.5 py-0.5 text-[9px]">{memoizedGroups.older.length}</span>
@@ -986,16 +986,16 @@ export function CoachChat({
       {showBriefingPanel ? (
         <section className="surface p-5">
           <div className="border-b border-[hsl(var(--border))] pb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">{topInsight.headline}</h2>
-            <p className="mt-1.5 max-w-3xl text-sm text-muted">{condensedRationale}</p>
+            <p className="text-ui-label font-semibold uppercase tracking-[0.14em] text-[hsl(var(--ai-accent-core))]">Coach briefing</p>
+            <h2 className="mt-2 text-page-title text-white">{topInsight.headline}</h2>
+            <p className="mt-1.5 max-w-3xl text-body text-muted">{condensedRationale}</p>
           </div>
           <div className="mt-3 grid gap-3.5 lg:grid-cols-[1.25fr_0.75fr]">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">What to do next</p>
+              <p className="text-kicker text-tertiary">What to do next</p>
               <ul className="mt-1.5 space-y-1">
                 {nextActions.slice(0, 2).map((action) => (
-                  <li key={action} className="text-sm text-[hsl(var(--text-secondary))]">• {action}</li>
+                  <li key={action} className="text-body text-[hsl(var(--text-secondary))]">• {action}</li>
                 ))}
               </ul>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -1007,28 +1007,28 @@ export function CoachChat({
                 </Link>
                 <a
                   href={topInsight.secondaryAction.href}
-                  className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-white"
+                  className="inline-flex items-center rounded-full border border-[hsl(var(--border))] px-4 py-2 text-body font-medium text-[hsl(var(--text-secondary))] transition hover:border-[hsl(var(--ai-accent-core)/0.3)] hover:text-white"
                 >
                   {topInsight.secondaryAction.label}
                 </a>
               </div>
-              <p className="mt-2 text-xs text-tertiary">{scoreTrendSummary}</p>
-              <p className="mt-2 text-[11px] text-tertiary">
+              <p className="mt-2 text-ui-label text-tertiary">{scoreTrendSummary}</p>
+              <p className="mt-2 text-ui-label text-tertiary">
                 {briefingContext.uploadedSessionCount} uploaded · {briefingContext.linkedSessionCount} linked · {briefingContext.reviewedSessionCount} reviewed
                 {briefingContext.pendingReviewCount > 0 ? ` · ${briefingContext.pendingReviewCount} pending review` : ""}
               </p>
             </div>
             <div id="sessions-needing-attention" className="rounded-xl bg-[hsl(var(--surface-subtle))] p-2.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Sessions needing attention</p>
-                <span className="text-xs text-tertiary">{flaggedSessions.length}</span>
+                <p className="text-kicker text-tertiary">Sessions needing attention</p>
+                <span className="text-ui-label text-tertiary">{flaggedSessions.length}</span>
               </div>
               {flaggedSessions.length === 0 ? (
-                <p className="mt-1.5 text-xs text-muted">{emptyAttentionText}</p>
+                <p className="mt-1.5 text-ui-label text-muted">{emptyAttentionText}</p>
               ) : (
                 <ul className="mt-1.5 space-y-1">
                   {flaggedSessions.slice(0, 2).map((session) => (
-                    <li key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2 py-1.5 text-xs">
+                    <li key={session.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-2 py-1.5 text-ui-label">
                       <div className="flex items-center justify-between gap-2">
                         <Link href={`/sessions/${session.id}`} className="truncate text-[hsl(var(--text-secondary))] underline-offset-2 hover:text-white hover:underline">
                           {session.sessionName}
@@ -1037,7 +1037,7 @@ export function CoachChat({
                       </div>
                       {session.executionScoreBand ? (
                         <div className="mt-1">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${executionScoreBandTone(session.executionScoreBand)}`}>
+                          <span className={`rounded-full border px-2 py-0.5 text-ui-label ${executionScoreBandTone(session.executionScoreBand)}`}>
                             {scoreHeadline(session)}
                           </span>
                         </div>
@@ -1047,7 +1047,7 @@ export function CoachChat({
                 </ul>
               )}
               {latestScoredSession ? (
-                <p className="mt-1.5 text-xs text-tertiary">
+                <p className="mt-1.5 text-ui-label text-tertiary">
                   Latest reviewed session:{" "}
                   <Link href={`/sessions/${latestScoredSession.id}`} className="underline-offset-2 hover:text-white hover:underline">
                     {latestScoredSession.sessionName}
@@ -1056,7 +1056,7 @@ export function CoachChat({
                   {scoreHeadline(latestScoredSession)}
                 </p>
               ) : null}
-              {matchedSessions.length > 0 ? <p className="mt-1.5 text-xs text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
+              {matchedSessions.length > 0 ? <p className="mt-1.5 text-ui-label text-tertiary">{matchedSessions.length} sessions on target.</p> : null}
             </div>
           </div>
         </section>
@@ -1065,7 +1065,7 @@ export function CoachChat({
       <section id="coaching-chat" className="surface overflow-hidden">
         <div className="flex min-h-[420px] h-[calc(100dvh-var(--mobile-chrome)-80px)] flex-col lg:grid lg:h-[68vh] lg:max-h-[780px] lg:min-h-[560px] lg:grid-cols-[248px_1fr]">
           <aside className="hidden min-h-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-2.5 lg:flex">
-            <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
+            <button type="button" onClick={handleNewChat} className="rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-body text-[var(--color-accent)]">
               New conversation
             </button>
             <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
@@ -1074,12 +1074,12 @@ export function CoachChat({
           </aside>
 
           <details className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] lg:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2 text-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2 text-body">
               <span className="font-medium text-white">History</span>
-              <span className="text-xs text-tertiary">{conversations.length}</span>
+              <span className="text-ui-label text-tertiary">{conversations.length}</span>
             </summary>
             <div className="max-h-[40vh] space-y-3 overflow-y-auto p-2.5">
-              <button type="button" onClick={handleNewChat} className="w-full rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-sm text-[var(--color-accent)]">
+              <button type="button" onClick={handleNewChat} className="w-full rounded-md border border-[rgba(190,255,0,0.35)] bg-transparent px-3 py-1.5 text-body text-[var(--color-accent)]">
                 New conversation
               </button>
               {historyGroups}
@@ -1091,13 +1091,13 @@ export function CoachChat({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="label hidden sm:block">Active conversation</p>
-                  <h3 className="truncate text-sm font-semibold sm:mt-0.5 sm:text-base">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
-                  <p className="text-[11px] text-muted sm:mt-0.5 sm:text-sm">{dataRecency}</p>
+                  <h3 className="truncate text-body font-medium sm:mt-0.5 sm:text-body">{activeConversation ? activeConversation.title || "Untitled conversation" : "New conversation"}</h3>
+                  <p className="text-ui-label text-muted sm:mt-0.5 sm:text-body">{dataRecency}</p>
                 </div>
               </div>
             </div>
             <div className="hidden border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-4 py-2 sm:block">
-              <p className="text-xs text-[hsl(var(--text-secondary))]">
+              <p className="text-ui-label text-[hsl(var(--text-secondary))]">
                 {sessionDiagnoses.length > 0
                   ? `${sessionDiagnoses.length} reviewed this week${flaggedSessions.length > 0 ? ` · ${flaggedSessions.length} needing attention` : ""}. Focus: ${nextActions[0] ?? "Stabilise execution quality."}`
                   : briefingContext.pendingReviewCount > 0
@@ -1154,13 +1154,13 @@ export function CoachChat({
                   <svg className="sm:hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
                 </button>
                 {isLoading ? (
-                  <button type="button" onClick={handleStopStreaming} aria-label="Stop" className="inline-flex shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border))] px-3 text-sm text-[hsl(var(--text-secondary))] hover:text-white">
+                  <button type="button" onClick={handleStopStreaming} aria-label="Stop" className="inline-flex shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border))] px-3 text-body text-[hsl(var(--text-secondary))] hover:text-white">
                     <span className="hidden sm:inline">Stop</span>
                     <svg className="sm:hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
                   </button>
                 ) : null}
               </div>
-              {error ? <p className="mt-2 text-sm text-rose-400">{error}</p> : null}
+              {error ? <p className="mt-2 text-body text-rose-400">{error}</p> : null}
             </form>
           </div>
         </div>

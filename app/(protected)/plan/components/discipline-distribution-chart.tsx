@@ -44,7 +44,7 @@ function DeltaBadge({ delta }: { delta: number }) {
   const sign = delta > 0 ? "+" : "\u2212";
 
   return (
-    <span className={`ml-1 text-[10px] font-medium ${color}`}>
+    <span className={`ml-1 text-ui-label ${color}`}>
       {sign}{abs}pp
     </span>
   );
@@ -74,7 +74,7 @@ export function DisciplineDistributionChart({ actual, target, deltas }: Props) {
           return (
             <g key={sport}>
               {/* Sport label */}
-              <text x={0} y={y + barHeight / 2 + 4} className="fill-current text-[11px]" dominantBaseline="middle">
+              <text x={0} y={y + barHeight / 2 + 4} className="fill-current text-ui-label" dominantBaseline="middle">
                 {SPORT_LABELS[sport]}
               </text>
 
@@ -91,7 +91,7 @@ export function DisciplineDistributionChart({ actual, target, deltas }: Props) {
               <text
                 x={labelWidth + Math.max(1, actualW) + 4}
                 y={y + barHeight / 2}
-                className="fill-current text-[10px] text-muted"
+                className="fill-current text-ui-label text-muted"
                 dominantBaseline="middle"
               >
                 {pct(actual[sport] ?? 0)}
@@ -112,7 +112,7 @@ export function DisciplineDistributionChart({ actual, target, deltas }: Props) {
               <text
                 x={labelWidth + chartWidth + 4}
                 y={y + barHeight / 2}
-                className={`text-[10px] ${Math.abs(deltas[sport]) >= 10 ? "fill-red-400" : Math.abs(deltas[sport]) >= 5 ? "fill-amber-400" : "fill-neutral-500"}`}
+                className={`text-ui-label ${Math.abs(deltas[sport]) >= 10 ? "fill-red-400" : Math.abs(deltas[sport]) >= 5 ? "fill-amber-400" : "fill-neutral-500"}`}
                 dominantBaseline="middle"
               >
                 {deltas[sport] > 0 ? "+" : ""}{deltas[sport]}pp
@@ -123,7 +123,7 @@ export function DisciplineDistributionChart({ actual, target, deltas }: Props) {
       </svg>
 
       {/* Inline legend */}
-      <div className="mt-2 flex gap-4 text-[10px] text-muted">
+      <div className="mt-2 flex gap-4 text-ui-label text-muted">
         {sports.map((sport) => (
           <span key={sport} className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: SPORT_COLORS[sport] }} />

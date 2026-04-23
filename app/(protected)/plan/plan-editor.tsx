@@ -555,7 +555,7 @@ export function PlanEditor({
   }
 
   if (!selectedPlan || !selectedWeek) {
-    return <div className="surface p-4 text-sm text-muted">Create a plan to start programming weeks.</div>;
+    return <div className="surface p-4 text-body text-muted">Create a plan to start programming weeks.</div>;
   }
 
   return (
@@ -563,21 +563,21 @@ export function PlanEditor({
       <header className="surface-subtle px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <p className="label-base text-[10px] text-accent">Plan</p>
-            <h2 className="text-lg font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
-            <p className="text-sm text-muted">{weekRangeLabel(selectedWeek.week_start_date)} · Planned {totalMinutes} min</p>
+            <p className="label-base text-ui-label text-accent">Plan</p>
+            <h2 className="text-section-title font-semibold">Week {selectedWeek.week_index} · {weekDraft.focus}</h2>
+            <p className="text-body text-muted">{weekRangeLabel(selectedWeek.week_start_date)} · Planned {totalMinutes} min</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               aria-label="Previous week"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-ui-label text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
               onClick={() => previousWeek && setSelectedWeekId(previousWeek.id)}
               disabled={!previousWeek}
             >
               ←
             </button>
-            <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base flex-1 py-1.5 text-xs sm:flex-none sm:w-auto" aria-label="Select plan week">
+            <select value={selectedWeek.id} onChange={(event) => setSelectedWeekId(event.target.value)} className="input-base flex-1 py-1.5 text-ui-label sm:flex-none sm:w-auto" aria-label="Select plan week">
               {planWeeks.map((week) => (
                 <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>
               ))}
@@ -585,14 +585,14 @@ export function PlanEditor({
             <button
               type="button"
               aria-label="Next week"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-xs text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-ui-label text-[rgba(255,255,255,0.7)] disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
               onClick={() => nextWeek && setSelectedWeekId(nextWeek.id)}
               disabled={!nextWeek}
             >
               →
             </button>
-            {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 text-xs">Save</button> : null}
-            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="inline-flex min-h-[44px] items-center rounded-md border border-[rgba(255,255,255,0.20)] bg-transparent px-3 text-xs text-[rgba(255,255,255,0.7)] lg:min-h-0 lg:py-1.5">Actions</button>
+            {isWeekDirty ? <button form="week-details-form" className="btn-primary px-3 text-ui-label">Save</button> : null}
+            <button type="button" onClick={() => setWeekActionOpen((v) => !v)} className="inline-flex min-h-[44px] items-center rounded-md border border-[rgba(255,255,255,0.20)] bg-transparent px-3 text-ui-label text-[rgba(255,255,255,0.7)] lg:min-h-0 lg:py-1.5">Actions</button>
           </div>
         </div>
       </header>
@@ -601,7 +601,7 @@ export function PlanEditor({
         <section className="surface-subtle px-4 py-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="card-kicker">Training blocks</p>
-            <p className="text-[11px] text-tertiary">{planBlocks.length} block{planBlocks.length === 1 ? "" : "s"}</p>
+            <p className="text-ui-label text-tertiary">{planBlocks.length} block{planBlocks.length === 1 ? "" : "s"}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {planBlocks.map((block) => {
@@ -612,14 +612,14 @@ export function PlanEditor({
                   key={block.id}
                   type="button"
                   onClick={() => setCurrentBlockId(block.id)}
-                  className={`rounded-full border px-3 py-1.5 text-left text-xs transition ${
+                  className={`rounded-full border px-3 py-1.5 text-left text-ui-label transition ${
                     isActive
                       ? "border-[rgba(190,255,0,0.4)] bg-[rgba(190,255,0,0.1)] text-white"
                       : "border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.26)]"
                   }`}
                 >
                   <span className="font-medium">{block.name}</span>
-                  <span className="ml-2 text-[10px] text-tertiary">
+                  <span className="ml-2 text-ui-label text-tertiary">
                     {block.block_type} · {blockWeeksCount} wk
                   </span>
                 </button>
@@ -645,21 +645,21 @@ export function PlanEditor({
           <div className="grid gap-3 md:grid-cols-4">
             <div>
               <p className="card-kicker">Block dates</p>
-              <p className="mt-1 text-sm font-medium text-white">
+              <p className="mt-1 text-body font-medium text-white">
                 {weekRangeLabel(activeBlock.start_date)} – {weekRangeLabel(activeBlock.end_date)}
               </p>
             </div>
             <div>
               <p className="card-kicker">Planned volume</p>
-              <p className="mt-1 text-sm font-medium text-white">{blockSummary.plannedMinutes} min</p>
+              <p className="mt-1 text-body font-medium text-white">{blockSummary.plannedMinutes} min</p>
             </div>
             <div>
               <p className="card-kicker">Completed</p>
-              <p className="mt-1 text-sm font-medium text-white">{blockSummary.completedMinutes} min</p>
+              <p className="mt-1 text-body font-medium text-white">{blockSummary.completedMinutes} min</p>
             </div>
             <div>
               <p className="card-kicker">Completion</p>
-              <p className="mt-1 text-sm font-medium text-white">{blockSummary.completionPct}%</p>
+              <p className="mt-1 text-body font-medium text-white">{blockSummary.completionPct}%</p>
             </div>
           </div>
         </section>
@@ -673,26 +673,26 @@ export function PlanEditor({
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <p className="card-kicker">Block</p>
-            <p className="mt-1 text-sm font-medium text-white">{weekDraft.focus}</p>
+            <p className="mt-1 text-body font-medium text-white">{weekDraft.focus}</p>
           </div>
           {displayWeekFocus ? (
             <div className="md:col-span-2">
               <p className="card-kicker">Week focus{weekFocusSource ? ` · ${weekFocusSource}` : ""}</p>
-              <p className="mt-1 text-sm font-medium text-white">{displayWeekFocus}</p>
+              <p className="mt-1 text-body font-medium text-white">{displayWeekFocus}</p>
             </div>
           ) : null}
           <div>
             <p className="card-kicker">Rest days</p>
-            <p className="mt-1 text-sm font-medium text-white">{restDays}</p>
+            <p className="mt-1 text-body font-medium text-white">{restDays}</p>
           </div>
           {keySessions > 0 ? (
             <div>
               <p className="card-kicker">Key sessions</p>
-              <p className="mt-1 text-sm font-medium text-white">{keySessions}</p>
+              <p className="mt-1 text-body font-medium text-white">{keySessions}</p>
             </div>
           ) : null}
         </div>
-        {notePreview ? <p className="mt-3 text-xs text-muted">Week notes: {notePreview}</p> : null}
+        {notePreview ? <p className="mt-3 text-ui-label text-muted">Week notes: {notePreview}</p> : null}
       </section>
 
       {weekDays.some((d) => d.totalMinutes > 0) ? (
@@ -700,7 +700,7 @@ export function PlanEditor({
           <div className="mb-2.5 flex items-center justify-between">
             <p className="card-kicker">Daily load shape</p>
             {volumeDelta !== null ? (
-              <p className={`text-[11px] font-medium ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
+              <p className={`text-ui-label ${volumeDelta > 0 ? "text-emerald-300" : volumeDelta < 0 ? "text-rose-300" : "text-muted"}`}>
                 {volumeDelta > 0 ? `+${volumeDelta}` : volumeDelta} min vs last week
               </p>
             ) : null}
@@ -723,7 +723,7 @@ export function PlanEditor({
                 const dayStress = dayStressTotals[dayIndex];
                 return (
                 <div key={day.iso} className="flex flex-1 flex-col items-center gap-1">
-                  <p className="text-[10px] tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
+                  <p className="text-ui-label tabular-nums text-tertiary" style={{ visibility: day.totalMinutes > 0 ? "visible" : "hidden" }}>
                     {anyStress ? Math.round(dayStress) : day.totalMinutes}
                   </p>
                   <div className="flex w-full flex-col-reverse overflow-hidden rounded-sm" style={{ height: "48px" }}>
@@ -749,13 +749,13 @@ export function PlanEditor({
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-tertiary">{day.label}</p>
+                  <p className="text-ui-label text-tertiary">{day.label}</p>
                 </div>
                 );
               });
             })()}
           </div>
-          <p className="mt-1 text-[10px] text-tertiary">Bar height reflects estimated training stress (TSS) per day, not duration.</p>
+          <p className="mt-1 text-ui-label text-tertiary">Bar height reflects estimated training stress (TSS) per day, not duration.</p>
         </section>
       ) : null}
 
@@ -768,17 +768,17 @@ export function PlanEditor({
 
       {weekActionOpen ? (
         <div className="surface-subtle p-3">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
-            <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); setDuplicateToast(null); startDuplicateTransition(async () => { await duplicateWeekForwardAction(fd); setDuplicateToast("Week duplicated"); setWeekActionOpen(false); }); }} className="space-y-2"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><label className="label-base">Duplicate to week</label><select name="destinationWeekId" className="input-base" required>{duplicateTargets.map((week) => <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>)}</select><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copyMetadata" defaultChecked /> Copy metadata</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" name="copySessions" defaultChecked /> Copy sessions</label><button disabled={isDuplicating} className="btn-secondary w-full text-xs">{isDuplicating ? "Duplicating…" : "Duplicate"}</button></form>
-            <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by +7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="forward" /><button className="btn-secondary w-full text-xs">Shift +7d</button></form>
-            <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by -7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="backward" /><button className="btn-secondary w-full text-xs">Shift -7d</button></form>
-            <form action={deleteWeekAction} onSubmit={(event) => { if (!window.confirm("Delete this week and all sessions in it?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><button className="btn-secondary w-full text-xs text-rose-200">Delete week</button></form>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-body">
+            <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); setDuplicateToast(null); startDuplicateTransition(async () => { await duplicateWeekForwardAction(fd); setDuplicateToast("Week duplicated"); setWeekActionOpen(false); }); }} className="space-y-2"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><label className="label-base">Duplicate to week</label><select name="destinationWeekId" className="input-base" required>{duplicateTargets.map((week) => <option key={week.id} value={week.id}>Week {week.week_index} ({weekRangeLabel(week.week_start_date)})</option>)}</select><label className="flex items-center gap-2 text-ui-label"><input type="checkbox" name="copyMetadata" defaultChecked /> Copy metadata</label><label className="flex items-center gap-2 text-ui-label"><input type="checkbox" name="copySessions" defaultChecked /> Copy sessions</label><button disabled={isDuplicating} className="btn-secondary w-full text-ui-label">{isDuplicating ? "Duplicating…" : "Duplicate"}</button></form>
+            <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by +7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="forward" /><button className="btn-secondary w-full text-ui-label">Shift +7d</button></form>
+            <form action={shiftWeekAction} onSubmit={(event) => { if (!window.confirm("Shift this week and all sessions by -7 days?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="direction" value="backward" /><button className="btn-secondary w-full text-ui-label">Shift -7d</button></form>
+            <form action={deleteWeekAction} onSubmit={(event) => { if (!window.confirm("Delete this week and all sessions in it?")) event.preventDefault(); }}><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><button className="btn-secondary w-full text-ui-label text-rose-200">Delete week</button></form>
           </div>
         </div>
       ) : null}
 
       {duplicateToast ? (
-        <div className="px-3 py-2 text-xs text-success">{duplicateToast}</div>
+        <div className="px-3 py-2 text-ui-label text-success">{duplicateToast}</div>
       ) : null}
 
       <form id="week-details-form" action={updateWeekAction} className="hidden">
@@ -791,20 +791,20 @@ export function PlanEditor({
 
       <article className="surface p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-[rgba(255,255,255,0.5)]">Week board (Mon–Sun)</h3>
-          <p className="text-xs text-tertiary">For scheduling changes, use Calendar.</p>
+          <h3 className="text-body font-medium text-[rgba(255,255,255,0.5)]">Week board (Mon–Sun)</h3>
+          <p className="text-ui-label text-tertiary">For scheduling changes, use Calendar.</p>
         </div>
 
         <div className="hidden gap-3 lg:grid lg:grid-cols-7">
           {weekDays.map((day) => (
             <section key={day.iso} className={`group/day flex min-h-[236px] min-w-0 flex-col p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
               <div className="mb-1.5 flex items-start justify-between border-b border-[hsl(var(--border))] pb-1.5">
-                <div><p className="text-xs uppercase tracking-wide text-muted">{day.label}</p><p className="text-sm font-medium">{day.date}</p></div>
+                <div><p className="text-ui-label uppercase tracking-wide text-muted">{day.label}</p><p className="text-body font-medium">{day.date}</p></div>
                 <div className="text-right">
-                  <p className="text-xs text-muted">{day.totalMinutes} min</p>
-                  {day.isRest ? <p className="text-[11px] text-muted/90">Rest</p> : null}
-                  {!day.isRest && day.roleCounts.key > 0 ? <p className="text-[11px] text-accent">Key day</p> : null}
-                  {!day.isRest && day.roleCounts.key === 0 && day.roleCounts.recovery > 0 ? <p className="text-[11px] text-emerald-200">Recovery-biased</p> : null}
+                  <p className="text-ui-label text-muted">{day.totalMinutes} min</p>
+                  {day.isRest ? <p className="text-ui-label text-muted/90">Rest</p> : null}
+                  {!day.isRest && day.roleCounts.key > 0 ? <p className="text-ui-label text-accent">Key day</p> : null}
+                  {!day.isRest && day.roleCounts.key === 0 && day.roleCounts.recovery > 0 ? <p className="text-ui-label text-emerald-200">Recovery-biased</p> : null}
                 </div>
               </div>
               <div className="flex-1 space-y-1.5">
@@ -829,7 +829,7 @@ export function PlanEditor({
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-ui-label"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text
@@ -840,23 +840,23 @@ export function PlanEditor({
                         </span>
                         <div className="flex items-center gap-1.5">
                           {session.is_key ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-ui-label text-[var(--color-accent)]">
                               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
                               Key
                             </span>
                           ) : null}
                           {roleCue ? (
-                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-ui-label tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                           ) : null}
                         </div>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
+                      <p className="mt-1 line-clamp-2 text-ui-label font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? (
-                        <p className="text-[11px] text-muted">
+                        <p className="text-ui-label text-muted">
                           Intent: {intentCue}
                         </p>
                       ) : null}
-                      <p className="text-[11px] text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
+                      <p className="text-ui-label text-muted">{session.duration_minutes} min{session.target ? ` · ${session.target}` : ""}{role === "Optional" ? " · Optional" : ""}</p>
                       {(() => {
                         const profile = sessionProfileMap.get(session.id);
                         return profile ? <IntensityBar zoneDistribution={profile.zoneDistribution} height={4} className="mt-1" /> : null;
@@ -864,9 +864,9 @@ export function PlanEditor({
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-4 text-center text-xs text-muted">Rest day · planned recovery window</p> : null}
+                {day.sessions.length === 0 ? <p className="py-4 text-center text-ui-label text-muted">Rest day · planned recovery window</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-2 w-fit text-left text-ui-label text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)]">＋ Add</button>
             </section>
           ))}
         </div>
@@ -875,8 +875,8 @@ export function PlanEditor({
           {weekDays.map((day) => (
             <section key={day.iso} className={`group/day p-2.5 ${day.isRest ? "surface-subtle opacity-80" : "surface-subtle"}`}>
               <div className="mb-1.5 flex items-center justify-between border-b border-[hsl(var(--border))] pb-1.5">
-                <p className="text-sm font-semibold">{day.label} · {day.date}</p>
-                <p className="text-xs text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.roleCounts.key > 0 ? " · Key day" : day.roleCounts.recovery > 0 ? " · Recovery-biased" : ""}</p>
+                <p className="text-body font-medium">{day.label} · {day.date}</p>
+                <p className="text-ui-label text-muted">{day.totalMinutes} min{day.isRest ? " · Rest" : day.roleCounts.key > 0 ? " · Key day" : day.roleCounts.recovery > 0 ? " · Recovery-biased" : ""}</p>
               </div>
               <div className="space-y-1.5">
                 {day.sessions.map((session) => {
@@ -890,7 +890,7 @@ export function PlanEditor({
                       key={session.id}
                       type="button"
                       onClick={() => setActiveSessionId(session.id)}
-                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left text-xs"
+                      className="w-full rounded-lg border bg-[#18181C] px-2 py-2 text-left text-ui-label"
                       style={{
                         borderColor: "rgba(255,255,255,0.06)",
                         borderLeftWidth: "3px",
@@ -899,7 +899,7 @@ export function PlanEditor({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-ui-label"
                           style={{
                             backgroundColor: disciplineChipTone(session.sport).bg,
                             color: disciplineChipTone(session.sport).text
@@ -910,19 +910,19 @@ export function PlanEditor({
                         </span>
                         <div className="flex items-center gap-1.5">
                           {session.is_key ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(190,255,0,0.35)] bg-[rgba(190,255,0,0.12)] px-1.5 py-0.5 text-ui-label text-[var(--color-accent)]">
                               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
                               Key
                             </span>
                           ) : null}
                           {roleCue ? (
-                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
+                            <span title={role ?? undefined} className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-ui-label tracking-wide ${roleCue.className}`}><span aria-hidden="true">{roleCue.marker}</span><span>{role}</span></span>
                           ) : null}
                         </div>
                       </div>
                       <p className="mt-1 line-clamp-2 font-semibold leading-snug">{getSessionDisplayName({ sessionName: session.session_name ?? session.type, discipline: session.discipline ?? session.sport, subtype: session.subtype ?? session.target, workoutType: session.workout_type, intentCategory: session.intent_category, source: session.source_metadata, executionResult: session.execution_result })}</p>
                       {intentCue ? (
-                        <p className="text-[11px] text-muted">
+                        <p className="text-ui-label text-muted">
                           Intent: {intentCue}
                         </p>
                       ) : null}
@@ -934,18 +934,18 @@ export function PlanEditor({
                     </button>
                   );
                 })}
-                {day.sessions.length === 0 ? <p className="py-2 text-xs text-muted">Rest day · planned recovery window.</p> : null}
+                {day.sessions.length === 0 ? <p className="py-2 text-ui-label text-muted">Rest day · planned recovery window.</p> : null}
               </div>
-              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 inline-flex min-h-[44px] items-center text-xs text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)] lg:min-h-0">＋ Add</button>
+              <button type="button" onClick={() => setQuickAddDay(day.iso)} className="mt-1.5 inline-flex min-h-[44px] items-center text-ui-label text-[rgba(255,255,255,0.25)] transition hover:text-[rgba(255,255,255,0.6)] focus-visible:text-[rgba(255,255,255,0.6)] lg:min-h-0">＋ Add</button>
             </section>
           ))}
         </div>
       </article>
 
       <details className="surface-subtle p-3">
-        <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-medium lg:min-h-0">Week notes & settings</summary>
+        <summary className="flex min-h-[44px] cursor-pointer items-center text-body font-medium lg:min-h-0">Week notes & settings</summary>
         <div className="mt-2">
-          <p className="text-xs text-muted">Discipline totals: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
+          <p className="text-ui-label text-muted">Discipline totals: {disciplineTotals.map((item) => `${getDisciplineMeta(item.sport).label} ${item.minutes}m`).join(" · ") || "No sessions yet"}</p>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div>
@@ -965,8 +965,8 @@ export function PlanEditor({
 
       {quickAddDay ? (
         <div className="fixed inset-0 z-50 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 text-xs">Close</button></div>
-          <p className="mt-1 text-xs text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
+          <div className="flex items-center justify-between"><h3 className="text-section-title font-semibold">Add session</h3><button type="button" onClick={() => setQuickAddDay(null)} className="btn-secondary px-3 text-ui-label">Close</button></div>
+          <p className="mt-1 text-ui-label text-muted">{longDateFormatter.format(new Date(`${quickAddDay}T00:00:00.000Z`))}</p>
           <form action={createSessionAction} onSubmit={handleQuickAddSubmit} className="mt-4 space-y-3"><input type="hidden" name="planId" value={selectedPlan.id} /><input type="hidden" name="weekId" value={selectedWeek.id} /><input type="hidden" name="date" value={quickAddDay} />
             <label className="label-base">Template</label><select className="input-base" onChange={(event) => { const t = templates.find((item) => item.label === event.target.value); if (!t) return; const form = event.currentTarget.form; if (!form) return; (form.elements.namedItem("sport") as HTMLInputElement).value = t.sport; (form.elements.namedItem("durationMinutes") as HTMLInputElement).value = String(t.duration); (form.elements.namedItem("sessionType") as HTMLInputElement).value = t.type; (form.elements.namedItem("target") as HTMLInputElement).value = t.target; }}><option value="">Custom</option>{templates.map((template) => <option key={template.label}>{template.label}</option>)}</select>
             <label className="label-base">Discipline</label><select className="input-base" name="sport" defaultValue="run">{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>
@@ -983,7 +983,7 @@ export function PlanEditor({
 
       {activeSession ? (
         <div className="fixed inset-0 z-50 w-full overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-4 shadow-2xl sm:bottom-0 sm:left-auto sm:top-14 sm:max-w-md sm:p-5">
-          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 text-xs">Close</button></div>
+          <div className="flex items-center justify-between"><h3 className="text-section-title font-semibold">Edit session</h3><button type="button" onClick={() => setActiveSessionId(null)} className="btn-secondary px-3 text-ui-label">Close</button></div>
           <form action={updateSessionAction} onSubmit={handleSessionUpdateSubmit} className="mt-4 space-y-3"><input type="hidden" name="sessionId" value={activeSession.id} /><input type="hidden" name="planId" value={activeSession.plan_id} /><input type="hidden" name="weekId" value={activeSession.week_id} />
             <label className="label-base">Day</label><input name="date" type="date" defaultValue={activeSession.date} className="input-base" required />
             <label className="label-base">Discipline</label><select name="sport" defaultValue={activeSession.sport} className="input-base" required>{sports.map((sport) => <option key={sport} value={sport}>{getDisciplineMeta(sport).label}</option>)}</select>

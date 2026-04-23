@@ -59,7 +59,7 @@ export function SeasonTimeline({ blocks, races, seasonStart, seasonEnd, todayIso
     <div className="surface p-4">
       <div className="mb-3 flex items-center justify-between">
         <p className="label">Season Timeline</p>
-        <p className="text-xs text-muted">
+        <p className="text-ui-label text-muted">
           {seasonStart} &mdash; {seasonEnd}
         </p>
       </div>
@@ -77,7 +77,7 @@ export function SeasonTimeline({ blocks, races, seasonStart, seasonEnd, todayIso
               style={{ left: `${Math.max(0, leftPct)}%`, width: `${Math.min(widthPct, 100 - leftPct)}%` }}
               title={`${block.name} (${block.startDate} – ${block.endDate})`}
             >
-              <span className="absolute inset-0 flex items-center justify-center truncate px-1 text-[10px] font-medium text-white/80">
+              <span className="absolute inset-0 flex items-center justify-center truncate px-1 text-ui-label text-white/80">
                 {widthPct > 8 ? block.name : ""}
               </span>
             </div>
@@ -116,7 +116,7 @@ export function SeasonTimeline({ blocks, races, seasonStart, seasonEnd, todayIso
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-muted">
+      <div className="mt-3 flex flex-wrap gap-3 text-ui-label text-muted">
         {Object.entries(BLOCK_COLORS).map(([type, color]) => (
           <span key={type} className="flex items-center gap-1">
             <span className={`inline-block h-2.5 w-2.5 rounded-sm ${color}`} />

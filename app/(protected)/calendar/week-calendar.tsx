@@ -308,14 +308,14 @@ function SessionActionMenu({
     <div ref={menuRef} className="relative" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] text-muted hover:text-foreground"
+        className="rounded-md border border-[hsl(var(--border))] px-2 py-1 text-ui-label text-muted hover:text-foreground"
         aria-label="Card actions"
         onClick={() => setOpen((value) => !value)}
       >
         •••
       </button>
       {open ? (
-        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-[11px] shadow-lg">
+        <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] p-1 text-ui-label shadow-lg">
           {session.displayType === "completed_activity" && activityId ? (
             <Link className="block rounded px-2 py-1 hover:bg-[hsl(var(--surface-subtle))]" href={`/sessions/activity-${activityId}`}>
               Open details
@@ -567,12 +567,12 @@ export function WeekCalendar({
   return (
     <section className="space-y-3">
       <header className="surface-subtle flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
-          <p className="text-sm font-semibold">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
-          <Link href={withWeek(addDays(activeWeekStart, -7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Prev</Link>
+        <div className="flex items-center gap-2 text-ui-label">
+          <p className="text-body font-medium">{dayFormatter.format(new Date(`${weekDays[0].iso}T00:00:00.000Z`))} – {dayFormatter.format(new Date(`${weekDays[6].iso}T00:00:00.000Z`))}</p>
+          <Link href={withWeek(addDays(activeWeekStart, -7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-ui-label text-[rgba(255,255,255,0.6)]">Prev</Link>
           <Link
             href={withWeek(currentWeekStart)}
-            className={`rounded-md border bg-[var(--color-surface-raised)] px-2 py-1 text-xs ${
+            className={`rounded-md border bg-[var(--color-surface-raised)] px-2 py-1 text-ui-label ${
               activeWeekStart === currentWeekStart
                 ? "border-[rgba(190,255,0,0.40)] text-[var(--color-accent)]"
                 : "border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.6)]"
@@ -580,9 +580,9 @@ export function WeekCalendar({
           >
             This week
           </Link>
-          <Link href={withWeek(addDays(activeWeekStart, 7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[rgba(255,255,255,0.6)]">Next</Link>
+          <Link href={withWeek(addDays(activeWeekStart, 7))} className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[var(--color-surface-raised)] px-2 py-1 text-ui-label text-[rgba(255,255,255,0.6)]">Next</Link>
         </div>
-        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-col gap-2 text-ui-label sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex items-center gap-2">
             <label className="sr-only" htmlFor="sport-filter">Discipline filter</label>
             <select id="sport-filter" value={sportFilter} onChange={(e) => setSportFilter(e.target.value as SportFilter)} className="flex-1 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 py-1.5 sm:flex-none sm:py-1">
@@ -594,9 +594,9 @@ export function WeekCalendar({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-3 text-xs">Add session</button>
-            <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
-            <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-[11px] text-muted">{completedCount} done · {skippedCount} skipped</span>
+            <button onClick={() => setQuickAddDate(weekDays[0]?.iso)} className="btn-primary px-3 text-ui-label">Add session</button>
+            <span className="hidden sm:inline rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-ui-label text-muted">{completedCount} done · {plannedRemainingCount} remaining · {skippedCount} skipped · {extraSessionCount} extra</span>
+            <span className="sm:hidden rounded-full border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-subtle)/0.45)] px-2 py-0.5 text-ui-label text-muted">{completedCount} done · {skippedCount} skipped</span>
           </div>
         </div>
       </header>
@@ -604,17 +604,17 @@ export function WeekCalendar({
       {hasLoadedDismissalsForActiveWeek && hasAdaptation ? (
         <section className="rounded-xl border border-[hsl(var(--border)/0.62)] bg-[linear-gradient(180deg,hsl(var(--bg-elevated)/0.78),hsl(var(--bg-elevated)/0.58))] px-3 py-2">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-danger">Needs attention</p>
-            <p className="text-[11px] text-muted">
+            <p className="text-ui-label font-semibold uppercase tracking-[0.14em] text-danger">Needs attention</p>
+            <p className="text-ui-label text-muted">
               {unmatchedUploads.length + skippedToResolve.length + movedItems.length + extraItems.length} open
             </p>
           </div>
-          <div className="flex flex-col gap-1.5 text-xs">
+          <div className="flex flex-col gap-1.5 text-ui-label">
             {unmatchedUploads.map((upload) => (
               <div key={upload.id} className="flex flex-col gap-1.5 rounded-lg border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.04)] px-2.5 py-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-white">Upload needs review</p>
-                  <p className="text-[11px] text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
+                  <p className="text-ui-label text-muted">{getDisciplineMeta(upload.sport).label} · {upload.duration} min · logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] md:justify-end">
                   <button onClick={() => setAssignSource(upload)} className="text-accent hover:underline">Assign to session</button>
@@ -721,7 +721,7 @@ export function WeekCalendar({
       {localAdaptations.length > 0 ? (
         <section className="rounded-xl border border-[rgba(190,255,0,0.22)] bg-[rgba(190,255,0,0.04)] px-3 py-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-accent)]">Adaptation suggestions</p>
+            <p className="text-ui-label font-semibold uppercase tracking-[0.14em] text-[var(--color-accent)]">Adaptation suggestions</p>
             <button
               type="button"
               onClick={() => {
@@ -739,7 +739,7 @@ export function WeekCalendar({
                   .finally(() => setLoadingAdaptations(false));
               }}
               disabled={loadingAdaptations}
-              className="text-[11px] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] disabled:opacity-40"
+              className="text-ui-label text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] disabled:opacity-40"
             >
               {loadingAdaptations ? "Refreshing…" : "Refresh"}
             </button>
@@ -752,12 +752,12 @@ export function WeekCalendar({
                 <div key={adaptation.id} className="rounded-lg border border-[rgba(190,255,0,0.15)] bg-[rgba(190,255,0,0.03)] px-3 py-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-white">{adaptation.trigger_type.replace(/_/g, " ")}</p>
+                      <p className="text-ui-label text-white">{adaptation.trigger_type.replace(/_/g, " ")}</p>
                       {options.length > 0 && !isExpanded ? (
-                        <p className="mt-0.5 text-[11px] text-tertiary">{options.length} option{options.length > 1 ? "s" : ""} available</p>
+                        <p className="mt-0.5 text-ui-label text-tertiary">{options.length} option{options.length > 1 ? "s" : ""} available</p>
                       ) : null}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px]">
+                    <div className="flex items-center gap-2 text-ui-label">
                       <button
                         type="button"
                         onClick={() => setExpandedAdaptationId(isExpanded ? null : adaptation.id)}
@@ -784,10 +784,10 @@ export function WeekCalendar({
                     <div className="mt-3 space-y-2">
                       {options.map((option) => (
                         <div key={option.id} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2.5">
-                          <p className="text-xs font-medium">{option.label}</p>
-                          <p className="mt-1 text-[11px] text-muted">{option.description}</p>
+                          <p className="text-ui-label">{option.label}</p>
+                          <p className="mt-1 text-ui-label text-muted">{option.description}</p>
                           <div className="mt-2 flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-tertiary">~{option.projectedCompletionPct}% completion · Key sessions: {option.keySessionImpact}</span>
+                            <span className="text-ui-label text-tertiary">~{option.projectedCompletionPct}% completion · Key sessions: {option.keySessionImpact}</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -799,7 +799,7 @@ export function WeekCalendar({
                                   });
                                 });
                               }}
-                              className="inline-flex min-h-[44px] items-center rounded-md bg-[rgba(190,255,0,0.15)] px-3 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)] lg:min-h-0 lg:px-2.5 lg:py-1"
+                              className="inline-flex min-h-[44px] items-center rounded-md bg-[rgba(190,255,0,0.15)] px-3 text-ui-label text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)] lg:min-h-0 lg:px-2.5 lg:py-1"
                             >
                               Accept
                             </button>
@@ -867,24 +867,24 @@ export function WeekCalendar({
               }}
             >
               <div className="mb-2 min-h-[86px] border-b border-[hsl(var(--border))] pb-2">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted">{day.weekday}</p>
+                <p className="text-kicker text-muted">{day.weekday}</p>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{day.label}</p>
-                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-[11px] text-accent">Today</span> : null}
+                  {isToday ? <span className="rounded-full bg-[hsl(var(--accent-performance)/0.2)] px-2 py-0.5 text-ui-label text-accent">Today</span> : null}
                 </div>
-                <p className="mt-1 text-xs text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
-                <p className={`mt-1 text-[11px] ${dayTone}`}>{dayLabel}</p>
+                <p className="mt-1 text-ui-label text-muted">{metrics?.completedMin ?? 0}/{metrics?.plannedMin ?? 0} min</p>
+                <p className={`mt-1 text-ui-label ${dayTone}`}>{dayLabel}</p>
                 {dayContextNote ? (
-                  <p className={`text-[11px] ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
+                  <p className={`text-ui-label ${hasKeySession ? "font-medium text-accent" : "text-tertiary"}`}>{dayContextNote}</p>
                 ) : null}
-                {attentionReason ? <p className="text-[11px] text-muted">{attentionReason}</p> : null}
+                {attentionReason ? <p className="text-ui-label text-muted">{attentionReason}</p> : null}
               </div>
 
               <div className="space-y-1.5 pt-0.5">
                 {daySessions.length === 0 ? (
-                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-xs text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
+                  <button onClick={() => setQuickAddDate(day.iso)} className="w-full min-h-[92px] rounded-xl border border-dashed border-[hsl(var(--border)/0.85)] bg-[hsl(var(--surface-subtle)/0.25)] px-2 py-2.5 text-ui-label text-muted hover:border-[hsl(var(--accent-performance)/0.38)] hover:text-accent">
                     + Add session
-                    <span className="mt-1 block text-[10px] text-tertiary">No items yet — add planned work or log extra activity.</span>
+                    <span className="mt-1 block text-ui-label text-tertiary">No items yet — add planned work or log extra activity.</span>
                   </button>
                 ) : null}
                 {daySessions.map((session) => {
@@ -899,9 +899,9 @@ export function WeekCalendar({
                   const stateBadge =
                     state === "extra" ? null
                     : state === "unmatched_upload" ? (
-                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-[10px] text-accent">Needs review</span>
+                      <span className="rounded-full border border-[hsl(var(--accent-performance)/0.45)] bg-[hsl(var(--accent-performance)/0.14)] px-1.5 py-0.5 text-ui-label text-accent">Needs review</span>
                     ) : state === "moved" ? (
-                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
+                      <span className="rounded-full border border-[hsl(var(--signal-load)/0.4)] px-1.5 py-0.5 text-ui-label text-[hsl(var(--signal-load))]">Moved{movedMeta ? ` · from ${weekDays.find((day) => day.iso === movedMeta.fromDate)?.weekday ?? movedMeta.fromDate}` : ""}</span>
                     ) : (
                       <SessionStatusChip status={session.status} compact />
                     );
@@ -915,7 +915,7 @@ export function WeekCalendar({
                   return (
                     <article
                       key={session.id}
-                      className={`rounded-[8px] border px-2 py-1.5 text-xs transition ${isClickable ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
+                      className={`rounded-[8px] border px-2 py-1.5 text-ui-label transition ${isClickable ? "cursor-pointer hover:border-[rgba(255,255,255,0.06)] focus-visible:border-[rgba(255,255,255,0.06)] focus-visible:outline-none" : ""}`}
                       style={{
                         background: cardBackground,
                         border: "1px solid rgba(255,255,255,0.06)",
@@ -939,7 +939,7 @@ export function WeekCalendar({
                     >
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
-                          <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                          <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-ui-label" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
                             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
                             {discipline.label}
                           </span>
@@ -976,10 +976,10 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
                       <div className="mt-0 flex flex-wrap items-center gap-1">
-                        <span className="text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</span>
+                        <span className="text-ui-label text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</span>
                         {state !== "unmatched_upload" ? (() => {
                           const target = extractTargetLine(session);
-                          return target ? <span className="text-[11px] text-muted">· {target}</span> : null;
+                          return target ? <span className="text-ui-label text-muted">· {target}</span> : null;
                         })() : null}
                         {session.intentCategory && state !== "unmatched_upload" ? (
                           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${getIntentPillClass(session.intentCategory)}`}>
@@ -988,14 +988,14 @@ export function WeekCalendar({
                         ) : null}
                       </div>
                       {isNeedsAttentionCard && !showCompletedFooter ? (
-                        <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[var(--color-warning)]">
+                        <div className="mt-1 flex items-center justify-end gap-1 text-ui-label text-[var(--color-warning)]">
                           <span aria-hidden="true" className="h-[6px] w-[6px] rounded-full bg-[var(--color-warning)]" />
                           <span>Needs review</span>
                         </div>
                       ) : null}
                       {showCompletedFooter ? (
-                        <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-[10px]">
-                          <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-[11px] font-medium text-success">
+                        <div className="mt-1 flex items-center border-t border-[rgba(255,255,255,0.06)] pt-1 text-ui-label">
+                          <span className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-[10px] py-[3px] text-ui-label text-success">
                             <span aria-hidden="true">✓</span>
                             {state === "extra" ? "Extra" : "Completed"}
                           </span>
@@ -1005,7 +1005,7 @@ export function WeekCalendar({
                           <button
                             type="button"
                             onClick={() => setAssignSource(session)}
-                            className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-[11px] font-medium text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
+                            className="w-full rounded-md border border-[hsl(var(--accent-performance)/0.26)] bg-[hsl(var(--accent-performance)/0.05)] px-2 py-1 text-ui-label text-accent transition hover:bg-[hsl(var(--accent-performance)/0.1)]"
                           >
                             Review upload
                           </button>
@@ -1066,7 +1066,7 @@ export function WeekCalendar({
       {detailSession ? <DetailsModal session={detailSession} onClose={() => setDetailSession(null)} /> : null}
       {toast ? (
         <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2">
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] px-4 py-2.5 text-sm font-medium text-white shadow-xl">
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-elevated))] px-4 py-2.5 text-body font-medium text-white shadow-xl">
             {toast}
           </div>
         </div>
@@ -1105,17 +1105,17 @@ function QuickAddModal({ initialDate, weekDays, onClose }: { initialDate: string
           });
         }}
       >
-        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body">
           {weekDays.map((day) => <option key={day.iso} value={day.iso}>{day.weekday} · {day.label}</option>)}
         </select>
-        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={form.sport} onChange={(e) => setForm((prev) => ({ ...prev, sport: e.target.value }))} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body">
           <option value="swim">Swim</option><option value="bike">Bike</option><option value="run">Run</option><option value="strength">Strength</option>
         </select>
-        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
-        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm" />
+        <input value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="Workout title (optional)" className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body" />
+        <input value={form.duration} onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))} type="number" min={1} max={300} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body" />
         <div className="flex justify-end gap-2 border-t border-[hsl(var(--border))] pt-3">
-          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
-          <button disabled={isPending} className="btn-primary px-2 py-1 text-xs">Save</button>
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-ui-label">Cancel</button>
+          <button disabled={isPending} className="btn-primary px-2 py-1 text-ui-label">Save</button>
         </div>
       </form>
     </TaskModal>
@@ -1128,7 +1128,7 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
   return (
     <TaskSheet onClose={onClose} title={`Move ${getSessionTitle(session)}`} description="Move this planned session to a different day this week.">
       <div className="space-y-3">
-        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+        <select value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body">
           {weekDays.map((day) => (
             <option key={day.iso} value={day.iso}>
               {day.weekday} · {day.label}
@@ -1137,8 +1137,8 @@ function MoveModal({ session, weekDays, onClose, onMove }: { session: CalendarSe
           ))}
         </select>
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
-          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
-          <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-xs">Move here</button>
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-ui-label">Cancel</button>
+          <button type="button" onClick={() => { onMove(session, date); onClose(); }} className="btn-primary px-2 py-1 text-ui-label">Move here</button>
         </div>
       </div>
     </TaskSheet>
@@ -1178,16 +1178,16 @@ function AssignUploadModal({
     >
       <div className="space-y-3">
         <div className="rounded-xl border border-[hsl(var(--accent-performance)/0.3)] bg-[hsl(var(--accent-performance)/0.08)] p-3">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Uploaded workout</p>
-          <p className="mt-1 text-sm font-semibold text-white">
+          <p className="text-kicker text-accent">Uploaded workout</p>
+          <p className="mt-1 text-body font-medium text-white">
             {getDisciplineMeta(upload.sport).label} · {upload.duration} min
           </p>
-          <p className="mt-1 text-xs text-muted">Logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
+          <p className="mt-1 text-ui-label text-muted">Logged {uploadDateFormatter.format(new Date(`${upload.created_at}`))}</p>
         </div>
         {candidateSessions.length === 0 ? (
-          <p className="text-xs text-muted">No planned sessions in this week. Add or move a planned session first.</p>
+          <p className="text-ui-label text-muted">No planned sessions in this week. Add or move a planned session first.</p>
         ) : (
-          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm">
+          <select value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)} className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body">
             {candidateSessions.map((session) => (
               <option key={session.id} value={session.id}>
                 {(weekDays.find((day) => day.iso === session.date)?.weekday ?? session.date)} · {getSessionTitle(session)} · {session.duration} min
@@ -1196,8 +1196,8 @@ function AssignUploadModal({
           </select>
         )}
         <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-          <p className="text-xs font-medium text-white">Mark as extra / unplanned</p>
-          <p className="mt-1 text-xs text-muted">This workout wasn&apos;t part of your training plan.</p>
+          <p className="text-ui-label text-white">Mark as extra / unplanned</p>
+          <p className="mt-1 text-ui-label text-muted">This workout wasn&apos;t part of your training plan.</p>
           <button
             type="button"
             disabled={isMarkingExtra || isAssigning}
@@ -1214,13 +1214,13 @@ function AssignUploadModal({
                 setIsMarkingExtra(false);
               }
             }}
-            className="btn-secondary mt-2 px-2 py-1 text-xs"
+            className="btn-secondary mt-2 px-2 py-1 text-ui-label"
           >
             {isMarkingExtra ? "Saving\u2026" : "Mark as extra"}
           </button>
         </div>
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] pt-3">
-          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-xs">Cancel</button>
+          <button type="button" onClick={onClose} className="btn-secondary px-2 py-1 text-ui-label">Cancel</button>
           <button
             type="button"
             disabled={isAssigning || isMarkingExtra || !selectedSessionId || candidateSessions.length === 0}
@@ -1250,7 +1250,7 @@ function AssignUploadModal({
                 setIsAssigning(false);
               }
             }}
-            className="btn-primary px-2 py-1 text-xs"
+            className="btn-primary px-2 py-1 text-ui-label"
           >
             {isAssigning ? "Assigning\u2026" : "Assign to session"}
           </button>
@@ -1278,14 +1278,14 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
       title={getSessionTitle(session)}
       description={`${getDisciplineMeta(session.sport).label} · ${session.duration} min`}
     >
-      <div className="space-y-3 text-sm">
+      <div className="space-y-3 text-body">
         <p className="text-muted">Status: {state}</p>
         {executionScore !== null && executionScoreBand ? (
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-tertiary">Execution Score</p>
+              <p className="text-kicker text-tertiary">Execution Score</p>
               <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
+                className={`inline-flex rounded-full border px-2 py-0.5 text-kicker ${
                   executionScoreBand === "On target"
                     ? "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success))]"
                     : executionScoreBand === "Partial match"
@@ -1296,24 +1296,24 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
                 {executionScoreBand}
               </span>
             </div>
-            <p className="mt-1 text-base font-semibold text-white">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
+            <p className="mt-1 text-body font-medium text-white">{executionScore} · {executionScoreBand}{provisional ? " · Provisional" : ""}</p>
             {(executionSummary || nextAction) ? (
               <div className="mt-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] px-2.5 py-2">
-                {executionSummary ? <p className="text-xs text-muted">{executionSummary}</p> : null}
-                {nextAction ? <p className="mt-1 text-xs font-medium text-white">Next step: {nextAction}</p> : null}
+                {executionSummary ? <p className="text-ui-label text-muted">{executionSummary}</p> : null}
+                {nextAction ? <p className="mt-1 text-ui-label text-white">Next step: {nextAction}</p> : null}
               </div>
             ) : null}
           </div>
         ) : (
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-            <p className="text-xs text-muted">Detailed execution scoring is still provisional. Use schedule status and session notes for now.</p>
+            <p className="text-ui-label text-muted">Detailed execution scoring is still provisional. Use schedule status and session notes for now.</p>
           </div>
         )}
-        {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-xs text-muted">{session.notes}</p> : null}
+        {session.notes ? <p className="rounded-lg bg-[hsl(var(--surface-subtle))] p-2 text-ui-label text-muted">{session.notes}</p> : null}
         {session.displayType === "completed_activity" ? (
           <div className="pt-1">
             {markedExtra ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-3 py-1.5 text-xs font-medium text-success">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] px-3 py-1.5 text-ui-label text-success">
                 <span aria-hidden="true">✓</span> Marked as extra
               </span>
             ) : (
@@ -1331,7 +1331,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
                     setMarkingExtra(false);
                   }
                 }}
-                className="rounded-full border border-[rgba(255,255,255,0.16)] bg-transparent px-3 py-1.5 text-xs text-muted transition hover:border-[rgba(255,255,255,0.3)] hover:text-foreground disabled:opacity-50"
+                className="rounded-full border border-[rgba(255,255,255,0.16)] bg-transparent px-3 py-1.5 text-ui-label text-muted transition hover:border-[rgba(255,255,255,0.3)] hover:text-foreground disabled:opacity-50"
               >
                 {markingExtra ? "Marking…" : "Mark as extra"}
               </button>
@@ -1339,7 +1339,7 @@ function DetailsModal({ session, onClose }: { session: CalendarSession; onClose:
           </div>
         ) : null}
         <div className="sticky bottom-0 pt-2 text-right">
-          <button onClick={onClose} className="btn-secondary px-3 text-xs">Close</button>
+          <button onClick={onClose} className="btn-secondary px-3 text-ui-label">Close</button>
         </div>
       </div>
     </TaskSheet>
@@ -1362,15 +1362,15 @@ function TaskSheet({ children, title, description, onClose }: { children: React.
         <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle)/0.22)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-accent">Calendar task</p>
-              <p className="mt-1 text-base font-semibold">{title}</p>
+              <p className="text-kicker text-accent">Calendar task</p>
+              <p className="mt-1 text-body font-medium">{title}</p>
               {description ? (
-                <p className="mt-2 max-w-md rounded-lg border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--bg-elevated)/0.82)] px-3 py-2 text-xs text-muted">
+                <p className="mt-2 max-w-md rounded-lg border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--bg-elevated)/0.82)] px-3 py-2 text-ui-label text-muted">
                   {description}
                 </p>
               ) : null}
             </div>
-            <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] rounded-md border border-[hsl(var(--border))] px-3 text-xs text-muted hover:text-foreground lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1">Close</button>
+            <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] rounded-md border border-[hsl(var(--border))] px-3 text-ui-label text-muted hover:text-foreground lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1">Close</button>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
@@ -1385,8 +1385,8 @@ function TaskModal({ children, title, description, onClose }: { children: React.
       <div className="relative z-10 flex min-h-[100dvh] max-h-[100dvh] items-center justify-center overflow-y-auto p-4">
         <section className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-elevated))] p-5 shadow-2xl">
           <header className="mb-4 border-b border-[hsl(var(--border))] pb-3">
-            <p className="text-base font-semibold">{title}</p>
-            {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
+            <p className="text-body font-medium">{title}</p>
+            {description ? <p className="mt-1 text-ui-label text-muted">{description}</p> : null}
           </header>
           {children}
         </section>

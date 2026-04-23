@@ -370,7 +370,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
     <section className="space-y-3">
       {/* Block context header */}
       {(blockContextLine || raceProximityLine || raceThisWeek) ? (
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-[rgba(255,255,255,0.6)]">
+        <div className="flex flex-wrap items-center gap-2 text-ui-label text-[rgba(255,255,255,0.6)]">
           {blockContextLine ? <span>{blockContextLine}</span> : null}
           {blockContextLine && raceProximityLine ? <span className="text-[rgba(255,255,255,0.2)]">·</span> : null}
           {raceProximityLine ? <span className="text-cyan-400">{raceProximityLine}</span> : null}
@@ -381,24 +381,24 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       {raceThisWeek ? (
         <article className="rounded-xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.06)] px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-base">🏁</span>
+            <span className="text-body">🏁</span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">{raceThisWeek.name}</p>
-              <p className="text-[11px] text-[rgba(255,255,255,0.6)]">
+              <p className="text-body font-medium text-white">{raceThisWeek.name}</p>
+              <p className="text-ui-label text-[rgba(255,255,255,0.6)]">
                 {raceThisWeek.date} · {raceThisWeek.priority ?? "A"} Race{raceThisWeek.distance_type ? ` · ${raceThisWeek.distance_type}` : ""}
               </p>
               {raceDistanceLine ? (
-                <p className="mt-0.5 text-[11px] text-[rgba(255,255,255,0.5)]">{raceDistanceLine}</p>
+                <p className="mt-0.5 text-ui-label text-[rgba(255,255,255,0.5)]">{raceDistanceLine}</p>
               ) : null}
             </div>
           </div>
-          <p className="mt-2 text-xs text-[rgba(255,255,255,0.72)]">Trust your training. Race smart.</p>
+          <p className="mt-2 text-ui-label text-[rgba(255,255,255,0.72)]">Trust your training. Race smart.</p>
         </article>
       ) : null}
 
       {/* Taper context banner — show when in taper block but no race this specific week */}
       {isInTaper && !raceThisWeek ? (
-        <div className="flex items-center gap-2 rounded-lg border border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.04)] px-3 py-2 text-[11px] text-cyan-400">
+        <div className="flex items-center gap-2 rounded-lg border border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.04)] px-3 py-2 text-ui-label text-cyan-400">
           <span className="font-medium">Taper week</span>
           <span className="text-[rgba(255,255,255,0.4)]">·</span>
           <span className="text-[rgba(255,255,255,0.56)]">Sessions are about sharpness, not fitness building</span>
