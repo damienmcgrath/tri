@@ -69,9 +69,9 @@ export function WeekProgressCard({
   return (
     <article className="surface p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Week Progress</h2>
+        <h2 className="text-section-title font-semibold">Week Progress</h2>
         {showStatusChip ? (
-          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
+          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-body font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
             {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
             <span>{chipLabel}</span>
           </span>
@@ -80,7 +80,7 @@ export function WeekProgressCard({
 
       <div className="mt-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-0.5 text-xs">
+          <div className="inline-flex rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-0.5 text-ui-label">
             {(["all", "planned", "unscheduled"] as const).map((option) => (
               <button
                 key={option}
@@ -92,15 +92,15 @@ export function WeekProgressCard({
               </button>
             ))}
           </div>
-          <p className="text-xs text-[hsl(var(--fg-muted))]">Extra work: {formatMinutes(extraTotalMinutes)}</p>
+          <p className="text-ui-label text-[hsl(var(--fg-muted))]">Extra work: {formatMinutes(extraTotalMinutes)}</p>
         </div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold">By discipline</p>
+          <p className="text-body font-semibold">By discipline</p>
           {emptyCount > 0 || !hideEmpty ? (
             <button
               type="button"
               onClick={() => setHideEmpty((current) => !current)}
-              className="text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
+              className="text-ui-label text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline"
               aria-pressed={!hideEmpty}
             >
               {hideEmpty ? `Show empty (+${emptyCount})` : "Hide empty"}
@@ -109,7 +109,7 @@ export function WeekProgressCard({
         </div>
 
         {visibleDisciplines.length === 0 ? (
-          <p className="text-xs text-[hsl(var(--fg-muted))]">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
+          <p className="text-ui-label text-[hsl(var(--fg-muted))]">No sessions match this filter yet. Uploaded unscheduled sessions still count as extra work.</p>
         ) : (
           <div className="space-y-3">
             {visibleDisciplines.map((item) => {
@@ -125,21 +125,21 @@ export function WeekProgressCard({
 
               return (
                 <div key={item.key} className="rounded-lg px-2 py-1 transition hover:bg-[hsl(var(--bg-card))]">
-                  <div className="flex items-center justify-between gap-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 text-body">
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 rounded-full ${isFocusDiscipline ? "bg-[hsl(var(--accent-performance))]" : "bg-[hsl(var(--fg-muted)/0.45)]"}`} aria-hidden />
                       <span className="font-medium text-[hsl(var(--fg))]">{item.label}</span>
                     </div>
                     <div className="ml-auto flex items-center justify-end gap-2">
-                      <div className="w-[96px] text-right text-xs text-[hsl(var(--fg))] tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <div className="w-[96px] text-right text-ui-label text-[hsl(var(--fg))] tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
                         {Math.round(item.visibleCompletedMinutes)} / {Math.round(item.visiblePlannedMinutes)} min
                       </div>
                       {chipLabel ? (
-                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-xs font-medium ${item.discGapMinutes > 0 ? "signal-load" : "signal-risk"}`}>
+                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-ui-label font-medium ${item.discGapMinutes > 0 ? "signal-load" : "signal-risk"}`}>
                           {chipLabel}
                         </span>
                       ) : isCompletedDiscipline ? (
-                        <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-[11px] font-medium text-[hsl(var(--fg-muted))]">
+                        <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-ui-label font-medium text-[hsl(var(--fg-muted))]">
                           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success)/0.62)]" />
                           Complete
                         </span>
@@ -171,7 +171,7 @@ export function WeekProgressCard({
         )}
       </div>
 
-      <a href="#coach-focus" className="mt-4 inline-block text-xs text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
+      <a href="#coach-focus" className="mt-4 inline-block text-ui-label text-[hsl(var(--fg-muted))] underline-offset-2 hover:text-[hsl(var(--fg))] hover:underline">
         {biggestGap && biggestGap.discGapMinutes > 0
           ? `Focus: ${biggestGap.label} +${formatMinutes(biggestGap.discGapMinutes)} (tap for why)`
           : "Focus: On track (tap for details)"}

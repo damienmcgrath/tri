@@ -29,11 +29,11 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
         className="flex w-full items-center justify-between gap-3 p-4 text-left md:p-5"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(190,255,0,0.7)]">
+          <p className="shrink-0 text-kicker font-medium text-[rgba(190,255,0,0.7)]">
             Monday brief
           </p>
           {!expanded ? (
-            <p className="min-w-0 truncate text-sm text-[rgba(255,255,255,0.6)]">
+            <p className="min-w-0 truncate text-body text-[rgba(255,255,255,0.6)]">
               {summary}
             </p>
           ) : null}
@@ -53,26 +53,26 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
         <div className="space-y-0">
           {/* Section 1: Last Week */}
           <div className="border-t border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Last week</p>
-            <p className="mt-2 text-sm leading-relaxed text-white">{briefing.lastWeekTakeaway}</p>
+            <p className="text-kicker font-medium text-tertiary">Last week</p>
+            <p className="mt-2 text-body leading-relaxed text-white">{briefing.lastWeekTakeaway}</p>
             {debriefSummary ? (
-              <p className="mt-1.5 text-sm leading-relaxed text-[rgba(255,255,255,0.65)]">{debriefSummary}</p>
+              <p className="mt-1.5 text-body leading-relaxed text-[rgba(255,255,255,0.65)]">{debriefSummary}</p>
             ) : null}
-            <Link href={`/debrief?weekStart=${weekStart}`} className="mt-2 inline-block text-[11px] text-cyan-400 hover:text-cyan-300">
+            <Link href={`/debrief?weekStart=${weekStart}`} className="mt-2 inline-block text-ui-label text-cyan-400 hover:text-cyan-300">
               Open full debrief →
             </Link>
           </div>
 
           {/* Section 2: This Week */}
           <div className="border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">This week</p>
-            <p className="mt-2 text-sm leading-relaxed text-white">{briefing.thisWeekFocus}</p>
+            <p className="text-kicker font-medium text-tertiary">This week</p>
+            <p className="mt-2 text-body leading-relaxed text-white">{briefing.thisWeekFocus}</p>
             {briefing.adaptationContext ? (
-              <p className="mt-1.5 rounded-lg border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.06)] px-3 py-2 text-xs text-[hsl(var(--warning))]">
+              <p className="mt-1.5 rounded-lg border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.06)] px-3 py-2 text-ui-label text-[hsl(var(--warning))]">
                 {briefing.adaptationContext}
               </p>
             ) : null}
-            <Link href="/calendar" className="mt-2 inline-block text-[11px] text-cyan-400 hover:text-cyan-300">
+            <Link href="/calendar" className="mt-2 inline-block text-ui-label text-cyan-400 hover:text-cyan-300">
               View this week&apos;s calendar →
             </Link>
           </div>
@@ -80,8 +80,8 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
           {/* Section 3: Today */}
           {morningBrief?.sessionPreview ? (
             <div className="border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Today</p>
-              <p className="mt-2 text-sm leading-relaxed text-white">{morningBrief.sessionPreview}</p>
+              <p className="text-kicker font-medium text-tertiary">Today</p>
+              <p className="mt-2 text-body leading-relaxed text-white">{morningBrief.sessionPreview}</p>
             </div>
           ) : null}
 
@@ -89,7 +89,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
           {pendingRationaleCount > 0 || briefing.coachingPrompt ? (
             <div className="p-4 md:p-5">
               {pendingRationaleCount > 0 ? (
-                <p className="text-sm text-[rgba(255,255,255,0.7)]">
+                <p className="text-body text-[rgba(255,255,255,0.7)]">
                   You have {pendingRationaleCount} adaptation{pendingRationaleCount === 1 ? "" : "s"} to review.{" "}
                   <Link href="/calendar" className="text-cyan-400 hover:text-cyan-300">View on Calendar →</Link>
                 </p>
@@ -97,7 +97,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
               {briefing.coachingPrompt ? (
                 <Link
                   href={`/coach?prompt=${encodeURIComponent(briefing.coachingPrompt)}`}
-                  className="mt-2 inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300"
+                  className="mt-2 inline-flex items-center gap-1.5 text-body text-cyan-400 hover:text-cyan-300"
                 >
                   Reply to coach →
                 </Link>

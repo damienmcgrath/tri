@@ -514,9 +514,9 @@ export default async function DashboardPage({
     return (
       <section className="space-y-4">
         <article className="surface p-6">
-          <p className="text-xs uppercase tracking-[0.16em] text-accent">Get started</p>
-          <h1 className="mt-2 text-2xl font-semibold">Build your first week</h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="text-kicker text-accent">Get started</p>
+          <h1 className="mt-2 text-page-title font-semibold">Build your first week</h1>
+          <p className="mt-2 text-body text-muted">
             Create a plan to unlock this week progress, today execution, and focused coaching decisions.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -535,21 +535,21 @@ export default async function DashboardPage({
       {/* Race-week hero cards — take priority over everything else */}
       {dashboardMoment === "race_day" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(251,191,36,0.5)] bg-[rgba(251,191,36,0.08)] px-5 py-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-400">Race day</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">{raceWeekCtx.race.name}</h2>
-          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
-          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
+          <p className="text-kicker font-semibold text-amber-400">Race day</p>
+          <h2 className="mt-2 text-page-title font-semibold text-white">{raceWeekCtx.race.name}</h2>
+          <p className="mt-1 text-body text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
+          <p className="mt-3 text-body text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
           {raceWeekCtx.readiness.readinessState === "fresh" ? (
-            <p className="mt-2 text-xs text-emerald-400">Readiness: Fresh (TSB +{Math.round(raceWeekCtx.readiness.tsb)})</p>
+            <p className="mt-2 text-ui-label text-emerald-400">Readiness: Fresh (TSB +{Math.round(raceWeekCtx.readiness.tsb)})</p>
           ) : null}
         </article>
       ) : dashboardMoment === "race_eve" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.06)] px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-400">Tomorrow is race day</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">{raceWeekCtx.race.name}</h2>
-          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
-          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">You have done the work. Trust your training.</p>
-          <div className="mt-3 space-y-1 text-xs text-[rgba(255,255,255,0.68)]">
+          <p className="text-kicker font-semibold text-amber-400">Tomorrow is race day</p>
+          <h2 className="mt-2 text-page-title font-semibold text-white">{raceWeekCtx.race.name}</h2>
+          <p className="mt-1 text-body text-[rgba(255,255,255,0.72)]">{formatRaceDistance(raceWeekCtx)}</p>
+          <p className="mt-3 text-body text-[rgba(255,255,255,0.84)]">You have done the work. Trust your training.</p>
+          <div className="mt-3 space-y-1 text-ui-label text-[rgba(255,255,255,0.68)]">
             <p>Lay out all race gear tonight. Pin your number. Charge your watch.</p>
             <p>Eat a familiar dinner. Hydrate well. Set two alarms.</p>
           </div>
@@ -558,23 +558,23 @@ export default async function DashboardPage({
         <article className="rounded-xl border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.06)] px-5 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-400">
+              <p className="text-kicker font-semibold text-cyan-400">
                 {raceWeekCtx.race.name} in {raceWeekCtx.race.daysUntil} day{raceWeekCtx.race.daysUntil === 1 ? "" : "s"}
               </p>
-              <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{raceWeekCtx.race.priority} Race · {formatRaceDistance(raceWeekCtx)}</p>
+              <p className="mt-1 text-body text-[rgba(255,255,255,0.72)]">{raceWeekCtx.race.priority} Race · {formatRaceDistance(raceWeekCtx)}</p>
             </div>
             {raceWeekCtx.taperStatus.inTaper ? (
-              <span className="rounded-full border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.1)] px-2.5 py-1 text-[11px] font-medium text-cyan-400">Taper</span>
+              <span className="rounded-full border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.1)] px-2.5 py-1 text-ui-label font-medium text-cyan-400">Taper</span>
             ) : null}
           </div>
-          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
+          <p className="mt-3 text-body text-[rgba(255,255,255,0.84)]">{getConfidenceStatement(raceWeekCtx)}</p>
         </article>
       ) : dashboardMoment === "post_race" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.06)] px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Recovery mode</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">{raceWeekCtx.race.name} — completed</h2>
-          <p className="mt-1 text-sm text-[rgba(255,255,255,0.72)]">{Math.abs(raceWeekCtx.race.daysUntil)} day{Math.abs(raceWeekCtx.race.daysUntil) === 1 ? "" : "s"} since race</p>
-          <p className="mt-3 text-sm text-[rgba(255,255,255,0.84)]">
+          <p className="text-kicker font-semibold text-emerald-400">Recovery mode</p>
+          <h2 className="mt-2 text-page-title font-semibold text-white">{raceWeekCtx.race.name} — completed</h2>
+          <p className="mt-1 text-body text-[rgba(255,255,255,0.72)]">{Math.abs(raceWeekCtx.race.daysUntil)} day{Math.abs(raceWeekCtx.race.daysUntil) === 1 ? "" : "s"} since race</p>
+          <p className="mt-3 text-body text-[rgba(255,255,255,0.84)]">
             {Math.abs(raceWeekCtx.race.daysUntil) <= 2
               ? "Take it easy. Walk, stretch, eat well. Your body needs rest."
               : Math.abs(raceWeekCtx.race.daysUntil) <= 4
@@ -602,14 +602,14 @@ export default async function DashboardPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-accent">This week</p>
+                <p className="text-kicker text-accent">This week</p>
                 {/* F12.2: when the week is behind / has a missed key session /
                     missed sessions, show a compact pill next to the kicker
                     instead of a separate sub-card below the progress bar. */}
                 {leftStatusRow ? (
                   <span
                     role="status"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,180,60,0.32)] bg-[rgba(255,180,60,0.12)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-warning)]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,180,60,0.32)] bg-[rgba(255,180,60,0.12)] px-2 py-0.5 text-ui-label font-medium uppercase tracking-[0.08em] text-[var(--color-warning)]"
                   >
                     <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--color-warning)]" />
                     {leftStatusRow.title}
@@ -631,18 +631,18 @@ export default async function DashboardPage({
                   />
                 </div>
               ) : (
-                <p className="mt-1 text-sm text-[rgba(255,255,255,0.68)]">{weekRangeLabel(weekStart)}</p>
+                <p className="mt-1 text-body text-[rgba(255,255,255,0.68)]">{weekRangeLabel(weekStart)}</p>
               )}
             </div>
             {leftStatusRow ? null : (
-              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
+              <span className={`inline-flex rounded-full border px-3 py-1 text-ui-label font-semibold ${resolvedStatusChip.className}`}>{resolvedStatusChip.label}</span>
             )}
           </div>
 
           <div className="mt-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="min-w-0">
               <p className="text-4xl font-semibold leading-none tracking-[-0.03em] sm:text-5xl lg:text-6xl">{completionPct}%</p>
-              <p className="mt-3 text-lg font-medium leading-tight text-[rgba(255,255,255,0.94)] sm:text-xl">{toHoursAndMinutes(remainingMinutes)} left this week</p>
+              <p className="mt-3 text-section-title font-medium leading-tight text-[rgba(255,255,255,0.94)]">{toHoursAndMinutes(remainingMinutes)} left this week</p>
             </div>
           </div>
 
@@ -672,7 +672,7 @@ export default async function DashboardPage({
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                      className={`text-ui-label font-semibold uppercase tracking-[0.08em] ${
                         isToday ? "text-[var(--color-accent)]" : "text-[rgba(255,255,255,0.7)]"
                       }`}
                     >
@@ -681,10 +681,10 @@ export default async function DashboardPage({
                     <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${pipClass}`} />
                   </div>
                   {chipContent.title ? (
-                    <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-tight text-white">{chipContent.title}</p>
+                    <p className="mt-1 line-clamp-2 text-ui-label font-medium leading-tight text-white">{chipContent.title}</p>
                   ) : null}
                   {chipContent.meta ? (
-                    <p className="mt-0.5 truncate text-[10px] leading-tight text-[rgba(255,255,255,0.6)]">{chipContent.meta}</p>
+                    <p className="mt-0.5 truncate text-ui-label leading-tight text-[rgba(255,255,255,0.6)]">{chipContent.meta}</p>
                   ) : null}
                 </div>
               );
@@ -693,7 +693,7 @@ export default async function DashboardPage({
 
           {/* F11: flatten the Completed/Remaining/Missed trio — they're redundant with
               the percentage above. One inline summary line instead. */}
-          <p className="mt-3 text-xs text-[rgba(255,255,255,0.62)]">
+          <p className="mt-3 text-ui-label text-[rgba(255,255,255,0.62)]">
             <span className="text-white">{toHoursAndMinutes(totals.completed)} done</span>
             <span> · {toHoursAndMinutes(remainingMinutes)} left</span>
             {missedMinutes > 0 ? <span> · {toHoursAndMinutes(missedMinutes)} missed</span> : null}
@@ -705,7 +705,7 @@ export default async function DashboardPage({
           {leftStatusRow ? (
             <Link
               href={leftStatusRow.href}
-              className="mt-2 inline-flex text-[11px] text-tertiary transition hover:text-white"
+              className="mt-2 inline-flex text-ui-label text-tertiary transition hover:text-white"
             >
               {leftStatusRow.cta} →
             </Link>
@@ -722,14 +722,14 @@ export default async function DashboardPage({
           ) : null}
           {pendingTodaySessions.length > 0 ? (
             <>
-              <p className={`text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)] ${isCurrentWeek ? "mt-4" : ""}`}>Today</p>
-              <h2 className="mt-2 text-xl font-semibold">What matters right now</h2>
-              <p className="mt-1 text-xs text-[rgba(255,255,255,0.56)]">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length + extraTodayActivities.length} completed`}</p>
-              {todayCue ? <p className="mt-2 text-xs text-[rgba(255,255,255,0.68)]">Cue: {todayCue}</p> : null}
+              <p className={`text-kicker text-[rgba(255,255,255,0.68)] ${isCurrentWeek ? "mt-4" : ""}`}>Today</p>
+              <h2 className="mt-2 text-page-title font-semibold">What matters right now</h2>
+              <p className="mt-1 text-ui-label text-[rgba(255,255,255,0.56)]">{pendingTodaySessions.length} remaining{` · ${completedTodaySessions.length + extraTodayActivities.length} completed`}</p>
+              {todayCue ? <p className="mt-2 text-ui-label text-[rgba(255,255,255,0.68)]">Cue: {todayCue}</p> : null}
 
               <div className="mt-4 space-y-3">
                 <div>
-                  <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.62)]">Remaining today</p>
+                  <p className="mb-2 text-kicker text-[rgba(255,255,255,0.62)]">Remaining today</p>
                   <div className="space-y-2">
                     {pendingTodaySessions.map((session) => {
                       // Prefer the AI-classified intent category for the meta line; fall back to
@@ -745,8 +745,8 @@ export default async function DashboardPage({
                         null;
                       return (
                         <div key={session.id} className="rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5">
-                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                          <p className="text-xs text-[rgba(255,255,255,0.72)]">
+                          <p className="text-body font-medium">{getSessionDisplayName(session)}</p>
+                          <p className="text-ui-label text-[rgba(255,255,255,0.72)]">
                             {session.duration_minutes} min{session.is_key ? " • Key" : ""}{intentLabel ? ` • ${intentLabel}` : ""}
                           </p>
                         </div>
@@ -757,18 +757,18 @@ export default async function DashboardPage({
 
                 {completedTodaySessions.length > 0 || extraTodayActivities.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.62)]">Completed today</p>
+                    <p className="mb-2 text-kicker text-[rgba(255,255,255,0.62)]">Completed today</p>
                     <div className="space-y-2">
                       {completedTodaySessions.map((session) => (
                         <div key={session.id} className="rounded-xl border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2.5">
-                          <p className="text-sm font-medium">{getSessionDisplayName(session)}</p>
-                          <p className="text-xs text-[rgba(255,255,255,0.72)]">{getCompletedMinutes(session)} min • Done</p>
+                          <p className="text-body font-medium">{getSessionDisplayName(session)}</p>
+                          <p className="text-ui-label text-[rgba(255,255,255,0.72)]">{getCompletedMinutes(session)} min • Done</p>
                         </div>
                       ))}
                       {extraTodayActivities.map((activity) => (
                         <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="block rounded-xl border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2.5 transition hover:border-[hsl(var(--success)/0.5)]">
-                          <p className="text-sm font-medium">{getDisciplineMeta(activity.sport).label} extra workout</p>
-                          <p className="text-xs text-[rgba(255,255,255,0.72)]">{activity.durationMinutes} min • Done</p>
+                          <p className="text-body font-medium">{getDisciplineMeta(activity.sport).label} extra workout</p>
+                          <p className="text-ui-label text-[rgba(255,255,255,0.72)]">{activity.durationMinutes} min • Done</p>
                         </Link>
                       ))}
                     </div>
@@ -778,7 +778,7 @@ export default async function DashboardPage({
 
               <div className="mt-4 space-y-2">
                 {nextPendingTodaySession ? (
-                  <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary w-full text-sm">
+                  <Link href={`/calendar?focus=${nextPendingTodaySession.id}`} className="btn-primary w-full text-body">
                     Open session
                   </Link>
                 ) : null}
@@ -791,10 +791,10 @@ export default async function DashboardPage({
                 <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
                   {contextualItems.map((item) => (
                     <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
-                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
-                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
+                      <p className={`text-kicker font-medium ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-body font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-ui-label text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-ui-label`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>
@@ -802,19 +802,19 @@ export default async function DashboardPage({
             </>
           ) : completedTodaySessions.length > 0 || extraTodayActivities.length > 0 ? (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)]">Today</p>
-              <h2 className="mt-2 text-xl font-semibold">Today is done</h2>
-              <p className="mt-1 text-xs text-[rgba(255,255,255,0.56)]">0 remaining · {completedTodaySessions.length + extraTodayActivities.length} completed</p>
+              <p className="text-kicker text-[rgba(255,255,255,0.68)]">Today</p>
+              <h2 className="mt-2 text-page-title font-semibold">Today is done</h2>
+              <p className="mt-1 text-ui-label text-[rgba(255,255,255,0.56)]">0 remaining · {completedTodaySessions.length + extraTodayActivities.length} completed</p>
               <div className="mt-4 space-y-1">
-                <h3 className="text-sm font-medium text-[rgba(255,255,255,0.72)]">Up next</h3>
-                <p className="text-2xl font-semibold leading-tight text-white">{nextImportantSession ? getSessionDisplayName(nextImportantSession) : "Next planned session"}</p>
-                {nextImportantSession ? <p className="text-sm text-[rgba(255,255,255,0.64)]">{getUpcomingSessionMeta(nextImportantSession)}</p> : null}
+                <h3 className="text-body font-medium text-[rgba(255,255,255,0.72)]">Up next</h3>
+                <p className="text-page-title font-semibold leading-tight text-white">{nextImportantSession ? getSessionDisplayName(nextImportantSession) : "Next planned session"}</p>
+                {nextImportantSession ? <p className="text-body text-[rgba(255,255,255,0.64)]">{getUpcomingSessionMeta(nextImportantSession)}</p> : null}
               </div>
 
               <div className="mt-4 space-y-2">
                 <Link
                   href={nextImportantSession ? `/calendar?focus=${nextImportantSession.id}` : "/calendar"}
-                  className="btn-primary w-full text-sm"
+                  className="btn-primary w-full text-body"
                 >
                   {nextImportantSession ? `Prepare ${getSessionDisplayName(nextImportantSession)}` : "Open weekly plan"}
                 </Link>
@@ -836,10 +836,10 @@ export default async function DashboardPage({
                 <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
                   {contextualItems.map((item) => (
                     <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
-                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
-                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
+                      <p className={`text-kicker font-medium ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-body font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-ui-label text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-ui-label`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>
@@ -847,21 +847,21 @@ export default async function DashboardPage({
             </>
           ) : (
             <>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.68)]">Today</p>
-              <h2 className="mt-2 text-xl font-semibold">No sessions scheduled</h2>
-              <p className="mt-2 text-sm text-[rgba(255,255,255,0.74)]">Use today for recovery and reset, then protect the next planned key session.</p>
+              <p className="text-kicker text-[rgba(255,255,255,0.68)]">Today</p>
+              <h2 className="mt-2 text-page-title font-semibold">No sessions scheduled</h2>
+              <p className="mt-2 text-body text-[rgba(255,255,255,0.74)]">Use today for recovery and reset, then protect the next planned key session.</p>
               <div className="mt-4">
-                <Link href="/calendar" className="btn-secondary px-3 text-xs">View plan</Link>
+                <Link href="/calendar" className="btn-secondary px-3 text-ui-label">View plan</Link>
               </div>
 
               {contextualItems.length > 0 ? (
                 <div className="mt-4 space-y-2 border-t border-[rgba(255,255,255,0.07)] pt-4">
                   {contextualItems.map((item) => (
                     <div key={item.kicker} className={`rounded-xl border px-3 py-2.5 ${item.kicker.toLowerCase() === "needs attention" ? "border-[rgba(255,90,40,0.28)] bg-[rgba(255,90,40,0.06)]" : "border-[rgba(190,255,0,0.14)] bg-[rgba(190,255,0,0.04)]"}`}>
-                      <p className={`text-[10px] font-medium uppercase tracking-[0.12em] ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
-                      <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-[rgba(255,255,255,0.68)]">{item.detail}</p>
-                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-[11px]`}>{item.cta}</Link>
+                      <p className={`text-kicker font-medium ${kickerClassName(item.kicker)}`}>{item.kicker}</p>
+                      <p className="mt-1 text-body font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 text-ui-label text-[rgba(255,255,255,0.68)]">{item.detail}</p>
+                      <Link href={item.href} className={`mt-2 inline-flex ${item.ctaStyle === "primary" ? "btn-primary" : "btn-secondary"} px-3 text-ui-label`}>{item.cta}</Link>
                     </div>
                   ))}
                 </div>

@@ -57,13 +57,13 @@ export function WeekAheadCard({ preview }: Props) {
         className="flex w-full items-center justify-between gap-3 text-left"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <p className="shrink-0 text-[11px] font-medium uppercase tracking-[0.14em] text-accent">Week ahead</p>
+          <p className="shrink-0 text-kicker font-medium text-accent">Week ahead</p>
           {!expanded ? (
-            <p className="min-w-0 truncate text-sm text-[rgba(255,255,255,0.6)]">
+            <p className="min-w-0 truncate text-body text-[rgba(255,255,255,0.6)]">
               {summaryParts.join(" · ")}
             </p>
           ) : (
-            <p className="text-xs text-tertiary">
+            <p className="text-ui-label text-tertiary">
               {preview.macroContext.currentBlock} phase · Week {preview.macroContext.currentPlanWeek} of {preview.macroContext.totalPlanWeeks}
             </p>
           )}
@@ -83,18 +83,18 @@ export function WeekAheadCard({ preview }: Props) {
       {expanded ? (
         <div className="mt-4">
           {preview.aiNarrative ? (
-            <p className="text-sm text-white">{preview.aiNarrative}</p>
+            <p className="text-body text-white">{preview.aiNarrative}</p>
           ) : null}
 
           <div className="mt-4 flex flex-wrap gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Total volume</p>
-              <p className="mt-1 text-lg font-semibold">{totalMinutes} min</p>
+              <p className="text-kicker text-tertiary">Total volume</p>
+              <p className="mt-1 text-section-title font-semibold">{totalMinutes} min</p>
             </div>
             {preview.keySessionCount > 0 ? (
               <div>
-                <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Key sessions</p>
-                <p className="mt-1 text-lg font-semibold">{preview.keySessionCount}</p>
+                <p className="text-kicker text-tertiary">Key sessions</p>
+                <p className="mt-1 text-section-title font-semibold">{preview.keySessionCount}</p>
               </div>
             ) : null}
           </div>
@@ -102,7 +102,7 @@ export function WeekAheadCard({ preview }: Props) {
           {/* Daily load shape */}
           {hasAnyLoad ? (
             <div className="mt-4">
-              <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-tertiary">Daily load</p>
+              <p className="mb-2 text-kicker text-tertiary">Daily load</p>
               <div className="flex items-end gap-1">
                 {weekDays.map((day) => (
                   <div key={day.iso} className="flex flex-1 flex-col items-center gap-0.5">
@@ -120,7 +120,7 @@ export function WeekAheadCard({ preview }: Props) {
                         );
                       })}
                     </div>
-                    <p className="text-[10px] text-tertiary">{day.label.slice(0, 2)}</p>
+                    <p className="text-ui-label text-tertiary">{day.label.slice(0, 2)}</p>
                   </div>
                 ))}
               </div>
@@ -144,7 +144,7 @@ export function WeekAheadCard({ preview }: Props) {
               </div>
               <div className="mt-2 flex flex-wrap gap-3">
                 {sportEntries.map(([sport, mins]) => (
-                  <span key={sport} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span key={sport} className="flex items-center gap-1.5 text-ui-label text-muted">
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SPORT_COLORS[sport] ?? "#888" }} />
                     {sport} {mins} min
                   </span>
@@ -156,17 +156,17 @@ export function WeekAheadCard({ preview }: Props) {
           {/* All sessions list */}
           {preview.allSessions.length > 0 ? (
             <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-              <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-tertiary">Sessions</p>
+              <p className="mb-2 text-kicker text-tertiary">Sessions</p>
               <div className="space-y-1.5">
                 {preview.allSessions.map((session, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
+                  <div key={i} className="flex items-center gap-2 text-ui-label">
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-full"
                       style={{ backgroundColor: SPORT_COLORS[session.sport] ?? "rgba(255,255,255,0.35)" }}
                     />
                     <span className="flex-1 text-white">
                       {session.type}
-                      {session.isKey ? <span className="ml-1.5 text-[10px] text-[hsl(var(--warning))]">Key</span> : null}
+                      {session.isKey ? <span className="ml-1.5 text-ui-label text-[hsl(var(--warning))]">Key</span> : null}
                     </span>
                     <span className="text-tertiary">
                       {dateFormatter.format(new Date(`${session.date}T00:00:00.000Z`))}
@@ -180,8 +180,8 @@ export function WeekAheadCard({ preview }: Props) {
 
           {preview.carryForwardNote ? (
             <div className="mt-4 rounded-lg border border-[rgba(255,180,60,0.2)] bg-[rgba(255,180,60,0.06)] px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--warning))]">From last week</p>
-              <p className="mt-1 text-xs text-muted">{preview.carryForwardNote}</p>
+              <p className="text-kicker text-[hsl(var(--warning))]">From last week</p>
+              <p className="mt-1 text-ui-label text-muted">{preview.carryForwardNote}</p>
             </div>
           ) : null}
         </div>
