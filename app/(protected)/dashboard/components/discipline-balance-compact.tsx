@@ -122,7 +122,7 @@ export function DisciplineBalanceCompact({ balance }: Props) {
                   <span className="text-tertiary">/{formatHours(plannedMins)}</span>
                 </span>
                 {delta ? (
-                  <span className={`text-ui-label font-medium ${deltaClass}`}>{delta}</span>
+                  <span className={`text-ui-label ${deltaClass}`}>{delta}</span>
                 ) : null}
               </div>
             </div>

@@ -610,7 +610,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       <article className="surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-page-title font-semibold text-[rgba(255,255,255,0.92)]">{sessionTitle}</h1>
+            <h1 className="text-page-title text-[rgba(255,255,255,0.92)]">{sessionTitle}</h1>
             <p className="mt-1 text-body text-muted">
               {disciplineLabel} · {sessionDateLabel} · {actualDurationLabel}
             </p>
@@ -647,7 +647,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                 {reviewVm.score}
               </span>
               <div className="min-w-0">
-                <p className={`text-section-title font-medium ${toneToTextClass(reviewVm.scoreTone)}`}>
+                <p className={`text-section-title ${toneToTextClass(reviewVm.scoreTone)}`}>
                   {reviewVm.scoreBand}
                 </p>
                 {confidenceQualifier ? (
@@ -687,7 +687,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
               : "border-l-[var(--color-accent)] bg-[rgba(190,255,0,0.04)]"
           } border-y border-r border-[hsl(var(--border))]`}
         >
-          <p className={`text-kicker font-medium ${isKeepDoingAdvice ? "text-success" : "text-[var(--color-accent)]"}`}>
+          <p className={`text-kicker ${isKeepDoingAdvice ? "text-success" : "text-[var(--color-accent)]"}`}>
             {oneThingLabel}
           </p>
           <p className="mt-2 text-body font-medium leading-snug text-white">{reviewVm.oneThingToChange}</p>
@@ -727,7 +727,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       {/* Post-upload: Impact on your week */}
       {isPostUpload && weekTotalCount > 0 ? (
         <article className="surface p-4 md:p-5">
-          <p className="text-kicker font-medium text-tertiary">Impact on your week</p>
+          <p className="text-kicker text-tertiary">Impact on your week</p>
           <p className="mt-2 text-body text-white">
             {weekCompletedCount} of {weekTotalCount} session{weekTotalCount === 1 ? "" : "s"} complete this week
           </p>
@@ -808,7 +808,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                   {reviewVm.usefulMetrics.map((metric) => (
                     <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
                       <p className="text-ui-label text-muted">{metric.label}</p>
-                      <p className="mt-1 text-body font-semibold text-white">{metric.value}</p>
+                      <p className="mt-1 text-body font-medium text-white">{metric.value}</p>
                     </div>
                   ))}
                 </div>
@@ -854,7 +854,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         return (
           <article className="surface p-4 md:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-kicker font-medium text-tertiary">Score breakdown</p>
+              <p className="text-kicker text-tertiary">Score breakdown</p>
               <div className="flex flex-wrap items-center gap-2">
                 {reviewVm.scoreBand ? (
                   <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-muted">
@@ -880,7 +880,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                   <div key={label}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-ui-label font-medium ${isLowest ? "text-warning" : "text-white"}`}>{label}</span>
+                        <span className={`text-ui-label ${isLowest ? "text-warning" : "text-white"}`}>{label}</span>
                         {isLowest ? (
                           <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Lowest</span>
                         ) : null}
@@ -888,7 +888,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                           <span className="rounded-full border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-warning">Capped</span>
                         ) : null}
                       </div>
-                      <span className={`font-mono tabular-nums ${isLowest ? "text-body font-semibold text-warning" : "text-ui-label font-medium text-white"}`}>{component.score}</span>
+                      <span className={`font-mono tabular-nums ${isLowest ? "text-body font-medium text-warning" : "text-ui-label text-white"}`}>{component.score}</span>
                     </div>
                     <p className="mt-1.5 text-ui-label leading-snug text-muted">{component.detail}</p>
                   </div>

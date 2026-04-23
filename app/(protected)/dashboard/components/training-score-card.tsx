@@ -134,7 +134,7 @@ export function TrainingScoreCard({ score }: Props) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-page-title font-semibold ${getScoreColour(score.compositeScore)}`}>
+            <span className={`text-page-title ${getScoreColour(score.compositeScore)}`}>
               {Math.round(score.compositeScore)}
             </span>
           </div>

@@ -33,7 +33,7 @@ export function MorningBriefCard({ brief }: Props) {
         >
           ai
         </span>
-        <p className="text-kicker font-medium text-[var(--color-accent)]">
+        <p className="text-kicker text-[var(--color-accent)]">
           Coach brief
         </p>
       </div>

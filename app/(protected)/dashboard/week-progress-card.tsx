@@ -71,7 +71,7 @@ export function WeekProgressCard({
       <div className="flex items-center justify-between">
         <h2 className="text-section-title font-semibold">Week Progress</h2>
         {showStatusChip ? (
-          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-body font-semibold ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
+          <span className={`inline-flex h-fit items-center gap-2 rounded-full border px-3 py-1 text-body font-medium ${overMinutes > 0 ? "signal-chip signal-load" : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]"}`}>
             {overMinutes > 0 ? <span aria-hidden className="h-2 w-2 rounded-full bg-[hsl(var(--signal-load))]" /> : null}
             <span>{chipLabel}</span>
           </span>
@@ -95,7 +95,7 @@ export function WeekProgressCard({
           <p className="text-ui-label text-[hsl(var(--fg-muted))]">Extra work: {formatMinutes(extraTotalMinutes)}</p>
         </div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-body font-semibold">By discipline</p>
+          <p className="text-body font-medium">By discipline</p>
           {emptyCount > 0 || !hideEmpty ? (
             <button
               type="button"
@@ -135,11 +135,11 @@ export function WeekProgressCard({
                         {Math.round(item.visibleCompletedMinutes)} / {Math.round(item.visiblePlannedMinutes)} min
                       </div>
                       {chipLabel ? (
-                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-ui-label font-medium ${item.discGapMinutes > 0 ? "signal-load" : "signal-risk"}`}>
+                        <span className={`inline-flex h-5 items-center rounded-full border px-2.5 text-ui-label ${item.discGapMinutes > 0 ? "signal-load" : "signal-risk"}`}>
                           {chipLabel}
                         </span>
                       ) : isCompletedDiscipline ? (
-                        <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-ui-label font-medium text-[hsl(var(--fg-muted))]">
+                        <span className="inline-flex h-5 items-center gap-1 rounded-full border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-2 text-ui-label text-[hsl(var(--fg-muted))]">
                           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success)/0.62)]" />
                           Complete
                         </span>

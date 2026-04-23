@@ -75,7 +75,7 @@ function PillSelector({ label, options, value, onChange }: {
               key={opt.value}
               type="button"
               onClick={() => onChange(isSelected ? null : opt.value)}
-              className={`rounded-full border px-3 py-1 text-ui-label font-medium transition-colors ${
+              className={`rounded-full border px-3 py-1 text-ui-label transition-colors ${
                 isSelected
                   ? "border-[rgba(190,255,0,0.4)] bg-[rgba(190,255,0,0.12)] text-[var(--color-accent)]"
                   : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.5)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
@@ -261,7 +261,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
               aria-checked={isSelected}
               aria-label={`${opt.label} (${opt.value}/5)`}
               onClick={() => handleFeelSelect(opt.value)}
-              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border text-ui-label font-medium transition-colors ${
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border text-ui-label transition-colors ${
                 isSelected
                   ? ""
                   : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.5)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"

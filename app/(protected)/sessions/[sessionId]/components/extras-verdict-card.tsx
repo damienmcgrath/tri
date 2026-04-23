@@ -127,7 +127,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
         {/* Part 1: What this session was */}
         <div className="px-5 py-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-0.5 text-ui-label font-medium text-muted">
+            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-0.5 text-ui-label text-muted">
               {intentLabel}
             </span>
             {sessionId && sport ? (
@@ -160,7 +160,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
                 {match.label}
               </p>
             </div>
-            <p className="mt-2 text-ui-label font-medium" style={{ color: match.color }}>
+            <p className="mt-2 text-ui-label" style={{ color: match.color }}>
               {sanitizeText(verdict.sessionVerdict.headline)}
             </p>
             <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.sessionVerdict.summary)}</p>
@@ -185,7 +185,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
                 <div className="mt-2 space-y-2 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
                   {verdict.citedEvidence.map((item, i) => (
                     <div key={i}>
-                      <p className="text-ui-label font-medium text-white">{sanitizeText(item.claim)}</p>
+                      <p className="text-ui-label text-white">{sanitizeText(item.claim)}</p>
                       <ul className="mt-1 space-y-0.5">
                         {item.support.map((s, j) => (
                           <li key={j} className="text-ui-label text-muted pl-3 relative before:absolute before:left-0 before:top-[7px] before:h-1 before:w-1 before:rounded-full before:bg-[rgba(255,255,255,0.2)]">
