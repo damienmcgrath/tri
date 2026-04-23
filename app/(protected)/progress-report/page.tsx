@@ -465,9 +465,11 @@ export default async function ProgressReportPage({
         stale: false,
         sourceUpdatedAt: artifact.sourceUpdatedAt
       };
-    } catch {
+    } catch (err) {
       // Keep the existing snapshot; render will fall back to the empty state
-      // below if there is still no artifact.
+      // below if there is still no artifact. Log so silent failures here don't
+      // hide upstream bugs (e.g. schema validation rejecting persisted rows).
+      console.error("[progress-report] refreshProgressReport failed", err);
     }
   }
 

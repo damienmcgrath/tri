@@ -1,4 +1,5 @@
 import {
+  progressReportArtifactSchema,
   progressReportFactsSchema,
   progressReportNarrativeSchema,
   type ProgressReportFacts,
@@ -188,6 +189,68 @@ describe("progressReportNarrativeSchema", () => {
       carryForward: [validNarrative.carryForward[0]]
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("progressReportArtifactSchema timestamp handling", () => {
+  // Postgres `timestamptz` columns return values like
+  // `2026-04-23T20:49:27.22214+00:00` — offset suffix + arbitrary fractional
+  // precision — which Zod's default `.datetime()` rejects. The persistence
+  // layer must normalize these via `new Date(value).toISOString()` before
+  // validating; these tests lock that contract in.
+  const baseArtifact = {
+    blockStart: "2026-03-23",
+    blockEnd: "2026-04-19",
+    status: "ready" as const,
+    generationVersion: 1,
+    facts: validFacts,
+    narrative: {
+      coachHeadline: "Run economy stepped up while bike held flat",
+      executiveSummary:
+        "You added 70 minutes and one session while total CTL rose 3.9 points. Run pace-at-HR improved from 5:12 to 5:05/km at the same cost; bike power-at-HR held.",
+      fitnessReport:
+        "Total CTL moved 58.2 → 62.1 (Δ +3.9). Run CTL climbed from 26.1 to 28.4 (Δ +2.3).",
+      durabilityReport:
+        "Aerobic decoupling averaged 3.2% across three ≥45-min endurance sessions, down from 5.1% last block.",
+      peakPerformancesReport:
+        "Best run pace of 4:40/km came from the Apr 12 session — 12s/km faster than the prior block's peak.",
+      disciplineVerdicts: [
+        {
+          sport: "run" as const,
+          verdict: "Run economy is the clearest adaptation: 5:05/km at 148 bpm vs 5:12 at 149 bpm last block."
+        }
+      ],
+      nonObviousInsight:
+        "Run CTL rose more than bike CTL, yet ramp rate stayed inside 3 points — adaptation is concentrating on running.",
+      teach: null,
+      carryForward: [
+        "Hold the current easy-pace discipline on run — it is producing 7–12s/km improvement at the same HR.",
+        "Add one ≥60-min bike endurance ride per week next block to give the bike aerobic system the same stimulus."
+      ] as [string, string]
+    }
+  };
+
+  const pgTimestamp = "2026-04-23T20:49:27.22214+00:00";
+
+  test("rejects raw Postgres timestamptz format (motivates boundary normalization)", () => {
+    const parsed = progressReportArtifactSchema.safeParse({
+      ...baseArtifact,
+      sourceUpdatedAt: pgTimestamp,
+      generatedAt: pgTimestamp,
+      feedback: { helpful: null, accurate: null, note: null, updatedAt: null }
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  test("accepts Postgres timestamps once normalized through `new Date().toISOString()`", () => {
+    const normalized = new Date(pgTimestamp).toISOString();
+    const parsed = progressReportArtifactSchema.safeParse({
+      ...baseArtifact,
+      sourceUpdatedAt: normalized,
+      generatedAt: normalized,
+      feedback: { helpful: null, accurate: null, note: null, updatedAt: normalized }
+    });
+    expect(parsed.success).toBe(true);
   });
 });
 
