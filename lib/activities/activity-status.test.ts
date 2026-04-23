@@ -41,6 +41,16 @@ describe("classifyActivityStatus", () => {
     ).toBe("extra");
   });
 
+  it("returns 'extra' for a rejected link with null planned_session_id (mark-as-extra sentinel)", () => {
+    expect(
+      classifyActivityStatus({
+        activityId: "a1",
+        isUnplanned: false,
+        links: [{ completed_activity_id: "a1", planned_session_id: null, confirmation_status: "rejected" }]
+      })
+    ).toBe("extra");
+  });
+
   it("returns 'unreviewed' for new upload with no links", () => {
     expect(
       classifyActivityStatus({
