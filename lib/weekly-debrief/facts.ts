@@ -857,12 +857,19 @@ export function buildWeeklyDebriefFacts(input: WeeklyDebriefInputs) {
       detail: strongestExecutionSession.review?.deterministic.rulesSummary.intentMatch === "on_target" ? "Stayed closest to target" : strongestExecutionSession.review?.executionScoreBand ?? null,
       tone: "positive" as const
     }] : []),
-    ...((latestIssueSession || skippedSessions > 0 || addedSessions > 0) ? [{
-      label: latestIssueSession ? "Biggest drift" : "Week shape",
-      value: latestIssueSession ? latestIssueSession.label : skippedSessions > 0 ? `${skippedSessions} missed` : `${addedSessions} added`,
-      detail: latestIssueSession ? null : skippedSessions > 0 ? "Back-half looseness" : "Added work changed the shape",
-      tone: latestIssueSession || skippedSessions > 0 ? "caution" as const : "muted" as const
-    }] : [])
+    (latestIssueSession || skippedSessions > 0 || addedSessions > 0)
+      ? {
+          label: latestIssueSession ? "Biggest drift" : "Week shape",
+          value: latestIssueSession ? latestIssueSession.label : skippedSessions > 0 ? `${skippedSessions} missed` : `${addedSessions} added`,
+          detail: latestIssueSession ? null : skippedSessions > 0 ? "Back-half looseness" : "Added work changed the shape",
+          tone: latestIssueSession || skippedSessions > 0 ? "caution" as const : "muted" as const
+        }
+      : {
+          label: "Week shape",
+          value: plannedSessions > 0 ? "On plan" : "Open week",
+          detail: plannedSessions > 0 ? "No drift, skips, or extras" : "No planned sessions",
+          tone: "muted" as const
+        }
   ];
 
   const draftFacts = weeklyDebriefFactsSchema.parse({

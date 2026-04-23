@@ -43,6 +43,7 @@ export async function generateProgressReportNarrative(args: {
   const result = await callOpenAIWithFallback<ProgressReportNarrative>({
     logTag: "progress-report",
     fallback: args.deterministicFallback,
+    timeoutMs: 120_000,
     buildRequest: () => ({
       model: getCoachModel({ deep: true }),
       instructions: INSTRUCTIONS,
