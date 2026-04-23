@@ -292,7 +292,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       <article className="surface border border-[hsl(var(--border))] p-5">
         <div className="flex items-center gap-3">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[rgba(190,255,0,0.3)] border-t-[var(--color-accent)]" />
-          <p className="text-sm text-muted">Generating session verdict...</p>
+          <p className="text-body text-muted">Generating session verdict...</p>
         </div>
       </article>
     );
@@ -301,11 +301,11 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
   if (error && !verdict) {
     return (
       <article className="surface border border-[hsl(var(--border))] p-5">
-        <p className="text-sm text-danger">{error}</p>
+        <p className="text-body text-danger">{error}</p>
         <button
           type="button"
           onClick={() => void fetchVerdict()}
-          className="mt-2 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+          className="mt-2 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
         >
           Retry
         </button>
@@ -332,9 +332,9 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
     <article className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
-        <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Session verdict</p>
+        <p className="text-kicker text-tertiary">Session verdict</p>
         {isAutoRegenerating ? (
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-tertiary">
+          <span className="inline-flex items-center gap-1.5 text-ui-label text-tertiary">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-accent)]" aria-hidden="true" />
             {"Refreshing\u2026"}
           </span>
@@ -342,7 +342,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
           <button
             type="button"
             onClick={handleRetryAutoRegen}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-2 py-0.5 text-[11px] text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.14)]"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] px-2 py-0.5 text-ui-label text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.14)]"
           >
             Refresh failed — retry
           </button>
@@ -352,9 +352,9 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
       <div className="divide-y divide-[hsl(var(--border))]">
         {/* Part 1: Purpose Statement */}
         <div className="px-5 py-4">
-          <p className="text-sm text-muted">{sanitizeText(verdict.purpose_statement)}</p>
+          <p className="text-body text-muted">{sanitizeText(verdict.purpose_statement)}</p>
           {verdict.training_block_context && (
-            <p className="mt-1 text-xs text-tertiary">{sanitizeText(verdict.training_block_context)}</p>
+            <p className="mt-1 text-ui-label text-tertiary">{sanitizeText(verdict.training_block_context)}</p>
           )}
         </div>
 
@@ -371,23 +371,23 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
               >
                 <StatusIcon status={verdict.verdict_status} />
               </span>
-              <p className="text-sm font-medium" style={{ color: status.color }}>
+              <p className="text-body font-medium" style={{ color: status.color }}>
                 {status.label}
               </p>
             </div>
-            <p className="mt-3 text-sm text-white leading-relaxed">{sanitizeText(verdict.execution_summary)}</p>
+            <p className="mt-3 text-body text-white leading-relaxed">{sanitizeText(verdict.execution_summary)}</p>
           </div>
 
           {/* Metric comparisons */}
           {verdict.metric_comparisons.length > 0 && (
             <div className="mt-4">
               <div className="overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-                <table className="w-full text-sm">
+                <table className="w-full text-body">
                   <thead>
                     <tr className="bg-[rgba(255,255,255,0.03)]">
-                      <th className="px-3 py-2 text-left text-xs font-normal text-tertiary">Metric</th>
-                      <th className="px-3 py-2 text-right text-xs font-normal text-tertiary">Target</th>
-                      <th className="px-3 py-2 text-right text-xs font-normal text-tertiary">Actual</th>
+                      <th className="px-3 py-2 text-left text-ui-label font-normal text-tertiary">Metric</th>
+                      <th className="px-3 py-2 text-right text-ui-label font-normal text-tertiary">Target</th>
+                      <th className="px-3 py-2 text-right text-ui-label font-normal text-tertiary">Actual</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[hsl(var(--border))]">
@@ -409,7 +409,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                               <span className="italic text-muted">Not set</span>
                             ) : targetIsMissingWithNote ? (
                               <span className="italic text-muted">
-                                Not set <span className="text-[11px] not-italic text-tertiary">({targetNote})</span>
+                                Not set <span className="text-ui-label not-italic text-tertiary">({targetNote})</span>
                               </span>
                             ) : (
                               rawTarget
@@ -431,7 +431,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
                 <button
                   type="button"
                   onClick={() => setShowAllMetrics(!showAllMetrics)}
-                  className="mt-2 text-xs text-tertiary hover:text-white"
+                  className="mt-2 text-ui-label text-tertiary hover:text-white"
                 >
                   {showAllMetrics
                     ? "Show fewer ↑"
@@ -445,7 +445,7 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
           {verdict.key_deviations && verdict.key_deviations.length > 0 && (
             <div className="mt-4 space-y-2">
               {verdict.key_deviations.map((dev, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm">
+                <div key={i} className="flex items-start gap-2 text-body">
                   <DeviationIcon severity={dev.severity} />
                   <span className="text-muted leading-relaxed">{sanitizeText(dev.description)}</span>
                 </div>
@@ -460,20 +460,20 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
           <button
             type="button"
             onClick={() => setShowExplanation(!showExplanation)}
-            className="mt-3 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+            className="mt-3 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
           >
             {showExplanation ? "Hide explanation" : "Explain these metrics"}
           </button>
           {showExplanation && (
             <div className="mt-2 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
-              <p className="text-sm text-muted leading-relaxed">
+              <p className="text-body text-muted leading-relaxed">
                 {getContextualExplanation(verdict.verdict_status, discipline, verdict.key_deviations)}
               </p>
               <Link
                 href={`/coach?prompt=${encodeURIComponent(
                   buildCoachPrompt(discipline, verdict.verdict_status, verdict.key_deviations)
                 )}`}
-                className="mt-2 inline-flex items-center text-[11px] text-[var(--color-accent)] transition-ui hover:text-white"
+                className="mt-2 inline-flex items-center text-ui-label text-[var(--color-accent)] transition-ui hover:text-white"
               >
                 Dig in with coach →
               </Link>
@@ -486,14 +486,14 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
           <div className="px-5 py-4">
             {verdict.non_obvious_insight && (
               <>
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-accent)]">Coach insight</p>
-                <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.non_obvious_insight)}</p>
+                <p className="text-kicker text-[var(--color-accent)]">Coach insight</p>
+                <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.non_obvious_insight)}</p>
               </>
             )}
             {verdict.teach && (
               <>
-                <p className="mt-3 text-xs uppercase tracking-[0.14em] text-tertiary">Why this matters</p>
-                <p className="mt-2 text-sm text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
+                <p className="mt-3 text-kicker text-tertiary">Why this matters</p>
+                <p className="mt-2 text-body text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
               </>
             )}
           </div>
@@ -501,11 +501,11 @@ export function SessionVerdictCard({ sessionId, existingVerdict, sessionComplete
 
         {/* Part 3: Adaptation Signal */}
         <div className="px-5 py-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What this means for your plan</p>
-          <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.adaptation_signal)}</p>
+          <p className="text-kicker text-tertiary">What this means for your plan</p>
+          <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.adaptation_signal)}</p>
           {verdict.adaptation_type && verdict.adaptation_type !== "proceed" && (
             <div
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-ui-label"
               style={{ borderColor: status.border, color: status.color, backgroundColor: status.bg }}
             >
               {ADAPTATION_LABELS[verdict.adaptation_type] ?? verdict.adaptation_type}

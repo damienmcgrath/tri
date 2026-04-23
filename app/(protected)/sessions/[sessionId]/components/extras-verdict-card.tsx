@@ -111,13 +111,13 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
     <article className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
-        <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Extra session verdict</p>
+        <p className="text-kicker text-tertiary">Extra session verdict</p>
         {narrativeSource === "ai" ? (
-          <span className="rounded-full border border-[rgba(190,255,0,0.2)] bg-[rgba(190,255,0,0.06)] px-2 py-0.5 text-[10px] text-[var(--color-accent)]">
+          <span className="rounded-full border border-[rgba(190,255,0,0.2)] bg-[rgba(190,255,0,0.06)] px-2 py-0.5 text-ui-label text-[var(--color-accent)]">
             AI review
           </span>
         ) : (
-          <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-tertiary">
+          <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-tertiary">
             Directional
           </span>
         )}
@@ -127,7 +127,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
         {/* Part 1: What this session was */}
         <div className="px-5 py-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-0.5 text-[11px] font-medium text-muted">
+            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-0.5 text-ui-label font-medium text-muted">
               {intentLabel}
             </span>
             {sessionId && sport ? (
@@ -139,7 +139,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
             ) : null}
           </div>
           {verdict.explanation.sessionIntent ? (
-            <p className="mt-2 text-sm text-muted">{sanitizeText(verdict.explanation.sessionIntent)}</p>
+            <p className="mt-2 text-body text-muted">{sanitizeText(verdict.explanation.sessionIntent)}</p>
           ) : null}
         </div>
 
@@ -156,19 +156,19 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
               >
                 <IntentMatchIcon match={verdict.sessionVerdict.intentMatch} />
               </span>
-              <p className="text-sm font-medium" style={{ color: match.color }}>
+              <p className="text-body font-medium" style={{ color: match.color }}>
                 {match.label}
               </p>
             </div>
-            <p className="mt-2 text-xs font-medium" style={{ color: match.color }}>
+            <p className="mt-2 text-ui-label font-medium" style={{ color: match.color }}>
               {sanitizeText(verdict.sessionVerdict.headline)}
             </p>
-            <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.sessionVerdict.summary)}</p>
+            <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.sessionVerdict.summary)}</p>
           </div>
 
           {/* What happened — expanded detail below the status box */}
           {verdict.explanation.whatHappened ? (
-            <p className="mt-3 text-sm text-muted leading-relaxed">{sanitizeText(verdict.explanation.whatHappened)}</p>
+            <p className="mt-3 text-body text-muted leading-relaxed">{sanitizeText(verdict.explanation.whatHappened)}</p>
           ) : null}
 
           {/* Cited evidence — progressive disclosure */}
@@ -177,7 +177,7 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
               <button
                 type="button"
                 onClick={() => setShowEvidence(!showEvidence)}
-                className="mt-3 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+                className="mt-3 rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary hover:border-[rgba(255,255,255,0.25)] hover:text-white"
               >
                 {showEvidence ? "Hide evidence" : "Show evidence"}
               </button>
@@ -185,10 +185,10 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
                 <div className="mt-2 space-y-2 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
                   {verdict.citedEvidence.map((item, i) => (
                     <div key={i}>
-                      <p className="text-xs font-medium text-white">{sanitizeText(item.claim)}</p>
+                      <p className="text-ui-label font-medium text-white">{sanitizeText(item.claim)}</p>
                       <ul className="mt-1 space-y-0.5">
                         {item.support.map((s, j) => (
-                          <li key={j} className="text-xs text-muted pl-3 relative before:absolute before:left-0 before:top-[7px] before:h-1 before:w-1 before:rounded-full before:bg-[rgba(255,255,255,0.2)]">
+                          <li key={j} className="text-ui-label text-muted pl-3 relative before:absolute before:left-0 before:top-[7px] before:h-1 before:w-1 before:rounded-full before:bg-[rgba(255,255,255,0.2)]">
                             {sanitizeText(s)}
                           </li>
                         ))}
@@ -206,14 +206,14 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
           <div className="px-5 py-4">
             {verdict.nonObviousInsight ? (
               <>
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-accent)]">Coach insight</p>
-                <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.nonObviousInsight)}</p>
+                <p className="text-kicker text-[var(--color-accent)]">Coach insight</p>
+                <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.nonObviousInsight)}</p>
               </>
             ) : null}
             {verdict.teach ? (
               <>
-                <p className="mt-3 text-xs uppercase tracking-[0.14em] text-tertiary">Why this matters</p>
-                <p className="mt-2 text-sm text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
+                <p className="mt-3 text-kicker text-tertiary">Why this matters</p>
+                <p className="mt-2 text-body text-muted leading-relaxed">{sanitizeText(verdict.teach)}</p>
               </>
             ) : null}
           </div>
@@ -221,14 +221,14 @@ export function ExtrasVerdictCard({ verdict, intentCategory, narrativeSource, se
 
         {/* Part 3: What it means for your plan */}
         <div className="px-5 py-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">What this means for your plan</p>
-          <p className="mt-2 text-sm text-white leading-relaxed">{sanitizeText(verdict.explanation.whatToDoThisWeek)}</p>
+          <p className="text-kicker text-tertiary">What this means for your plan</p>
+          <p className="mt-2 text-body text-white leading-relaxed">{sanitizeText(verdict.explanation.whatToDoThisWeek)}</p>
           {verdict.explanation.whyItMatters ? (
-            <p className="mt-2 text-sm text-muted leading-relaxed">{sanitizeText(verdict.explanation.whyItMatters)}</p>
+            <p className="mt-2 text-body text-muted leading-relaxed">{sanitizeText(verdict.explanation.whyItMatters)}</p>
           ) : null}
           {showNextCallChip ? (
             <div
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-ui-label"
               style={{ borderColor: match.border, color: match.color, backgroundColor: match.bg }}
             >
               {nextCallLabel}

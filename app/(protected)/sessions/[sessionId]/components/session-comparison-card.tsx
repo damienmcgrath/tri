@@ -101,18 +101,18 @@ function ComparisonNarrative({ text }: { text: string }) {
   const { lead, rest } = splitNarrative(text);
   const [expanded, setExpanded] = useState(false);
   if (!rest) {
-    return <p className="mt-3 text-sm text-white">{lead}</p>;
+    return <p className="mt-3 text-body text-white">{lead}</p>;
   }
   return (
     <div className="mt-3">
-      <p className="text-sm text-white">{lead}</p>
+      <p className="text-body text-white">{lead}</p>
       {expanded ? (
-        <p className="mt-2 text-sm text-muted">{rest}</p>
+        <p className="mt-2 text-body text-muted">{rest}</p>
       ) : null}
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="mt-2 text-xs text-tertiary hover:text-white"
+        className="mt-2 text-ui-label text-tertiary hover:text-white"
       >
         {expanded ? "Less detail ↑" : "More detail ↓"}
       </button>
@@ -137,12 +137,12 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
         <div className="flex items-center gap-2.5">
           <p className="label">Compared to previous</p>
           {bestAiComparison ? (
-            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em] leading-none ${trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).className}`}>
+            <span className={`rounded-full border px-2.5 py-0.5 text-kicker leading-none ${trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).className}`}>
               {trendBadge(bestAiComparison.trendDirection, bestAiComparison.trendConfidence).label}
             </span>
           ) : null}
         </div>
-        <p className="mt-1 text-xs text-tertiary">{previousDateLabel}</p>
+        <p className="mt-1 text-ui-label text-tertiary">{previousDateLabel}</p>
       </div>
 
       {/* AI narrative — 2-line lead + More detail disclosure so the block
@@ -154,11 +154,11 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {comparison.metrics.map((m) => (
           <div key={m.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-            <p className="text-xs text-muted">{m.metric}</p>
-            <p className="mt-1 text-base font-semibold text-white">{m.current}</p>
+            <p className="text-ui-label text-muted">{m.metric}</p>
+            <p className="mt-1 text-section-title text-white">{m.current}</p>
             <div className="mt-2 flex items-center gap-2">
               <span
-                className={`text-sm font-medium ${
+                className={`text-body font-medium ${
                   m.direction === "better"
                     ? "text-success"
                     : m.direction === "worse"
@@ -169,7 +169,7 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
                 {m.direction === "better" ? "▲ " : m.direction === "worse" ? "▼ " : ""}
                 {m.delta}
               </span>
-              <span className="text-xs text-tertiary">vs {m.previous}</span>
+              <span className="text-ui-label text-tertiary">vs {m.previous}</span>
             </div>
           </div>
         ))}
@@ -177,7 +177,7 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
 
       {matchedTrends.length > 0 ? (
         <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
-          <p className="mb-3 text-[10px] uppercase tracking-[0.08em] text-tertiary">Multi-week trend</p>
+          <p className="mb-3 text-kicker text-tertiary">Multi-week trend</p>
           <div className="space-y-2.5">
             {matchedTrends.map((trend) => {
               const recent = trend.dataPoints.slice(-5);
@@ -186,15 +186,15 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
               const directionClass = trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary";
               return (
                 <div key={trend.metric} className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted whitespace-nowrap">{trend.metric}</span>
+                  <span className="text-ui-label text-muted whitespace-nowrap">{trend.metric}</span>
                   <div className="flex items-center gap-2">
                     <TrendSparkline points={recent} direction={trend.direction} />
                     {latest ? (
-                      <span className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-xs font-medium tabular-nums text-white">
+                      <span className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-ui-label font-medium tabular-nums text-white">
                         {latest.label}
                       </span>
                     ) : null}
-                    <span className={`ml-0.5 text-sm font-medium ${directionClass}`}>{directionGlyph}</span>
+                    <span className={`ml-0.5 text-body font-medium ${directionClass}`}>{directionGlyph}</span>
                   </div>
                 </div>
               );

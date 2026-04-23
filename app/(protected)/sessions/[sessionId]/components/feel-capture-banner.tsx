@@ -66,7 +66,7 @@ function PillSelector({ label, options, value, onChange }: {
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-tertiary">{label}</p>
+      <p className="mb-1.5 text-ui-label text-tertiary">{label}</p>
       <div className="flex gap-1.5">
         {options.map((opt) => {
           const isSelected = value === opt.value;
@@ -75,7 +75,7 @@ function PillSelector({ label, options, value, onChange }: {
               key={opt.value}
               type="button"
               onClick={() => onChange(isSelected ? null : opt.value)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-full border px-3 py-1 text-ui-label font-medium transition-colors ${
                 isSelected
                   ? "border-[rgba(190,255,0,0.4)] bg-[rgba(190,255,0,0.12)] text-[var(--color-accent)]"
                   : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.5)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
@@ -119,9 +119,9 @@ function FeelSummary({
         onClick={onEdit}
         className="surface flex w-full items-center justify-between border border-[hsl(var(--border))] px-4 py-3 text-left transition-ui hover:border-[rgba(255,255,255,0.2)]"
       >
-        <span className="text-sm font-medium text-muted">RPE {feel.rpe}/10</span>
-        {feel.note ? <p className="text-xs italic text-muted">{feel.note}</p> : null}
-        <span className="text-[11px] text-tertiary">Edit →</span>
+        <span className="text-body font-medium text-muted">RPE {feel.rpe}/10</span>
+        {feel.note ? <p className="text-ui-label italic text-muted">{feel.note}</p> : null}
+        <span className="text-ui-label text-tertiary">Edit →</span>
       </button>
     );
   }
@@ -142,23 +142,23 @@ function FeelSummary({
         <div className="flex items-center gap-2.5">
           <span className="text-2xl leading-none" aria-hidden="true">{option.icon}</span>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">Your rating</p>
-            <p className="mt-0.5 text-base font-semibold leading-none" style={{ color: option.color.text }}>
+            <p className="text-kicker text-tertiary">Your rating</p>
+            <p className="mt-0.5 text-section-title font-semibold leading-none" style={{ color: option.color.text }}>
               {option.label}
             </p>
             {feel.note ? (
-              <p className="mt-1 max-w-[60ch] truncate text-xs italic text-muted">{feel.note}</p>
+              <p className="mt-1 max-w-[60ch] truncate text-ui-label italic text-muted">{feel.note}</p>
             ) : null}
           </div>
         </div>
-        <span className="text-[11px] text-tertiary transition-ui group-hover:text-white">Edit →</span>
+        <span className="text-ui-label text-tertiary transition-ui group-hover:text-white">Edit →</span>
       </div>
       {secondaryItems.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {secondaryItems.map((item) => (
             <span
               key={item.label}
-              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px]"
+              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label"
             >
               <span className="text-tertiary">{item.label}</span>
               <span className="font-medium text-[rgba(255,255,255,0.78)]">{item.value}</span>
@@ -248,7 +248,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
   return (
     <article className="surface border border-[hsl(var(--border))] p-5">
       <p className="label">How did that feel?</p>
-      <p className="mt-1 text-sm text-muted">Tap the one that best describes this session.</p>
+      <p className="mt-1 text-body text-muted">Tap the one that best describes this session.</p>
 
       <div className="mt-4 grid grid-cols-5 gap-2" role="radiogroup" aria-label="How did the session feel? (1-5)">
         {FEEL_OPTIONS.map((opt) => {
@@ -261,7 +261,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
               aria-checked={isSelected}
               aria-label={`${opt.label} (${opt.value}/5)`}
               onClick={() => handleFeelSelect(opt.value)}
-              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border text-xs font-medium transition-colors ${
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border text-ui-label font-medium transition-colors ${
                 isSelected
                   ? ""
                   : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-[rgba(255,255,255,0.5)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
@@ -271,7 +271,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
                 : undefined
               }
             >
-              <span className="text-lg">{opt.icon}</span>
+              <span className="text-section-title">{opt.icon}</span>
               <span>{opt.label}</span>
             </button>
           );
@@ -282,7 +282,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
         <button
           type="button"
           onClick={() => setShowSecondary(true)}
-          className="mt-3 text-xs text-tertiary hover:text-white transition-colors"
+          className="mt-3 text-ui-label text-tertiary hover:text-white transition-colors"
         >
           + Add more details
         </button>
@@ -296,21 +296,21 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
           <PillSelector label="Sleep last night" options={SLEEP_OPTIONS} value={sleepQuality} onChange={setSleepQuality} />
           <PillSelector label="Life stress" options={STRESS_OPTIONS} value={lifeStress} onChange={setLifeStress} />
           <div>
-            <p className="mb-1.5 text-xs text-tertiary">Anything else your coach should know?</p>
+            <p className="mb-1.5 text-ui-label text-tertiary">Anything else your coach should know?</p>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, 280))}
               placeholder="e.g. felt strong on the run, legs heavy after yesterday..."
               rows={2}
-              className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-3 py-2 text-sm text-white placeholder:text-tertiary focus:border-[rgba(190,255,0,0.4)] focus:outline-none"
+              className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] px-3 py-2 text-body text-white placeholder:text-tertiary focus:border-[rgba(190,255,0,0.4)] focus:outline-none"
             />
-            <p className="mt-1 text-right text-[11px] text-tertiary">{note.length}/280</p>
+            <p className="mt-1 text-right text-ui-label text-tertiary">{note.length}/280</p>
           </div>
         </div>
       )}
 
       {saveError && (
-        <p className="mt-3 rounded-lg border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] px-3 py-2 text-xs text-danger" role="alert">
+        <p className="mt-3 rounded-lg border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] px-3 py-2 text-ui-label text-danger" role="alert">
           {saveError}
         </p>
       )}
@@ -320,7 +320,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
           type="button"
           onClick={() => void handleSave()}
           disabled={selectedFeel === null || saving}
-          className="rounded-lg bg-[rgba(190,255,0,0.15)] px-4 py-2 text-sm font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg bg-[rgba(190,255,0,0.15)] px-4 py-2 text-body font-medium text-[var(--color-accent)] hover:bg-[rgba(190,255,0,0.22)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving\u2026" : "Save"}
         </button>
@@ -346,7 +346,7 @@ export function FeelCaptureBanner({ sessionId, existingFeel }: FeelCaptureBanner
               setDismissed(true);
             }
           }}
-          className="text-sm text-tertiary hover:text-white"
+          className="text-body text-tertiary hover:text-white"
         >
           {editing ? "Cancel" : "Skip"}
         </button>

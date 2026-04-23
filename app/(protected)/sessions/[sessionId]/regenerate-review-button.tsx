@@ -43,11 +43,11 @@ export function RegenerateReviewButton({ sessionId }: { sessionId: string }) {
         type="button"
         onClick={handleRegenerate}
         disabled={isPending}
-        className="text-xs text-tertiary underline-offset-2 transition-ui hover:text-white hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+        className="text-ui-label text-tertiary underline-offset-2 transition-ui hover:text-white hover:underline disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Regenerating..." : "Regenerate review"}
       </button>
-      {message ? <p className="text-xs text-muted">{message}</p> : null}
+      {message ? <p className="text-ui-label text-muted">{message}</p> : null}
     </div>
   );
 }
