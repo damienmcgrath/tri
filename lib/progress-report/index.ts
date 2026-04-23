@@ -166,6 +166,16 @@ async function resolveBlockBounds(args: {
   return { ...bounds, blockId: null, priorBlockId: null };
 }
 
+/**
+ * Postgres `timestamptz` columns come back from PostgREST in the form
+ * `2026-04-23T20:49:27.22214+00:00` — Zod's default `.datetime()` wants a
+ * `Z` suffix and rejects offset form. Round-trip through `Date` so the
+ * schema sees a canonical `…Z` string.
+ */
+function normalizeIsoTimestamp(value: string): string {
+  return new Date(value).toISOString();
+}
+
 function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportArtifact | null {
   try {
     const facts = progressReportFactsSchema.parse(record.facts);
@@ -174,8 +184,8 @@ function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportA
       blockStart: record.block_start,
       blockEnd: record.block_end,
       status: record.status,
-      sourceUpdatedAt: record.source_updated_at,
-      generatedAt: record.generated_at,
+      sourceUpdatedAt: normalizeIsoTimestamp(record.source_updated_at),
+      generatedAt: normalizeIsoTimestamp(record.generated_at),
       generationVersion: record.generation_version,
       facts,
       narrative,
@@ -184,9 +194,15 @@ function hydratePersistedArtifact(record: ProgressReportRecord): ProgressReportA
         accurate: record.accurate,
         note: record.feedback_note,
         updatedAt: record.feedback_updated_at
+          ? normalizeIsoTimestamp(record.feedback_updated_at)
+          : null
       }
     });
-  } catch {
+  } catch (err) {
+    console.error(
+      "[progress-report] hydratePersistedArtifact failed — falling back to null",
+      err
+    );
     return null;
   }
 }

@@ -36,6 +36,17 @@ export type ProgressReportReadiness = {
   sourceUpdatedAt: string;
 };
 
+/**
+ * Postgres `timestamptz` columns come back from PostgREST in the form
+ * `2026-04-23T20:49:27.22214+00:00` — i.e. offset suffix + arbitrary
+ * fractional precision — which Zod's default `.datetime()` rejects (it wants
+ * a `Z` suffix). Round-trip through `Date` so the schema sees a canonical
+ * `…Z` string regardless of how Postgres formatted it.
+ */
+function normalizeIsoTimestamp(value: string): string {
+  return new Date(value).toISOString();
+}
+
 function normalizePersistedRecord(
   record: ProgressReportRecord,
   effectiveStatus: "ready" | "stale" | "failed"
@@ -46,8 +57,8 @@ function normalizePersistedRecord(
     blockStart: record.block_start,
     blockEnd: record.block_end,
     status: effectiveStatus,
-    sourceUpdatedAt: record.source_updated_at,
-    generatedAt: record.generated_at,
+    sourceUpdatedAt: normalizeIsoTimestamp(record.source_updated_at),
+    generatedAt: normalizeIsoTimestamp(record.generated_at),
     generationVersion: record.generation_version,
     facts: rawFacts,
     narrative: rawNarrative,
@@ -56,6 +67,8 @@ function normalizePersistedRecord(
       accurate: record.accurate,
       note: record.feedback_note,
       updatedAt: record.feedback_updated_at
+        ? normalizeIsoTimestamp(record.feedback_updated_at)
+        : null
     }
   });
 }
