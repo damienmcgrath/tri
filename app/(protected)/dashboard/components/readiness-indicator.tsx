@@ -63,7 +63,7 @@ export function ReadinessIndicator({ readiness, tsb, tsbTrend, signalContext }: 
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: config.color }}
           />
-          <span className="text-ui-label font-medium uppercase tracking-[0.12em]" style={{ color: config.color }}>
+          <span className="text-ui-label uppercase tracking-[0.12em]" style={{ color: config.color }}>
             {config.label}
           </span>
           <span className="text-ui-label font-mono text-tertiary">

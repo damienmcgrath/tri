@@ -39,7 +39,7 @@ export function TransitionBriefingCard({ briefing }: Props) {
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <p className="shrink-0 text-kicker font-medium text-[rgba(190,255,0,0.7)]">
+          <p className="shrink-0 text-kicker text-[rgba(190,255,0,0.7)]">
             Monday brief
           </p>
           {!expanded ? (
@@ -89,7 +89,7 @@ export function TransitionBriefingCard({ briefing }: Props) {
               {briefing.pendingRationaleIds.length > 0 ? (
                 <Link
                   href="/calendar"
-                  className="mt-1.5 inline-block text-ui-label font-medium text-[hsl(var(--warning))] hover:underline"
+                  className="mt-1.5 inline-block text-ui-label text-[hsl(var(--warning))] hover:underline"
                 >
                   Review {briefing.pendingRationaleIds.length} adaptation{briefing.pendingRationaleIds.length > 1 ? "s" : ""}
                 </Link>

@@ -81,7 +81,7 @@ export function TrendCards({ trends, fatigueSignal }: { trends: WeeklyTrend[]; f
           }`}
           aria-label="Cross-discipline fatigue synthesis"
         >
-          <p className="text-kicker font-medium text-white">
+          <p className="text-kicker text-white">
             Cross-discipline fatigue
           </p>
           <p className="mt-2 text-body text-white">
@@ -115,10 +115,10 @@ export function TrendCards({ trends, fatigueSignal }: { trends: WeeklyTrend[]; f
                     <Sparkline values={values} color={color} width={80} height={24} />
                   </div>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-body font-semibold text-white">
+                    <span className="text-body font-medium text-white">
                       {currentLabel}
                     </span>
-                    <span className={`text-ui-label font-medium ${DIRECTION_CLASS[trend.direction]}`}>
+                    <span className={`text-ui-label ${DIRECTION_CLASS[trend.direction]}`}>
                       {DIRECTION_ARROW[trend.direction]} {trend.direction}
                     </span>
                   </div>

@@ -190,7 +190,7 @@ export function SessionComparisonCard({ comparison, trends = [], aiComparisons =
                   <div className="flex items-center gap-2">
                     <TrendSparkline points={recent} direction={trend.direction} />
                     {latest ? (
-                      <span className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-ui-label font-medium tabular-nums text-white">
+                      <span className="rounded border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] px-2 py-1 text-ui-label tabular-nums text-white">
                         {latest.label}
                       </span>
                     ) : null}

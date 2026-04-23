@@ -29,7 +29,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
         className="flex w-full items-center justify-between gap-3 p-4 text-left md:p-5"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <p className="shrink-0 text-kicker font-medium text-[rgba(190,255,0,0.7)]">
+          <p className="shrink-0 text-kicker text-[rgba(190,255,0,0.7)]">
             Monday brief
           </p>
           {!expanded ? (
@@ -53,7 +53,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
         <div className="space-y-0">
           {/* Section 1: Last Week */}
           <div className="border-t border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-            <p className="text-kicker font-medium text-tertiary">Last week</p>
+            <p className="text-kicker text-tertiary">Last week</p>
             <p className="mt-2 text-body leading-relaxed text-white">{briefing.lastWeekTakeaway}</p>
             {debriefSummary ? (
               <p className="mt-1.5 text-body leading-relaxed text-[rgba(255,255,255,0.65)]">{debriefSummary}</p>
@@ -65,7 +65,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
 
           {/* Section 2: This Week */}
           <div className="border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-            <p className="text-kicker font-medium text-tertiary">This week</p>
+            <p className="text-kicker text-tertiary">This week</p>
             <p className="mt-2 text-body leading-relaxed text-white">{briefing.thisWeekFocus}</p>
             {briefing.adaptationContext ? (
               <p className="mt-1.5 rounded-lg border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.06)] px-3 py-2 text-ui-label text-[hsl(var(--warning))]">
@@ -80,7 +80,7 @@ export function MondayTransitionFlow({ briefing, morningBrief, debriefSummary, p
           {/* Section 3: Today */}
           {morningBrief?.sessionPreview ? (
             <div className="border-b border-[rgba(255,255,255,0.06)] p-4 md:p-5">
-              <p className="text-kicker font-medium text-tertiary">Today</p>
+              <p className="text-kicker text-tertiary">Today</p>
               <p className="mt-2 text-body leading-relaxed text-white">{morningBrief.sessionPreview}</p>
             </div>
           ) : null}

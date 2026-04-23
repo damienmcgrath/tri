@@ -46,7 +46,7 @@ export function ProgressGlanceCard({
 
           <div className="min-w-0 flex-1">
             <p className="text-kicker text-[hsl(var(--fg-muted))]">{weekRangeLabel}</p>
-            <p className="text-body font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
+            <p className="text-body font-medium text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
             <p className="text-ui-label text-[hsl(var(--fg-muted))]">{remainingTimeLabel} remaining • {unmatchedExtraCount} extra sessions (additive) • {missedPlannedCount} missed planned</p>
           </div>
 

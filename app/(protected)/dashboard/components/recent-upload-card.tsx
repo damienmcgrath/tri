@@ -23,7 +23,7 @@ export function RecentUploadCard({ sessionId, sessionName, sport, durationMinute
     <article className="rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-kicker font-medium text-[hsl(var(--accent))]">New activity</p>
+          <p className="text-kicker text-[hsl(var(--accent))]">New activity</p>
           <p className="mt-1 text-body text-white">
             You completed <span className="font-medium">{sessionName}</span> ({durationLabel}) — how did it feel?
           </p>

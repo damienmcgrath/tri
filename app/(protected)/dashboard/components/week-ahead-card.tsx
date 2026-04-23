@@ -57,7 +57,7 @@ export function WeekAheadCard({ preview }: Props) {
         className="flex w-full items-center justify-between gap-3 text-left"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <p className="shrink-0 text-kicker font-medium text-accent">Week ahead</p>
+          <p className="shrink-0 text-kicker text-accent">Week ahead</p>
           {!expanded ? (
             <p className="min-w-0 truncate text-body text-[rgba(255,255,255,0.6)]">
               {summaryParts.join(" · ")}
