@@ -150,12 +150,12 @@ export default async function DebriefPage({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="label">Weekly Debrief</p>
-              <h1 className="mt-1 text-2xl font-semibold">Generating your debrief…</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted">
+              <h1 className="mt-1 text-page-title">Generating your debrief…</h1>
+              <p className="mt-2 max-w-2xl text-body text-muted">
                 We&rsquo;re pulling this week&rsquo;s sessions together. This usually takes 20–40 seconds — the page will update automatically when it&rsquo;s ready.
               </p>
             </div>
-            <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary">
+            <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary">
               {formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}
             </span>
           </div>
@@ -174,35 +174,35 @@ export default async function DebriefPage({
       <section className="space-y-4">
         <article className="surface p-5">
           <p className="label">Weekly Debrief</p>
-          <h1 className="mt-1 text-2xl font-semibold">Not enough signal yet</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted">{snapshot.readiness.reason}</p>
+          <h1 className="mt-1 text-page-title">Not enough signal yet</h1>
+          <p className="mt-2 max-w-2xl text-body text-muted">{snapshot.readiness.reason}</p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Week</p>
-              <p className="mt-2 text-sm font-medium">{formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}</p>
+              <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Week</p>
+              <p className="mt-2 text-body font-medium">{formatDebriefDate(snapshot.weekStart)} – {formatDebriefDate(snapshot.weekEnd)}</p>
             </div>
             {snapshot.readiness.totalKeySessions > 0 ? (
               <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Key sessions</p>
-                <p className="mt-2 text-sm font-medium">{snapshot.readiness.resolvedKeySessions}/{snapshot.readiness.totalKeySessions} resolved</p>
+                <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Key sessions</p>
+                <p className="mt-2 text-body font-medium">{snapshot.readiness.resolvedKeySessions}/{snapshot.readiness.totalKeySessions} resolved</p>
               </div>
             ) : null}
             {snapshot.readiness.plannedMinutes > 0 ? (
               <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Resolved time</p>
-                <p className="mt-2 text-sm font-medium">{formatDuration(snapshot.readiness.resolvedMinutes)} / {formatDuration(snapshot.readiness.plannedMinutes)}</p>
+                <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Resolved time</p>
+                <p className="mt-2 text-body font-medium">{formatDuration(snapshot.readiness.resolvedMinutes)} / {formatDuration(snapshot.readiness.plannedMinutes)}</p>
               </div>
             ) : null}
           </div>
 
-          <p className="mt-4 text-xs text-tertiary">Complete 2+ key sessions to unlock your weekly analysis with trends, benchmarks, and coaching notes.</p>
+          <p className="mt-4 text-ui-label text-tertiary">Complete 2+ key sessions to unlock your weekly analysis with trends, benchmarks, and coaching notes.</p>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <a href="/dashboard" className="btn-secondary px-3 text-xs">
+            <a href="/dashboard" className="btn-secondary px-3 text-ui-label">
               Back to dashboard
             </a>
-            <a href="/calendar" className="btn-secondary px-3 text-xs">
+            <a href="/calendar" className="btn-secondary px-3 text-ui-label">
               View calendar
             </a>
           </div>
@@ -260,9 +260,9 @@ export default async function DebriefPage({
       <article className="debrief-hero surface p-4 sm:p-6 md:p-7">
         {macroArcLine ? (
           <div className="relative mb-4 flex flex-wrap items-center gap-3 border-b border-[rgba(255,255,255,0.07)] pb-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">{macroArcLine}</p>
+            <p className="text-kicker text-[rgba(255,255,255,0.6)]">{macroArcLine}</p>
             {cumulativeVolumeLine ? (
-              <p className="text-[11px] text-[rgba(255,255,255,0.45)]">{cumulativeVolumeLine}</p>
+              <p className="text-ui-label text-[rgba(255,255,255,0.45)]">{cumulativeVolumeLine}</p>
             ) : null}
           </div>
         ) : null}
@@ -274,17 +274,17 @@ export default async function DebriefPage({
               <span className={statePillClass(artifact.facts.artifactStateLabel, snapshot.stale)}>{stateLabel(artifact.facts.artifactStateLabel, snapshot.stale)}</span>
               <span className={narrativeSourcePillClass(artifact.facts.narrativeSource)}>{narrativeSourceLabel(artifact.facts.narrativeSource)}</span>
             </div>
-            <h1 className="mt-4 max-w-4xl text-2xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">{artifact.facts.title}</h1>
+            <h1 className="mt-4 max-w-4xl text-page-title leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">{artifact.facts.title}</h1>
             <p className="mt-3 max-w-3xl text-[15px] leading-7 text-white">{artifact.facts.statusLine}</p>
             {snapshot.stale ? (
-              <p className="mt-3 max-w-2xl text-sm text-muted">The week changed after this version was saved.</p>
+              <p className="mt-3 max-w-2xl text-body text-muted">The week changed after this version was saved.</p>
             ) : artifact.facts.artifactStateNote ? (
-              <p className="mt-3 max-w-2xl text-sm text-muted">{artifact.facts.artifactStateNote}</p>
+              <p className="mt-3 max-w-2xl text-body text-muted">{artifact.facts.artifactStateNote}</p>
             ) : null}
           </div>
           <div className="relative z-10 flex min-w-[220px] flex-col items-start gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 text-xs">
+              <a href={`/debrief/coach?weekStart=${artifact.weekStart}`} className="btn-secondary px-3 text-ui-label">
                 Coach brief
               </a>
               <DebriefRefreshButton weekStart={artifact.weekStart} />
@@ -293,7 +293,7 @@ export default async function DebriefPage({
             <ShareSummaryButton weekOf={artifact.weekStart} displayName={athleteDisplayName} />
             <a
               href={`/coach?prompt=${encodeURIComponent(`Let's discuss my week of ${artifact.facts.weekRange}. ${artifact.narrative.executiveSummary.split(".")[0]}.`)}`}
-              className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
+              className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-ui-label"
             >
               Discuss with Coach
             </a>
@@ -304,8 +304,8 @@ export default async function DebriefPage({
           {artifact.facts.metrics.map((metric) => (
             <div key={metric.label} className={`${metricToneClass(metric.tone)} sm:min-h-[110px]`}>
               <p className="debrief-kicker">{metric.label}</p>
-              <p className="mt-4 text-xl font-semibold leading-tight text-white">{metric.value}</p>
-              {metric.detail ? <p className="mt-2 text-xs text-muted">{metric.detail}</p> : null}
+              <p className="mt-4 text-page-title leading-tight text-white">{metric.value}</p>
+              {metric.detail ? <p className="mt-2 text-ui-label text-muted">{metric.detail}</p> : null}
             </div>
           ))}
         </div>
@@ -327,19 +327,19 @@ export default async function DebriefPage({
         return (
           <article className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Sessions completed</p>
-              <p className="mt-2 text-sm font-medium">{sessionsLabel}</p>
-              <p className="mt-1 text-[11px] text-muted">vs {prevSessionsLabel} last week</p>
+              <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Sessions completed</p>
+              <p className="mt-2 text-body font-medium">{sessionsLabel}</p>
+              <p className="mt-1 text-ui-label text-muted">vs {prevSessionsLabel} last week</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Training time</p>
-              <p className="mt-2 text-sm font-medium">{timeLabel}</p>
-              <p className="mt-1 text-[11px] text-muted">vs {prevTimeLabel} last week</p>
+              <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Training time</p>
+              <p className="mt-2 text-body font-medium">{timeLabel}</p>
+              <p className="mt-1 text-ui-label text-muted">vs {prevTimeLabel} last week</p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-tertiary">Execution quality</p>
-              <p className={`mt-2 text-sm font-medium ${qualityColor}`}>{qualityTrend}</p>
-              <p className="mt-1 text-[11px] text-muted">{artifact.facts.completionPct}% vs {prevFacts.completionPct ?? 0}% last week</p>
+              <p className="text-kicker uppercase tracking-[0.1em] text-tertiary">Execution quality</p>
+              <p className={`mt-2 text-body font-medium ${qualityColor}`}>{qualityTrend}</p>
+              <p className="mt-1 text-ui-label text-muted">{artifact.facts.completionPct}% vs {prevFacts.completionPct ?? 0}% last week</p>
             </div>
           </article>
         );
@@ -372,7 +372,7 @@ export default async function DebriefPage({
           <div className="mt-3 space-y-3">
             {artifact.narrative.highlights.map((item) => (
               <div key={item} className="debrief-list-card debrief-list-card--positive">
-                <p className="text-sm text-white">{item}</p>
+                <p className="text-body text-white">{item}</p>
               </div>
             ))}
           </div>
@@ -383,7 +383,7 @@ export default async function DebriefPage({
           <div className="mt-3 space-y-3">
             {artifact.narrative.observations.map((item) => (
               <div key={item} className="debrief-list-card debrief-list-card--notice">
-                <p className="text-sm text-white">{item}</p>
+                <p className="text-body text-white">{item}</p>
               </div>
             ))}
           </div>
@@ -394,7 +394,7 @@ export default async function DebriefPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="debrief-kicker">Carry into next week</p>
-            <p className="mt-2 text-sm text-muted">Two reminders worth keeping in mind next week.</p>
+            <p className="mt-2 text-body text-muted">Two reminders worth keeping in mind next week.</p>
           </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -428,7 +428,7 @@ export default async function DebriefPage({
             {teach ? (
               <>
                 <p className="debrief-kicker mt-5">Why this matters</p>
-                <p className="mt-3 text-sm leading-6 text-muted">{teach}</p>
+                <p className="mt-3 text-body leading-6 text-muted">{teach}</p>
               </>
             ) : null}
           </article>
@@ -447,7 +447,7 @@ export default async function DebriefPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="debrief-kicker">What supports this summary</p>
-            <p className="mt-2 text-sm text-muted">Open the supporting claims when you want to inspect the sessions behind them.</p>
+            <p className="mt-2 text-body text-muted">Open the supporting claims when you want to inspect the sessions behind them.</p>
           </div>
           {snapshot.stale ? <span className="debrief-pill signal-load">Week data changed since this version</span> : null}
         </div>
@@ -470,8 +470,8 @@ export default async function DebriefPage({
                 <div key={group.claim} className="debrief-list-card">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="max-w-3xl">
-                      <p className="text-sm font-semibold text-white">{group.claim}</p>
-                      <p className="mt-1.5 text-sm leading-6 text-muted">{group.detail}</p>
+                      <p className="text-body font-medium text-white">{group.claim}</p>
+                      <p className="mt-1.5 text-body leading-6 text-muted">{group.detail}</p>
                     </div>
                     <span className="debrief-pill">{group.supports.length} support{group.supports.length === 1 ? "" : "s"}</span>
                   </div>
@@ -479,8 +479,8 @@ export default async function DebriefPage({
                   <div className="mt-3 space-y-2.5">
                     {group.supports.map((support) => (
                       <a key={`${support.kind}-${support.id}`} href={support.href} className="block rounded-2xl border border-[hsl(var(--border))] bg-[rgba(255,255,255,0.02)] px-4 py-3 transition hover:border-[hsl(var(--accent)/0.42)]">
-                        <p className="text-sm font-medium text-white">{support.label}</p>
-                        <p className="mt-1.5 text-sm leading-6 text-muted">{support.reason}</p>
+                        <p className="text-body font-medium text-white">{support.label}</p>
+                        <p className="mt-1.5 text-body leading-6 text-muted">{support.reason}</p>
                       </a>
                     ))}
                   </div>
@@ -493,8 +493,8 @@ export default async function DebriefPage({
                     {artifact.evidence.map((item) => (
                       <a key={`${item.kind}-${item.id}`} href={item.href} className="debrief-list-card block transition hover:border-[hsl(var(--accent)/0.42)]">
                         <div>
-                          <p className="text-sm font-semibold text-white">{item.label}</p>
-                          <p className="mt-2 text-sm text-muted">{item.detail}</p>
+                          <p className="text-body font-medium text-white">{item.label}</p>
+                          <p className="mt-2 text-body text-muted">{item.detail}</p>
                         </div>
                       </a>
                     ))}
@@ -517,17 +517,17 @@ export default async function DebriefPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {adjacent.previousWeekStart ? (
-              <a href={`/debrief?weekStart=${adjacent.previousWeekStart}`} className="btn-secondary w-full px-3 text-xs sm:w-auto">
+              <a href={`/debrief?weekStart=${adjacent.previousWeekStart}`} className="btn-secondary w-full px-3 text-ui-label sm:w-auto">
                 Previous saved week
               </a>
             ) : null}
             {adjacent.nextWeekStart ? (
-              <a href={`/debrief?weekStart=${adjacent.nextWeekStart}`} className="btn-secondary w-full px-3 text-xs sm:w-auto">
+              <a href={`/debrief?weekStart=${adjacent.nextWeekStart}`} className="btn-secondary w-full px-3 text-ui-label sm:w-auto">
                 Next saved week
               </a>
             ) : null}
           </div>
-          <a href="/dashboard" className="inline-flex min-h-[44px] items-center text-xs text-muted underline-offset-2 hover:text-white hover:underline lg:min-h-0">
+          <a href="/dashboard" className="inline-flex min-h-[44px] items-center text-ui-label text-muted underline-offset-2 hover:text-white hover:underline lg:min-h-0">
             Back to dashboard
           </a>
         </div>
@@ -556,23 +556,23 @@ async function DebriefTrends(props: {
   return (
     <article className="debrief-section-card p-5">
       <p className="debrief-kicker">Trends</p>
-      <p className="mt-2 text-sm text-muted">Patterns observed over the last 6 weeks.</p>
+      <p className="mt-2 text-body text-muted">Patterns observed over the last 6 weeks.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {trends.map((trend) => (
           <div key={trend.metric} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-medium text-muted">{trend.metric}</p>
-              <span className={`text-[11px] font-medium uppercase tracking-[0.08em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
+              <p className="text-ui-label text-muted">{trend.metric}</p>
+              <span className={`text-ui-label uppercase tracking-[0.08em] ${trend.direction === "improving" ? "text-success" : trend.direction === "declining" ? "text-danger" : "text-tertiary"}`}>
                 {trend.direction === "improving" ? "▲ Improving" : trend.direction === "declining" ? "▼ Declining" : "Stable"}
               </span>
             </div>
-            <p className="mt-2 text-sm text-white">{trend.detail}</p>
+            <p className="mt-2 text-body text-white">{trend.detail}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {trend.dataPoints.slice(-4).map((pt) => (
-                <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[11px] text-tertiary">{pt.label}</span>
+                <span key={pt.weekStart} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-tertiary">{pt.label}</span>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-tertiary">Confidence: {trend.confidence}</p>
+            <p className="mt-2 text-ui-label text-tertiary">Confidence: {trend.confidence}</p>
           </div>
         ))}
       </div>
@@ -600,21 +600,21 @@ async function DebriefBenchmarks(props: {
   return (
     <article className="debrief-section-card p-5">
       <p className="debrief-kicker">Best efforts</p>
-      <p className="mt-2 text-sm text-muted">Training-block bests from the last 12 weeks.</p>
+      <p className="mt-2 text-body text-muted">Training-block bests from the last 12 weeks.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {benchmarks.map((benchmark) => (
           <a key={benchmark.activityId} href={`/activities/${benchmark.activityId}`} className="block rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 transition hover:border-[hsl(var(--accent)/0.42)]">
             <div className="flex items-center gap-2">
               <span>{benchmark.sport === "run" ? "🏃" : benchmark.sport === "bike" ? "🚴" : "🏊"}</span>
-              <p className="text-xs font-medium text-muted">{benchmark.label}</p>
+              <p className="text-ui-label text-muted">{benchmark.label}</p>
             </div>
-            <p className="mt-2 text-xl font-semibold leading-tight text-white">{benchmark.formattedValue}</p>
+            <p className="mt-2 text-page-title leading-tight text-white">{benchmark.formattedValue}</p>
             {benchmark.isThisWeek ? (
-              <span className="mt-1 inline-block text-[11px] font-medium uppercase tracking-[0.08em] text-success">New this week</span>
+              <span className="mt-1 inline-block text-ui-label uppercase tracking-[0.08em] text-success">New this week</span>
             ) : null}
-            <p className="mt-1 text-sm text-muted">{benchmark.detail}</p>
+            <p className="mt-1 text-body text-muted">{benchmark.detail}</p>
             {benchmark.deltaLabel ? (
-              <p className={`mt-1 text-[11px] ${(benchmark.deltaVsPriorBlock ?? 0) > 0 ? "text-success" : "text-muted"}`}>{benchmark.deltaLabel}</p>
+              <p className={`mt-1 text-ui-label ${(benchmark.deltaVsPriorBlock ?? 0) > 0 ? "text-success" : "text-muted"}`}>{benchmark.deltaLabel}</p>
             ) : null}
           </a>
         ))}

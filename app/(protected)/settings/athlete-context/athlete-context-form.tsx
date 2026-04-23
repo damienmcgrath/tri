@@ -33,7 +33,7 @@ function parseDisciplines(values: string[]): Discipline[] {
 // ── shared input class ───────────────────────────────────────────────────────
 
 const inputCls =
-  "w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-sm";
+  "w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2 text-body";
 // [color-scheme:dark] makes native date pickers render in dark mode
 const dateCls = `${inputCls} [color-scheme:dark]`;
 
@@ -42,7 +42,7 @@ const dateCls = `${inputCls} [color-scheme:dark]`;
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 pt-2">
-      <span className="shrink-0 text-xs uppercase tracking-[0.14em] text-zinc-500">
+      <span className="shrink-0 text-kicker text-zinc-500">
         {children}
       </span>
       <div className="h-px flex-1 bg-[hsl(var(--border))]" />
@@ -78,7 +78,7 @@ function CoachingStyleCards({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="space-y-1.5 text-sm">
+    <div className="space-y-1.5 text-body">
       <span className="text-muted">Coaching style</span>
       <div className="grid grid-cols-3 gap-2">
         {COACHING_OPTIONS.map((opt) => {
@@ -96,13 +96,13 @@ function CoachingStyleCards({
               }`}
             >
               <p
-                className={`mb-1 text-sm font-medium ${
+                className={`mb-1 text-body font-medium ${
                   active ? "text-[hsl(var(--accent))]" : ""
                 }`}
               >
                 {opt.label}
               </p>
-              <p className="text-xs leading-snug text-muted">{opt.description}</p>
+              <p className="text-ui-label leading-snug text-muted">{opt.description}</p>
             </button>
           );
         })}
@@ -128,7 +128,7 @@ function DisciplineChips({
     );
   }
   return (
-    <div className="space-y-1.5 text-sm">
+    <div className="space-y-1.5 text-body">
       <span className="text-muted">{label}</span>
       <div className="flex flex-wrap gap-2">
         {DISCIPLINES.map((d) => {
@@ -138,7 +138,7 @@ function DisciplineChips({
               key={d}
               type="button"
               onClick={() => toggle(d)}
-              className={`rounded-full border px-3.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-full border px-3.5 py-1 text-ui-label transition-colors ${
                 active
                   ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent))] text-black"
                   : "border-[hsl(var(--border))] text-muted hover:border-zinc-500 hover:text-[hsl(var(--foreground))]"
@@ -172,12 +172,12 @@ function CountedTextarea({
 }) {
   const count = countLines(value);
   return (
-    <div className="space-y-1 text-sm">
+    <div className="space-y-1 text-body">
       <div className="flex items-center justify-between">
         <span className="text-muted">{label}</span>
         {count > 0 && (
           <span
-            className={`tabular-nums text-xs ${
+            className={`tabular-nums text-ui-label ${
               count >= max ? "text-[hsl(var(--danger))]" : "text-muted"
             }`}
           >
@@ -212,7 +212,7 @@ function InjuryNotes({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="text-sm text-muted underline-offset-2 transition-colors hover:text-[hsl(var(--foreground))] hover:underline"
+        className="text-body text-muted underline-offset-2 transition-colors hover:text-[hsl(var(--foreground))] hover:underline"
       >
         + Add injury or caution notes
       </button>
@@ -220,14 +220,14 @@ function InjuryNotes({
   }
 
   return (
-    <div className="space-y-1 text-sm">
+    <div className="space-y-1 text-body">
       <div className="flex items-center justify-between">
         <span className="text-muted">Injury or caution notes</span>
         {!value && (
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="text-xs text-muted transition-colors hover:text-[hsl(var(--foreground))]"
+            className="text-ui-label text-muted transition-colors hover:text-[hsl(var(--foreground))]"
           >
             Cancel
           </button>
@@ -243,7 +243,7 @@ function InjuryNotes({
         autoFocus
       />
       {value.length > 0 && (
-        <p className="text-right text-xs tabular-nums text-muted">{value.length}/600</p>
+        <p className="text-right text-ui-label tabular-nums text-muted">{value.length}/600</p>
       )}
     </div>
   );
@@ -276,7 +276,7 @@ function CompletenessBar({
   if (filled === total) return null;
   const pct = Math.round((filled / total) * 100);
   return (
-    <div className="flex items-center gap-3 text-xs text-muted">
+    <div className="flex items-center gap-3 text-ui-label text-muted">
       <div className="h-1 flex-1 overflow-hidden rounded-full bg-[hsl(var(--border))]">
         <div
           className="h-full rounded-full bg-[hsl(var(--accent))] transition-all duration-300"
@@ -365,7 +365,7 @@ export function AthleteContextForm({ snapshot, compact = false, raceName, raceDa
       <SectionLabel>Racing Profile</SectionLabel>
 
       <div className={`grid gap-3 ${colGrid}`}>
-        <label className="space-y-1 text-sm">
+        <label className="space-y-1 text-body">
           <span className="text-muted">Experience level</span>
           <select
             value={experienceLevel}
@@ -379,7 +379,7 @@ export function AthleteContextForm({ snapshot, compact = false, raceName, raceDa
           </select>
         </label>
 
-        <label className="space-y-1 text-sm">
+        <label className="space-y-1 text-body">
           <span className="text-muted">Goal type</span>
           <select
             value={goalType}
@@ -394,17 +394,17 @@ export function AthleteContextForm({ snapshot, compact = false, raceName, raceDa
           </select>
         </label>
 
-        <div className="space-y-1 text-sm sm:col-span-2">
+        <div className="space-y-1 text-body sm:col-span-2">
           <span className="text-muted">Race target</span>
           <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-2">
-            <span className="flex-1 truncate text-sm">
+            <span className="flex-1 truncate text-body">
               {raceName && raceDate
                 ? `${raceName} — ${new Date(`${raceDate}T00:00:00.000Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
                 : raceName
                   ? raceName
                   : "No race set yet"}
             </span>
-            <a href="/settings/race" className="shrink-0 text-xs text-accent underline-offset-2 hover:underline">
+            <a href="/settings/race" className="shrink-0 text-ui-label text-accent underline-offset-2 hover:underline">
               {raceName ? "Change" : "Set race"}
             </a>
           </div>
@@ -412,7 +412,7 @@ export function AthleteContextForm({ snapshot, compact = false, raceName, raceDa
       </div>
 
       {compact ? (
-        <label className="block space-y-1 text-sm">
+        <label className="block space-y-1 text-body">
           <span className="text-muted">Coaching style</span>
           <select
             value={coachingPreference}
@@ -487,7 +487,7 @@ export function AthleteContextForm({ snapshot, compact = false, raceName, raceDa
           >
             {isSaving ? "Saving..." : compact ? "Save context" : "Save athlete context"}
           </button>
-          {message ? <p className="text-sm text-muted">{message}</p> : null}
+          {message ? <p className="text-body text-muted">{message}</p> : null}
         </div>
       </div>
     </form>
@@ -578,12 +578,12 @@ export function FtpSection({
       {/* header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-accent mb-1">
+          <p className="text-kicker text-accent mb-1">
             Physical Metrics
           </p>
-          <h3 className="text-sm font-medium">Bike FTP</h3>
+          <h3 className="text-body font-medium">Bike FTP</h3>
           {currentFtp ? (
-            <p className="mt-0.5 text-sm text-muted">
+            <p className="mt-0.5 text-body text-muted">
               Current:{" "}
               <span className="font-mono text-[hsl(var(--foreground))]">
                 {currentFtp.value}W
@@ -592,7 +592,7 @@ export function FtpSection({
               {currentFtp.recorded_at}
             </p>
           ) : (
-            <p className="mt-0.5 text-sm text-muted">
+            <p className="mt-0.5 text-body text-muted">
               Not set — add your FTP for power-zone guidance.
             </p>
           )}
@@ -601,7 +601,7 @@ export function FtpSection({
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
-            className="shrink-0 text-xs text-muted underline-offset-2 hover:underline"
+            className="shrink-0 text-ui-label text-muted underline-offset-2 hover:underline"
           >
             {showHistory ? "Hide history" : `History (${history.length})`}
           </button>
@@ -611,7 +611,7 @@ export function FtpSection({
       {/* history table with deltas */}
       {showHistory && history.length > 1 && (
         <div className="overflow-hidden rounded-xl border border-[hsl(var(--border))]">
-          <table className="w-full text-xs">
+          <table className="w-full text-ui-label">
             <thead>
               <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))]">
                 <th className="px-3 py-2 text-left font-normal text-muted">Date</th>
@@ -680,11 +680,11 @@ export function FtpSection({
 
       {/* log new reading */}
       <form onSubmit={handleFtpSubmit} className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+        <p className="text-kicker text-zinc-500">
           {currentFtp ? "Log new reading" : "Set FTP"}
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1 text-sm">
+          <label className="space-y-1 text-body">
             <span className="text-muted">Watts</span>
             <input
               type="number"
@@ -696,7 +696,7 @@ export function FtpSection({
               className={inputCls}
             />
           </label>
-          <label className="space-y-1 text-sm">
+          <label className="space-y-1 text-body">
             <span className="text-muted">Source</span>
             <select
               value={ftpSource}
@@ -708,7 +708,7 @@ export function FtpSection({
               <option value="estimated">Estimated</option>
             </select>
           </label>
-          <label className="space-y-1 text-sm">
+          <label className="space-y-1 text-body">
             <span className="text-muted">Date</span>
             <input
               type="date"
@@ -717,7 +717,7 @@ export function FtpSection({
               className={dateCls}
             />
           </label>
-          <label className="space-y-1 text-sm">
+          <label className="space-y-1 text-body">
             <span className="text-muted">Notes (optional)</span>
             <input
               value={ftpNotes}
@@ -735,7 +735,7 @@ export function FtpSection({
           >
             {isSaving ? "Saving..." : "Log FTP"}
           </button>
-          {message && <p className="text-sm text-muted">{message}</p>}
+          {message && <p className="text-body text-muted">{message}</p>}
         </div>
       </form>
     </div>

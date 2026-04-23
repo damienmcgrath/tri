@@ -21,13 +21,13 @@ export default async function AthleteContextSettingsPage() {
 
   return (
     <section className="space-y-4">
-      <Link href="/settings" className="text-sm text-cyan-300 underline-offset-2 hover:underline">
+      <Link href="/settings" className="text-body text-cyan-300 underline-offset-2 hover:underline">
         ← Back to Settings
       </Link>
       <header className="surface p-6">
-        <p className="text-xs uppercase tracking-[0.14em] text-accent">Athlete context</p>
-        <h1 className="mt-2 text-2xl font-semibold">Coaching context</h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="text-kicker text-accent">Athlete context</p>
+        <h1 className="mt-2 text-page-title">Coaching context</h1>
+        <p className="mt-1 text-body text-muted">
           This context feeds every AI coaching response — the more complete, the better.
         </p>
       </header>

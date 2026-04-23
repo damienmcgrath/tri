@@ -12,7 +12,7 @@ export function PageHeader({ title, objective, actions = [] }: { title: string; 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="label">{title}</p>
-          <p className="mt-2 max-w-3xl text-sm text-muted">{objective}</p>
+          <p className="mt-2 max-w-3xl text-body text-muted">{objective}</p>
         </div>
 
         {actions.length > 0 ? (

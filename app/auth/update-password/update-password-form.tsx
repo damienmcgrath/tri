@@ -88,14 +88,14 @@ export function UpdatePasswordForm() {
         />
       </div>
 
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
-      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
+      {error ? <p className="text-body text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-body text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Updating password..." : "Update password"}
       </button>
 
-      <p className="text-center text-sm text-muted">
+      <p className="text-center text-body text-muted">
         Need to start over?{" "}
         <Link href="/auth/forgot-password" className="font-medium text-accent hover:text-white">
           Send another reset email

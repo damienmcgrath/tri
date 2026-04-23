@@ -129,9 +129,9 @@ export default async function IntegrationsPage() {
   return (
     <section className="space-y-4">
       <header className="surface p-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-cyan-300">Settings → Integrations / Uploads</p>
-        <h1 className="mt-2 text-2xl font-semibold">Integrations &amp; uploads</h1>
-        <p className="mt-1 text-sm text-muted">Connect third-party accounts or upload .fit / .tcx files to import your completed activities.</p>
+        <p className="text-kicker text-cyan-300">Settings → Integrations / Uploads</p>
+        <h1 className="mt-2 text-page-title">Integrations &amp; uploads</h1>
+        <p className="mt-1 text-body text-muted">Connect third-party accounts or upload .fit / .tcx files to import your completed activities.</p>
       </header>
 
       <Suspense fallback={null}>

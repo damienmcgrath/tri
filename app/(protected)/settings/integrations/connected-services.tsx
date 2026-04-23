@@ -54,8 +54,8 @@ export async function ConnectedServices() {
   return (
     <section className="surface p-6 space-y-4">
       <header>
-        <h2 className="text-lg font-semibold">Connected services</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="text-section-title font-semibold">Connected services</h2>
+        <p className="mt-1 text-body text-muted">
           Connect third-party accounts to import your completed workouts automatically.
         </p>
       </header>

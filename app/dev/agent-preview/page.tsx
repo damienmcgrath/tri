@@ -29,8 +29,8 @@ export default async function AgentPreviewPage() {
       <div className="mx-auto flex min-h-screen w-full max-w-[960px] flex-col gap-4 px-4 py-10 md:px-6">
         <section className="surface p-6">
           <p className="label">Agent Preview</p>
-          <h1 className="mt-3 text-3xl">Local UI preview mode</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
+          <h1 className="mt-3 text-page-hero">Local UI preview mode</h1>
+          <p className="mt-2 max-w-2xl text-body text-muted">
             Use this when agents need a stable authenticated view across the full product without real Supabase sign-in.
           </p>
 
@@ -51,7 +51,7 @@ export default async function AgentPreviewPage() {
           <p className="label">Routes</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {previewLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="rounded-xl border border-[var(--border-default)] px-4 py-3 text-sm transition hover:border-[var(--border-accent)] hover:bg-[var(--color-surface-raised)]">
+              <Link key={link.href} href={link.href} className="rounded-xl border border-[var(--border-default)] px-4 py-3 text-body transition hover:border-[var(--border-accent)] hover:bg-[var(--color-surface-raised)]">
                 {link.label}
               </Link>
             ))}

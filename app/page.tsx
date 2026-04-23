@@ -6,7 +6,7 @@ export default function HomePage() {
       <div className="space-y-4">
         <p className="label">tri.ai</p>
         <h1 className="text-4xl tracking-tight">Your AI training companion for triathlon</h1>
-        <p className="max-w-2xl text-lg text-muted">
+        <p className="max-w-2xl text-section-title text-muted">
           Build your weekly plan, track execution, and get coach-style insights without a noisy interface.
         </p>
       </div>

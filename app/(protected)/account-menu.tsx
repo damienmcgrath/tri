@@ -49,7 +49,7 @@ export function AccountMenu({ avatarUrl, initials, displayName, email, signOutAc
             className="h-9 w-9 rounded-full object-cover"
           />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-xs font-medium text-accent">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-ui-label text-accent">
             {initials}
           </span>
         )}
@@ -58,24 +58,24 @@ export function AccountMenu({ avatarUrl, initials, displayName, email, signOutAc
       <div className="absolute right-0 z-50 mt-2 w-64 rounded-md border border-[var(--border-default)] bg-[var(--color-surface-overlay)] p-3">
         <div className="border-b border-[var(--border-subtle)] pb-3">
           <p className="label-base">Account</p>
-          <p className="mt-1 text-sm font-medium text-[hsl(var(--fg))]">{displayName}</p>
-          <p className="text-xs text-muted">{email}</p>
+          <p className="mt-1 text-body font-medium text-[hsl(var(--fg))]">{displayName}</p>
+          <p className="text-ui-label text-muted">{email}</p>
         </div>
 
         <div className="mt-3 space-y-1">
-          <Link href="/settings" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-sm text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
+          <Link href="/settings" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-body text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
             Account
           </Link>
-          <Link href="/settings/race" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-sm text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
+          <Link href="/settings/race" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-body text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
             Race settings
           </Link>
-          <Link href="/settings/integrations" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-sm text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
+          <Link href="/settings/integrations" onClick={closeMenu} className="block rounded-md px-2 py-1.5 text-body text-[hsl(var(--fg-muted))] hover:bg-[var(--color-surface-raised)] hover:text-[hsl(var(--fg))]">
             Integrations
           </Link>
         </div>
 
         <form action={signOutAction} className="mt-3 border-t border-[var(--border-subtle)] pt-3">
-          <button onClick={closeMenu} className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[hsl(var(--fg-muted))] transition hover:bg-[var(--color-danger-muted)] hover:text-[var(--color-danger)]">
+          <button onClick={closeMenu} className="w-full rounded-md px-2 py-1.5 text-left text-body text-[hsl(var(--fg-muted))] transition hover:bg-[var(--color-danger-muted)] hover:text-[var(--color-danger)]">
             Sign out
           </button>
         </form>

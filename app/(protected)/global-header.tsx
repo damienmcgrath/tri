@@ -53,7 +53,7 @@ export function GlobalHeader({
               </span>
             </span>
           ) : null}
-          <Link href="/coach" className="btn-header-cta px-2.5 py-1 text-xs">Ask tri.ai</Link>
+          <Link href="/coach" className="btn-header-cta px-2.5 py-1 text-ui-label">Ask tri.ai</Link>
           <AccountMenu
             avatarUrl={account.avatarUrl}
             initials={account.initials}

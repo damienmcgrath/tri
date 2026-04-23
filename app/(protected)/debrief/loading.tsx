@@ -27,7 +27,7 @@ export default function DebriefLoading() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--border))] border-t-[hsl(var(--accent-performance))]" />
 
           {/* Current step message */}
-          <p className="text-sm font-medium text-white">
+          <p className="text-body font-medium text-white">
             {steps[activeStep]}&hellip;
           </p>
 

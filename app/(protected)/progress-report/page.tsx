@@ -49,8 +49,8 @@ function renderBlockSelector(
             }
           >
             <span className="font-medium">{block.name}</span>
-            <span className="ml-2 text-[11px] text-muted">· {block.block_type}</span>
-            <span className="ml-2 text-[11px] text-tertiary">
+            <span className="ml-2 text-ui-label text-muted">· {block.block_type}</span>
+            <span className="ml-2 text-ui-label text-tertiary">
               {formatShortRange(block.start_date, block.end_date)}
             </span>
           </a>
@@ -137,15 +137,15 @@ function renderArtifact(
           <div className="max-w-4xl">
             <p className="label">Progress Report</p>
             {renderFactsHeader(facts, stale)}
-            <h1 className="mt-4 max-w-4xl text-2xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">
+            <h1 className="mt-4 max-w-4xl text-page-title leading-[1.05] tracking-[-0.03em] sm:text-4xl md:text-[3.25rem]">
               {narrative.coachHeadline}
             </h1>
             <p className="mt-3 max-w-3xl text-[15px] leading-7 text-white">
               {narrative.executiveSummary}
             </p>
-            <p className="mt-2 text-sm text-muted">{renderVolumeDelta(facts)}</p>
+            <p className="mt-2 text-body text-muted">{renderVolumeDelta(facts)}</p>
             {facts.confidenceNote ? (
-              <p className="mt-2 max-w-2xl text-xs text-tertiary">{facts.confidenceNote}</p>
+              <p className="mt-2 max-w-2xl text-ui-label text-tertiary">{facts.confidenceNote}</p>
             ) : null}
           </div>
           <div className="relative z-10 flex min-w-[180px] flex-col items-end gap-3">
@@ -157,29 +157,29 @@ function renderArtifact(
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="debrief-metric-card">
               <p className="debrief-kicker">Total CTL</p>
-              <p className="mt-4 text-xl font-semibold leading-tight text-white">
+              <p className="mt-4 text-page-title leading-tight text-white">
                 {totalFitness.currentCtlStart} → {totalFitness.currentCtlEnd}
               </p>
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-2 text-ui-label text-muted">
                 Δ {totalFitness.currentCtlDelta >= 0 ? "+" : ""}
                 {totalFitness.currentCtlDelta} across the block
               </p>
             </div>
             <div className="debrief-metric-card">
               <p className="debrief-kicker">vs Prior Block</p>
-              <p className="mt-4 text-xl font-semibold leading-tight text-white">
+              <p className="mt-4 text-page-title leading-tight text-white">
                 {totalFitness.deltaVsPrior !== null
                   ? `${totalFitness.deltaVsPrior >= 0 ? "+" : ""}${totalFitness.deltaVsPrior}`
                   : "—"}
               </p>
-              <p className="mt-2 text-xs text-muted">End-of-block CTL delta</p>
+              <p className="mt-2 text-ui-label text-muted">End-of-block CTL delta</p>
             </div>
             <div className="debrief-metric-card">
               <p className="debrief-kicker">Ramp Rate</p>
-              <p className="mt-4 text-xl font-semibold leading-tight text-white">
+              <p className="mt-4 text-page-title leading-tight text-white">
                 {totalFitness.rampRate !== null ? `${totalFitness.rampRate} / wk` : "—"}
               </p>
-              <p className="mt-2 text-xs text-muted">7-day CTL slope</p>
+              <p className="mt-2 text-ui-label text-muted">7-day CTL slope</p>
             </div>
           </div>
         ) : null}
@@ -196,14 +196,14 @@ function renderArtifact(
                 className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-muted">
+                  <p className="text-ui-label text-muted">
                     {sportGlyph(f.sport)} CTL ({f.sport})
                   </p>
                   <span className={directionPillClass(f.direction)}>
                     {directionGlyph(f.direction)} {f.direction}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-white">
+                <p className="mt-2 text-body text-white">
                   {f.currentCtlStart} → {f.currentCtlEnd}
                   {f.deltaVsPrior !== null
                     ? ` (Δ ${f.deltaVsPrior >= 0 ? "+" : ""}${f.deltaVsPrior} vs prior end)`
@@ -219,25 +219,25 @@ function renderArtifact(
           <p className="debrief-summary mt-4 max-w-3xl">{narrative.durabilityReport}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-xs font-medium text-muted">This block</p>
-              <p className="mt-2 text-sm text-white">
+              <p className="text-ui-label text-muted">This block</p>
+              <p className="mt-2 text-body text-white">
                 {facts.durability.current.avgDecouplingPct !== null
                   ? `${facts.durability.current.avgDecouplingPct}% avg decoupling`
                   : "No samples"}
               </p>
-              <p className="mt-1 text-[11px] text-tertiary">
+              <p className="mt-1 text-ui-label text-tertiary">
                 {facts.durability.current.decouplingSamples} samples ·{" "}
                 {facts.durability.current.poorDurabilityCount} poor-durability
               </p>
             </div>
             <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-              <p className="text-xs font-medium text-muted">Prior block</p>
-              <p className="mt-2 text-sm text-white">
+              <p className="text-ui-label text-muted">Prior block</p>
+              <p className="mt-2 text-body text-white">
                 {facts.durability.prior.avgDecouplingPct !== null
                   ? `${facts.durability.prior.avgDecouplingPct}% avg decoupling`
                   : "No samples"}
               </p>
-              <p className="mt-1 text-[11px] text-tertiary">
+              <p className="mt-1 text-ui-label text-tertiary">
                 {facts.durability.prior.decouplingSamples} samples ·{" "}
                 {facts.durability.prior.poorDurabilityCount} poor-durability
               </p>
@@ -251,10 +251,10 @@ function renderArtifact(
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {narrative.disciplineVerdicts.map((v) => (
             <div key={v.sport} className="debrief-list-card">
-              <p className="text-xs font-medium text-muted">
+              <p className="text-ui-label text-muted">
                 {sportGlyph(v.sport)} {v.sport}
               </p>
-              <p className="mt-2 text-sm leading-6 text-white">{v.verdict}</p>
+              <p className="mt-2 text-body leading-6 text-white">{v.verdict}</p>
             </div>
           ))}
         </div>
@@ -263,7 +263,7 @@ function renderArtifact(
       {facts.paceAtHrByDiscipline.length > 0 ? (
         <article className="debrief-section-card p-5">
           <p className="debrief-kicker">Pace-at-HR</p>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-body text-muted">
             Same cost, different output — read the aerobic economy shift.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -273,15 +273,15 @@ function renderArtifact(
                 className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-muted">
+                  <p className="text-ui-label text-muted">
                     {sportGlyph(p.sport)} {p.sport}
                   </p>
                   <span className={directionPillClass(p.direction)}>
                     {directionGlyph(p.direction)} {p.direction}
                   </span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-white">{p.summary}</p>
-                <p className="mt-2 text-[11px] text-tertiary">
+                <p className="mt-2 text-body leading-6 text-white">{p.summary}</p>
+                <p className="mt-2 text-ui-label text-tertiary">
                   {p.current.sessionCount} / {p.prior.sessionCount} sessions (this / prior)
                 </p>
               </div>
@@ -299,17 +299,17 @@ function renderArtifact(
               <div key={`${peak.sport}-${peak.label}`} className="debrief-list-card">
                 <div className="flex items-center gap-2">
                   <span>{sportGlyph(peak.sport)}</span>
-                  <p className="text-xs font-medium text-muted">{peak.label}</p>
+                  <p className="text-ui-label text-muted">{peak.label}</p>
                 </div>
-                <p className="mt-2 text-xl font-semibold leading-tight text-white">
+                <p className="mt-2 text-page-title leading-tight text-white">
                   {peak.current.formatted}
                 </p>
                 {peak.prior.formatted ? (
-                  <p className="mt-1 text-xs text-muted">vs. {peak.prior.formatted} prior block</p>
+                  <p className="mt-1 text-ui-label text-muted">vs. {peak.prior.formatted} prior block</p>
                 ) : null}
                 {peak.deltaLabel ? (
                   <p
-                    className={`mt-1 text-[11px] ${peak.delta && peak.delta > 0 ? "text-success" : peak.delta && peak.delta < 0 ? "text-warning" : "text-muted"}`}
+                    className={`mt-1 text-ui-label ${peak.delta && peak.delta > 0 ? "text-success" : peak.delta && peak.delta < 0 ? "text-warning" : "text-muted"}`}
                   >
                     {peak.deltaLabel}
                   </p>
@@ -317,7 +317,7 @@ function renderArtifact(
                 {peak.current.activityId ? (
                   <a
                     href={`/activities/${peak.current.activityId}`}
-                    className="mt-2 inline-flex text-[11px] text-muted underline-offset-2 hover:text-white hover:underline"
+                    className="mt-2 inline-flex text-ui-label text-muted underline-offset-2 hover:text-white hover:underline"
                   >
                     View activity
                   </a>
@@ -336,14 +336,14 @@ function renderArtifact(
         {narrative.teach ? (
           <>
             <p className="debrief-kicker mt-5">Why this matters</p>
-            <p className="mt-3 text-sm leading-6 text-muted">{narrative.teach}</p>
+            <p className="mt-3 text-body leading-6 text-muted">{narrative.teach}</p>
           </>
         ) : null}
       </article>
 
       <article className="debrief-section-card p-5">
         <p className="debrief-kicker">Carry into next block</p>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           Two reminders worth keeping in mind as the next block starts.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -375,9 +375,9 @@ function renderEmptyState(
   return (
     <article className="surface p-5">
       <p className="label">Progress Report</p>
-      <h1 className="mt-1 text-2xl font-semibold">No block-over-block data yet</h1>
-      <p className="mt-2 max-w-2xl text-sm text-muted">{reason}</p>
-      <p className="mt-2 max-w-2xl text-xs text-tertiary">
+      <h1 className="mt-1 text-page-title">No block-over-block data yet</h1>
+      <p className="mt-2 max-w-2xl text-body text-muted">{reason}</p>
+      <p className="mt-2 max-w-2xl text-ui-label text-tertiary">
         Block ending {blockEnd}. Data last changed {sourceUpdatedAt.slice(0, 10)}.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -386,7 +386,7 @@ function renderEmptyState(
           blockEnd={blockEnd}
           label="Try again"
         />
-        <a href="/dashboard" className="btn-secondary px-3 text-xs">
+        <a href="/dashboard" className="btn-secondary px-3 text-ui-label">
           Back to dashboard
         </a>
       </div>
