@@ -134,7 +134,7 @@ export function TrainingScoreCard({ score }: Props) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-2xl font-semibold ${getScoreColour(score.compositeScore)}`}>
+            <span className={`text-page-title font-semibold ${getScoreColour(score.compositeScore)}`}>
               {Math.round(score.compositeScore)}
             </span>
           </div>
@@ -146,7 +146,7 @@ export function TrainingScoreCard({ score }: Props) {
             {trendText(score.scoreDelta7d)}
           </p>
           {!score.progressionActive ? (
-            <p className="mt-1 text-[11px] text-tertiary">Progression builds with 2+ weeks of data</p>
+            <p className="mt-1 text-ui-label text-tertiary">Progression builds with 2+ weeks of data</p>
           ) : null}
         </div>
       </div>
@@ -158,14 +158,14 @@ export function TrainingScoreCard({ score }: Props) {
           const display = sub.active && sub.value !== null ? Math.round(sub.value) : "—";
           return (
             <div key={sub.label} className="grid grid-cols-[88px_1fr_auto] items-center gap-3">
-              <span className="text-[11px] uppercase tracking-[0.08em] text-tertiary">{sub.label}</span>
+              <span className="text-kicker text-tertiary">{sub.label}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
                 <div
                   className={`h-full rounded-full transition-ui ${sub.active ? sub.fillClass : "bg-white/20"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className="w-6 text-right text-sm font-medium tabular-nums text-white">{display}</span>
+              <span className="w-6 text-right text-body font-medium tabular-nums text-white">{display}</span>
             </div>
           );
         })}

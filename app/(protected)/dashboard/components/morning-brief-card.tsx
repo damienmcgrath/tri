@@ -29,15 +29,15 @@ export function MorningBriefCard({ brief }: Props) {
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-[10px] font-semibold text-[var(--color-accent)]"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-ui-label font-semibold text-[var(--color-accent)]"
         >
           ai
         </span>
-        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--color-accent)]">
+        <p className="text-kicker font-medium text-[var(--color-accent)]">
           Coach brief
         </p>
       </div>
-      <p className="mt-1.5 text-sm leading-snug text-white">
+      <p className="mt-1.5 text-body leading-snug text-white">
         {expanded ? brief.briefText : summary}
       </p>
 
@@ -51,7 +51,7 @@ export function MorningBriefCard({ brief }: Props) {
               <Link
                 key={i}
                 href={href}
-                className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.7)] transition-ui hover:bg-[rgba(255,255,255,0.08)]"
+                className="rounded-md border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-ui-label text-[rgba(255,255,255,0.7)] transition-ui hover:bg-[rgba(255,255,255,0.08)]"
               >
                 {action}
               </Link>
@@ -64,7 +64,7 @@ export function MorningBriefCard({ brief }: Props) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-1.5 text-[11px] text-tertiary transition hover:text-white"
+          className="mt-1.5 text-ui-label text-tertiary transition hover:text-white"
         >
           {expanded ? "Show less" : "Read more"}
         </button>

@@ -104,7 +104,7 @@ export function DisciplineBalanceCompact({ balance }: Props) {
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ backgroundColor: SPORT_COLORS[sport] }}
                 />
-                <span className="text-xs text-muted">{SPORT_LABELS[sport] ?? sport}</span>
+                <span className="text-ui-label text-muted">{SPORT_LABELS[sport] ?? sport}</span>
               </div>
               <div
                 className="relative h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]"
@@ -117,12 +117,12 @@ export function DisciplineBalanceCompact({ balance }: Props) {
                 />
               </div>
               <div className="flex items-baseline gap-1.5 tabular-nums">
-                <span className="text-[11px] text-[rgba(255,255,255,0.78)]">
+                <span className="text-ui-label text-[rgba(255,255,255,0.78)]">
                   {formatHours(actualMins)}
                   <span className="text-tertiary">/{formatHours(plannedMins)}</span>
                 </span>
                 {delta ? (
-                  <span className={`text-[10px] font-medium ${deltaClass}`}>{delta}</span>
+                  <span className={`text-ui-label font-medium ${deltaClass}`}>{delta}</span>
                 ) : null}
               </div>
             </div>
@@ -133,7 +133,7 @@ export function DisciplineBalanceCompact({ balance }: Props) {
       {hint ? (
         <Link
           href="/plan"
-          className="mt-3 flex items-start gap-2 rounded-lg border border-[rgba(255,180,60,0.24)] bg-[rgba(255,180,60,0.06)] px-2.5 py-1.5 text-[11px] transition-ui hover:border-[rgba(255,180,60,0.45)] hover:bg-[rgba(255,180,60,0.12)]"
+          className="mt-3 flex items-start gap-2 rounded-lg border border-[rgba(255,180,60,0.24)] bg-[rgba(255,180,60,0.06)] px-2.5 py-1.5 text-ui-label transition-ui hover:border-[rgba(255,180,60,0.45)] hover:bg-[rgba(255,180,60,0.12)]"
         >
           <span aria-hidden="true" className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-warning)]" />
           <span className="flex-1 text-[rgba(255,255,255,0.88)]">{hint.message}</span>

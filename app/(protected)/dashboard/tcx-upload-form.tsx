@@ -31,7 +31,7 @@ export function TcxUploadForm() {
       </div>
       <SubmitButton />
       {state.status !== "idle" ? (
-        <p className={`text-sm ${state.status === "success" ? "text-emerald-300" : "text-rose-400"}`}>{state.message}</p>
+        <p className={`text-body ${state.status === "success" ? "text-emerald-300" : "text-rose-400"}`}>{state.message}</p>
       ) : null}
     </form>
   );

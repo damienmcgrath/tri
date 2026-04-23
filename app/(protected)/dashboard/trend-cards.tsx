@@ -81,23 +81,23 @@ export function TrendCards({ trends, fatigueSignal }: { trends: WeeklyTrend[]; f
           }`}
           aria-label="Cross-discipline fatigue synthesis"
         >
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white">
+          <p className="text-kicker font-medium text-white">
             Cross-discipline fatigue
           </p>
-          <p className="mt-2 text-sm text-white">
+          <p className="mt-2 text-body text-white">
             {formatSports(synthesisSports)} are trending down together over the same window.
             This pattern typically indicates accumulated fatigue rather than
             discipline-specific weakness. Prioritize recovery this weekend and watch how
             your legs feel on the next long session.
           </p>
           {fatigueSignal?.detail ? (
-            <p className="mt-2 text-[11px] text-muted">{fatigueSignal.detail}</p>
+            <p className="mt-2 text-ui-label text-muted">{fatigueSignal.detail}</p>
           ) : null}
         </article>
       ) : null}
       {trends.length > 0 ? (
         <article className="surface p-4 md:p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-tertiary">Recent trends</p>
+          <p className="text-kicker text-tertiary">Recent trends</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {trends.map((trend) => {
               const sport = METRIC_SPORT[trend.metric] ?? "other";
@@ -111,18 +111,18 @@ export function TrendCards({ trends, fatigueSignal }: { trends: WeeklyTrend[]; f
                   className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted">{trend.metric}</p>
+                    <p className="text-ui-label text-muted">{trend.metric}</p>
                     <Sparkline values={values} color={color} width={80} height={24} />
                   </div>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-base font-semibold text-white">
+                    <span className="text-body font-semibold text-white">
                       {currentLabel}
                     </span>
-                    <span className={`text-xs font-medium ${DIRECTION_CLASS[trend.direction]}`}>
+                    <span className={`text-ui-label font-medium ${DIRECTION_CLASS[trend.direction]}`}>
                       {DIRECTION_ARROW[trend.direction]} {trend.direction}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-snug text-muted">{trend.detail}</p>
+                  <p className="mt-1 text-ui-label leading-snug text-muted">{trend.detail}</p>
                 </div>
               );
             })}

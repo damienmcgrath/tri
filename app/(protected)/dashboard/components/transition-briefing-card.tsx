@@ -39,11 +39,11 @@ export function TransitionBriefingCard({ briefing }: Props) {
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(190,255,0,0.7)]">
+          <p className="shrink-0 text-kicker font-medium text-[rgba(190,255,0,0.7)]">
             Monday brief
           </p>
           {!expanded ? (
-            <p className="min-w-0 truncate text-sm text-[rgba(255,255,255,0.6)]">
+            <p className="min-w-0 truncate text-body text-[rgba(255,255,255,0.6)]">
               {summary}
             </p>
           ) : null}
@@ -60,7 +60,7 @@ export function TransitionBriefingCard({ briefing }: Props) {
 
         <button
           onClick={handleDismiss}
-          className="shrink-0 rounded-md px-2 py-1 text-[11px] text-tertiary transition hover:bg-[rgba(255,255,255,0.06)]"
+          className="shrink-0 rounded-md px-2 py-1 text-ui-label text-tertiary transition hover:bg-[rgba(255,255,255,0.06)]"
           aria-label="Dismiss briefing"
         >
           Dismiss
@@ -71,25 +71,25 @@ export function TransitionBriefingCard({ briefing }: Props) {
         <div className="mt-3 space-y-3">
           {/* Last week takeaway */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">Last week</p>
-            <p className="mt-1 text-sm text-white">{briefing.lastWeekTakeaway}</p>
+            <p className="text-kicker text-tertiary">Last week</p>
+            <p className="mt-1 text-body text-white">{briefing.lastWeekTakeaway}</p>
           </div>
 
           {/* This week focus */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-tertiary">This week</p>
-            <p className="mt-1 text-sm text-white">{briefing.thisWeekFocus}</p>
+            <p className="text-kicker text-tertiary">This week</p>
+            <p className="mt-1 text-body text-white">{briefing.thisWeekFocus}</p>
           </div>
 
           {/* Adaptation context */}
           {briefing.adaptationContext ? (
             <div className="rounded-lg border border-[rgba(255,180,60,0.2)] bg-[rgba(255,180,60,0.06)] px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--warning))]">Adaptations</p>
-              <p className="mt-1 text-xs text-muted">{briefing.adaptationContext}</p>
+              <p className="text-kicker text-[hsl(var(--warning))]">Adaptations</p>
+              <p className="mt-1 text-ui-label text-muted">{briefing.adaptationContext}</p>
               {briefing.pendingRationaleIds.length > 0 ? (
                 <Link
                   href="/calendar"
-                  className="mt-1.5 inline-block text-[11px] font-medium text-[hsl(var(--warning))] hover:underline"
+                  className="mt-1.5 inline-block text-ui-label font-medium text-[hsl(var(--warning))] hover:underline"
                 >
                   Review {briefing.pendingRationaleIds.length} adaptation{briefing.pendingRationaleIds.length > 1 ? "s" : ""}
                 </Link>
@@ -100,10 +100,10 @@ export function TransitionBriefingCard({ briefing }: Props) {
           {/* Coaching prompt */}
           {briefing.coachingPrompt ? (
             <div className="border-t border-[rgba(255,255,255,0.07)] pt-3">
-              <p className="text-sm text-[rgba(255,255,255,0.8)]">{briefing.coachingPrompt}</p>
+              <p className="text-body text-[rgba(255,255,255,0.8)]">{briefing.coachingPrompt}</p>
               <Link
                 href={`/coach?prompt=${encodeURIComponent(briefing.coachingPrompt)}`}
-                className="mt-2 inline-flex btn-secondary px-3 text-[11px]"
+                className="mt-2 inline-flex btn-secondary px-3 text-ui-label"
               >
                 Reply to coach
               </Link>

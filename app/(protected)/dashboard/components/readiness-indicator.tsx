@@ -63,21 +63,21 @@ export function ReadinessIndicator({ readiness, tsb, tsbTrend, signalContext }: 
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: config.color }}
           />
-          <span className="text-xs font-medium uppercase tracking-[0.12em]" style={{ color: config.color }}>
+          <span className="text-ui-label font-medium uppercase tracking-[0.12em]" style={{ color: config.color }}>
             {config.label}
           </span>
-          <span className="text-[11px] font-mono text-tertiary">
+          <span className="text-ui-label font-mono text-tertiary">
             TSB {tsb > 0 ? "+" : ""}{Math.round(tsb)}
           </span>
           {trendTag ? (
-            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] text-tertiary">
+            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-ui-label text-tertiary">
               {trendTag}
             </span>
           ) : null}
         </div>
-        <span className="text-[10px] uppercase tracking-[0.12em] text-tertiary">Readiness</span>
+        <span className="text-kicker text-tertiary">Readiness</span>
       </div>
-      <p className="mt-2 text-sm text-[rgba(255,255,255,0.78)]">{cue}</p>
+      <p className="mt-2 text-body text-[rgba(255,255,255,0.78)]">{cue}</p>
     </article>
   );
 }

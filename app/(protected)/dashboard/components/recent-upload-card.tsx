@@ -23,8 +23,8 @@ export function RecentUploadCard({ sessionId, sessionName, sport, durationMinute
     <article className="rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.06)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[hsl(var(--accent))]">New activity</p>
-          <p className="mt-1 text-sm text-white">
+          <p className="text-kicker font-medium text-[hsl(var(--accent))]">New activity</p>
+          <p className="mt-1 text-body text-white">
             You completed <span className="font-medium">{sessionName}</span> ({durationLabel}) — how did it feel?
           </p>
         </div>
@@ -43,7 +43,7 @@ export function RecentUploadCard({ sessionId, sessionName, sport, durationMinute
       <div className="mt-3">
         <Link
           href={`/sessions/${sessionId}?postUpload=true`}
-          className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-sm"
+          className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-body"
         >
           Review session
         </Link>

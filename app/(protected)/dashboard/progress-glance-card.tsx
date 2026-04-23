@@ -39,19 +39,19 @@ export function ProgressGlanceCard({
                 background: `conic-gradient(hsl(var(--signal-recovery) / 0.76) ${ringPct * 3.6}deg, hsl(var(--surface-2)) 0deg)`
               }}
             />
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--surface-1))] text-xs font-semibold">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--surface-1))] text-ui-label font-semibold">
               {ringPct}%
             </div>
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--fg-muted))]">{weekRangeLabel}</p>
-            <p className="text-sm font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
-            <p className="text-xs text-[hsl(var(--fg-muted))]">{remainingTimeLabel} remaining • {unmatchedExtraCount} extra sessions (additive) • {missedPlannedCount} missed planned</p>
+            <p className="text-kicker text-[hsl(var(--fg-muted))]">{weekRangeLabel}</p>
+            <p className="text-body font-semibold text-[hsl(var(--fg))]">{completedTimeLabel} / {plannedTimeLabel}</p>
+            <p className="text-ui-label text-[hsl(var(--fg-muted))]">{remainingTimeLabel} remaining • {unmatchedExtraCount} extra sessions (additive) • {missedPlannedCount} missed planned</p>
           </div>
 
           <div className="text-right">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-ui-label font-semibold ${statusClassName}`}>
               {statusLabel}
             </span>
           </div>

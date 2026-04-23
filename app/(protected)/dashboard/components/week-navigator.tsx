@@ -74,29 +74,29 @@ export function WeekNavigator({ weekStart, currentWeekStart, weekOptions, blockL
         onClick={goPrev}
         disabled={!canGoPrev}
         aria-label="Previous week"
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.12)] text-sm text-white transition hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-25 disabled:hover:bg-transparent"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.12)] text-body text-white transition hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-25 disabled:hover:bg-transparent"
       >
         ◀
       </button>
 
       <button
         onClick={() => setPickerOpen(!pickerOpen)}
-        className="flex min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[rgba(255,255,255,0.06)]"
+        className="flex min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-body font-medium text-white transition hover:bg-[rgba(255,255,255,0.06)]"
       >
         <span className="truncate">{weekLabel}</span>
         {isCurrentWeek ? (
-          <span className="shrink-0 rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-[10px] font-semibold text-black">
+          <span className="shrink-0 rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-ui-label font-semibold text-black">
             Current
           </span>
         ) : null}
-        <span className="shrink-0 text-[10px] text-tertiary">▼</span>
+        <span className="shrink-0 text-ui-label text-tertiary">▼</span>
       </button>
 
       <button
         onClick={goNext}
         disabled={!canGoNext}
         aria-label="Next week"
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.12)] text-sm text-white transition hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-25 disabled:hover:bg-transparent"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.12)] text-body text-white transition hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-25 disabled:hover:bg-transparent"
       >
         ▶
       </button>
@@ -104,7 +104,7 @@ export function WeekNavigator({ weekStart, currentWeekStart, weekOptions, blockL
       {!isCurrentWeek ? (
         <button
           onClick={() => navigate(currentWeekStart)}
-          className="ml-1 rounded-md border border-[rgba(255,255,255,0.12)] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.7)] transition hover:bg-[rgba(255,255,255,0.06)]"
+          className="ml-1 rounded-md border border-[rgba(255,255,255,0.12)] px-2.5 py-1 text-ui-label text-[rgba(255,255,255,0.7)] transition hover:bg-[rgba(255,255,255,0.06)]"
         >
           Today
         </button>
@@ -119,7 +119,7 @@ export function WeekNavigator({ weekStart, currentWeekStart, weekOptions, blockL
               <button
                 key={option.weekStart}
                 onClick={() => navigate(option.weekStart)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition hover:bg-[rgba(255,255,255,0.06)] ${
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-body transition hover:bg-[rgba(255,255,255,0.06)] ${
                   option.weekStart === weekStart
                     ? "bg-[rgba(255,255,255,0.08)] text-white"
                     : "text-[rgba(255,255,255,0.7)]"
@@ -127,7 +127,7 @@ export function WeekNavigator({ weekStart, currentWeekStart, weekOptions, blockL
               >
                 <span className="truncate">{option.label}</span>
                 {option.blockLabel ? (
-                  <span className="ml-2 shrink-0 text-[10px] text-tertiary">{option.blockLabel}</span>
+                  <span className="ml-2 shrink-0 text-ui-label text-tertiary">{option.blockLabel}</span>
                 ) : null}
                 {option.weekStart === currentWeekStart ? (
                   <span className="ml-2 shrink-0 rounded-full bg-[var(--color-accent)] px-1.5 py-0.5 text-[9px] font-semibold text-black">
