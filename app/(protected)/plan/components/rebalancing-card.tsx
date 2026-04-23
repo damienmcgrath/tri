@@ -47,29 +47,29 @@ function RecommendationItem({ rec }: { rec: Recommendation }) {
   return (
     <div className="rounded-md border border-[var(--border-subtle)] p-3">
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-[var(--color-surface-raised)] text-xs font-bold">
+        <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-[var(--color-surface-raised)] text-ui-label font-semibold">
           {TYPE_ICON[rec.type] ?? "?"}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{rec.summary}</p>
+          <p className="text-body font-medium">{rec.summary}</p>
           {expanded && (
-            <p className="mt-1 text-xs text-muted leading-relaxed">{rec.rationale}</p>
+            <p className="mt-1 text-ui-label text-muted leading-relaxed">{rec.rationale}</p>
           )}
           <div className="mt-2 flex flex-wrap gap-2">
             <button
-              className="text-xs text-[hsl(var(--fg-muted))] underline underline-offset-2"
+              className="text-ui-label text-[hsl(var(--fg-muted))] underline underline-offset-2"
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? "Less" : "Why?"}
             </button>
             <Link
               href={`/coach?prompt=${encodeURIComponent(`I'd like to discuss the rebalancing recommendation for ${rec.sport}: ${rec.summary}`)}`}
-              className="text-xs text-cyan-400 underline underline-offset-2"
+              className="text-ui-label text-cyan-400 underline underline-offset-2"
             >
               Discuss with Coach
             </Link>
             <button
-              className="text-xs text-[hsl(var(--fg-muted)/0.6)] underline underline-offset-2"
+              className="text-ui-label text-[hsl(var(--fg-muted)/0.6)] underline underline-offset-2"
               onClick={() => setDismissed(true)}
             >
               Dismiss

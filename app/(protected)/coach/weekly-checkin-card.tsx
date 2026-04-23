@@ -93,11 +93,11 @@ function ModalMetricRow({
     <div className="rounded-[22px] border border-[hsl(var(--border))] bg-[linear-gradient(180deg,hsl(var(--surface-subtle)),hsl(var(--surface)))] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-white">{metric.label}</p>
-          <p className="mt-1 text-xs text-muted">{metric.hint}</p>
+          <p className="text-body font-medium text-white">{metric.label}</p>
+          <p className="mt-1 text-ui-label text-muted">{metric.hint}</p>
         </div>
         <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${
+          className={`rounded-full border px-2.5 py-1 text-kicker ${
             value === null
               ? "border-[hsl(var(--border))] text-tertiary"
               : "border-[hsl(var(--accent)/0.35)] bg-[hsl(var(--accent)/0.14)] text-[hsl(var(--accent))]"
@@ -111,7 +111,7 @@ function ModalMetricRow({
         {metric.choices.map((choice) => (
           <label
             key={choice.label}
-            className={`cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium transition ${
+            className={`cursor-pointer rounded-full border px-3.5 py-2 text-body font-medium transition ${
               value === choice.value
                 ? "border-[hsl(var(--accent))] bg-[linear-gradient(180deg,hsl(var(--accent)),hsl(var(--accent)/0.88))] text-[hsl(var(--accent-foreground))] shadow-[0_12px_30px_hsl(var(--accent)/0.22)]"
                 : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] text-muted hover:border-[hsl(var(--accent)/0.35)] hover:bg-[hsl(var(--surface-subtle))] hover:text-white"
@@ -226,13 +226,13 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="label">Weekly check-in</p>
-            <h2 className="mt-1 text-lg font-semibold">How does the week feel?</h2>
-            <p className="mt-1 text-sm text-muted">Keep Coach grounded in your current recovery state without turning this page into a full control panel.</p>
+            <h2 className="mt-1 text-section-title font-semibold">How does the week feel?</h2>
+            <p className="mt-1 text-body text-muted">Keep Coach grounded in your current recovery state without turning this page into a full control panel.</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary">Week of {weekStart}</span>
+            <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary">Week of {weekStart}</span>
             <span
-              className={`rounded-full border px-3 py-1 text-xs ${
+              className={`rounded-full border px-3 py-1 text-ui-label ${
                 completedCount === METRICS.length
                   ? "border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.12)] text-success"
                   : "border-[hsl(var(--border))] text-tertiary"
@@ -246,12 +246,12 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
         <div className="mt-3 rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3.5">
           <div className="flex flex-wrap gap-2">
             {summaryChips.map((chip) => (
-              <span key={chip.key} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.7)]">
+              <span key={chip.key} className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-ui-label text-[rgba(255,255,255,0.7)]">
                 <span className="text-[rgba(255,255,255,0.35)]">{chip.label}:</span> <span className="text-[rgba(255,255,255,0.8)]">{chip.value}</span>
               </span>
             ))}
             {note.trim() ? (
-              <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-xs text-[rgba(255,255,255,0.6)]">
+              <span className="rounded-md border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-ui-label text-[rgba(255,255,255,0.6)]">
                 Note added
               </span>
             ) : null}
@@ -259,11 +259,11 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
 
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-3">
-              {status ? <p className="text-sm text-muted">{status}</p> : null}
+              {status ? <p className="text-body text-muted">{status}</p> : null}
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[#0A0A0B]"
+                className="inline-flex items-center rounded-md bg-[var(--color-accent)] px-4 py-2 text-body font-medium text-[#0A0A0B]"
               >
                 {completedCount > 0 ? "Update check-in" : "Start check-in"}
               </button>
@@ -284,16 +284,16 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
             <div className="border-b border-[hsl(var(--border))] p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-accent">Weekly check-in</p>
-                  <h3 id="weekly-checkin-title" className="mt-1 text-xl font-semibold sm:text-2xl">How does the week feel?</h3>
-                  <p className="mt-1 text-sm text-muted">Keep this short. The goal is to give Coach the right caution level before your next key session.</p>
+                  <p className="text-kicker text-accent">Weekly check-in</p>
+                  <h3 id="weekly-checkin-title" className="mt-1 text-page-title sm:text-page-title">How does the week feel?</h3>
+                  <p className="mt-1 text-body text-muted">Keep this short. The goal is to give Coach the right caution level before your next key session.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-xs text-tertiary">Week of {weekStart}</span>
+                  <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1 text-ui-label text-tertiary">Week of {weekStart}</span>
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-lg text-muted transition hover:text-white"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-section-title text-muted transition hover:text-white"
                     aria-label="Close weekly check-in"
                   >
                     ×
@@ -315,9 +315,9 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
               </div>
 
               <div className="rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4">
-                <label className="block space-y-2 text-sm">
-                  <span className="text-sm font-medium text-white">Quick note</span>
-                  <span className="block text-xs text-muted">Optional context for sleep, work stress, soreness, or confidence.</span>
+                <label className="block space-y-2 text-body">
+                  <span className="text-body font-medium text-white">Quick note</span>
+                  <span className="block text-ui-label text-muted">Optional context for sleep, work stress, soreness, or confidence.</span>
                   <textarea
                     value={note}
                     onChange={(event) => {
@@ -333,18 +333,18 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-4 sm:p-5">
-              <div className="flex flex-wrap gap-2 text-xs text-tertiary">
+              <div className="flex flex-wrap gap-2 text-ui-label text-tertiary">
                 <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1">Fast update</span>
                 <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1">Used for coaching tone</span>
                 <span className="rounded-full border border-[hsl(var(--border))] px-3 py-1">You can update it anytime</span>
               </div>
 
               <div className="flex items-center gap-3">
-                {status ? <p className="text-sm text-muted">{status}</p> : null}
+                {status ? <p className="text-body text-muted">{status}</p> : null}
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-sm text-muted transition hover:text-white"
+                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-body text-muted transition hover:text-white"
                 >
                   Cancel
                 </button>
@@ -352,7 +352,7 @@ export function WeeklyCheckinCard({ weekStart, snapshot }: Props) {
                   type="button"
                   onClick={save}
                   disabled={isSaving}
-                  className="rounded-full bg-[linear-gradient(180deg,hsl(var(--accent)),hsl(var(--accent)/0.88))] px-5 py-2.5 text-sm font-medium text-[hsl(var(--accent-foreground))] shadow-[0_14px_32px_hsl(var(--accent)/0.2)] disabled:opacity-60"
+                  className="rounded-full bg-[linear-gradient(180deg,hsl(var(--accent)),hsl(var(--accent)/0.88))] px-5 py-2.5 text-body font-medium text-[hsl(var(--accent-foreground))] shadow-[0_14px_32px_hsl(var(--accent)/0.2)] disabled:opacity-60"
                 >
                   {isSaving ? "Saving..." : "Save check-in"}
                 </button>

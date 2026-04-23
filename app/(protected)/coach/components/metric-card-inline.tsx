@@ -26,16 +26,16 @@ export function MetricCardInline({ label, value, unit, trend, color = "accent" }
     <div
       className={`my-1 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${COLOR_MAP[color] ?? COLOR_MAP.accent}`}
     >
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="text-ui-label uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <span className="text-sm font-semibold text-surface-foreground">
+      <span className="text-body font-medium text-surface-foreground">
         {value}
-        {unit && <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unit}</span>}
+        {unit && <span className="ml-0.5 text-ui-label font-normal text-muted-foreground">{unit}</span>}
       </span>
       {trend && (
         <span
-          className={`text-xs ${
+          className={`text-ui-label ${
             trend === "up" ? "text-success" : trend === "down" ? "text-danger" : "text-muted-foreground"
           }`}
         >

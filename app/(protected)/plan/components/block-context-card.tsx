@@ -29,17 +29,17 @@ export function BlockContextCard({ blockType, blockWeek, blockTotalWeeks, raceNa
   return (
     <div className={`surface border-l-2 p-4 ${BLOCK_ACCENT[blockType] ?? "border-l-neutral-500"}`}>
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="text-sm font-semibold">{blockType} Phase</span>
-        <span className="text-xs text-muted">
+        <span className="text-body font-medium">{blockType} Phase</span>
+        <span className="text-ui-label text-muted">
           Week {blockWeek} of {blockTotalWeeks}
         </span>
         {raceName && weeksToRace !== null && weeksToRace > 0 && (
-          <span className="text-xs text-muted">
+          <span className="text-ui-label text-muted">
             &mdash; {weeksToRace} {weeksToRace === 1 ? "week" : "weeks"} to {raceName}
           </span>
         )}
       </div>
-      {notes && <p className="mt-1 text-xs text-muted">{notes}</p>}
+      {notes && <p className="mt-1 text-ui-label text-muted">{notes}</p>}
     </div>
   );
 }

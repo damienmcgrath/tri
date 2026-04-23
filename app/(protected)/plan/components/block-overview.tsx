@@ -44,7 +44,7 @@ export function BlockOverview({ weeks, currentWeekStart }: Props) {
   return (
     <article className="surface p-5">
       <p className="label">Block overview</p>
-      <p className="mt-1 text-xs text-tertiary">{weeks.length} weeks</p>
+      <p className="mt-1 text-ui-label text-tertiary">{weeks.length} weeks</p>
 
       <div className="mt-4 space-y-1.5">
         {weeks.map((week) => {
@@ -65,8 +65,8 @@ export function BlockOverview({ weeks, currentWeekStart }: Props) {
             >
               {/* Week label */}
               <div className="w-16 shrink-0">
-                <p className="text-xs font-medium text-white">Wk {week.weekIndex}</p>
-                <p className="text-[10px] text-tertiary">
+                <p className="text-ui-label text-white">Wk {week.weekIndex}</p>
+                <p className="text-ui-label text-tertiary">
                   {weekDateFormatter.format(new Date(`${week.weekStartDate}T00:00:00.000Z`))}
                 </p>
               </div>
@@ -98,16 +98,16 @@ export function BlockOverview({ weeks, currentWeekStart }: Props) {
               <div className="w-20 shrink-0 text-right">
                 {summary ? (
                   <>
-                    <p className="text-xs font-medium text-white">{formatHours(summary.totalPlannedHours)}</p>
-                    <p className="text-[10px] text-tertiary">{summary.sessionCount} sessions</p>
+                    <p className="text-ui-label text-white">{formatHours(summary.totalPlannedHours)}</p>
+                    <p className="text-ui-label text-tertiary">{summary.sessionCount} sessions</p>
                   </>
                 ) : (
-                  <p className="text-[10px] text-tertiary">No data</p>
+                  <p className="text-ui-label text-tertiary">No data</p>
                 )}
               </div>
 
               {/* Focus badge */}
-              <span className="w-16 shrink-0 text-right text-[10px] text-tertiary">
+              <span className="w-16 shrink-0 text-right text-ui-label text-tertiary">
                 {week.focus}
               </span>
             </div>

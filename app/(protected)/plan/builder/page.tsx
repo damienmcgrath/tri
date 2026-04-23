@@ -25,15 +25,15 @@ export default async function PlanBuilderPage() {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-semibold">Plan settings</h1>
-          <p className="text-sm text-muted">Create plans and manage existing plan shells.</p>
+          <h1 className="text-section-title font-semibold">Plan settings</h1>
+          <p className="text-body text-muted">Create plans and manage existing plan shells.</p>
         </div>
-        <Link href="/plan" className="btn-secondary px-3 py-1.5 text-xs">Back to week schedule</Link>
+        <Link href="/plan" className="btn-secondary px-3 py-1.5 text-ui-label">Back to week schedule</Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <form action={createPlanAction} className="surface space-y-4 p-4">
-          <h2 className="text-sm font-semibold">Create plan</h2>
+          <h2 className="text-body font-medium">Create plan</h2>
           <div>
             <label className="label-base" htmlFor="plan-name">Plan name</label>
             <input id="plan-name" name="name" required className="input-base" />
@@ -52,20 +52,20 @@ export default async function PlanBuilderPage() {
         </form>
 
         <article className="surface p-4">
-          <h2 className="text-sm font-semibold">Existing plans ({plans.length})</h2>
+          <h2 className="text-body font-medium">Existing plans ({plans.length})</h2>
           <div className="mt-3 space-y-2">
             {plans.length === 0 ? (
-              <p className="text-sm text-muted">No plans yet.</p>
+              <p className="text-body text-muted">No plans yet.</p>
             ) : (
               plans.map((plan) => (
                 <div key={plan.id} className="flex items-start gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-2">
                   <Link href={`/plan?plan=${plan.id}`} className="min-w-0 flex-1 rounded-lg px-1 py-0.5">
                     <p className="font-medium">{plan.name}</p>
-                    <p className="text-xs text-muted">{plan.start_date} • {plan.duration_weeks} weeks</p>
+                    <p className="text-ui-label text-muted">{plan.start_date} • {plan.duration_weeks} weeks</p>
                   </Link>
                   <form action={deletePlanAction} onSubmit={(event) => { if (!window.confirm(`Delete plan "${plan.name}" and all weeks/sessions?`)) event.preventDefault(); }}>
                     <input type="hidden" name="planId" value={plan.id} />
-                    <button className="btn-secondary px-2 py-1 text-xs">Delete</button>
+                    <button className="btn-secondary px-2 py-1 text-ui-label">Delete</button>
                   </form>
                 </div>
               ))

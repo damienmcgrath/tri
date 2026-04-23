@@ -34,23 +34,23 @@ export function ProposedChangeCard({ change, onApprove, onReject }: Props) {
     <div className="my-2 rounded-lg border border-accent/30 bg-accent/5 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
-          <h4 className="text-sm font-medium text-surface-foreground">
+          <h4 className="text-body font-medium text-surface-foreground">
             {change.title}
           </h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-ui-label text-muted-foreground">
             {change.changeSummary}
           </p>
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="shrink-0 text-xs text-muted-foreground hover:text-surface-foreground"
+          className="shrink-0 text-ui-label text-muted-foreground hover:text-surface-foreground"
         >
           {expanded ? "Hide" : "Why?"}
         </button>
       </div>
 
       {expanded && (
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-ui-label leading-relaxed text-muted-foreground">
           {change.rationale}
         </p>
       )}
@@ -59,13 +59,13 @@ export function ProposedChangeCard({ change, onApprove, onReject }: Props) {
         <div className="mt-2 flex gap-2">
           <button
             onClick={handleApprove}
-            className="rounded-md bg-success/20 px-3 py-1 text-xs font-medium text-success transition hover:bg-success/30"
+            className="rounded-md bg-success/20 px-3 py-1 text-ui-label text-success transition hover:bg-success/30"
           >
             Approve
           </button>
           <button
             onClick={handleReject}
-            className="rounded-md bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition hover:bg-danger/30"
+            className="rounded-md bg-danger/20 px-3 py-1 text-ui-label text-danger transition hover:bg-danger/30"
           >
             Reject
           </button>
@@ -73,10 +73,10 @@ export function ProposedChangeCard({ change, onApprove, onReject }: Props) {
       )}
 
       {status === "approved" && (
-        <p className="mt-2 text-xs font-medium text-success">Applied</p>
+        <p className="mt-2 text-ui-label text-success">Applied</p>
       )}
       {status === "rejected" && (
-        <p className="mt-2 text-xs font-medium text-muted-foreground">Dismissed</p>
+        <p className="mt-2 text-ui-label text-muted-foreground">Dismissed</p>
       )}
     </div>
   );

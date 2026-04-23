@@ -77,7 +77,7 @@ export function WeeklyIntensityHeader({ summary }: Props) {
       </div>
 
       {/* Zone breakdown text */}
-      <div className="flex flex-wrap gap-3 text-[10px] text-tertiary">
+      <div className="flex flex-wrap gap-3 text-ui-label text-tertiary">
         {endurancePct > 0 ? (
           <span className="flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ZONE_COLOURS.z2 }} />
@@ -105,7 +105,7 @@ export function WeeklyIntensityHeader({ summary }: Props) {
       </div>
 
       {/* Totals */}
-      <div className="flex flex-wrap gap-4 text-xs text-muted">
+      <div className="flex flex-wrap gap-4 text-ui-label text-muted">
         <span>
           {formatHours(summary.totalPlannedHours)}
           {hoursDelta ? (

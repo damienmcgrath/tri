@@ -14,7 +14,7 @@ export function SuggestedQuestions({ questions, onSelect }: Props) {
         <button
           key={i}
           onClick={() => onSelect(q)}
-          className="rounded-full border border-accent/30 bg-accent/5 px-3 py-1.5 text-xs text-accent transition hover:bg-accent/15"
+          className="rounded-full border border-accent/30 bg-accent/5 px-3 py-1.5 text-ui-label text-accent transition hover:bg-accent/15"
         >
           {q}
         </button>

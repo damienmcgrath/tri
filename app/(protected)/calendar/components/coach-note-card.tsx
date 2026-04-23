@@ -117,16 +117,16 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wider" style={{ color: colors.text }}>
+          <span className="text-ui-label uppercase tracking-wider" style={{ color: colors.text }}>
             Coach note
           </span>
-          <span className="rounded-full border px-2 py-0.5 text-[10px]" style={{ borderColor: colors.border, color: colors.text }}>
+          <span className="rounded-full border px-2 py-0.5 text-ui-label" style={{ borderColor: colors.border, color: colors.text }}>
             {triggerLabel}
           </span>
         </div>
       </div>
 
-      <p className="mt-2 text-sm text-white">
+      <p className="mt-2 text-body text-white">
         {expanded ? rationale.rationale_text : summaryLine}
       </p>
 
@@ -134,7 +134,7 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="mt-2 text-xs text-tertiary hover:text-white"
+          className="mt-2 text-ui-label text-tertiary hover:text-white"
         >
           {expanded ? "Show less" : "Show full reasoning"}
         </button>
@@ -144,10 +144,10 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
         <div className="mt-3 space-y-3 rounded-lg bg-[rgba(0,0,0,0.2)] p-3">
           {changes.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-tertiary">Changes</p>
+              <p className="text-ui-label uppercase tracking-wider text-tertiary">Changes</p>
               <div className="mt-1.5 space-y-1.5">
                 {changes.map((change, i) => (
-                  <div key={i} className="text-xs">
+                  <div key={i} className="text-ui-label">
                     <span className="font-medium text-white">{change.session_label}</span>
                     <span className="text-tertiary"> — </span>
                     <span className="text-muted line-through">{change.before}</span>
@@ -160,10 +160,10 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
           )}
           {preserved.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-tertiary">Preserved</p>
+              <p className="text-ui-label uppercase tracking-wider text-tertiary">Preserved</p>
               <ul className="mt-1 space-y-0.5">
                 {preserved.map((item, i) => (
-                  <li key={i} className="text-xs text-muted">{item}</li>
+                  <li key={i} className="text-ui-label text-muted">{item}</li>
                 ))}
               </ul>
             </div>
@@ -177,13 +177,13 @@ function SingleCoachNote({ rationale, defaultCollapsed = true }: { rationale: Ad
           type="button"
           onClick={() => void handleAcknowledge()}
           disabled={acknowledging}
-          className="rounded-lg bg-[rgba(255,255,255,0.08)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[rgba(255,255,255,0.14)] disabled:opacity-40"
+          className="rounded-lg bg-[rgba(255,255,255,0.08)] px-3 py-1.5 text-ui-label text-white hover:bg-[rgba(255,255,255,0.14)] disabled:opacity-40"
         >
           {acknowledging ? "..." : "Got it"}
         </button>
         <Link
           href={`/coach?prompt=${encodeURIComponent(`I want to discuss this adaptation: ${rationale.rationale_text}`)}`}
-          className="text-xs text-tertiary hover:text-white"
+          className="text-ui-label text-tertiary hover:text-white"
         >
           Let&apos;s discuss
         </Link>
@@ -208,12 +208,12 @@ export function CoachNoteCards({ rationales }: Props) {
         <button
           type="button"
           onClick={() => setShowAll((prev) => !prev)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-xs text-tertiary transition hover:border-[rgba(255,255,255,0.16)] hover:text-white"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-ui-label text-tertiary transition hover:border-[rgba(255,255,255,0.16)] hover:text-white"
         >
           {showAll
             ? "Hide older notes"
             : `${restNotes.length} more coach note${restNotes.length > 1 ? "s" : ""}`}
-          <span className="text-[10px]">{showAll ? "\u25B2" : "\u25BC"}</span>
+          <span className="text-ui-label">{showAll ? "\u25B2" : "\u25BC"}</span>
         </button>
       )}
 
