@@ -101,7 +101,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
   return (
     <div className="space-y-4">
       <div
-        className="surface-subtle rounded-xl border border-dashed border-white/20 p-5 text-sm"
+        className="surface-subtle rounded-xl border border-dashed border-white/20 p-5 text-body"
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
@@ -115,7 +115,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
         }}
       >
         <p className="font-medium">Drop Garmin files here</p>
-        <p className="mt-1 text-xs text-muted">Accepted formats: .fit (preferred), .tcx. Max 20MB.</p>
+        <p className="mt-1 text-ui-label text-muted">Accepted formats: .fit (preferred), .tcx. Max 20MB.</p>
         <label className="btn-secondary mt-3 inline-flex cursor-pointer">
           Pick file
           <input
@@ -128,13 +128,13 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
             }}
           />
         </label>
-        {message ? <p className="mt-2 text-xs text-cyan-200">{message}</p> : null}
+        {message ? <p className="mt-2 text-ui-label text-cyan-200">{message}</p> : null}
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-body">
           <thead>
-            <tr className="text-left text-xs uppercase text-muted">
+            <tr className="text-left text-ui-label uppercase text-muted">
               <th className="py-2">Date</th><th>Sport</th><th>Duration</th><th>Distance</th><th>Status</th><th></th>
             </tr>
           </thead>
@@ -152,7 +152,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                   <td>{fmtDuration(activity?.duration_sec)}</td>
                   <td>{activity?.distance_m ? `${(Number(activity.distance_m) / 1000).toFixed(2)} km` : "—"}</td>
                   <td>{upload.status === "error" ? "Error" : linked ? "Scheduled" : hasRejectedLink || upload.status === "matched" ? "Extra" : hasSuggestion ? "Suggested" : "Unscheduled"}</td>
-                  <td className="space-x-2 text-xs">
+                  <td className="space-x-2 text-ui-label">
                     {activity?.id ? <Link className="text-cyan-300 underline" href={`/activities/${activity.id}`}>View activity</Link> : <button className="text-cyan-300 underline" onClick={() => setDetailId(upload.id)}>View details</button>}
                     {!linked && upload.status !== "error" ? (
                       <button className="text-cyan-300 underline" onClick={() => { setAttachFor(upload); setAttachError(""); }}>Attach to planned session</button>
@@ -177,7 +177,7 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
       </div>
 
       {detail ? (
-        <div className="surface-subtle flex items-center justify-between gap-3 p-3 text-xs">
+        <div className="surface-subtle flex items-center justify-between gap-3 p-3 text-ui-label">
           <span>{detail.filename} • {detail.file_type.toUpperCase()} • {detail.error_message ?? "No errors"}</span>
           <button
             className="text-rose-300 underline"
@@ -196,13 +196,13 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
       {attachFor ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="surface w-full max-w-xl p-4">
-            <h3 className="text-lg font-semibold">Attach to planned session</h3>
+            <h3 className="text-section-title font-semibold">Attach to planned session</h3>
             <ul className="mt-3 max-h-72 space-y-2 overflow-auto">
               {sortedCandidates.length === 0 ? (
-                <li className="surface-subtle p-3 text-sm text-muted">No planned sessions found. Create a session in Plan first, then attach.</li>
+                <li className="surface-subtle p-3 text-body text-muted">No planned sessions found. Create a session in Plan first, then attach.</li>
               ) : null}
               {sortedCandidates.map((candidate) => (
-                <li key={candidate.id} className="surface-subtle flex items-center justify-between p-2 text-sm">
+                <li key={candidate.id} className="surface-subtle flex items-center justify-between p-2 text-body">
                   <span>{candidate.date} · {candidate.sport} · {candidate.type}</span>
                   <button
                     className="btn-secondary"
@@ -257,8 +257,8 @@ export function ActivityUploadsPanel({ initialUploads, plannedSessions, initialO
                 </li>
               ))}
             </ul>
-            {attachError ? <p className="mt-3 text-xs text-red-400">{attachError}</p> : null}
-            <button className="mt-3 text-xs underline" onClick={() => setAttachFor(null)}>Close</button>
+            {attachError ? <p className="mt-3 text-ui-label text-red-400">{attachError}</p> : null}
+            <button className="mt-3 text-ui-label underline" onClick={() => setAttachFor(null)}>Close</button>
           </div>
         </div>
       ) : null}

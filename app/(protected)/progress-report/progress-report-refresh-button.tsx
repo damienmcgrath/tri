@@ -49,7 +49,7 @@ export function ProgressReportRefreshButton({ blockEnd, blockId, label = "Refres
       >
         {isRefreshing ? "Refreshing…" : label}
       </button>
-      {error ? <p className="text-[11px] text-danger">{error}</p> : null}
+      {error ? <p className="text-ui-label text-danger">{error}</p> : null}
     </div>
   );
 }

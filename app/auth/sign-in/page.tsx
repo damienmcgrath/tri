@@ -11,8 +11,8 @@ export default function SignInPage() {
       <div className="auth-panel auth-stack">
         <div className="surface space-y-2 p-6 text-center">
           <p className="label">Tri.ai</p>
-          <h1 className="mt-3 text-3xl">Sign in to Tri.AI</h1>
-          <p className="mt-2 text-sm text-muted">Access your dashboard, plan, calendar, and coach workspace.</p>
+          <h1 className="mt-3 text-page-hero">Sign in to Tri.AI</h1>
+          <p className="mt-2 text-body text-muted">Access your dashboard, plan, calendar, and coach workspace.</p>
         </div>
         <Suspense fallback={<div className="mt-4 h-40 animate-pulse rounded-md bg-[var(--color-surface-raised)]" />}>
           <div className="surface p-6">
@@ -22,7 +22,7 @@ export default function SignInPage() {
         {showAgentPreview ? (
           <div className="surface space-y-3 p-6">
             <p className="label">Local Preview</p>
-            <p className="text-sm text-muted">For agent screenshots and UI inspection, skip live auth and enter the seeded preview workspace.</p>
+            <p className="text-body text-muted">For agent screenshots and UI inspection, skip live auth and enter the seeded preview workspace.</p>
             <div className="flex flex-wrap gap-2">
               <Link href="/dev/agent-login" className="btn-primary">
                 Enter preview mode

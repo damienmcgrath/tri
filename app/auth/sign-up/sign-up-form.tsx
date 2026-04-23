@@ -67,14 +67,14 @@ export function SignUpForm() {
         />
       </div>
 
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
-      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
+      {error ? <p className="text-body text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-body text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Creating account..." : "Sign up"}
       </button>
 
-      <p className="text-center text-sm text-muted">
+      <p className="text-center text-body text-muted">
         Already have an account?{" "}
         <Link href="/auth/sign-in" className="font-medium text-accent hover:text-white">
           Sign in

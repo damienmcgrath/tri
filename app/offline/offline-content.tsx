@@ -20,7 +20,7 @@ export function OfflineContent() {
           />
         </svg>
       </div>
-      <h1 className="font-[family-name:var(--font-geist-sans)] text-2xl font-bold text-[var(--color-text-primary)]">
+      <h1 className="font-[family-name:var(--font-geist-sans)] text-page-title font-semibold text-[var(--color-text-primary)]">
         You&apos;re offline
       </h1>
       <p className="mt-3 max-w-sm font-[family-name:var(--font-geist-sans)] text-[var(--color-text-secondary)]">
@@ -29,7 +29,7 @@ export function OfflineContent() {
       </p>
       <button
         onClick={() => window.location.reload()}
-        className="mt-8 rounded-[var(--radius-md)] bg-[var(--color-accent)] px-6 py-3 font-[family-name:var(--font-geist-sans)] text-sm font-semibold text-[var(--color-base)] transition-opacity hover:opacity-90"
+        className="mt-8 rounded-[var(--radius-md)] bg-[var(--color-accent)] px-6 py-3 font-[family-name:var(--font-geist-sans)] text-body font-medium text-[var(--color-base)] transition-opacity hover:opacity-90"
       >
         Try again
       </button>

@@ -53,9 +53,9 @@ export async function SyncHistory() {
 
   return (
     <section className="surface p-5 space-y-3">
-      <h3 className="text-sm font-semibold">Sync history</h3>
+      <h3 className="text-body font-medium">Sync history</h3>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-ui-label">
           <thead>
             <tr className="border-b border-border text-left text-muted">
               <th className="pb-2 pr-3 font-medium">Time</th>

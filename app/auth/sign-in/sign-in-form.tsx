@@ -120,13 +120,13 @@ export function SignInForm() {
       </div>
 
       <div className="flex justify-end">
-        <Link href="/auth/forgot-password" className="text-sm font-medium text-accent hover:text-white">
+        <Link href="/auth/forgot-password" className="text-body font-medium text-accent hover:text-white">
           I forgot my password
         </Link>
       </div>
 
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
-      {message ? <p className="text-sm text-[var(--color-success)]">{message}</p> : null}
+      {error ? <p className="text-body text-[var(--color-danger)]">{error}</p> : null}
+      {message ? <p className="text-body text-[var(--color-success)]">{message}</p> : null}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full disabled:opacity-70">
         {isSubmitting ? "Signing in..." : "Sign in"}
@@ -141,7 +141,7 @@ export function SignInForm() {
         {isSendingLink ? "Sending link..." : "Email me a sign-in link"}
       </button>
 
-      <p className="text-center text-sm text-muted">
+      <p className="text-center text-body text-muted">
         Need an account?{" "}
         <Link href="/auth/sign-up" className="font-medium text-accent hover:text-white">
           Sign up

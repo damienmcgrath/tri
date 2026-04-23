@@ -75,11 +75,11 @@ export default async function ProtectedLayout({ children }: { children: React.Re
               <div className="surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div>
                   <p className="label">Agent Preview</p>
-                  <p className="mt-1 text-sm text-muted">You are browsing seeded local data. Reset the workspace whenever you want a clean UI state.</p>
+                  <p className="mt-1 text-body text-muted">You are browsing seeded local data. Reset the workspace whenever you want a clean UI state.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <a href="/dev/agent-reset" className="btn-secondary px-3 py-1.5 text-xs">Reset data</a>
-                  <a href="/dev/agent-preview" className="btn-secondary px-3 py-1.5 text-xs">Preview guide</a>
+                  <a href="/dev/agent-reset" className="btn-secondary px-3 py-1.5 text-ui-label">Reset data</a>
+                  <a href="/dev/agent-preview" className="btn-secondary px-3 py-1.5 text-ui-label">Preview guide</a>
                 </div>
               </div>
             ) : null}

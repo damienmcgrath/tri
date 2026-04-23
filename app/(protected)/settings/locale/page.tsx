@@ -29,8 +29,8 @@ export default async function LocaleSettingsPage() {
     <section className="space-y-4">
       <header className="surface p-6">
         <p className="label">Settings</p>
-        <h1 className="mt-3 text-2xl">Language &amp; units</h1>
-        <p className="mt-2 text-sm text-muted">Set your language, units, timezone, and week start day.</p>
+        <h1 className="mt-3 text-page-title">Language &amp; units</h1>
+        <p className="mt-2 text-body text-muted">Set your language, units, timezone, and week start day.</p>
       </header>
 
       <article className="surface p-5">
@@ -61,7 +61,7 @@ export default async function LocaleSettingsPage() {
               placeholder="Europe/Dublin"
               className="input-base mt-1"
             />
-            <p className="mt-1 text-xs text-muted">IANA timezone identifier (e.g. Europe/Berlin, America/New_York)</p>
+            <p className="mt-1 text-ui-label text-muted">IANA timezone identifier (e.g. Europe/Berlin, America/New_York)</p>
           </div>
 
           <div>

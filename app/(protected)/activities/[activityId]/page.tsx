@@ -138,21 +138,21 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
 
   return (
     <section className="space-y-4">
-      <Link href="/dashboard" className="text-sm text-cyan-300 underline-offset-2 hover:underline">← Back to Dashboard</Link>
+      <Link href="/dashboard" className="text-body text-cyan-300 underline-offset-2 hover:underline">← Back to Dashboard</Link>
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_0.8fr]">
         <div className="space-y-4">
           <article className="surface p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-semibold">{sportIcon(activity.sport_type)} Activity</h1>
-                <p className="mt-1 text-sm text-muted">{dateLabel}</p>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <h1 className="text-page-title">{sportIcon(activity.sport_type)} Activity</h1>
+                <p className="mt-1 text-body text-muted">{dateLabel}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-ui-label">
                   <SourceBadge source={activity.source} externalProvider={activity.external_provider} externalActivityId={activity.external_activity_id} externalTitle={activity.external_title} />
                   <span className="rounded-full border border-[hsl(var(--border))] px-2 py-1">{linkedSession ? "Linked" : "Unassigned"}</span>
                   {!linkedSession ? <span className="rounded-full border border-[hsl(var(--signal-risk)/0.5)] bg-[hsl(var(--signal-risk)/0.12)] px-2 py-1 text-[hsl(var(--signal-risk))]">Unscheduled</span> : null}
                 </div>
-                {!linkedSession ? <p className="mt-2 text-xs text-muted">This uploaded activity counts as extra work even without a planned slot.</p> : null}
+                {!linkedSession ? <p className="mt-2 text-ui-label text-muted">This uploaded activity counts as extra work even without a planned slot.</p> : null}
               </div>
             </div>
           </article>
@@ -160,15 +160,15 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           <article className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {loadCards.map(([label, value]) => (
               <div key={label} className="surface p-4">
-                <p className="text-xs text-muted">{label}</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+                <p className="text-ui-label text-muted">{label}</p>
+                <p className="mt-1 text-page-title tabular-nums">{value}</p>
               </div>
             ))}
           </article>
 
           <article className="surface p-5">
-            <h2 className="text-sm font-semibold">Key details</h2>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm lg:grid-cols-3">
+            <h2 className="text-body font-medium">Key details</h2>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-body lg:grid-cols-3">
               <dt className="text-muted">Start time</dt><dd>{new Date(activity.start_time_utc).toLocaleString()}</dd>
               <dt className="text-muted">End time</dt><dd>{activity.end_time_utc ? new Date(activity.end_time_utc).toLocaleString() : "—"}</dd>
               <dt className="text-muted">Calories</dt><dd>{activity.calories ?? "—"}</dd>
@@ -187,16 +187,16 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           {(powerZones.length > 0 || hrZones.length > 0) ? (
             <article className="surface p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">Zone distribution</h2>
-                <p className="text-xs text-muted">Source-backed time in zone from Garmin FIT</p>
+                <h2 className="text-body font-medium">Zone distribution</h2>
+                <p className="text-ui-label text-muted">Source-backed time in zone from Garmin FIT</p>
               </div>
               <div className={`mt-4 grid gap-4 ${powerZones.length > 0 && hrZones.length > 0 ? "lg:grid-cols-2" : ""}`}>
                 {powerZones.length > 0 ? (
                   <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-muted">Power</p>
+                    <p className="text-kicker text-muted">Power</p>
                     <div className="mt-3 space-y-2">
                       {powerZones.map((zone) => (
-                        <div key={`power-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
+                        <div key={`power-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-body">
                           <span>Z{zone.zone} · {formatZoneRange(zone.powerMin, zone.powerMax, "w")}</span>
                           <span className="tabular-nums text-muted">{formatSeconds(zone.durationSec)}{zone.pctOfSession !== null ? ` · ${Math.round(zone.pctOfSession * 100)}%` : ""}</span>
                         </div>
@@ -206,10 +206,10 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
                 ) : null}
                 {hrZones.length > 0 ? (
                   <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-muted">Heart rate</p>
+                    <p className="text-kicker text-muted">Heart rate</p>
                     <div className="mt-3 space-y-2">
                       {hrZones.map((zone) => (
-                        <div key={`hr-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
+                        <div key={`hr-${zone.zone}`} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-body">
                           <span>Z{zone.zone} · {formatZoneRange(zone.heartRateMin, zone.heartRateMax, "bpm")}</span>
                           <span className="tabular-nums text-muted">{formatSeconds(zone.durationSec)}{zone.pctOfSession !== null ? ` · ${Math.round(zone.pctOfSession * 100)}%` : ""}</span>
                         </div>
@@ -222,14 +222,14 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           ) : null}
 
           <article className="surface p-5">
-            <h2 className="text-sm font-semibold">Splits / intervals</h2>
+            <h2 className="text-body font-medium">Splits / intervals</h2>
             {laps.length === 0 ? (
-              <p className="mt-3 text-sm text-muted">Splits coming soon.</p>
+              <p className="mt-3 text-body text-muted">Splits coming soon.</p>
             ) : (
               <div className="mt-3 overflow-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-body">
                   <thead>
-                    <tr className="text-left text-xs uppercase text-muted">
+                    <tr className="text-left text-ui-label uppercase text-muted">
                       <th>Lap</th>
                       <th>Time</th>
                       <th>Distance</th>

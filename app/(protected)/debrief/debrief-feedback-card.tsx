@@ -56,8 +56,8 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="label">Feedback</p>
-          <h2 className="mt-1 text-lg font-semibold">Did this match the week?</h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted">A quick signal is enough. Add a note only if something felt missing, overstated, or especially useful.</p>
+          <h2 className="mt-1 text-section-title font-semibold">Did this match the week?</h2>
+          <p className="mt-2 max-w-2xl text-body text-muted">A quick signal is enough. Add a note only if something felt missing, overstated, or especially useful.</p>
         </div>
         {isSaving ? <span className="debrief-pill">Saving…</span> : null}
       </div>
@@ -69,14 +69,14 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
             <button
               type="button"
               onClick={() => void save({ helpful: true })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-body transition ${helpful === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
             >
               Yes
             </button>
             <button
               type="button"
               onClick={() => void save({ helpful: false })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${helpful === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-body transition ${helpful === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
             >
               No
             </button>
@@ -89,14 +89,14 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
             <button
               type="button"
               onClick={() => void save({ accurate: true })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-body transition ${accurate === true ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.14)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
             >
               Yes
             </button>
             <button
               type="button"
               onClick={() => void save({ accurate: false })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition ${accurate === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-body transition ${accurate === false ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] text-white" : "border-[hsl(var(--border))] text-muted hover:text-white"}`}
             >
               No
             </button>
@@ -111,7 +111,7 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
           >
             {showNoteEditor ? "Hide note" : note.trim() ? "Edit note" : "Add note"}
           </button>
-          {status ? <p className="text-xs text-muted">{status}</p> : null}
+          {status ? <p className="text-ui-label text-muted">{status}</p> : null}
         </div>
       </div>
 
@@ -133,7 +133,7 @@ export function DebriefFeedbackCard({ weekStart, initialHelpful, initialAccurate
               type="button"
               onClick={() => void save({ note })}
               disabled={isSaving}
-              className="btn-secondary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-secondary px-3 py-1.5 text-ui-label disabled:cursor-not-allowed disabled:opacity-60"
             >
               Save note
             </button>

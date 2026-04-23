@@ -97,16 +97,16 @@ export function StravaConnectionCard({ connection }: Props) {
             <StravaLogo className="w-4 h-4" />
           </span>
           <div className="min-w-0">
-            <p className="font-medium text-sm leading-tight">Strava</p>
-            <p className="text-xs text-muted">Not connected</p>
+            <p className="font-medium text-body leading-tight">Strava</p>
+            <p className="text-ui-label text-muted">Not connected</p>
           </div>
         </div>
-        <p className="text-xs text-muted">
+        <p className="text-ui-label text-muted">
           Import completed workouts from your Strava account.
         </p>
         <a
           href="/api/integrations/strava/connect"
-          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded bg-[#FC4C02] text-white hover:bg-[#e04400] transition-colors"
+          className="inline-flex items-center justify-center px-3 py-1.5 text-ui-label rounded bg-[#FC4C02] text-white hover:bg-[#e04400] transition-colors"
         >
           Connect Strava
         </a>
@@ -125,10 +125,10 @@ export function StravaConnectionCard({ connection }: Props) {
           <StravaLogo className="w-4 h-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm leading-tight truncate">
+          <p className="font-medium text-body leading-tight truncate">
             {connection.provider_display_name ?? "Strava"}
           </p>
-          <p className="text-xs text-muted">
+          <p className="text-ui-label text-muted">
             {isRunning ? (
               <span className="text-cyan-400">Syncing…</span>
             ) : hasError ? (
@@ -148,24 +148,24 @@ export function StravaConnectionCard({ connection }: Props) {
       </div>
 
       {hasError && connection.last_sync_error && (
-        <p className="text-xs text-danger bg-danger/10 rounded px-2 py-1 leading-snug">
+        <p className="text-ui-label text-danger bg-danger/10 rounded px-2 py-1 leading-snug">
           {connection.last_sync_error}
         </p>
       )}
 
       {!isRunning && connection.last_sync_metadata && (
-        <p className="text-xs text-muted">
+        <p className="text-ui-label text-muted">
           {formatSyncSummary(connection.last_sync_metadata)}
         </p>
       )}
 
       <div className="flex items-center gap-2">
-        <label htmlFor="sync-window" className="text-xs text-muted whitespace-nowrap">Sync window</label>
+        <label htmlFor="sync-window" className="text-ui-label text-muted whitespace-nowrap">Sync window</label>
         <select
           id="sync-window"
           value={syncWindow}
           onChange={(e) => handleSyncWindowChange(Number(e.target.value))}
-          className="flex-1 text-xs rounded border border-border bg-[var(--color-base)] px-2 py-1 text-foreground"
+          className="flex-1 text-ui-label rounded border border-border bg-[var(--color-base)] px-2 py-1 text-foreground"
         >
           <option value={7}>7 days</option>
           <option value={14}>14 days</option>
@@ -178,14 +178,14 @@ export function StravaConnectionCard({ connection }: Props) {
         <button
           onClick={handleSync}
           disabled={isRunning || isDisconnecting}
-          className="flex-1 btn-primary px-3 py-1.5 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 btn-primary px-3 py-1.5 text-ui-label disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isRunning ? "Syncing…" : "Sync now"}
         </button>
         <button
           onClick={handleDisconnect}
           disabled={isRunning || isDisconnecting}
-          className="px-3 py-1.5 text-xs font-medium rounded border border-border text-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-3 py-1.5 text-ui-label rounded border border-border text-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Disconnect
         </button>

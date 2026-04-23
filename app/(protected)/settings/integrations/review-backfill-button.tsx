@@ -40,15 +40,15 @@ export function ReviewBackfillButton() {
     <article className="surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">Execution reviews</p>
-          <h2 className="mt-1 text-lg font-semibold">Run reviews for linked sessions</h2>
-          <p className="mt-1 text-sm text-muted">Manually trigger the execution review process for all confirmed linked sessions.</p>
+          <p className="text-kicker text-accent">Execution reviews</p>
+          <h2 className="mt-1 text-section-title font-semibold">Run reviews for linked sessions</h2>
+          <p className="mt-1 text-body text-muted">Manually trigger the execution review process for all confirmed linked sessions.</p>
         </div>
-        <button type="button" onClick={handleRunReviews} disabled={isPending} className="btn-primary px-4 py-2 text-sm disabled:opacity-60">
+        <button type="button" onClick={handleRunReviews} disabled={isPending} className="btn-primary px-4 py-2 text-body disabled:opacity-60">
           {isPending ? "Running reviews..." : "Run execution reviews"}
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-muted">{message}</p> : null}
+      {message ? <p className="mt-3 text-body text-muted">{message}</p> : null}
     </article>
   );
 }

@@ -58,23 +58,23 @@ export default async function RaceSettingsPage() {
     <section className="space-y-4">
       <header className="surface p-6">
         <p className="label">Settings</p>
-        <h1 className="mt-3 text-2xl">Race settings</h1>
-        <p className="mt-2 text-sm text-muted">Manage your race calendar. Set your A-race and tune-up events.</p>
+        <h1 className="mt-3 text-page-title">Race settings</h1>
+        <p className="mt-2 text-body text-muted">Manage your race calendar. Set your A-race and tune-up events.</p>
       </header>
 
       {/* Race Profiles */}
       {!isMissingTable(rpError) && (
         <article className="surface p-5">
-          <h2 className="text-lg font-semibold">Race Calendar</h2>
-          <p className="mt-1 text-sm text-muted">Add races with priority: A (peak for), B (mini-taper), C (train through).</p>
+          <h2 className="text-section-title font-semibold">Race Calendar</h2>
+          <p className="mt-1 text-body text-muted">Add races with priority: A (peak for), B (mini-taper), C (train through).</p>
           <RaceProfileList races={races} />
         </article>
       )}
 
       {/* Legacy single-race fallback */}
       <article className="surface p-5">
-        <h2 className="text-lg font-semibold">Dashboard Countdown</h2>
-        <p className="mt-1 text-sm text-muted">Primary race shown on your dashboard countdown.</p>
+        <h2 className="text-section-title font-semibold">Dashboard Countdown</h2>
+        <p className="mt-1 text-body text-muted">Primary race shown on your dashboard countdown.</p>
         <form action={updateRaceSettingsAction} className="mt-3 grid gap-3 md:max-w-lg">
           <div>
             <label htmlFor="raceName" className="label-base">Race name</label>

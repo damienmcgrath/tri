@@ -97,7 +97,7 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Share your week</h2>
+          <h2 className="text-section-title font-semibold">Share your week</h2>
           <button type="button" onClick={onClose} className="text-tertiary hover:text-white" aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M15 5L5 15M5 5l10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </button>
@@ -142,10 +142,10 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
                     : "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] hover:border-[rgba(255,255,255,0.2)]"
                 }`}
               >
-                <span className={`text-xs font-medium ${isSelected ? "text-[var(--color-accent)]" : "text-white"}`}>
+                <span className={`text-ui-label ${isSelected ? "text-[var(--color-accent)]" : "text-white"}`}>
                   {opt.label}
                 </span>
-                <span className="text-[10px] text-tertiary">{opt.ratio}</span>
+                <span className="text-ui-label text-tertiary">{opt.ratio}</span>
               </button>
             );
           })}
@@ -153,7 +153,7 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
 
         {/* Name toggle — only shown when user has a display name */}
         {hasName ? (
-          <label className="mt-4 flex items-center gap-2 text-sm text-muted">
+          <label className="mt-4 flex items-center gap-2 text-body text-muted">
             <input
               type="checkbox"
               checked={showName}
@@ -163,7 +163,7 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
             Show athlete name
           </label>
         ) : (
-          <p className="mt-4 text-xs text-tertiary">
+          <p className="mt-4 text-ui-label text-tertiary">
             Set a display name in <a href="/settings/athlete-context" className="underline hover:text-white">Settings</a> to include your name on the card.
           </p>
         )}
@@ -175,7 +175,7 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
               type="button"
               onClick={() => void handleShare()}
               disabled={generating}
-              className="btn-primary flex-1 px-4 py-2.5 text-sm disabled:opacity-40"
+              className="btn-primary flex-1 px-4 py-2.5 text-body disabled:opacity-40"
             >
               {generating ? "Generating…" : "Share"}
             </button>
@@ -184,7 +184,7 @@ export function ShareCardModal({ weekOf, displayName, onClose }: Props) {
             type="button"
             onClick={() => void handleDownload()}
             disabled={generating}
-            className={`${typeof navigator !== "undefined" && "share" in navigator ? "btn-secondary" : "btn-primary"} flex-1 px-4 py-2.5 text-sm disabled:opacity-40`}
+            className={`${typeof navigator !== "undefined" && "share" in navigator ? "btn-secondary" : "btn-primary"} flex-1 px-4 py-2.5 text-body disabled:opacity-40`}
           >
             {generating ? "Generating…" : "Download"}
           </button>

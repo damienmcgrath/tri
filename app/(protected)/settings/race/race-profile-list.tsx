@@ -60,21 +60,21 @@ export function RaceProfileList({ races }: { races: RaceProfileRow[] }) {
   return (
     <div className="mt-4 space-y-3">
       {races.length === 0 && !showForm && (
-        <p className="text-sm text-muted">No races added yet.</p>
+        <p className="text-body text-muted">No races added yet.</p>
       )}
 
       {races.map((race) => (
         <div key={race.id} className="flex items-center gap-3 rounded-md border border-[var(--border-subtle)] p-3">
-          <span className={`inline-flex h-6 w-6 items-center justify-center rounded border text-xs font-bold ${PRIORITY_BADGE[race.priority] ?? ""}`}>
+          <span className={`inline-flex h-6 w-6 items-center justify-center rounded border text-ui-label font-semibold ${PRIORITY_BADGE[race.priority] ?? ""}`}>
             {race.priority}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{race.name}</p>
-            <p className="text-xs text-muted">
+            <p className="text-body font-medium">{race.name}</p>
+            <p className="text-ui-label text-muted">
               {DISTANCE_LABELS[race.distance_type] ?? race.distance_type} &middot; {race.date}
             </p>
           </div>
-          {race.notes && <p className="hidden text-xs text-muted md:block">{race.notes}</p>}
+          {race.notes && <p className="hidden text-ui-label text-muted md:block">{race.notes}</p>}
         </div>
       ))}
 
@@ -122,7 +122,7 @@ export function RaceProfileList({ races }: { races: RaceProfileRow[] }) {
           </div>
         </form>
       ) : (
-        <button className="btn-secondary text-sm" onClick={() => setShowForm(true)}>
+        <button className="btn-secondary text-body" onClick={() => setShowForm(true)}>
           + Add race
         </button>
       )}

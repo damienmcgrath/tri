@@ -164,8 +164,8 @@ export function CoachPanel() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">Coach</span>
-            <Link href="/coach" className="text-[11px] text-cyan-400 hover:text-cyan-300" onClick={close}>
+            <span className="text-body font-medium text-white">Coach</span>
+            <Link href="/coach" className="text-ui-label text-cyan-400 hover:text-cyan-300" onClick={close}>
               Open full →
             </Link>
           </div>
@@ -186,14 +186,14 @@ export function CoachPanel() {
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {messages.length === 0 ? (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-tertiary">Ask your coach anything about your training.</p>
+              <p className="text-body text-tertiary">Ask your coach anything about your training.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`rounded-xl px-3 py-2.5 text-sm leading-relaxed ${
+                  className={`rounded-xl px-3 py-2.5 text-body leading-relaxed ${
                     message.role === "user"
                       ? "ml-8 bg-[hsl(var(--accent)/0.12)] text-white"
                       : "mr-4 bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.85)]"
@@ -204,7 +204,7 @@ export function CoachPanel() {
               ))}
               {isLoading && messages[messages.length - 1]?.role === "user" ? (
                 <div className="mr-4 rounded-xl bg-[rgba(255,255,255,0.04)] px-3 py-2.5">
-                  <span className="inline-flex gap-1 text-sm text-tertiary">
+                  <span className="inline-flex gap-1 text-body text-tertiary">
                     <span className="animate-pulse">Thinking</span>
                     <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>.</span>
                     <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>.</span>
@@ -232,12 +232,12 @@ export function CoachPanel() {
               }}
               placeholder="Ask your coach..."
               rows={1}
-              className="flex-1 resize-none rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white placeholder:text-tertiary focus:border-[rgba(255,255,255,0.2)] focus:outline-none"
+              className="flex-1 resize-none rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-body text-white placeholder:text-tertiary focus:border-[rgba(255,255,255,0.2)] focus:outline-none"
             />
             <button
               type="submit"
               disabled={isLoading || input.trim().length < 3}
-              className="rounded-lg bg-[hsl(var(--accent))] px-3 py-2 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-lg bg-[hsl(var(--accent))] px-3 py-2 text-body font-medium text-black transition hover:opacity-90 disabled:opacity-40"
             >
               Send
             </button>
