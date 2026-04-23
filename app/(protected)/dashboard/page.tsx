@@ -1069,12 +1069,15 @@ async function DashboardRecentUpload(props: {
   if (!props?.supabase) return null;
   const { supabase, userId } = props;
   try {
-    // Find recently-synced activities (last 4 hours) that haven't been reviewed via feel capture
+    // Find recently-synced activities (last 4 hours) whose workout actually happened recently (last 36 hours)
+    // so backfilled uploads of old sessions don't trigger the "how did it feel?" prompt.
+    const now = Date.now();
     const { data: recentActivity } = await supabase
       .from("completed_activities")
       .select("id,sport_type,duration_sec")
       .eq("user_id", userId)
-      .gte("created_at", new Date(Date.now() - 4 * 3600 * 1000).toISOString())
+      .gte("created_at", new Date(now - 4 * 3600 * 1000).toISOString())
+      .gte("start_time_utc", new Date(now - 36 * 3600 * 1000).toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
