@@ -319,7 +319,8 @@
   }
 
   /* Kicker baseline — neutral tertiary text. Reserve lime accent for
-     live/new/alert states only; use `.priority-kicker--accent` for those. */
+     live/new/alert states only; use `.priority-kicker--accent` for those.
+     F02: aligned to 0.12em tracking to match `.text-kicker`. */
   .priority-kicker,
   .label,
   .label-base {
@@ -327,7 +328,7 @@
     font-size: 11px;
     font-weight: 500;
     line-height: 1;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-tertiary);
   }
@@ -341,8 +342,77 @@
     color: var(--color-accent);
   }
 
-  /* Explicit type-scale utilities — the audit's recommended replacement for
-     the old `font-weight: 500 !important` sledgehammer. */
+  /* ─────────────────────────────────────────────────────────────────
+     F02: canonical 6-row type scale.
+
+     The audit's diagnosis: with `font-weight: 500 !important` neutralising
+     weight as a hierarchy tool, every new role reached for a new size —
+     and the Session Review page ended up running seven distinct sizes
+     with no role-to-size mapping. Fix is to commit to exactly six roles
+     and map every element to one of them.
+
+     Rollout happens in stages (see PR series):
+       1. Define utilities (this file).
+       2. Swap raw `text-xs/sm/base/lg/xl/2xl/3xl` Tailwind classes to
+          the semantic utility that fits their role.
+       3. Audit `font-semibold` callsites — most should drop to 500 at
+          a larger size, not stay at 600.
+
+     Legacy utilities (.text-title-xl, .text-title-lg, .text-stat,
+     .card-kicker, .priority-kicker, .label) remain as aliases so the
+     app keeps rendering while call-sites migrate one surface at a time.
+     ───────────────────────────────────────────────────────────────── */
+
+  /* 32 / 600 — hero stats and page-level numbers ("92", "Long Bike"). */
+  .text-page-hero {
+    font-size: 32px;
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* 22 / 600 — mid-page titles, card hero numbers. */
+  .text-page-title {
+    font-size: 22px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  /* 17 / 500 — section titles ("Ask coach follow-up", "Session verdict"). */
+  .text-section-title {
+    font-size: 17px;
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+
+  /* 15 / 400 — body prose, findings bullets, chip copy, table rows. */
+  .text-body {
+    font-size: 15px;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  /* 13 / 500 — companion stat values, table headers, metadata lines. */
+  .text-ui-label {
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  /* 11 / 500 — uppercase mono-ish kickers ("SCORE BREAKDOWN"). */
+  .text-kicker {
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Legacy type utilities (kept as aliases during rollout) ─────── */
+
+  /* Maps to page-title in the new scale. Do not introduce new callsites. */
   .text-title-xl {
     font-size: 28px;
     line-height: 1.15;
@@ -350,6 +420,7 @@
     letter-spacing: -0.015em;
   }
 
+  /* Maps to page-title / section-title depending on context. */
   .text-title-lg {
     font-size: 20px;
     line-height: 1.25;
@@ -357,6 +428,7 @@
     letter-spacing: -0.01em;
   }
 
+  /* Mono stat — distinct from page-hero because hero uses sans. */
   .text-stat {
     font-family: var(--font-geist-mono), monospace;
     font-size: 34px;
@@ -664,11 +736,12 @@
     padding: 18px 20px;
   }
 
-  /* General-purpose card section kicker — 11px caps, tight tracking, tertiary color */
+  /* General-purpose card section kicker — 11px caps, tight tracking, tertiary color.
+     F02: aligned to 0.12em tracking to match `.text-kicker`. */
   .card-kicker {
     font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-tertiary);
   }
