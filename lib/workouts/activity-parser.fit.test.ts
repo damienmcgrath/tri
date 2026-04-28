@@ -7,7 +7,16 @@ jest.mock("fit-file-parser", () => ({
   }))
 }));
 
-import { parseFitFile } from "./activity-parser";
+import type { ParsedActivity } from "./activity-parser";
+import { isMultisportParseResult, parseFitFile } from "./activity-parser";
+
+async function parseSingleFit(buffer: Buffer): Promise<ParsedActivity> {
+  const result = await parseFitFile(buffer);
+  if (isMultisportParseResult(result)) {
+    throw new Error("Expected single-session FIT, received multisport result");
+  }
+  return result;
+}
 
 describe("parseFitFile", () => {
   beforeEach(() => {
@@ -110,7 +119,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result).toMatchObject({
       sportType: "bike",
@@ -176,7 +185,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(3600);
     expect(result.elapsedDurationSec).toBe(3600);
@@ -200,7 +209,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(1800);
     expect(result.elapsedDurationSec).toBe(1800);
@@ -226,7 +235,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(1800);
   });
@@ -252,7 +261,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(3600);
     expect(result.elapsedDurationSec).toBe(3600);
@@ -271,7 +280,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(2700);
     expect(result.elapsedDurationSec).toBe(2700);
@@ -290,7 +299,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(1500);
     expect(result.elapsedDurationSec).toBe(1500);
@@ -323,7 +332,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(0);
     expect(result.movingDurationSec).toBeUndefined();
@@ -346,7 +355,7 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(3600);
     expect(result.elapsedDurationSec).toBe(3600);
@@ -387,10 +396,130 @@ describe("parseFitFile", () => {
       });
     });
 
-    const result = await parseFitFile(Buffer.from("fit"));
+    const result = await parseSingleFit(Buffer.from("fit"));
 
     expect(result.durationSec).toBe(2700);
     expect(result.movingDurationSec).toBe(2700);
     expect(result.elapsedDurationSec).toBe(2700);
+  });
+
+  test("returns a multisport result for an auto_multi_sport FIT (Olympic triathlon shape)", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        activity: { type: "auto_multi_sport", num_sessions: 5 },
+        sessions: [
+          {
+            start_time: "2026-04-26T08:03:08.000Z",
+            sport: "swimming",
+            sub_sport: "lap_swimming",
+            total_elapsed_time: 1601,
+            total_timer_time: 1601,
+            total_distance: 600,
+            avg_heart_rate: 118,
+            max_heart_rate: 131
+          },
+          {
+            start_time: "2026-04-26T08:29:51.000Z",
+            sport: "transition",
+            sub_sport: "generic",
+            total_elapsed_time: 130,
+            total_timer_time: 130,
+            total_distance: 213,
+            avg_heart_rate: 164,
+            max_heart_rate: 180
+          },
+          {
+            start_time: "2026-04-26T08:32:01.000Z",
+            sport: "cycling",
+            sub_sport: "generic",
+            total_elapsed_time: 4619,
+            total_timer_time: 4619,
+            total_distance: 39966,
+            avg_heart_rate: 165,
+            max_heart_rate: 176
+          },
+          {
+            start_time: "2026-04-26T09:49:00.000Z",
+            sport: "transition",
+            sub_sport: "generic",
+            total_elapsed_time: 99,
+            total_timer_time: 99,
+            total_distance: 160,
+            avg_heart_rate: 160,
+            max_heart_rate: 169
+          },
+          {
+            start_time: "2026-04-26T09:50:39.000Z",
+            sport: "running",
+            sub_sport: "generic",
+            total_elapsed_time: 2641,
+            total_timer_time: 2641,
+            total_distance: 9368,
+            avg_heart_rate: 166,
+            max_heart_rate: 194
+          }
+        ],
+        laps: [],
+        events: [],
+        records: [],
+        time_in_zone: []
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+
+    if (!isMultisportParseResult(result)) throw new Error("expected multisport result");
+
+    expect(result.kind).toBe("multisport");
+    expect(result.bundle.source).toBe("garmin_multisport");
+    expect(result.bundle.startedAt).toBe("2026-04-26T08:03:08.000Z");
+    expect(result.bundle.totalDurationSec).toBe(1601 + 130 + 4619 + 99 + 2641);
+    expect(result.bundle.totalDistanceM).toBe(600 + 213 + 39966 + 160 + 9368);
+
+    expect(result.segments).toHaveLength(5);
+    expect(result.segments.map((s) => s.role)).toEqual(["swim", "t1", "bike", "t2", "run"]);
+    expect(result.segments.map((s) => s.segmentIndex)).toEqual([0, 1, 2, 3, 4]);
+
+    const [swim, t1, bike, t2, run] = result.segments;
+    expect(swim.sportType).toBe("swim");
+    expect(swim.durationSec).toBe(1601);
+    expect(swim.distanceM).toBe(600);
+    expect(t1.durationSec).toBe(130);
+    expect(bike.sportType).toBe("bike");
+    expect(bike.durationSec).toBe(4619);
+    expect(bike.distanceM).toBe(39966);
+    expect(t2.durationSec).toBe(99);
+    expect(run.sportType).toBe("run");
+    expect(run.durationSec).toBe(2641);
+  });
+
+  test("treats a sessions.length > 1 FIT (no auto_multi_sport flag) as multisport", async () => {
+    parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+      callback(null, {
+        activity: { type: "manual" },
+        sessions: [
+          {
+            start_time: "2026-04-26T08:00:00.000Z",
+            sport: "swimming",
+            total_elapsed_time: 1000,
+            total_timer_time: 1000,
+            total_distance: 500
+          },
+          {
+            start_time: "2026-04-26T08:20:00.000Z",
+            sport: "running",
+            total_elapsed_time: 2000,
+            total_timer_time: 2000,
+            total_distance: 6000
+          }
+        ],
+        laps: [],
+        events: [],
+        records: []
+      });
+    });
+
+    const result = await parseFitFile(Buffer.from("fit"));
+    expect(isMultisportParseResult(result)).toBe(true);
   });
 });

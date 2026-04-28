@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseFitFile, parseTcxFile } from "@/lib/workouts/activity-parser";
+import { isMultisportParseResult, parseFitFile, parseTcxFile } from "@/lib/workouts/activity-parser";
 import { asMetricsRecord, getNestedString, getNestedValue } from "@/lib/workouts/metrics-v2";
 
 type CompletedActivityBackfillRow = {
@@ -136,6 +136,14 @@ export async function backfillActivityMetrics(args: {
       const parsed = upload.file_type === "fit"
         ? await parseFitFile(bytes)
         : parseTcxFile(bytes.toString("utf8"));
+
+      if (isMultisportParseResult(parsed)) {
+        // Multisport uploads insert per-segment rows up-front; metrics-backfill
+        // would need to know which segment maps to this row. Skip for now —
+        // segment metrics are already populated at upload time.
+        skipped += 1;
+        continue;
+      }
 
       const metricsV2 = withBackfillWarning(parsed.metricsV2);
       const { error: updateError } = await args.supabase

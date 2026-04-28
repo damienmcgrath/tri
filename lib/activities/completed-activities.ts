@@ -20,6 +20,9 @@ export type CompletedActivityRecord = {
   avg_power: number | null;
   schedule_status: "scheduled" | "unscheduled";
   is_unplanned: boolean;
+  race_bundle_id: string | null;
+  race_segment_role: "swim" | "t1" | "bike" | "t2" | "run" | null;
+  race_segment_index: number | null;
   metrics_v2?: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
@@ -56,7 +59,7 @@ export function localIsoDate(utcIso: string, timeZone: string) {
 
 export function isMissingCompletedActivityColumnError(error: { code?: string; message?: string } | null) {
   if (!error) return false;
-  return error.code === "42703" || /(schedule_status|is_unplanned|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+  return error.code === "42703" || /(schedule_status|is_unplanned|race_bundle_id|race_segment_role|race_segment_index|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
 }
 
 export function hasConfirmedPlannedSessionLink(link: {
@@ -114,6 +117,12 @@ export function buildExtraCompletedActivities(params: {
 }
 
 const selectVariants = [
+  // Race-column-aware variants (most complete first). Each pair tries with then without updated_at.
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at",
+  "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at",
+  // Pre-race-columns fallbacks (kept for envs where the migration hasn't landed).
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,metrics_v2,created_at,updated_at",
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,created_at,updated_at",
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,metrics_v2,created_at,updated_at",
@@ -132,8 +141,6 @@ const selectVariants = [
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,created_at"
 ] as const;
 
-let cachedSelectVariantIndex = 0;
-
 function mapActivityRow(activity: Record<string, unknown>): CompletedActivityRecord {
   return {
     id: String(activity.id),
@@ -146,6 +153,17 @@ function mapActivityRow(activity: Record<string, unknown>): CompletedActivityRec
     avg_power: typeof activity.avg_power === "number" ? activity.avg_power : null,
     schedule_status: activity.schedule_status === "scheduled" ? "scheduled" : "unscheduled",
     is_unplanned: typeof activity.is_unplanned === "boolean" ? activity.is_unplanned : false,
+    race_bundle_id: typeof activity.race_bundle_id === "string" ? activity.race_bundle_id : null,
+    race_segment_role:
+      activity.race_segment_role === "swim" ||
+      activity.race_segment_role === "t1" ||
+      activity.race_segment_role === "bike" ||
+      activity.race_segment_role === "t2" ||
+      activity.race_segment_role === "run"
+        ? activity.race_segment_role
+        : null,
+    race_segment_index:
+      typeof activity.race_segment_index === "number" ? activity.race_segment_index : null,
     metrics_v2:
       activity.metrics_v2 && typeof activity.metrics_v2 === "object" && !Array.isArray(activity.metrics_v2)
         ? activity.metrics_v2 as Record<string, unknown>
@@ -163,28 +181,15 @@ export const loadCompletedActivities = cache(async function loadCompletedActivit
 }): Promise<CompletedActivityRecord[]> {
   const { supabase, userId, rangeStart, rangeEnd } = params;
 
-  // Try the cached successful variant first to avoid retrying all 16 on every call
-  const cachedQuery = await supabase
-    .from("completed_activities")
-    .select(selectVariants[cachedSelectVariantIndex])
-    .eq("user_id", userId)
-    .gte("start_time_utc", rangeStart)
-    .lt("start_time_utc", rangeEnd);
-
-  if (!cachedQuery.error) {
-    return ((cachedQuery.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapActivityRow);
-  }
-
-  if (!isMissingCompletedActivityColumnError(cachedQuery.error)) {
-    throw new Error(cachedQuery.error.message ?? "Failed to load completed activities.");
-  }
-
-  // Cached variant failed due to schema change — find new working variant
-  let lastError: { code?: string; message?: string } | null = cachedQuery.error;
+  // Always start at the most-complete variant (index 0). The module-level cache
+  // we used to keep here got poisoned when columns were added: it would pin a
+  // fallback variant that lacked the new column, then keep returning rows
+  // without that column even after the migration ran. The cost of always
+  // starting at 0 is at most one extra query per request when a column is
+  // genuinely missing, which is negligible.
+  let lastError: { code?: string; message?: string } | null = null;
 
   for (let i = 0; i < selectVariants.length; i++) {
-    if (i === cachedSelectVariantIndex) continue;
-
     const query = await supabase
       .from("completed_activities")
       .select(selectVariants[i])
@@ -193,7 +198,6 @@ export const loadCompletedActivities = cache(async function loadCompletedActivit
       .lt("start_time_utc", rangeEnd);
 
     if (!query.error) {
-      cachedSelectVariantIndex = i;
       return ((query.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapActivityRow);
     }
 

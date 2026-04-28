@@ -1,8 +1,16 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseFitFile, parseTcxFile, sha256Hex } from "@/lib/workouts/activity-parser";
+import {
+  isMultisportParseResult,
+  parseFitFile,
+  parseTcxFile,
+  sha256Hex,
+  type ParsedActivity,
+  type ParsedMultisportSegment
+} from "@/lib/workouts/activity-parser";
 import { pickBestSuggestion, suggestSessionMatches } from "@/lib/workouts/matching-service";
+import { persistMultisportBundle } from "@/lib/workouts/race-bundle";
 import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { syncSessionLoad } from "@/lib/training/load-sync";
@@ -148,10 +156,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not store upload." }, { status: 400 });
   }
 
-  try {
-    const parsed = extension === ".fit" ? await parseFitFile(bytes) : parseTcxFile(bytes.toString("utf8"));
-
-    const { data: createdActivity, error: activityError } = await supabase
+  const insertCompletedActivity = async (parsed: ParsedActivity) => {
+    return supabase
       .from("completed_activities")
       .insert({
         user_id: user.id,
@@ -186,6 +192,48 @@ export async function POST(request: Request) {
       })
       .select("id,start_time_utc,sport_type,duration_sec,distance_m")
       .single();
+  };
+
+  try {
+    const parsed = extension === ".fit" ? await parseFitFile(bytes) : parseTcxFile(bytes.toString("utf8"));
+
+    if (isMultisportParseResult(parsed)) {
+      const insertedSegments: Array<{ activityId: string; role: ParsedMultisportSegment["role"]; segmentIndex: number }> = [];
+      for (const segment of parsed.segments) {
+        const { data: row, error: segError } = await insertCompletedActivity(segment);
+        if (segError || !row) {
+          throw new Error(segError?.message ?? `Could not save segment ${segment.segmentIndex}`);
+        }
+        insertedSegments.push({
+          activityId: row.id as string,
+          role: segment.role,
+          segmentIndex: segment.segmentIndex
+        });
+      }
+
+      await supabase.from("activity_uploads").update({ status: "parsed" }).eq("id", upload.id).eq("user_id", user.id);
+
+      const linkResult = await persistMultisportBundle({
+        supabase,
+        userId: user.id,
+        uploadId: upload.id,
+        bundle: parsed.bundle,
+        segments: insertedSegments
+      });
+
+      const matchedSessionId = linkResult.status === "linked" ? linkResult.plannedSessionId : null;
+      const bundleId = linkResult.status === "linked" ? linkResult.bundleId : null;
+
+      return NextResponse.json({
+        uploadId: upload.id,
+        multisport: true,
+        bundleId,
+        segmentIds: insertedSegments.map((s) => s.activityId),
+        matchedSessionId
+      }, { headers: rateLimitHeaders(userRateLimit) });
+    }
+
+    const { data: createdActivity, error: activityError } = await insertCompletedActivity(parsed);
 
     if (activityError || !createdActivity) throw new Error(activityError?.message ?? "Could not save parsed activity");
 
