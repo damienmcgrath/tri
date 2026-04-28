@@ -14,6 +14,7 @@ import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { RaceSegmentList, type RaceSegmentSummary } from "./components/race-segment-list";
 import { RaceReviewCard, RaceReviewPlaceholder } from "./components/race-review-card";
+import { RegenerateRaceReviewButton } from "./components/regenerate-race-review-button";
 import { isRaceSession } from "@/lib/training/race-session";
 import { DetailsAccordion } from "../../details-accordion";
 import { getMonday } from "../../week-context";
@@ -617,9 +618,14 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
   const quietLabelClass = "card-kicker";
 
-  // Use actual duration from execution_result when available, fall back to planned
+  // Use actual duration from execution_result when available, fall back to planned.
+  // For race sessions, prefer the rolled-up segment-list total so the subtitle
+  // reflects the real race time rather than the placeholder planned duration.
   const execReview = session.execution_result ? parsePersistedExecutionReview(session.execution_result) : null;
-  const actualDurationSec = execReview?.deterministic?.actual?.durationSec ?? null;
+  const raceTotalDurationSec = raceSegmentList
+    ? raceSegmentList.reduce((sum, segment) => sum + segment.durationSec, 0)
+    : null;
+  const actualDurationSec = raceTotalDurationSec ?? execReview?.deterministic?.actual?.durationSec ?? null;
   const actualDurationLabel = actualDurationSec
     ? durationLabel(Math.round(actualDurationSec / 60))
     : durationLabel(session.duration_minutes);
@@ -690,17 +696,25 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </p>
           </div>
           <div className="flex flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-            {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
+            {raceSegmentList && raceBundleId ? (
+              <RegenerateRaceReviewButton bundleId={raceBundleId} />
+            ) : hasLinkedActivity ? (
+              <RegenerateReviewButton sessionId={session.id} />
+            ) : null}
           </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className={sessionStatusBadgeClass}>{reviewVm.sessionStatusLabel}</span>
-          <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
-          {reviewVm.isReviewable ? (
-            <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
-              {narrativeSourceLabel(reviewVm.narrativeSource)}
-            </span>
+          {!raceSegmentList ? (
+            <>
+              <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
+              {reviewVm.isReviewable ? (
+                <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
+                  {narrativeSourceLabel(reviewVm.narrativeSource)}
+                </span>
+              ) : null}
+            </>
           ) : null}
           {blockContext ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.78)]">
@@ -712,7 +726,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           ) : null}
         </div>
 
-        {reviewVm.isReviewable && reviewVm.score !== null ? (
+        {!raceSegmentList && reviewVm.isReviewable && reviewVm.score !== null ? (
           <div className="mt-5 flex flex-col gap-4 border-t border-[hsl(var(--border))] pt-5 sm:flex-row sm:items-center sm:gap-6">
             <div className="flex items-baseline gap-3">
               <span
@@ -848,7 +862,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           and the sub-score breakdown now collapses here. Default closed.
           The SessionVerdictCard is rendered inside so its fetch still
           runs on mount, just behind a disclosure. */}
-      {reviewVm.isReviewable ? (
+      {!raceSegmentList && reviewVm.isReviewable ? (
         <DetailsAccordion
           title="Read full analysis"
           summaryDetail={
@@ -928,7 +942,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       ) : null}
 
       {/* ── Section 4: Score Breakdown (visible by default) ── */}
-      {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
+      {!raceSegmentList && reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
         const breakdownRows = [
           { key: "intentMatch", label: "Intent match", component: reviewVm.componentScores.intentMatch },
           { key: "pacingExecution", label: "Pacing & execution", component: reviewVm.componentScores.pacingExecution },
@@ -1020,32 +1034,36 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </DetailsAccordion>
       ) : null}
 
-      {/* Ask coach follow-up */}
-      <section className="border-t border-[hsl(var(--border))] pt-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-            <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
-          </div>
-          <Link
-            href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
-            className="btn-primary px-3 text-xs"
-          >
-            Ask coach
-          </Link>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {reviewVm.followUpPrompts.map((prompt) => (
+      {/* Ask coach follow-up — hidden for race sessions; the race review card
+          owns the next-step prescription and the standard prompts ("Why was
+          this session flagged?") don't apply to multi-segment races. */}
+      {!raceSegmentList ? (
+        <section className="border-t border-[hsl(var(--border))] pt-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
+              <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
+            </div>
             <Link
-              key={prompt}
-              href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
+              href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
+              className="btn-primary px-3 text-xs"
             >
-              {prompt}
+              Ask coach
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {reviewVm.followUpPrompts.map((prompt) => (
+              <Link
+                key={prompt}
+                href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
+              >
+                {prompt}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* F41: footer walks the week — prev on the left, next on the right.
           Breadcrumb at the top of the page handles back-to-calendar, and
