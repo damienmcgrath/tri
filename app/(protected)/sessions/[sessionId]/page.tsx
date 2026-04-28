@@ -13,6 +13,7 @@ import { SessionVerdictCard } from "./components/session-verdict-card";
 import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { RaceSegmentList, type RaceSegmentSummary } from "./components/race-segment-list";
+import { RaceReviewCard, RaceReviewPlaceholder } from "./components/race-review-card";
 import { isRaceSession } from "@/lib/training/race-session";
 import { DetailsAccordion } from "../../details-accordion";
 import { getMonday } from "../../week-context";
@@ -26,6 +27,19 @@ type LegacySessionRow = {
   type: string;
   duration?: number | null;
   notes?: string | null;
+};
+
+type RaceReviewRow = {
+  headline: string;
+  narrative: string;
+  coach_take: string;
+  transition_notes: string | null;
+  pacing_notes: Record<string, unknown> | null;
+  discipline_distribution_actual: Record<string, number> | null;
+  discipline_distribution_delta: Record<string, number> | null;
+  model_used: string;
+  is_provisional: boolean;
+  generated_at: string;
 };
 
 type ActivityReviewRow = {
@@ -399,6 +413,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
   // Race bundle: load all linked segments when this is a race session.
   let raceSegmentList: RaceSegmentSummary[] | null = null;
+  let raceBundleId: string | null = null;
+  let raceReviewRow: RaceReviewRow | null = null;
   if (!activityId && isRaceSession({ type: session.type, session_name: session.session_name })) {
     try {
       const { data: raceLinks } = await supabase
@@ -414,7 +430,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       if (confirmedIds.length >= 3) {
         const { data: segmentRows } = await supabase
           .from("completed_activities")
-          .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_segment_role,race_segment_index")
+          .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_segment_role,race_segment_index,race_bundle_id")
           .in("id", confirmedIds)
           .eq("user_id", user.id);
 
@@ -433,10 +449,23 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             avgHr: row.avg_hr !== null && row.avg_hr !== undefined ? Number(row.avg_hr) : null,
             avgPower: row.avg_power !== null && row.avg_power !== undefined ? Number(row.avg_power) : null
           }));
+
+          // All segments share the same race_bundle_id by construction.
+          raceBundleId = (ordered.find((row: any) => row.race_bundle_id)?.race_bundle_id as string | undefined) ?? null;
+          if (raceBundleId) {
+            const { data: reviewRow } = await supabase
+              .from("race_reviews")
+              .select("headline,narrative,coach_take,transition_notes,pacing_notes,discipline_distribution_actual,discipline_distribution_delta,model_used,is_provisional,generated_at")
+              .eq("race_bundle_id", raceBundleId)
+              .maybeSingle();
+            raceReviewRow = (reviewRow ?? null) as RaceReviewRow | null;
+          }
         }
       }
     } catch {
       raceSegmentList = null;
+      raceBundleId = null;
+      raceReviewRow = null;
     }
   }
 
@@ -717,6 +746,26 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         ) : null}
       </article>
 
+      {raceSegmentList && raceBundleId && raceReviewRow ? (
+        <RaceReviewCard
+          bundleId={raceBundleId}
+          review={{
+            headline: raceReviewRow.headline,
+            narrative: raceReviewRow.narrative,
+            coachTake: raceReviewRow.coach_take,
+            transitionNotes: raceReviewRow.transition_notes,
+            pacingNotes: (raceReviewRow.pacing_notes ?? {}) as Record<string, never>,
+            disciplineDistributionActual: raceReviewRow.discipline_distribution_actual ?? {},
+            disciplineDistributionDelta: raceReviewRow.discipline_distribution_delta,
+            modelUsed: raceReviewRow.model_used,
+            isProvisional: raceReviewRow.is_provisional,
+            generatedAt: raceReviewRow.generated_at
+          }}
+        />
+      ) : raceSegmentList && raceBundleId ? (
+        <RaceReviewPlaceholder bundleId={raceBundleId} />
+      ) : null}
+
       {raceSegmentList ? <RaceSegmentList segments={raceSegmentList} /> : null}
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
@@ -726,7 +775,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           single most actionable takeaway gets its own emphasised card.
           The long-form analysis (purpose, execution assessment, metric
           table, why-it-matters, etc.) moves into the accordion below. */}
-      {reviewVm.isReviewable && reviewVm.oneThingToChange ? (
+      {!raceSegmentList && reviewVm.isReviewable && reviewVm.oneThingToChange ? (
         <article
           className={`rounded-2xl border-l-[3px] p-5 ${
             isKeepDoingAdvice
@@ -863,7 +912,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             ) : null}
           </div>
         </DetailsAccordion>
-      ) : (
+      ) : !raceSegmentList ? (
         <section className="surface p-4 md:p-5">
           <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
             <div>
@@ -876,7 +925,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
       {/* ── Section 4: Score Breakdown (visible by default) ── */}
       {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
