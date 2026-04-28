@@ -1,6 +1,8 @@
 jest.mock("./activity-parser", () => ({
   parseFitFile: jest.fn(),
-  parseTcxFile: jest.fn()
+  parseTcxFile: jest.fn(),
+  isMultisportParseResult: (result: unknown) =>
+    typeof result === "object" && result !== null && (result as { kind?: string }).kind === "multisport"
 }));
 
 import { backfillActivityMetrics } from "./activity-metrics-backfill";

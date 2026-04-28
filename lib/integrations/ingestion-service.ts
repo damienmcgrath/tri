@@ -11,6 +11,7 @@
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { insertActivityWithCompat } from "@/lib/supabase/schema-compat";
+import { attemptRaceBundle } from "@/lib/workouts/race-bundle";
 import { fetchActivity, fetchRecentActivitiesWithRateLimit } from "./providers/strava/client";
 import { shouldThrottle, type RateLimitInfo } from "./providers/strava/rate-limiter";
 import { normalizeStravaActivity } from "./providers/strava/normalizer";
@@ -315,6 +316,21 @@ export async function ingestStravaActivity(
     console.log(`[INGEST] NO_MATCH activityId=${externalId}`);
   }
 
+  // 7. Race bundling — idempotent. Each new activity may complete a same-day race shape.
+  try {
+    const bundleResult = await attemptRaceBundle({
+      supabase,
+      userId,
+      date: created.start_time_utc.slice(0, 10),
+      source: "strava_reconstructed"
+    });
+    if (bundleResult.status === "bundled") {
+      console.log(`[INGEST] RACE_BUNDLED activityId=${externalId} bundleId=${bundleResult.bundleId}`);
+    }
+  } catch (err) {
+    console.error(`[INGEST] RACE_BUNDLE_ERROR activityId=${externalId}:`, err);
+  }
+
   await logSyncEvent(userId, "strava", "activity_imported", externalId, "ok", { matched });
 
   return { status: "imported", activityId: created.id, matched };
@@ -448,6 +464,18 @@ export async function backfillRecentActivities(
 
         const matched = await matchActivity(supabase, userId, created);
         if (matched) result.matched++;
+
+        // Idempotent race bundle attempt — no-op until same-day race shape is complete.
+        try {
+          await attemptRaceBundle({
+            supabase,
+            userId,
+            date: created.start_time_utc.slice(0, 10),
+            source: "strava_reconstructed"
+          });
+        } catch (bundleErr) {
+          console.error(`[INGEST] BACKFILL_RACE_BUNDLE_ERROR activityId=${activity.id}:`, bundleErr);
+        }
       } catch (err) {
         console.error(`[INGEST] BACKFILL_ACTIVITY_ERROR activityId=${activity.id}:`, err);
         result.skipped++;

@@ -37,6 +37,17 @@ type CalendarActivityRecord = {
   schedule_status?: "scheduled" | "unscheduled" | null;
   is_unplanned?: boolean | null;
   notes?: string | null;
+  race_bundle_id?: string | null;
+  race_segment_role?: "swim" | "t1" | "bike" | "t2" | "run" | null;
+  race_segment_index?: number | null;
+};
+
+export type RaceSegmentDisplay = {
+  activityId: string;
+  role: "swim" | "t1" | "bike" | "t2" | "run";
+  sport: string;
+  durationMin: number;
+  distanceKm: number | null;
 };
 
 type CalendarLinkRecord = {
@@ -74,6 +85,7 @@ export type CalendarDisplayItem = {
   is_key: boolean;
   isUnplanned: boolean;
   displayType: "planned_session" | "completed_activity";
+  raceSegments: RaceSegmentDisplay[] | null;
 };
 
 type ActivityItem = {
@@ -87,10 +99,36 @@ type ActivityItem = {
   avg_power: number | null;
   is_unplanned: boolean;
   created_at: string;
+  race_bundle_id: string | null;
+  race_segment_role: "swim" | "t1" | "bike" | "t2" | "run" | null;
+  race_segment_index: number | null;
 };
 
 function isSkipped(notes: string | null) {
   return /\[skipped\s\d{4}-\d{2}-\d{2}\]/i.test(notes ?? "");
+}
+
+function buildRaceSegments(linked: ActivityItem[]): RaceSegmentDisplay[] | null {
+  if (linked.length < 3) return null;
+  const bundleId = linked[0].race_bundle_id;
+  if (!bundleId) return null;
+  if (!linked.every((item) => item.race_bundle_id === bundleId)) return null;
+  if (!linked.every((item) => item.race_segment_role !== null)) return null;
+
+  const ordered = [...linked].sort((a, b) => {
+    const ai = a.race_segment_index ?? 0;
+    const bi = b.race_segment_index ?? 0;
+    if (ai !== bi) return ai - bi;
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  return ordered.map((item) => ({
+    activityId: item.id,
+    role: item.race_segment_role as RaceSegmentDisplay["role"],
+    sport: item.sport,
+    durationMin: item.duration_min,
+    distanceKm: item.distance_km
+  }));
 }
 
 function dateInRange(date: string, start?: string, endExclusive?: string) {
@@ -151,7 +189,10 @@ export function buildCalendarDisplayItems(input: {
           isUnplanned: Boolean(activity.is_unplanned),
           links
         }) === "extra",
-        created_at: activity.start_time_utc
+        created_at: activity.start_time_utc,
+        race_bundle_id: activity.race_bundle_id ?? null,
+        race_segment_role: activity.race_segment_role ?? null,
+        race_segment_index: activity.race_segment_index ?? null
       }
     ])
   );
@@ -206,6 +247,8 @@ export function buildCalendarDisplayItems(input: {
         }
       : null;
 
+    const raceSegments = buildRaceSegments(linked);
+
     return {
       id: session.id,
       date: session.date,
@@ -229,7 +272,8 @@ export function buildCalendarDisplayItems(input: {
       unassignedSameDayCount: linked.length > 0 ? 0 : (unassignedByDate.get(session.date) ?? 0),
       is_key: Boolean(session.is_key),
       isUnplanned: false,
-      displayType: "planned_session"
+      displayType: "planned_session",
+      raceSegments
     };
   });
 
@@ -263,7 +307,8 @@ export function buildCalendarDisplayItems(input: {
       unassignedSameDayCount: 0,
       is_key: false,
       isUnplanned: item.is_unplanned,
-      displayType: "completed_activity"
+      displayType: "completed_activity",
+      raceSegments: null
     }));
 
   return [...plannedItems, ...unlinkedActivityItems].sort((a, b) => {

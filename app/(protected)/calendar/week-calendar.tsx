@@ -39,6 +39,13 @@ type CalendarSession = {
   is_key?: boolean;
   isUnplanned?: boolean;
   displayType?: "planned_session" | "completed_activity";
+  raceSegments?: Array<{
+    activityId: string;
+    role: "swim" | "t1" | "bike" | "t2" | "run";
+    sport: string;
+    durationMin: number;
+    distanceKm: number | null;
+  }> | null;
 };
 
 type WeekDay = { iso: string; weekday: string; label: string };
@@ -911,6 +918,17 @@ export function WeekCalendar({
                   const isClickable = reviewableCompleted || Boolean(extraActivityId);
                   const showCompletedFooter = state === "completed" || state === "assigned_from_upload" || state === "extra";
                   const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
+                  const raceSegments = session.raceSegments ?? null;
+                  const isRaceCard = Boolean(raceSegments && raceSegments.length >= 3);
+                  const raceSubtitle = isRaceCard && raceSegments
+                    ? raceSegments
+                        .filter((seg) => seg.role === "swim" || seg.role === "bike" || seg.role === "run")
+                        .map((seg) => `${seg.role === "swim" ? "Swim" : seg.role === "bike" ? "Bike" : "Run"} ${seg.durationMin}m`)
+                        .join(" · ")
+                    : null;
+                  const raceTotalMin = isRaceCard && raceSegments
+                    ? raceSegments.reduce((sum, seg) => sum + seg.durationMin, 0)
+                    : null;
 
                   return (
                     <article
@@ -939,11 +957,22 @@ export function WeekCalendar({
                     >
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
-                          <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
-                            {discipline.label}
-                          </span>
+                          {isRaceCard ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px]"
+                                  style={{ backgroundColor: "rgba(196,135,114,0.12)", color: "#F0D3C8", borderColor: "rgba(196,135,114,0.28)" }}>
+                              <span aria-hidden="true">🏊</span>
+                              <span aria-hidden="true">🚴</span>
+                              <span aria-hidden="true">🏃</span>
+                              <span className="ml-1 font-medium tracking-wide">Race</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: disciplineTone.bg, color: disciplineTone.text, borderColor: disciplineTone.border }}>
+                              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: disciplineTone.dot }} />
+                              {discipline.label}
+                            </span>
+                          )}
                           {(() => {
+                            if (isRaceCard) return null;
                             const pill = getRolePill(session);
                             if (!pill) return null;
                             return (
@@ -976,12 +1005,18 @@ export function WeekCalendar({
                       </div>
                       <p className="mt-1 min-h-[1.5rem] font-medium leading-snug">{cardTitle}</p>
                       <div className="mt-0 flex flex-wrap items-center gap-1">
-                        <span className="text-[11px] text-muted">{session.duration} min{state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}</span>
-                        {state !== "unmatched_upload" ? (() => {
+                        <span className="text-[11px] text-muted">
+                          {isRaceCard && raceTotalMin !== null
+                            ? `${raceTotalMin} min total`
+                            : `${session.duration} min${state === "unmatched_upload" ? ` · logged ${uploadDateFormatter.format(new Date(`${session.created_at}`))}` : ""}`}
+                        </span>
+                        {isRaceCard && raceSubtitle ? (
+                          <span className="text-[11px] text-muted">· {raceSubtitle}</span>
+                        ) : state !== "unmatched_upload" ? (() => {
                           const target = extractTargetLine(session);
                           return target ? <span className="text-[11px] text-muted">· {target}</span> : null;
                         })() : null}
-                        {session.intentCategory && state !== "unmatched_upload" ? (
+                        {session.intentCategory && !isRaceCard && state !== "unmatched_upload" ? (
                           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${getIntentPillClass(session.intentCategory)}`}>
                             {getIntentLabel(session.intentCategory)}
                           </span>

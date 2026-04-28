@@ -12,6 +12,8 @@ import { FeelCaptureBanner } from "./components/feel-capture-banner";
 import { SessionVerdictCard } from "./components/session-verdict-card";
 import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
+import { RaceSegmentList, type RaceSegmentSummary } from "./components/race-segment-list";
+import { isRaceSession } from "@/lib/training/race-session";
 import { DetailsAccordion } from "../../details-accordion";
 import { getMonday } from "../../week-context";
 
@@ -395,6 +397,49 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
   session.has_linked_activity = hasLinkedActivity;
 
+  // Race bundle: load all linked segments when this is a race session.
+  let raceSegmentList: RaceSegmentSummary[] | null = null;
+  if (!activityId && isRaceSession({ type: session.type, session_name: session.session_name })) {
+    try {
+      const { data: raceLinks } = await supabase
+        .from("session_activity_links")
+        .select("completed_activity_id,confirmation_status")
+        .eq("planned_session_id", session.id)
+        .eq("user_id", user.id);
+
+      const confirmedIds = (raceLinks ?? [])
+        .filter((row: any) => row.confirmation_status === "confirmed" || row.confirmation_status === null)
+        .map((row: any) => row.completed_activity_id as string);
+
+      if (confirmedIds.length >= 3) {
+        const { data: segmentRows } = await supabase
+          .from("completed_activities")
+          .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_segment_role,race_segment_index")
+          .in("id", confirmedIds)
+          .eq("user_id", user.id);
+
+        const ordered = (segmentRows ?? [])
+          .filter((row: any) => row.race_segment_role)
+          .sort((a: any, b: any) => (a.race_segment_index ?? 0) - (b.race_segment_index ?? 0));
+
+        if (ordered.length >= 3) {
+          raceSegmentList = ordered.map((row: any) => ({
+            activityId: row.id as string,
+            role: row.race_segment_role as RaceSegmentSummary["role"],
+            sport: row.sport_type as string,
+            startTimeUtc: row.start_time_utc as string,
+            durationSec: Number(row.duration_sec ?? 0),
+            distanceM: row.distance_m !== null && row.distance_m !== undefined ? Number(row.distance_m) : null,
+            avgHr: row.avg_hr !== null && row.avg_hr !== undefined ? Number(row.avg_hr) : null,
+            avgPower: row.avg_power !== null && row.avg_power !== undefined ? Number(row.avg_power) : null
+          }));
+        }
+      }
+    } catch {
+      raceSegmentList = null;
+    }
+  }
+
   // Query session_feels for completed sessions (skip for activity-route synthetic sessions)
   let existingFeelData: {
     overall_feel: number | null;
@@ -671,6 +716,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           </div>
         ) : null}
       </article>
+
+      {raceSegmentList ? <RaceSegmentList segments={raceSegmentList} /> : null}
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
 

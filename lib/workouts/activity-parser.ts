@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import FitParser from "fit-file-parser";
 import { XMLParser } from "fast-xml-parser";
 
-type ParsedActivity = {
+export type ParsedActivity = {
   sportType: string;
   startTimeUtc: string;
   endTimeUtc: string;
@@ -30,6 +30,31 @@ type ParsedActivity = {
   metricsV2?: Record<string, unknown>;
   parseSummary?: Record<string, unknown>;
 };
+
+export type RaceSegmentRole = "swim" | "t1" | "bike" | "t2" | "run";
+
+export type ParsedMultisportSegment = ParsedActivity & {
+  role: RaceSegmentRole;
+  segmentIndex: number;
+};
+
+export type ParsedMultisportActivity = {
+  kind: "multisport";
+  bundle: {
+    startedAt: string;
+    endedAt: string;
+    totalDurationSec: number;
+    totalDistanceM: number;
+    source: "garmin_multisport";
+  };
+  segments: ParsedMultisportSegment[];
+};
+
+export type ParsedFitFile = ParsedActivity | ParsedMultisportActivity;
+
+export function isMultisportParseResult(result: ParsedFitFile): result is ParsedMultisportActivity {
+  return (result as ParsedMultisportActivity).kind === "multisport";
+}
 
 function buildPaceSummary(durationSec: number, distanceM: number) {
   if (durationSec <= 0 || distanceM <= 0) {
@@ -505,7 +530,7 @@ export function sha256Hex(content: Buffer | string) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
+export async function parseFitFile(buffer: Buffer): Promise<ParsedFitFile> {
   const parser = new FitParser({ force: true, speedUnit: "m/s", lengthUnit: "m", temperatureUnit: "celsius" });
 
   const fit = await new Promise<any>((resolve, reject) => {
@@ -515,11 +540,20 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
     });
   });
 
-  const session = fit?.sessions?.[0];
-  if (!session?.start_time) {
+  const sessions = Array.isArray(fit?.sessions) ? fit.sessions : [];
+  if (sessions.length === 0 || !sessions[0]?.start_time) {
     throw new Error("FIT file missing session start time.");
   }
 
+  const isMultisport = fit?.activity?.type === "auto_multi_sport" || sessions.length > 1;
+  if (isMultisport) {
+    return buildMultisportFromFit(fit, sessions);
+  }
+
+  return buildParsedActivityFromSession(sessions[0], fit);
+}
+
+function buildParsedActivityFromSession(session: any, fit: any): ParsedActivity {
   const start = new Date(session.start_time);
   const movingDurationSec = positiveInt(firstPositiveNumber([session.total_timer_time, session.total_moving_time]));
   const elapsedDurationSec =
@@ -814,6 +848,100 @@ export async function parseFitFile(buffer: Buffer): Promise<ParsedActivity> {
       laps: simplifiedLaps,
       ...buildPaceSummary(durationSec, distanceM)
     }
+  };
+}
+
+function sessionTimeWindow(session: any): { startMs: number; endMs: number } {
+  const startMs = new Date(session.start_time).getTime();
+  const elapsed = Number(
+    firstPositiveNumber([session.total_elapsed_time, session.total_timer_time]) ?? 0
+  );
+  const endMs = startMs + Math.max(0, elapsed) * 1000;
+  return { startMs, endMs };
+}
+
+function withinWindow(timestamp: unknown, startMs: number, endMs: number): boolean {
+  if (typeof timestamp !== "string" && !(timestamp instanceof Date)) return false;
+  const ms = new Date(timestamp as string | Date).getTime();
+  if (!Number.isFinite(ms)) return false;
+  return ms >= startMs && ms <= endMs;
+}
+
+function sliceFitForSession(fit: any, session: any, sessionIndex: number) {
+  const { startMs, endMs } = sessionTimeWindow(session);
+
+  const sliceByTimestamp = (rows: unknown) =>
+    Array.isArray(rows)
+      ? rows.filter((row) => {
+          const r = asRecord(row);
+          if (!r) return false;
+          return withinWindow(r.timestamp ?? r.start_time, startMs, endMs);
+        })
+      : [];
+
+  const allTimeInZone = Array.isArray(fit?.time_in_zone) ? fit.time_in_zone : [];
+  // Each `time_in_zone` entry corresponds to a session message; for multisport we pick
+  // the entry whose ordinal index matches this session.
+  const sessionTizEntries = allTimeInZone.filter((entry: unknown) => {
+    const r = asRecord(entry);
+    return r?.reference_mesg === 18 || r?.reference_mesg === "session";
+  });
+  const tizForSession = sessionTizEntries[sessionIndex] ?? sessionTizEntries[0] ?? null;
+
+  return {
+    laps: sliceByTimestamp(fit?.laps),
+    records: sliceByTimestamp(fit?.records),
+    events: sliceByTimestamp(fit?.events),
+    lengths: sliceByTimestamp(fit?.lengths),
+    time_in_zone: tizForSession ? [tizForSession] : [],
+    activity: fit?.activity,
+    activity_metrics: fit?.activity_metrics
+  };
+}
+
+function determineSegmentRole(sportRaw: unknown, transitionsSoFar: number): RaceSegmentRole {
+  const sport = `${sportRaw ?? ""}`.toLowerCase();
+  if (sport.includes("swim")) return "swim";
+  if (sport.includes("cycl") || sport.includes("bike")) return "bike";
+  if (sport.includes("run")) return "run";
+  if (sport === "transition") return transitionsSoFar === 0 ? "t1" : "t2";
+  // Fallback for unexpected sports inside a multisport file: treat as a transition slot.
+  return transitionsSoFar === 0 ? "t1" : "t2";
+}
+
+function buildMultisportFromFit(fit: any, sessions: any[]): ParsedMultisportActivity {
+  const segments: ParsedMultisportSegment[] = [];
+  let transitionsSeen = 0;
+
+  for (let i = 0; i < sessions.length; i += 1) {
+    const session = sessions[i];
+    if (!session?.start_time) {
+      throw new Error(`FIT multisport session ${i} missing start time.`);
+    }
+    const slicedFit = sliceFitForSession(fit, session, i);
+    const parsed = buildParsedActivityFromSession(session, slicedFit);
+    const role = determineSegmentRole(session.sport, transitionsSeen);
+    if (`${session.sport ?? ""}`.toLowerCase() === "transition") transitionsSeen += 1;
+    segments.push({ ...parsed, role, segmentIndex: i });
+  }
+
+  segments.sort((a, b) => a.segmentIndex - b.segmentIndex);
+
+  const startedAt = segments[0].startTimeUtc;
+  const endedAt = segments[segments.length - 1].endTimeUtc;
+  const totalDurationSec = segments.reduce((sum, s) => sum + (s.durationSec || 0), 0);
+  const totalDistanceM = segments.reduce((sum, s) => sum + (s.distanceM || 0), 0);
+
+  return {
+    kind: "multisport",
+    bundle: {
+      startedAt,
+      endedAt,
+      totalDurationSec,
+      totalDistanceM,
+      source: "garmin_multisport"
+    },
+    segments
   };
 }
 
