@@ -21,6 +21,61 @@ const PREVIEW_WEEK_FIVE_ID = "33333333-3333-4333-8333-333333333335";
 const PREVIEW_BLOCK_BASE_ID = "88888888-8888-4888-8888-888888888881";
 const PREVIEW_BLOCK_BUILD_ID = "88888888-8888-4888-8888-888888888882";
 
+// ── Race bundle preview entities ──
+// Lets the race-review feature be exercised locally without seeding from prod.
+// Sunday of the current week (previewMonday() + 6) is wired up as a completed
+// Olympic-distance race with 5 segments, a matching race_profile, and a
+// pre-populated race_reviews row so the populated card state is visible
+// immediately on seed.
+const PREVIEW_RACE_SESSION_ID = "77777777-7777-4777-8777-777777777795";
+const PREVIEW_RACE_BUNDLE_ID = "99999999-9999-4999-8999-999999999991";
+const PREVIEW_RACE_PROFILE_ID = "99999999-9999-4999-8999-999999999992";
+const PREVIEW_RACE_REVIEW_ID = "99999999-9999-4999-8999-999999999993";
+const PREVIEW_RACE_ACT_SWIM_ID = "99999999-9999-4999-8999-99999999999a";
+const PREVIEW_RACE_ACT_T1_ID = "99999999-9999-4999-8999-99999999999b";
+const PREVIEW_RACE_ACT_BIKE_ID = "99999999-9999-4999-8999-99999999999c";
+const PREVIEW_RACE_ACT_T2_ID = "99999999-9999-4999-8999-99999999999d";
+const PREVIEW_RACE_ACT_RUN_ID = "99999999-9999-4999-8999-99999999999e";
+const PREVIEW_RACE_LINK_SWIM_ID = "99999999-9999-4999-8999-9999999999a1";
+const PREVIEW_RACE_LINK_T1_ID = "99999999-9999-4999-8999-9999999999a2";
+const PREVIEW_RACE_LINK_BIKE_ID = "99999999-9999-4999-8999-9999999999a3";
+const PREVIEW_RACE_LINK_T2_ID = "99999999-9999-4999-8999-9999999999a4";
+const PREVIEW_RACE_LINK_RUN_ID = "99999999-9999-4999-8999-9999999999a5";
+
+// Bundle starts at 08:00 UTC on the previewMonday()+6 Sunday and runs ~2:24.
+// Per-segment offsets in seconds from the race start.
+const RACE_SEGMENT_OFFSETS_SEC = {
+  swim: 0,        // 0:26:41
+  t1: 1601,       // 0:02:10
+  bike: 1731,     // 1:16:59
+  t2: 6350,       // 0:01:39
+  run: 6449       // 0:44:01
+};
+const RACE_SEGMENT_DURATIONS_SEC = {
+  swim: 1601,
+  t1: 130,
+  bike: 4619,
+  t2: 99,
+  run: 2641
+};
+const RACE_TOTAL_DURATION_SEC =
+  RACE_SEGMENT_DURATIONS_SEC.swim
+  + RACE_SEGMENT_DURATIONS_SEC.t1
+  + RACE_SEGMENT_DURATIONS_SEC.bike
+  + RACE_SEGMENT_DURATIONS_SEC.t2
+  + RACE_SEGMENT_DURATIONS_SEC.run;
+
+function raceSegmentStartIso(mondayIso: string, role: keyof typeof RACE_SEGMENT_OFFSETS_SEC) {
+  const baseIso = `${previewDateOffset(mondayIso, 6)}T08:00:00.000Z`;
+  const ms = new Date(baseIso).getTime() + RACE_SEGMENT_OFFSETS_SEC[role] * 1000;
+  return new Date(ms).toISOString();
+}
+
+function raceSegmentEndIso(mondayIso: string, role: keyof typeof RACE_SEGMENT_OFFSETS_SEC) {
+  const startMs = new Date(raceSegmentStartIso(mondayIso, role)).getTime();
+  return new Date(startMs + RACE_SEGMENT_DURATIONS_SEC[role] * 1000).toISOString();
+}
+
 function previewMonday(): string {
   const now = new Date();
   const day = now.getUTCDay();
@@ -60,7 +115,10 @@ type PreviewTableName =
   | "session_comparisons"
   | "session_intensity_profiles"
   | "weekly_intensity_summaries"
-  | "session_load";
+  | "session_load"
+  | "race_bundles"
+  | "race_profiles"
+  | "race_reviews";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -676,6 +734,31 @@ export function createPreviewDatabase(): PreviewDatabase {
             created_at: new Date().toISOString(),
             is_key: true,
             execution_result: null
+          },
+          // Sunday — completed Olympic-distance race. Surfaces the v2 race
+          // review feature: planned race session links to a 5-segment bundle
+          // via session_activity_links.match_method = 'race_bundle'.
+          {
+            id: PREVIEW_RACE_SESSION_ID,
+            user_id: PREVIEW_USER_ID,
+            athlete_id: PREVIEW_USER_ID,
+            plan_id: PREVIEW_PLAN_ID,
+            week_id: PREVIEW_WEEK_FIVE_ID,
+            date: previewDateOffset(mon, 6),
+            sport: "other",
+            discipline: "multi",
+            type: "Olympic (race)",
+            session_name: "Joe Hannon Olympic",
+            target: "Race-pace execution; even splits, controlled bike, hold run pace",
+            duration_minutes: Math.round(RACE_TOTAL_DURATION_SEC / 60),
+            intent_category: "race",
+            session_role: "key",
+            status: "completed",
+            day_order: 1,
+            notes: "B-race rehearsal for Galway 70.3.",
+            created_at: new Date().toISOString(),
+            is_key: true,
+            execution_result: null
           }
         ];
       })()
@@ -1036,7 +1119,242 @@ export function createPreviewDatabase(): PreviewDatabase {
             { index: 7, durationSec: 767, distanceM: 3000, avgHr: 155, avgPaceSecPerKm: 256 }
           ]
         }
-      }
+      },
+      // ── Race bundle segments (Sunday of current week) ──
+      // Five activities carrying race_bundle_id + race_segment_role +
+      // race_segment_index. Bike halves are populated so the race-review
+      // pipeline has real pacing data to chew on; run laps drive a
+      // computed-from-laps halves split.
+      ...(() => {
+        const mon = previewMonday();
+        return [
+          {
+            id: PREVIEW_RACE_ACT_SWIM_ID,
+            user_id: PREVIEW_USER_ID,
+            upload_id: PREVIEW_UPLOAD_ID,
+            sport_type: "swim",
+            start_time_utc: raceSegmentStartIso(mon, "swim"),
+            end_time_utc: raceSegmentEndIso(mon, "swim"),
+            duration_sec: RACE_SEGMENT_DURATIONS_SEC.swim,
+            moving_duration_sec: RACE_SEGMENT_DURATIONS_SEC.swim,
+            elapsed_duration_sec: RACE_SEGMENT_DURATIONS_SEC.swim,
+            distance_m: 1500,
+            avg_hr: 152,
+            avg_power: null,
+            avg_cadence: null,
+            max_hr: 168,
+            max_power: null,
+            elevation_gain_m: null,
+            elevation_loss_m: null,
+            calories: 280,
+            avg_pace_per_100m_sec: 107,
+            avg_stroke_rate_spm: 30,
+            avg_swolf: null,
+            pool_length_m: null,
+            laps_count: 4,
+            activity_vendor: "garmin",
+            activity_type_raw: "open_water_swimming",
+            activity_subtype_raw: "open_water",
+            source: "upload",
+            parse_summary: null,
+            notes: null,
+            schedule_status: "scheduled",
+            is_unplanned: false,
+            is_race: true,
+            race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+            race_segment_role: "swim",
+            race_segment_index: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metrics_v2: {
+              laps: [
+                { index: 1, durationSec: 410, distanceM: 400, avgPacePer100mSec: 102 },
+                { index: 2, durationSec: 405, distanceM: 400, avgPacePer100mSec: 101 },
+                { index: 3, durationSec: 395, distanceM: 400, avgPacePer100mSec: 99 },
+                { index: 4, durationSec: 391, distanceM: 300, avgPacePer100mSec: 130 }
+              ]
+            }
+          },
+          {
+            id: PREVIEW_RACE_ACT_T1_ID,
+            user_id: PREVIEW_USER_ID,
+            upload_id: PREVIEW_UPLOAD_ID,
+            sport_type: "strength",
+            start_time_utc: raceSegmentStartIso(mon, "t1"),
+            end_time_utc: raceSegmentEndIso(mon, "t1"),
+            duration_sec: RACE_SEGMENT_DURATIONS_SEC.t1,
+            moving_duration_sec: RACE_SEGMENT_DURATIONS_SEC.t1,
+            elapsed_duration_sec: RACE_SEGMENT_DURATIONS_SEC.t1,
+            distance_m: 213,
+            avg_hr: 148,
+            avg_power: null,
+            avg_cadence: null,
+            max_hr: 162,
+            max_power: null,
+            elevation_gain_m: null,
+            elevation_loss_m: null,
+            calories: 12,
+            avg_pace_per_100m_sec: null,
+            avg_stroke_rate_spm: null,
+            avg_swolf: null,
+            pool_length_m: null,
+            laps_count: 1,
+            activity_vendor: "garmin",
+            activity_type_raw: "transition",
+            activity_subtype_raw: "transition",
+            source: "upload",
+            parse_summary: null,
+            notes: null,
+            schedule_status: "scheduled",
+            is_unplanned: false,
+            is_race: true,
+            race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+            race_segment_role: "t1",
+            race_segment_index: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metrics_v2: {}
+          },
+          {
+            id: PREVIEW_RACE_ACT_BIKE_ID,
+            user_id: PREVIEW_USER_ID,
+            upload_id: PREVIEW_UPLOAD_ID,
+            sport_type: "bike",
+            start_time_utc: raceSegmentStartIso(mon, "bike"),
+            end_time_utc: raceSegmentEndIso(mon, "bike"),
+            duration_sec: RACE_SEGMENT_DURATIONS_SEC.bike,
+            moving_duration_sec: RACE_SEGMENT_DURATIONS_SEC.bike - 18,
+            elapsed_duration_sec: RACE_SEGMENT_DURATIONS_SEC.bike,
+            distance_m: 39966,
+            avg_hr: 158,
+            avg_power: 218,
+            avg_cadence: 88,
+            max_hr: 174,
+            max_power: 412,
+            elevation_gain_m: 312,
+            elevation_loss_m: 308,
+            calories: 920,
+            avg_pace_per_100m_sec: null,
+            avg_stroke_rate_spm: null,
+            avg_swolf: null,
+            pool_length_m: null,
+            laps_count: 4,
+            activity_vendor: "garmin",
+            activity_type_raw: "cycling",
+            activity_subtype_raw: "road_biking",
+            source: "upload",
+            parse_summary: null,
+            notes: null,
+            schedule_status: "scheduled",
+            is_unplanned: false,
+            is_race: true,
+            race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+            race_segment_role: "bike",
+            race_segment_index: 2,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metrics_v2: {
+              power: { normalizedPower: 224, intensityFactor: 0.91, totalWorkKj: 1010 },
+              halves: { firstHalfAvgPower: 220, lastHalfAvgPower: 216 },
+              laps: [
+                { index: 1, durationSec: 1150, distanceM: 10000, avgHr: 154, avgPower: 222, normalizedPower: 226, avgCadence: 89 },
+                { index: 2, durationSec: 1160, distanceM: 10000, avgHr: 158, avgPower: 220, normalizedPower: 224, avgCadence: 88 },
+                { index: 3, durationSec: 1155, distanceM: 10000, avgHr: 160, avgPower: 217, normalizedPower: 222, avgCadence: 87 },
+                { index: 4, durationSec: 1154, distanceM: 9966,  avgHr: 162, avgPower: 213, normalizedPower: 220, avgCadence: 87 }
+              ]
+            }
+          },
+          {
+            id: PREVIEW_RACE_ACT_T2_ID,
+            user_id: PREVIEW_USER_ID,
+            upload_id: PREVIEW_UPLOAD_ID,
+            sport_type: "strength",
+            start_time_utc: raceSegmentStartIso(mon, "t2"),
+            end_time_utc: raceSegmentEndIso(mon, "t2"),
+            duration_sec: RACE_SEGMENT_DURATIONS_SEC.t2,
+            moving_duration_sec: RACE_SEGMENT_DURATIONS_SEC.t2,
+            elapsed_duration_sec: RACE_SEGMENT_DURATIONS_SEC.t2,
+            distance_m: 160,
+            avg_hr: 156,
+            avg_power: null,
+            avg_cadence: null,
+            max_hr: 165,
+            max_power: null,
+            elevation_gain_m: null,
+            elevation_loss_m: null,
+            calories: 10,
+            avg_pace_per_100m_sec: null,
+            avg_stroke_rate_spm: null,
+            avg_swolf: null,
+            pool_length_m: null,
+            laps_count: 1,
+            activity_vendor: "garmin",
+            activity_type_raw: "transition",
+            activity_subtype_raw: "transition",
+            source: "upload",
+            parse_summary: null,
+            notes: null,
+            schedule_status: "scheduled",
+            is_unplanned: false,
+            is_race: true,
+            race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+            race_segment_role: "t2",
+            race_segment_index: 3,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metrics_v2: {}
+          },
+          {
+            id: PREVIEW_RACE_ACT_RUN_ID,
+            user_id: PREVIEW_USER_ID,
+            upload_id: PREVIEW_UPLOAD_ID,
+            sport_type: "run",
+            start_time_utc: raceSegmentStartIso(mon, "run"),
+            end_time_utc: raceSegmentEndIso(mon, "run"),
+            duration_sec: RACE_SEGMENT_DURATIONS_SEC.run,
+            moving_duration_sec: RACE_SEGMENT_DURATIONS_SEC.run - 5,
+            elapsed_duration_sec: RACE_SEGMENT_DURATIONS_SEC.run,
+            distance_m: 9368,
+            avg_hr: 168,
+            avg_power: null,
+            avg_cadence: 178,
+            max_hr: 182,
+            max_power: null,
+            elevation_gain_m: 64,
+            elevation_loss_m: 62,
+            calories: 590,
+            avg_pace_per_100m_sec: null,
+            avg_stroke_rate_spm: null,
+            avg_swolf: null,
+            pool_length_m: null,
+            laps_count: 5,
+            activity_vendor: "garmin",
+            activity_type_raw: "running",
+            activity_subtype_raw: "race",
+            source: "upload",
+            parse_summary: null,
+            notes: null,
+            schedule_status: "scheduled",
+            is_unplanned: false,
+            is_race: true,
+            race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+            race_segment_role: "run",
+            race_segment_index: 4,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metrics_v2: {
+              cadence: { avgCadence: 178, maxCadence: 184 },
+              laps: [
+                { index: 1, durationSec: 510, distanceM: 2000, avgHr: 162, avgPaceSecPerKm: 255 },
+                { index: 2, durationSec: 520, distanceM: 2000, avgHr: 167, avgPaceSecPerKm: 260 },
+                { index: 3, durationSec: 535, distanceM: 2000, avgHr: 170, avgPaceSecPerKm: 268 },
+                { index: 4, durationSec: 540, distanceM: 2000, avgHr: 172, avgPaceSecPerKm: 270 },
+                { index: 5, durationSec: 536, distanceM: 1368, avgHr: 174, avgPaceSecPerKm: 391 }
+              ]
+            }
+          }
+        ];
+      })()
     ],
     session_activity_links: [
       {
@@ -1088,6 +1406,64 @@ export function createPreviewDatabase(): PreviewDatabase {
         confirmation_status: "confirmed",
         matched_at: "2026-03-15T09:02:00.000Z",
         match_method: "preview"
+      },
+      // Race-bundle links: one per segment, all confirmed, all carrying
+      // match_method = "race_bundle" so the page-level race detection picks
+      // up the segment list and triggers the race-review fetch.
+      {
+        id: PREVIEW_RACE_LINK_SWIM_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        completed_activity_id: PREVIEW_RACE_ACT_SWIM_ID,
+        confidence: 1,
+        confirmation_status: "confirmed",
+        matched_at: new Date().toISOString(),
+        match_method: "race_bundle",
+        match_reason: { kind: "race_bundle", role: "swim", segmentIndex: 0, source: "strava_reconstructed" }
+      },
+      {
+        id: PREVIEW_RACE_LINK_T1_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        completed_activity_id: PREVIEW_RACE_ACT_T1_ID,
+        confidence: 1,
+        confirmation_status: "confirmed",
+        matched_at: new Date().toISOString(),
+        match_method: "race_bundle",
+        match_reason: { kind: "race_bundle", role: "t1", segmentIndex: 1, source: "strava_reconstructed" }
+      },
+      {
+        id: PREVIEW_RACE_LINK_BIKE_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        completed_activity_id: PREVIEW_RACE_ACT_BIKE_ID,
+        confidence: 1,
+        confirmation_status: "confirmed",
+        matched_at: new Date().toISOString(),
+        match_method: "race_bundle",
+        match_reason: { kind: "race_bundle", role: "bike", segmentIndex: 2, source: "strava_reconstructed" }
+      },
+      {
+        id: PREVIEW_RACE_LINK_T2_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        completed_activity_id: PREVIEW_RACE_ACT_T2_ID,
+        confidence: 1,
+        confirmation_status: "confirmed",
+        matched_at: new Date().toISOString(),
+        match_method: "race_bundle",
+        match_reason: { kind: "race_bundle", role: "t2", segmentIndex: 3, source: "strava_reconstructed" }
+      },
+      {
+        id: PREVIEW_RACE_LINK_RUN_ID,
+        user_id: PREVIEW_USER_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        completed_activity_id: PREVIEW_RACE_ACT_RUN_ID,
+        confidence: 1,
+        confirmation_status: "confirmed",
+        matched_at: new Date().toISOString(),
+        match_method: "race_bundle",
+        match_reason: { kind: "race_bundle", role: "run", segmentIndex: 4, source: "strava_reconstructed" }
       }
     ],
     activity_uploads: [
@@ -1720,14 +2096,98 @@ export function createPreviewDatabase(): PreviewDatabase {
           intensity_factor: null
         }
       ];
-    })()
+    })(),
+    race_bundles: (() => {
+      const mon = previewMonday();
+      const startedAt = raceSegmentStartIso(mon, "swim");
+      const endedAt = raceSegmentEndIso(mon, "run");
+      return [
+        {
+          id: PREVIEW_RACE_BUNDLE_ID,
+          user_id: PREVIEW_USER_ID,
+          started_at: startedAt,
+          ended_at: endedAt,
+          total_duration_sec: RACE_TOTAL_DURATION_SEC,
+          total_distance_m: 1500 + 213 + 39966 + 160 + 9368,
+          source: "strava_reconstructed",
+          upload_id: PREVIEW_UPLOAD_ID,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
+    })(),
+    race_profiles: (() => {
+      const mon = previewMonday();
+      return [
+        {
+          id: PREVIEW_RACE_PROFILE_ID,
+          user_id: PREVIEW_USER_ID,
+          athlete_id: PREVIEW_USER_ID,
+          name: "Joe Hannon Olympic",
+          date: previewDateOffset(mon, 6),
+          distance_type: "olympic",
+          priority: "B",
+          course_profile: {
+            swim_distance_m: 1500,
+            bike_distance_km: 40,
+            run_distance_km: 10,
+            bike_elevation_m: 320,
+            course_type: "rolling",
+            expected_conditions: "cool"
+          },
+          ideal_discipline_distribution: { swim: 0.18, bike: 0.55, run: 0.27 },
+          notes: "B-race rehearsal slotted before Galway 70.3.",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
+    })(),
+    // Pre-populated race review row so iteration on the populated card layout
+    // is instant. Set is_provisional: true and delete the row (or run the
+    // regenerate button) to exercise the placeholder + manual-regen flow.
+    race_reviews: [
+      {
+        id: PREVIEW_RACE_REVIEW_ID,
+        user_id: PREVIEW_USER_ID,
+        race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+        planned_session_id: PREVIEW_RACE_SESSION_ID,
+        headline: "Even-split Olympic; bike held within 2% across halves.",
+        narrative:
+          "Held a balanced execution across all five segments. Swim closed strong, transitioning at race-pace HR. Bike pacing was the highlight — 220W → 216W across halves with normalised power 224W and IF 0.91, a controlled effort that left fuel for the run. Run faded modestly in the back half (4:15/km → 4:30/km) as expected for an Olympic effort, with HR drifting to 172. Transitions were quick and clean.",
+        coach_take:
+          "Repeat this pacing template at Galway 70.3: hold bike to NP 220–225W and run the first 5km at 4:15/km. If HR caps at 170 through 8km, push the final 2km.",
+        transition_notes: "T1 2:10, T2 1:39 — both under target. Mount/dismount sequence clean.",
+        pacing_notes: {
+          swim: { firstHalf: 102, lastHalf: 99, deltaPct: -2.94, unit: "sec_per_100m", note: "Negative split — 1:42 → 1:39 per 100m. Drafting paid off in the back half." },
+          bike: { firstHalf: 220, lastHalf: 216, deltaPct: -1.82, unit: "watts", note: "Power held within 2% across halves. Sustainable pacing with NP 224W, IF 0.91." },
+          run: { firstHalf: 257, lastHalf: 269, deltaPct: 4.67, unit: "sec_per_km", note: "Modest fade — 4:17 → 4:29 /km. Cadence held at 178." }
+        },
+        discipline_distribution_actual: {
+          swim: Number((RACE_SEGMENT_DURATIONS_SEC.swim / RACE_TOTAL_DURATION_SEC).toFixed(4)),
+          t1: Number((RACE_SEGMENT_DURATIONS_SEC.t1 / RACE_TOTAL_DURATION_SEC).toFixed(4)),
+          bike: Number((RACE_SEGMENT_DURATIONS_SEC.bike / RACE_TOTAL_DURATION_SEC).toFixed(4)),
+          t2: Number((RACE_SEGMENT_DURATIONS_SEC.t2 / RACE_TOTAL_DURATION_SEC).toFixed(4)),
+          run: Number((RACE_SEGMENT_DURATIONS_SEC.run / RACE_TOTAL_DURATION_SEC).toFixed(4))
+        },
+        discipline_distribution_delta: {
+          swim: Number((RACE_SEGMENT_DURATIONS_SEC.swim / RACE_TOTAL_DURATION_SEC - 0.18).toFixed(4)),
+          bike: Number(((RACE_SEGMENT_DURATIONS_SEC.bike + RACE_SEGMENT_DURATIONS_SEC.t1) / RACE_TOTAL_DURATION_SEC - 0.55).toFixed(4)),
+          run: Number(((RACE_SEGMENT_DURATIONS_SEC.run + RACE_SEGMENT_DURATIONS_SEC.t2) / RACE_TOTAL_DURATION_SEC - 0.27).toFixed(4))
+        },
+        model_used: "gpt-5-mini",
+        is_provisional: false,
+        generated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ]
   };
 }
 
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 6;
+const PREVIEW_DATABASE_VERSION = 7;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
