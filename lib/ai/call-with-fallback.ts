@@ -42,6 +42,12 @@ type CallWithFallbackOptions<T> = {
   postProcess?: (parsed: T) => T;
   /** Extra context fields included in console.warn log entries. */
   logContext?: Record<string, unknown>;
+  /**
+   * Override for the per-request timeout in milliseconds. Defaults to
+   * getCoachRequestTimeoutMs() (60s). Raise for deep-reasoning calls that
+   * routinely exceed the default.
+   */
+  timeoutMs?: number;
 };
 
 type CallWithFallbackResult<T> = {
@@ -66,7 +72,7 @@ export async function callOpenAIWithFallback<T>(
 
   try {
     const client = getOpenAIClient();
-    const timeoutMs = getCoachRequestTimeoutMs();
+    const timeoutMs = opts.timeoutMs ?? getCoachRequestTimeoutMs();
     const startedAt = Date.now();
 
     const requestParams = opts.buildRequest();
@@ -133,7 +139,7 @@ export async function callOpenAIWithFallback<T>(
     const value = opts.postProcess ? opts.postProcess(parsed.data) : parsed.data;
     return { value, source: "ai" };
   } catch (error) {
-    const timeoutMs = getCoachRequestTimeoutMs();
+    const timeoutMs = opts.timeoutMs ?? getCoachRequestTimeoutMs();
     const message =
       error instanceof Error && error.message === "Request timed out."
         ? `OpenAI request timed out after ${Math.round(timeoutMs / 1000)}s`

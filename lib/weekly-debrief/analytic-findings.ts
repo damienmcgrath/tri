@@ -82,6 +82,7 @@ export async function generateAnalyticFindings(args: {
   const result = await callOpenAIWithFallback<WeeklyFindings>({
     logTag: "weekly-debrief-findings",
     fallback: FINDINGS_FALLBACK_SENTINEL,
+    timeoutMs: 120_000,
     buildRequest: () => ({
       model: getCoachModel({ deep: true }),
       instructions: ANALYTIC_INSTRUCTIONS,

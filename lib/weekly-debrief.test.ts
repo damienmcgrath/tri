@@ -305,4 +305,57 @@ describe("weekly debrief helpers", () => {
     expect(result.evidence.some((item) => item.detail.includes("74 TSS"))).toBe(true);
     expect(result.deterministicNarrative.observations.length).toBeGreaterThan(0);
   });
+
+  // Regression: a clean week with no execution reviews, zero skipped, zero added
+  // used to produce only 2 metrics, which failed the z.array(...).min(3) schema
+  // guard during refreshWeeklyDebrief. The 5th metric now always emits.
+  test("emits at least 3 metrics on a quiet week with no reviews or drift", () => {
+    const result = buildWeeklyDebriefFacts({
+      sessions: [
+        {
+          id: "session-a",
+          date: "2025-11-17",
+          sport: "run",
+          type: "Easy Run",
+          session_name: "Easy Run",
+          notes: null,
+          status: "completed",
+          duration_minutes: 45,
+          updated_at: "2025-11-17T10:00:00.000Z",
+          created_at: "2025-11-16T10:00:00.000Z",
+          execution_result: null,
+          is_key: false
+        },
+        {
+          id: "session-b",
+          date: "2025-11-19",
+          sport: "bike",
+          type: "Endurance Ride",
+          session_name: "Endurance Ride",
+          notes: null,
+          status: "completed",
+          duration_minutes: 60,
+          updated_at: "2025-11-19T10:00:00.000Z",
+          created_at: "2025-11-16T10:00:00.000Z",
+          execution_result: null,
+          is_key: false
+        }
+      ],
+      activities: [],
+      links: [],
+      athleteContext: null,
+      sessionFeels: [],
+      timeZone: "UTC",
+      weekStart: "2025-11-17",
+      weekEnd: "2025-11-23",
+      todayIso: "2025-11-23",
+      checkIn: null
+    });
+
+    expect(result.facts.metrics.length).toBeGreaterThanOrEqual(3);
+    const weekShape = result.facts.metrics.find((metric) => metric.label === "Week shape");
+    expect(weekShape).toBeDefined();
+    expect(weekShape!.value).toBe("On plan");
+    expect(weekShape!.tone).toBe("muted");
+  });
 });
