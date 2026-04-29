@@ -2213,7 +2213,75 @@ export function createPreviewDatabase(): PreviewDatabase {
         is_provisional: false,
         generated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        // Phase 1B layered output. Verdict + race story shape; deterministic
+        // gates already enforced (emotionalFrame=null, crossDisciplineInsight=null
+        // for this clean execution).
+        verdict: {
+          headline: "Finished in 2:31:30 with bike held 220→216W (−1.8%) across halves.",
+          perDiscipline: {
+            swim: { status: "on_plan", summary: "Closed at 1:39/100m — 3% negative split off a controlled first half." },
+            bike: { status: "strong", summary: "Held 220→216W across halves; NP 224W, IF 0.91." },
+            run: { status: "faded", summary: "Pace eased 4.7% (4:17 → 4:29 /km) as HR drifted to 172." }
+          },
+          coachTake: {
+            target: "NEXT bike block at 220–225W NP for 30 minutes",
+            scope: "next race-pace ride",
+            successCriterion: "Halves move less than 2% between first and last; HR caps at 165",
+            progression: "If steady, extend to 45 minutes the following week"
+          },
+          emotionalFrame: null
+        },
+        race_story: {
+          overall:
+            "Held a balanced execution across all five segments. Swim came in even with a 3% negative split. Bike was the highlight — 220→216W across halves at NP 224W (IF 0.91), a controlled effort that left fuel for the run. Run eased modestly in the back half (4:17 → 4:29 /km) as HR drifted to 172, an expected pattern for an Olympic effort. Transitions came in quick and clean.",
+          perLeg: {
+            swim: {
+              narrative: "Swim closed at 1:39/100m, transitioning at race-pace HR.",
+              keyEvidence: ["1:42 → 1:39 /100m halves", "Drafting paid in the back half"]
+            },
+            bike: {
+              narrative: "Bike held 220→216W across halves with NP 224W, IF 0.91.",
+              keyEvidence: ["−1.8% halves drift", "NP 224W", "IF 0.91"]
+            },
+            run: {
+              narrative: "Run eased 4.7% in the second half (4:17 → 4:29 /km) as HR drifted +6bpm.",
+              keyEvidence: ["+4.7% halves drift", "HR 166 → 172", "Cadence held at 178"]
+            }
+          },
+          transitions: "T1 2:10, T2 1:39 — both under target.",
+          crossDisciplineInsight: null
+        },
+        leg_status: {
+          swim: { label: "on_plan", evidence: ["Halves moved -2.9%."] },
+          bike: { label: "strong", evidence: ["Halves moved -1.8% with avg above target."] },
+          run: { label: "faded", evidence: ["Second half eased 4.7% vs the first."] }
+        },
+        emotional_frame: null,
+        cross_discipline_insight: null,
+        pacing_arc_data: {
+          totalDurationSec: RACE_TOTAL_DURATION_SEC,
+          points: [
+            { tSec: 800, role: "swim", hr: 142, power: null, paceSec: 102 },
+            { tSec: 2200, role: "bike", hr: 152, power: 220, paceSec: null },
+            { tSec: 4500, role: "bike", hr: 154, power: 218, paceSec: null },
+            { tSec: 6000, role: "bike", hr: 154, power: 216, paceSec: null },
+            { tSec: 7100, role: "run", hr: 166, power: null, paceSec: 257 },
+            { tSec: 7800, role: "run", hr: 172, power: null, paceSec: 269 }
+          ],
+          transitions: [
+            { role: "t1", startSec: RACE_SEGMENT_DURATIONS_SEC.swim, endSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1, inferred: true },
+            { role: "t2", startSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1 + RACE_SEGMENT_DURATIONS_SEC.bike, endSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1 + RACE_SEGMENT_DURATIONS_SEC.bike + RACE_SEGMENT_DURATIONS_SEC.t2, inferred: true }
+          ],
+          legBoundaries: [
+            { role: "swim", startSec: 0, endSec: RACE_SEGMENT_DURATIONS_SEC.swim },
+            { role: "bike", startSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1, endSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1 + RACE_SEGMENT_DURATIONS_SEC.bike },
+            { role: "run", startSec: RACE_SEGMENT_DURATIONS_SEC.swim + RACE_SEGMENT_DURATIONS_SEC.t1 + RACE_SEGMENT_DURATIONS_SEC.bike + RACE_SEGMENT_DURATIONS_SEC.t2, endSec: RACE_TOTAL_DURATION_SEC }
+          ],
+          inferredGaps: true,
+          thresholdHrBpm: 168
+        },
+        tone_violations: []
       }
     ]
   };
@@ -2222,7 +2290,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 8;
+const PREVIEW_DATABASE_VERSION = 9;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
