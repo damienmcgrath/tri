@@ -3,6 +3,8 @@ import { isRaceSession } from "@/lib/training/race-session";
 import { detectRaceBundle, type RaceCandidate } from "@/lib/workouts/race-detection";
 import type { RaceSegmentRole } from "@/lib/workouts/activity-parser";
 import { triggerRaceReviewBackground } from "@/lib/race-review";
+import { freezeGoalSnapshot, resolveRaceProfileForBundle } from "@/lib/race/bundle-helpers";
+import { snapshotPreRaceState } from "@/lib/race/snapshot-pre-race-state";
 
 export type PersistMultisportBundleArgs = {
   supabase: SupabaseClient;
@@ -44,17 +46,30 @@ export async function persistMultisportBundle(
     return { status: "error", reason: "no_segments" };
   }
 
+  const startDate = bundle.startedAt.slice(0, 10);
+  const profile = await resolveRaceProfileForBundle(supabase, userId, startDate);
+  const goalSnapshot = profile ? freezeGoalSnapshot(profile) : null;
+
+  const bundleInsertPayload: Record<string, unknown> = {
+    user_id: userId,
+    started_at: bundle.startedAt,
+    ended_at: bundle.endedAt,
+    total_duration_sec: Math.round(bundle.totalDurationSec),
+    total_distance_m: bundle.totalDistanceM || null,
+    source: "garmin_multisport",
+    upload_id: uploadId,
+    inferred_transitions: false
+  };
+  if (goalSnapshot) {
+    bundleInsertPayload.race_profile_id = goalSnapshot.race_profile_id;
+    bundleInsertPayload.goal_time_sec = goalSnapshot.goal_time_sec;
+    bundleInsertPayload.goal_strategy_summary = goalSnapshot.goal_strategy_summary;
+    bundleInsertPayload.course_profile_snapshot = goalSnapshot.course_profile_snapshot;
+  }
+
   const { data: createdBundle, error: bundleError } = await supabase
     .from("race_bundles")
-    .insert({
-      user_id: userId,
-      started_at: bundle.startedAt,
-      ended_at: bundle.endedAt,
-      total_duration_sec: Math.round(bundle.totalDurationSec),
-      total_distance_m: bundle.totalDistanceM || null,
-      source: "garmin_multisport",
-      upload_id: uploadId
-    })
+    .insert(bundleInsertPayload)
     .select("id")
     .single();
 
@@ -79,7 +94,6 @@ export async function persistMultisportBundle(
   }
 
   // Find a planned race session for the same local date.
-  const startDate = bundle.startedAt.slice(0, 10);
   const { data: sameDaySessions } = await supabase
     .from("sessions")
     .select("id,sport,type,session_name")
@@ -111,6 +125,8 @@ export async function persistMultisportBundle(
     console.error("[race-bundle] link insert failed", linkError.message);
     return { status: "error", reason: `link_insert_failed:${linkError.message}` };
   }
+
+  await snapshotPreRaceState({ supabase, userId, bundleId, raceDate: startDate });
 
   // Only fire the race-review generator when the bundle is attached to a
   // planned race session — ad-hoc bundles without a planned target are out
@@ -268,6 +284,36 @@ export async function attemptRaceBundle(
         return { status: "skipped", reason: `link_insert_failed:${linkError.message}` };
       }
 
+      // Backfill goal snapshot if the existing bundle predates Phase 1A
+      // (or was inserted without a same-day race profile). Only writes
+      // when goal columns are still null to avoid overwriting an immutable
+      // snapshot.
+      const { data: existingBundleRow } = await supabase
+        .from("race_bundles")
+        .select("race_profile_id, inferred_transitions")
+        .eq("id", bundleId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (existingBundleRow && !existingBundleRow.race_profile_id) {
+        const profile = await resolveRaceProfileForBundle(supabase, userId, date);
+        if (profile) {
+          const snapshot = freezeGoalSnapshot(profile);
+          await supabase
+            .from("race_bundles")
+            .update({
+              race_profile_id: snapshot.race_profile_id,
+              goal_time_sec: snapshot.goal_time_sec,
+              goal_strategy_summary: snapshot.goal_strategy_summary,
+              course_profile_snapshot: snapshot.course_profile_snapshot
+            })
+            .eq("id", bundleId)
+            .eq("user_id", userId);
+        }
+      }
+
+      await snapshotPreRaceState({ supabase, userId, bundleId, raceDate: date });
+
       triggerRaceReviewBackground({ supabase, userId, bundleId });
       return {
         status: "bundled",
@@ -329,17 +375,29 @@ export async function attemptRaceBundle(
   );
   const totalDistanceM = segmentIds.reduce((sum, id) => sum + (distanceById.get(id) ?? 0), 0);
 
+  const profile = await resolveRaceProfileForBundle(supabase, userId, date);
+  const goalSnapshot = profile ? freezeGoalSnapshot(profile) : null;
+
+  const newBundlePayload: Record<string, unknown> = {
+    user_id: userId,
+    started_at: startedAt,
+    ended_at: endedAt,
+    total_duration_sec: Math.round(totalDurationSec),
+    total_distance_m: totalDistanceM || null,
+    source,
+    upload_id: uploadId ?? null,
+    inferred_transitions: source === "strava_reconstructed" || source === "manual"
+  };
+  if (goalSnapshot) {
+    newBundlePayload.race_profile_id = goalSnapshot.race_profile_id;
+    newBundlePayload.goal_time_sec = goalSnapshot.goal_time_sec;
+    newBundlePayload.goal_strategy_summary = goalSnapshot.goal_strategy_summary;
+    newBundlePayload.course_profile_snapshot = goalSnapshot.course_profile_snapshot;
+  }
+
   const { data: createdBundle, error: bundleError } = await supabase
     .from("race_bundles")
-    .insert({
-      user_id: userId,
-      started_at: startedAt,
-      ended_at: endedAt,
-      total_duration_sec: Math.round(totalDurationSec),
-      total_distance_m: totalDistanceM || null,
-      source,
-      upload_id: uploadId ?? null
-    })
+    .insert(newBundlePayload)
     .select("id")
     .single();
 
@@ -391,6 +449,8 @@ export async function attemptRaceBundle(
     console.error("[race-bundle] link insert failed", linkError.message);
     return { status: "skipped", reason: `link_insert_failed:${linkError.message}` };
   }
+
+  await snapshotPreRaceState({ supabase, userId, bundleId, raceDate: date });
 
   triggerRaceReviewBackground({ supabase, userId, bundleId });
   return {

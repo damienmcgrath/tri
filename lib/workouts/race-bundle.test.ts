@@ -48,10 +48,14 @@ describe("attemptRaceBundle", () => {
     sameDaySessions: Row[];
     activities: Row[];
     existingLinks?: Row[];
+    raceProfiles?: Row[];
+    fitnessRow?: Row | null;
+    bundleRow?: Row | null;
   }) {
     const behaviors: any = {
       inserts: [],
       updates: [],
+      bundleUpdates: [],
       activities: opts.activities,
       lastTable: ""
     };
@@ -60,12 +64,18 @@ describe("attemptRaceBundle", () => {
     const supabase: any = {};
     supabase.from = (table: string) => {
       if (table === "sessions") {
+        // attemptRaceBundle uses .select().eq().eq() (sessions same-day query).
+        // computeTaperCompliance uses .select().eq().gte().lt() (taper window).
+        // Make every chain step thenable so both shapes resolve to the same data.
+        const resolveSessions = () => Promise.resolve({ data: opts.sameDaySessions, error: null });
+        const taperChain: any = {
+          eq: () => taperChain,
+          gte: () => taperChain,
+          lt: () => taperChain,
+          then: (resolve: any) => resolveSessions().then(resolve)
+        };
         return {
-          select: () => ({
-            eq: () => ({
-              eq: () => Promise.resolve({ data: opts.sameDaySessions, error: null })
-            })
-          })
+          select: () => taperChain
         };
       }
       if (table === "completed_activities") {
@@ -115,7 +125,52 @@ describe("attemptRaceBundle", () => {
                 single: async () => ({ data: { id: "bundle-1" }, error: null })
               })
             };
+          },
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: behaviors.bundleRow ?? { id: "bundle-1", pre_race_snapshot_status: "pending", race_profile_id: null, inferred_transitions: false },
+                  error: null
+                })
+              })
+            })
+          }),
+          update: (patch: Row) => {
+            behaviors.bundleUpdates.push(patch);
+            return {
+              eq: () => ({
+                eq: async () => ({ error: null })
+              })
+            };
           }
+        };
+      }
+      if (table === "race_profiles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: async () => ({ data: opts.raceProfiles ?? [], error: null })
+            })
+          })
+        };
+      }
+      if (table === "athlete_fitness") {
+        const finalChain = {
+          maybeSingle: async () => ({ data: opts.fitnessRow ?? null, error: null })
+        };
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                lte: () => ({
+                  order: () => ({
+                    limit: () => finalChain
+                  })
+                })
+              })
+            })
+          })
         };
       }
       throw new Error(`Unexpected table: ${table}`);

@@ -100,6 +100,39 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
   if (!payload) notFound();
 
   const { activity, linkedSession, candidates } = payload;
+
+  // Race-stitching context: same-day sibling activities + this activity's
+  // current bundle id (so the stitch CTA only renders when this activity
+  // is marked as a race AND not already part of a bundle).
+  const dayIso = activity.start_time_utc.slice(0, 10);
+  const dayStart = `${dayIso}T00:00:00.000Z`;
+  const dayEnd = `${dayIso}T23:59:59.999Z`;
+
+  const { data: stitchSelfRow } = await supabase
+    .from("completed_activities")
+    .select("race_bundle_id")
+    .eq("id", activity.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const activityBundleId = (stitchSelfRow?.race_bundle_id as string | null | undefined) ?? null;
+
+  const { data: stitchSiblings } = await supabase
+    .from("completed_activities")
+    .select("id,sport_type,start_time_utc,duration_sec,distance_m,race_bundle_id")
+    .eq("user_id", user.id)
+    .gte("start_time_utc", dayStart)
+    .lte("start_time_utc", dayEnd)
+    .order("start_time_utc", { ascending: true });
+
+  const stitchCandidates = (stitchSiblings ?? [])
+    .filter((row: any) => !row.race_bundle_id)
+    .map((row: any) => ({
+      id: row.id as string,
+      sportType: row.sport_type as string,
+      startTimeUtc: row.start_time_utc as string,
+      durationSec: Number(row.duration_sec ?? 0),
+      distanceM: row.distance_m != null ? Number(row.distance_m) : null
+    }));
   const dateLabel = new Date(activity.start_time_utc).toLocaleString(undefined, {
     weekday: "short",
     month: "short",
@@ -265,6 +298,8 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           isUnplanned={activity.is_unplanned}
           source={activity.source}
           externalProvider={activity.external_provider}
+          activityBundleId={activityBundleId}
+          stitchCandidates={stitchCandidates}
         />
       </div>
     </section>
