@@ -2111,6 +2111,38 @@ export function createPreviewDatabase(): PreviewDatabase {
           total_distance_m: 1500 + 213 + 39966 + 160 + 9368,
           source: "strava_reconstructed",
           upload_id: PREVIEW_UPLOAD_ID,
+          // Phase 1A: goal anchor + pre-race snapshot + subjective inputs
+          race_profile_id: PREVIEW_RACE_PROFILE_ID,
+          goal_time_sec: 10800,
+          goal_strategy_summary:
+            "Negative-split bike, hold 4:15/km on the first 5k, push final 2k if HR caps at 170.",
+          course_profile_snapshot: {
+            swim_distance_m: 1500,
+            bike_distance_km: 40,
+            run_distance_km: 10,
+            bike_elevation_m: 320,
+            course_type: "rolling",
+            expected_conditions: "cool"
+          },
+          conditions_snapshot: {},
+          pre_race_ctl: 78.4,
+          pre_race_atl: 62.1,
+          pre_race_tsb: 16.3,
+          pre_race_tsb_state: "fresh",
+          pre_race_ramp_rate: 1.4,
+          pre_race_snapshot_at: new Date().toISOString(),
+          pre_race_snapshot_status: "captured",
+          taper_compliance_score: 0.857,
+          taper_compliance_summary: "6 of 7 taper sessions on target",
+          athlete_rating: 4,
+          athlete_notes:
+            "Felt strong off the bike, slight nutrition wobble at km 8 of the run but recovered fast.",
+          issues_flagged: ["nutrition"],
+          finish_position: 18,
+          age_group_position: 4,
+          subjective_captured_at: new Date().toISOString(),
+          status: "reviewed",
+          inferred_transitions: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -2136,6 +2168,9 @@ export function createPreviewDatabase(): PreviewDatabase {
             expected_conditions: "cool"
           },
           ideal_discipline_distribution: { swim: 0.18, bike: 0.55, run: 0.27 },
+          goal_time_sec: 10800,
+          goal_strategy_summary:
+            "Negative-split bike, hold 4:15/km on the first 5k, push final 2k if HR caps at 170.",
           notes: "B-race rehearsal slotted before Galway 70.3.",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -2187,7 +2222,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 7;
+const PREVIEW_DATABASE_VERSION = 8;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;

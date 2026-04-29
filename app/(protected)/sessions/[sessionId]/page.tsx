@@ -780,6 +780,17 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         <RaceReviewPlaceholder bundleId={raceBundleId} />
       ) : null}
 
+      {raceSegmentList && raceBundleId ? (
+        <div className="flex justify-end">
+          <Link
+            href={`/races/${raceBundleId}`}
+            className="inline-flex items-center gap-2 text-xs text-tertiary underline-offset-2 hover:underline"
+          >
+            View race summary →
+          </Link>
+        </div>
+      ) : null}
+
       {raceSegmentList ? <RaceSegmentList segments={raceSegmentList} /> : null}
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
