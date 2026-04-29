@@ -212,10 +212,16 @@ export function RaceReviewPlaceholder({ bundleId }: { bundleId: string }) {
     <article className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-5">
       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race review</p>
       <p className="mt-2 text-sm text-[rgba(255,255,255,0.78)]">
-        Generating your race review… this usually takes about 20 seconds. Refresh the page or trigger a manual regenerate if it doesn&apos;t appear shortly.
+        Add your race notes (rating, issues, context the data can&apos;t see) and the verdict will appear within ~15 seconds.
       </p>
-      <div className="mt-3">
-        <RegenerateRaceReviewButton bundleId={bundleId} label="Generate race review" />
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <a
+          href={`/races/${bundleId}/notes`}
+          className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-1.5 text-sm text-[rgba(255,255,255,0.92)] transition hover:border-[rgba(255,255,255,0.18)]"
+        >
+          Add race notes →
+        </a>
+        <RegenerateRaceReviewButton bundleId={bundleId} label="Or regenerate review" />
       </div>
     </article>
   );
