@@ -13,6 +13,8 @@ import { SessionVerdictCard } from "./components/session-verdict-card";
 import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { RaceSegmentList, type RaceSegmentSummary } from "./components/race-segment-list";
+import { RaceReviewCard, RaceReviewPlaceholder } from "./components/race-review-card";
+import { RegenerateRaceReviewButton } from "./components/regenerate-race-review-button";
 import { isRaceSession } from "@/lib/training/race-session";
 import { DetailsAccordion } from "../../details-accordion";
 import { getMonday } from "../../week-context";
@@ -26,6 +28,19 @@ type LegacySessionRow = {
   type: string;
   duration?: number | null;
   notes?: string | null;
+};
+
+type RaceReviewRow = {
+  headline: string;
+  narrative: string;
+  coach_take: string;
+  transition_notes: string | null;
+  pacing_notes: Record<string, unknown> | null;
+  discipline_distribution_actual: Record<string, number> | null;
+  discipline_distribution_delta: Record<string, number> | null;
+  model_used: string;
+  is_provisional: boolean;
+  generated_at: string;
 };
 
 type ActivityReviewRow = {
@@ -399,6 +414,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
   // Race bundle: load all linked segments when this is a race session.
   let raceSegmentList: RaceSegmentSummary[] | null = null;
+  let raceBundleId: string | null = null;
+  let raceReviewRow: RaceReviewRow | null = null;
   if (!activityId && isRaceSession({ type: session.type, session_name: session.session_name })) {
     try {
       const { data: raceLinks } = await supabase
@@ -414,7 +431,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
       if (confirmedIds.length >= 3) {
         const { data: segmentRows } = await supabase
           .from("completed_activities")
-          .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_segment_role,race_segment_index")
+          .select("id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,race_segment_role,race_segment_index,race_bundle_id")
           .in("id", confirmedIds)
           .eq("user_id", user.id);
 
@@ -433,10 +450,23 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             avgHr: row.avg_hr !== null && row.avg_hr !== undefined ? Number(row.avg_hr) : null,
             avgPower: row.avg_power !== null && row.avg_power !== undefined ? Number(row.avg_power) : null
           }));
+
+          // All segments share the same race_bundle_id by construction.
+          raceBundleId = (ordered.find((row: any) => row.race_bundle_id)?.race_bundle_id as string | undefined) ?? null;
+          if (raceBundleId) {
+            const { data: reviewRow } = await supabase
+              .from("race_reviews")
+              .select("headline,narrative,coach_take,transition_notes,pacing_notes,discipline_distribution_actual,discipline_distribution_delta,model_used,is_provisional,generated_at")
+              .eq("race_bundle_id", raceBundleId)
+              .maybeSingle();
+            raceReviewRow = (reviewRow ?? null) as RaceReviewRow | null;
+          }
         }
       }
     } catch {
       raceSegmentList = null;
+      raceBundleId = null;
+      raceReviewRow = null;
     }
   }
 
@@ -588,9 +618,14 @@ export default async function SessionReviewPage({ params, searchParams }: { para
   const hasSpecificPlannedIntent = reviewVm.plannedIntent.trim().toLowerCase() !== `${disciplineLabel.toLowerCase()} session intent`;
   const quietLabelClass = "card-kicker";
 
-  // Use actual duration from execution_result when available, fall back to planned
+  // Use actual duration from execution_result when available, fall back to planned.
+  // For race sessions, prefer the rolled-up segment-list total so the subtitle
+  // reflects the real race time rather than the placeholder planned duration.
   const execReview = session.execution_result ? parsePersistedExecutionReview(session.execution_result) : null;
-  const actualDurationSec = execReview?.deterministic?.actual?.durationSec ?? null;
+  const raceTotalDurationSec = raceSegmentList
+    ? raceSegmentList.reduce((sum, segment) => sum + segment.durationSec, 0)
+    : null;
+  const actualDurationSec = raceTotalDurationSec ?? execReview?.deterministic?.actual?.durationSec ?? null;
   const actualDurationLabel = actualDurationSec
     ? durationLabel(Math.round(actualDurationSec / 60))
     : durationLabel(session.duration_minutes);
@@ -661,17 +696,25 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </p>
           </div>
           <div className="flex flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-            {hasLinkedActivity ? <RegenerateReviewButton sessionId={session.id} /> : null}
+            {raceSegmentList && raceBundleId ? (
+              <RegenerateRaceReviewButton bundleId={raceBundleId} />
+            ) : hasLinkedActivity ? (
+              <RegenerateReviewButton sessionId={session.id} />
+            ) : null}
           </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className={sessionStatusBadgeClass}>{reviewVm.sessionStatusLabel}</span>
-          <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
-          {reviewVm.isReviewable ? (
-            <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
-              {narrativeSourceLabel(reviewVm.narrativeSource)}
-            </span>
+          {!raceSegmentList ? (
+            <>
+              <span className={intentBadgeClass}>{reviewVm.intent.label}</span>
+              {reviewVm.isReviewable ? (
+                <span className={narrativeSourcePillClass(reviewVm.narrativeSource)}>
+                  {narrativeSourceLabel(reviewVm.narrativeSource)}
+                </span>
+              ) : null}
+            </>
           ) : null}
           {blockContext ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2.5 py-1 text-[11px] text-[rgba(255,255,255,0.78)]">
@@ -683,7 +726,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           ) : null}
         </div>
 
-        {reviewVm.isReviewable && reviewVm.score !== null ? (
+        {!raceSegmentList && reviewVm.isReviewable && reviewVm.score !== null ? (
           <div className="mt-5 flex flex-col gap-4 border-t border-[hsl(var(--border))] pt-5 sm:flex-row sm:items-center sm:gap-6">
             <div className="flex items-baseline gap-3">
               <span
@@ -717,6 +760,26 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         ) : null}
       </article>
 
+      {raceSegmentList && raceBundleId && raceReviewRow ? (
+        <RaceReviewCard
+          bundleId={raceBundleId}
+          review={{
+            headline: raceReviewRow.headline,
+            narrative: raceReviewRow.narrative,
+            coachTake: raceReviewRow.coach_take,
+            transitionNotes: raceReviewRow.transition_notes,
+            pacingNotes: (raceReviewRow.pacing_notes ?? {}) as Record<string, never>,
+            disciplineDistributionActual: raceReviewRow.discipline_distribution_actual ?? {},
+            disciplineDistributionDelta: raceReviewRow.discipline_distribution_delta,
+            modelUsed: raceReviewRow.model_used,
+            isProvisional: raceReviewRow.is_provisional,
+            generatedAt: raceReviewRow.generated_at
+          }}
+        />
+      ) : raceSegmentList && raceBundleId ? (
+        <RaceReviewPlaceholder bundleId={raceBundleId} />
+      ) : null}
+
       {raceSegmentList ? <RaceSegmentList segments={raceSegmentList} /> : null}
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
@@ -726,7 +789,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           single most actionable takeaway gets its own emphasised card.
           The long-form analysis (purpose, execution assessment, metric
           table, why-it-matters, etc.) moves into the accordion below. */}
-      {reviewVm.isReviewable && reviewVm.oneThingToChange ? (
+      {!raceSegmentList && reviewVm.isReviewable && reviewVm.oneThingToChange ? (
         <article
           className={`rounded-2xl border-l-[3px] p-5 ${
             isKeepDoingAdvice
@@ -799,7 +862,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
           and the sub-score breakdown now collapses here. Default closed.
           The SessionVerdictCard is rendered inside so its fetch still
           runs on mount, just behind a disclosure. */}
-      {reviewVm.isReviewable ? (
+      {!raceSegmentList && reviewVm.isReviewable ? (
         <DetailsAccordion
           title="Read full analysis"
           summaryDetail={
@@ -863,7 +926,7 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             ) : null}
           </div>
         </DetailsAccordion>
-      ) : (
+      ) : !raceSegmentList ? (
         <section className="surface p-4 md:p-5">
           <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
             <div>
@@ -876,10 +939,10 @@ export default async function SessionReviewPage({ params, searchParams }: { para
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
       {/* ── Section 4: Score Breakdown (visible by default) ── */}
-      {reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
+      {!raceSegmentList && reviewVm.isReviewable && reviewVm.score !== null && reviewVm.componentScores ? (() => {
         const breakdownRows = [
           { key: "intentMatch", label: "Intent match", component: reviewVm.componentScores.intentMatch },
           { key: "pacingExecution", label: "Pacing & execution", component: reviewVm.componentScores.pacingExecution },
@@ -971,32 +1034,36 @@ export default async function SessionReviewPage({ params, searchParams }: { para
         </DetailsAccordion>
       ) : null}
 
-      {/* Ask coach follow-up */}
-      <section className="border-t border-[hsl(var(--border))] pt-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
-            <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
-          </div>
-          <Link
-            href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
-            className="btn-primary px-3 text-xs"
-          >
-            Ask coach
-          </Link>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {reviewVm.followUpPrompts.map((prompt) => (
+      {/* Ask coach follow-up — hidden for race sessions; the race review card
+          owns the next-step prescription and the standard prompts ("Why was
+          this session flagged?") don't apply to multi-segment races. */}
+      {!raceSegmentList ? (
+        <section className="border-t border-[hsl(var(--border))] pt-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Ask coach follow-up</h2>
+              <p className="mt-1 text-sm text-muted">{reviewVm.followUpIntro}</p>
+            </div>
             <Link
-              key={prompt}
-              href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
-              className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
+              href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${reviewVm.followUpPrompts[0] ?? "What should I change next time?"}`)}`}
+              className="btn-primary px-3 text-xs"
             >
-              {prompt}
+              Ask coach
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {reviewVm.followUpPrompts.map((prompt) => (
+              <Link
+                key={prompt}
+                href={`/coach?prompt=${encodeURIComponent(`${sessionTitle}: ${prompt}`)}`}
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-xs text-[rgba(255,255,255,0.55)] transition hover:border-[rgba(255,255,255,0.16)] hover:text-[rgba(255,255,255,0.75)] lg:min-h-0 lg:py-1.5"
+              >
+                {prompt}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* F41: footer walks the week — prev on the left, next on the right.
           Breadcrumb at the top of the page handles back-to-calendar, and

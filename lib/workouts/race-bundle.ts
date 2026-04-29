@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isRaceSession } from "@/lib/training/race-session";
 import { detectRaceBundle, type RaceCandidate } from "@/lib/workouts/race-detection";
 import type { RaceSegmentRole } from "@/lib/workouts/activity-parser";
+import { triggerRaceReviewBackground } from "@/lib/race-review";
 
 export type PersistMultisportBundleArgs = {
   supabase: SupabaseClient;
@@ -111,6 +112,12 @@ export async function persistMultisportBundle(
     return { status: "error", reason: `link_insert_failed:${linkError.message}` };
   }
 
+  // Only fire the race-review generator when the bundle is attached to a
+  // planned race session — ad-hoc bundles without a planned target are out
+  // of scope for v2.
+  if (plannedSessionId) {
+    triggerRaceReviewBackground({ supabase, userId, bundleId });
+  }
   return { status: "linked", bundleId, plannedSessionId };
 }
 
@@ -261,6 +268,7 @@ export async function attemptRaceBundle(
         return { status: "skipped", reason: `link_insert_failed:${linkError.message}` };
       }
 
+      triggerRaceReviewBackground({ supabase, userId, bundleId });
       return {
         status: "bundled",
         bundleId,
@@ -384,6 +392,7 @@ export async function attemptRaceBundle(
     return { status: "skipped", reason: `link_insert_failed:${linkError.message}` };
   }
 
+  triggerRaceReviewBackground({ supabase, userId, bundleId });
   return {
     status: "bundled",
     bundleId,
