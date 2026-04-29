@@ -6,6 +6,7 @@ import {
   persistSubjectiveInput,
   subjectiveInputSchema
 } from "@/lib/race/subjective-input";
+import { triggerRaceReviewBackground } from "@/lib/race-review";
 
 export async function POST(request: Request, context: { params: Promise<{ bundleId: string }> }) {
   if (!isSameOrigin(request)) {
@@ -45,6 +46,11 @@ export async function POST(request: Request, context: { params: Promise<{ bundle
     const httpStatus = result.reason === "bundle_not_found" ? 404 : 500;
     return NextResponse.json({ error: result.reason }, { status: httpStatus });
   }
+
+  // Phase 1B: subjective inputs gate AI generation. Fire-and-forget the
+  // review pipeline so Verdict + Race Story refresh based on the latest
+  // notes. Acceptance criterion #1 expects this within 15s of submission.
+  triggerRaceReviewBackground({ supabase, userId: user.id, bundleId });
 
   revalidatePath(`/races/${bundleId}`);
   revalidatePath(`/races/${bundleId}/notes`);

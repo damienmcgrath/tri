@@ -103,6 +103,21 @@ export type RaceBundleSummary = {
     discipline_distribution_delta: Record<string, number> | null;
     is_provisional: boolean;
     generated_at: string | null;
+    /** Phase 1B Layer 1 — Verdict (structured). */
+    verdict: unknown;
+    /** Phase 1B Layer 2 — Race Story (structured). */
+    race_story: unknown;
+    /** Per-leg deterministic status snapshot. */
+    leg_status: unknown;
+    /** Set only when emotional-frame trigger fired. */
+    emotional_frame: string | null;
+    /** Set only when cross-discipline gate detected a hypothesis. */
+    cross_discipline_insight: string | null;
+    /** Pre-computed series for the unified pacing arc visualization. */
+    pacing_arc_data: unknown;
+    /** Tone-guard telemetry for the spot-check audit. */
+    tone_violations: unknown;
+    model_used: string | null;
   } | null;
 };
 
@@ -176,24 +191,38 @@ export async function loadRaceBundleSummary(
 
   const { data: reviewRow } = await supabase
     .from("race_reviews")
-    .select("headline,narrative,coach_take,transition_notes,pacing_notes,discipline_distribution_actual,discipline_distribution_delta,is_provisional,generated_at")
+    .select(
+      "headline,narrative,coach_take,transition_notes,pacing_notes," +
+        "discipline_distribution_actual,discipline_distribution_delta," +
+        "verdict,race_story,leg_status,emotional_frame,cross_discipline_insight," +
+        "pacing_arc_data,tone_violations,model_used,is_provisional,generated_at"
+    )
     .eq("race_bundle_id", bundleId)
     .eq("user_id", userId)
     .maybeSingle();
 
-  const review: RaceBundleSummary["review"] = reviewRow
+  const reviewRecord = reviewRow ? (reviewRow as unknown as Record<string, unknown>) : null;
+  const review: RaceBundleSummary["review"] = reviewRecord
     ? {
-        headline: (reviewRow.headline as string | null) ?? null,
-        narrative: (reviewRow.narrative as string | null) ?? null,
-        coach_take: (reviewRow.coach_take as string | null) ?? null,
-        transition_notes: (reviewRow.transition_notes as string | null) ?? null,
-        pacing_notes: reviewRow.pacing_notes ?? null,
+        headline: (reviewRecord.headline as string | null) ?? null,
+        narrative: (reviewRecord.narrative as string | null) ?? null,
+        coach_take: (reviewRecord.coach_take as string | null) ?? null,
+        transition_notes: (reviewRecord.transition_notes as string | null) ?? null,
+        pacing_notes: reviewRecord.pacing_notes ?? null,
         discipline_distribution_actual:
-          (reviewRow.discipline_distribution_actual as Record<string, number> | null) ?? null,
+          (reviewRecord.discipline_distribution_actual as Record<string, number> | null) ?? null,
         discipline_distribution_delta:
-          (reviewRow.discipline_distribution_delta as Record<string, number> | null) ?? null,
-        is_provisional: Boolean(reviewRow.is_provisional),
-        generated_at: (reviewRow.generated_at as string | null) ?? null
+          (reviewRecord.discipline_distribution_delta as Record<string, number> | null) ?? null,
+        verdict: reviewRecord.verdict ?? null,
+        race_story: reviewRecord.race_story ?? null,
+        leg_status: reviewRecord.leg_status ?? null,
+        emotional_frame: (reviewRecord.emotional_frame as string | null) ?? null,
+        cross_discipline_insight: (reviewRecord.cross_discipline_insight as string | null) ?? null,
+        pacing_arc_data: reviewRecord.pacing_arc_data ?? null,
+        tone_violations: reviewRecord.tone_violations ?? null,
+        model_used: (reviewRecord.model_used as string | null) ?? null,
+        is_provisional: Boolean(reviewRecord.is_provisional),
+        generated_at: (reviewRecord.generated_at as string | null) ?? null
       }
     : null;
 

@@ -36,6 +36,21 @@ function makeBundle(overrides: Partial<RaceBundleData> = {}): RaceBundleData {
     totalDurationSec: 9090,
     totalDistanceM: 50000,
     source: "strava_reconstructed",
+    goalTimeSec: null,
+    goalStrategySummary: null,
+    preRaceCtl: null,
+    preRaceAtl: null,
+    preRaceTsb: null,
+    preRaceTsbState: null,
+    taperComplianceScore: null,
+    taperComplianceSummary: null,
+    athleteRating: null,
+    athleteNotes: null,
+    issuesFlagged: [],
+    finishPosition: null,
+    ageGroupPosition: null,
+    subjectiveCapturedAt: "2026-04-26T20:00:00.000Z",
+    inferredTransitions: false,
     ...overrides
   };
 }
@@ -337,7 +352,23 @@ function buildSupabaseStub(opts: {
         ended_at: "2026-04-26T10:34:00.000Z",
         total_duration_sec: 9090,
         total_distance_m: 50000,
-        source: "strava_reconstructed"
+        source: "strava_reconstructed",
+        // Phase 1B: subjective gate. Tests default to inputs captured.
+        subjective_captured_at: "2026-04-26T20:00:00.000Z",
+        athlete_rating: 4,
+        athlete_notes: null,
+        issues_flagged: [],
+        finish_position: null,
+        age_group_position: null,
+        goal_time_sec: null,
+        goal_strategy_summary: null,
+        pre_race_ctl: null,
+        pre_race_atl: null,
+        pre_race_tsb: null,
+        pre_race_tsb_state: null,
+        taper_compliance_score: null,
+        taper_compliance_summary: null,
+        inferred_transitions: false
       };
   const segmentRows = opts.segmentRows ?? [];
   const linkRows = opts.linkRows ?? [];
@@ -445,17 +476,59 @@ describe("generateRaceReview", () => {
     expect(result).toEqual({ status: "skipped", reason: "insufficient_segments" });
   });
 
+  it("returns skipped when subjective inputs have not been captured yet (Phase 1B gate)", async () => {
+    const { supabase } = buildSupabaseStub({
+      bundleRow: {
+        id: "bundle-1",
+        user_id: "user-1",
+        started_at: "2026-04-26T08:03:08.000Z",
+        ended_at: "2026-04-26T10:34:00.000Z",
+        total_duration_sec: 9090,
+        total_distance_m: 50000,
+        source: "strava_reconstructed",
+        subjective_captured_at: null,
+        athlete_rating: null,
+        athlete_notes: null,
+        issues_flagged: [],
+        inferred_transitions: false
+      },
+      segmentRows: [
+        { id: "a1", race_segment_role: "swim", race_segment_index: 0, duration_sec: 1500, sport_type: "swim", distance_m: 1500, avg_hr: 145, avg_power: null, metrics_v2: null },
+        { id: "a2", race_segment_role: "bike", race_segment_index: 1, duration_sec: 4500, sport_type: "bike", distance_m: 40000, avg_hr: 152, avg_power: 220, metrics_v2: null },
+        { id: "a3", race_segment_role: "run",  race_segment_index: 2, duration_sec: 2400, sport_type: "run",  distance_m: 10000, avg_hr: 158, avg_power: null, metrics_v2: null }
+      ]
+    });
+    const result = await generateRaceReview({ supabase: supabase as any, userId: "user-1", bundleId: "bundle-1" });
+    expect(result).toEqual({ status: "skipped", reason: "subjective_required" });
+  });
+
   it("upserts an AI-source race review when OpenAI succeeds", async () => {
     mockCallOpenAIWithFallback.mockResolvedValue({
       value: {
-        headline: "Even-split race; bike held 220→218W.",
-        narrative: "Race held together — swim controlled, bike steady, run fade minimal.",
-        coachTake: "Repeat this pacing on the next 70.3 build ride at 220W ±2%. If HR holds, extend by 10 minutes.",
-        transitionNotes: "T1 2:10, T2 1:39 — both efficient.",
-        pacingNotes: {
-          swim: null,
-          bike: { note: "Held within 1% across halves." },
-          run: null
+        verdict: {
+          headline: "Finished in 2:31:30 with bike held 220→218W across halves.",
+          perDiscipline: {
+            swim: { status: "on_plan", summary: "Swim came in steady." },
+            bike: { status: "on_plan", summary: "Held within 1% across halves." },
+            run: { status: "on_plan", summary: "Run held even." }
+          },
+          coachTake: {
+            target: "Hold 220W ±2% across halves",
+            scope: "next race-pace ride",
+            successCriterion: "Halves move less than 2%",
+            progression: "If steady, extend duration by 10 minutes"
+          },
+          emotionalFrame: null
+        },
+        raceStory: {
+          overall: "Race came together — swim controlled, bike steady, run held shape across halves.",
+          perLeg: {
+            swim: null,
+            bike: { narrative: "Bike held 220→218W.", keyEvidence: ["Halves moved -0.9%."] },
+            run: null
+          },
+          transitions: "T1 2:10, T2 1:39.",
+          crossDisciplineInsight: null
         }
       },
       source: "ai"
@@ -502,11 +575,20 @@ describe("generateRaceReview", () => {
       user_id: "user-1",
       race_bundle_id: "bundle-1",
       planned_session_id: "session-race",
-      headline: "Even-split race; bike held 220→218W.",
-      coach_take: expect.stringContaining("Repeat this pacing"),
+      headline: expect.stringContaining("2:31:30"),
+      coach_take: expect.stringContaining("220W"),
       model_used: "gpt-5-mini",
       is_provisional: false
     });
+    // Phase 1B: structured layers persisted alongside legacy columns.
+    expect((upsert.payload as any).verdict).toMatchObject({
+      headline: expect.any(String),
+      coachTake: expect.objectContaining({ target: expect.any(String) })
+    });
+    expect((upsert.payload as any).race_story).toMatchObject({
+      overall: expect.any(String)
+    });
+    expect((upsert.payload as any).pacing_arc_data).toBeDefined();
     // Halves data should be merged into pacing_notes for the bike leg.
     expect((upsert.payload as any).pacing_notes.bike).toMatchObject({
       firstHalf: 220,
@@ -518,11 +600,23 @@ describe("generateRaceReview", () => {
   it("marks the row provisional when the AI call falls back", async () => {
     mockCallOpenAIWithFallback.mockResolvedValue({
       value: {
-        headline: "Fallback headline.",
-        narrative: "Fallback narrative.",
-        coachTake: "Fallback take.",
-        transitionNotes: null,
-        pacingNotes: { swim: null, bike: null, run: null }
+        verdict: {
+          headline: "Fallback headline.",
+          perDiscipline: { swim: null, bike: null, run: null },
+          coachTake: {
+            target: "Hold even-split race pacing",
+            scope: "next race-pace session",
+            successCriterion: "Halves move less than 2%",
+            progression: "Extend by 10 minutes"
+          },
+          emotionalFrame: null
+        },
+        raceStory: {
+          overall: "Race completed.",
+          perLeg: { swim: null, bike: null, run: null },
+          transitions: null,
+          crossDisciplineInsight: null
+        }
       },
       source: "fallback"
     });
@@ -558,11 +652,18 @@ describe("generateRaceReview", () => {
   it("returns skipped when the upsert fails", async () => {
     mockCallOpenAIWithFallback.mockResolvedValue({
       value: {
-        headline: "h",
-        narrative: "n",
-        coachTake: "c",
-        transitionNotes: null,
-        pacingNotes: { swim: null, bike: null, run: null }
+        verdict: {
+          headline: "h",
+          perDiscipline: { swim: null, bike: null, run: null },
+          coachTake: { target: "t", scope: "s", successCriterion: "x", progression: "p" },
+          emotionalFrame: null
+        },
+        raceStory: {
+          overall: "n",
+          perLeg: { swim: null, bike: null, run: null },
+          transitions: null,
+          crossDisciplineInsight: null
+        }
       },
       source: "ai"
     });
@@ -586,5 +687,90 @@ describe("generateRaceReview", () => {
     expect(result.status).toBe("skipped");
     if (result.status !== "skipped") return;
     expect(result.reason).toContain("upsert_failed");
+  });
+
+  it("forces emotionalFrame to null when the deterministic trigger did not fire", async () => {
+    // AI tries to set emotionalFrame; the orchestrator must overwrite it.
+    mockCallOpenAIWithFallback.mockResolvedValue({
+      value: {
+        verdict: {
+          headline: "Strong even-split race in 2:31:30.",
+          perDiscipline: { swim: null, bike: null, run: null },
+          coachTake: { target: "t", scope: "s", successCriterion: "x", progression: "p" },
+          emotionalFrame: "Tough day on the bike — the AI invented this when it should not have."
+        },
+        raceStory: {
+          overall: "Solid race.",
+          perLeg: { swim: null, bike: null, run: null },
+          transitions: null,
+          crossDisciplineInsight: null
+        }
+      },
+      source: "ai"
+    });
+
+    const { supabase, trace } = buildSupabaseStub({
+      // Default bundle has rating=4 and no issues, so trigger does NOT fire.
+      segmentRows: [
+        { id: "a1", race_segment_role: "swim", race_segment_index: 0, duration_sec: 1500, sport_type: "swim", distance_m: 1500, avg_hr: 145, avg_power: null, metrics_v2: null },
+        { id: "a2", race_segment_role: "bike", race_segment_index: 1, duration_sec: 4500, sport_type: "bike", distance_m: 40000, avg_hr: 152, avg_power: 220, metrics_v2: null },
+        { id: "a3", race_segment_role: "run",  race_segment_index: 2, duration_sec: 2400, sport_type: "run",  distance_m: 10000, avg_hr: 158, avg_power: null, metrics_v2: null }
+      ],
+      linkRows: [
+        { planned_session_id: "session-race", confirmation_status: "confirmed" },
+        { planned_session_id: "session-race", confirmation_status: "confirmed" },
+        { planned_session_id: "session-race", confirmation_status: "confirmed" }
+      ],
+      plannedRow: { id: "session-race", type: "Race", session_name: "Race", target: null }
+    });
+
+    const result = await generateRaceReview({ supabase: supabase as any, userId: "user-1", bundleId: "bundle-1" });
+    expect(result.status).toBe("ok");
+
+    const persisted = (trace.upserts[0].payload as any).verdict;
+    expect(persisted.emotionalFrame).toBeNull();
+    // emotional_frame top-level column also forced null.
+    expect((trace.upserts[0].payload as any).emotional_frame).toBeNull();
+  });
+
+  it("forces crossDisciplineInsight to null when the deterministic gate did not detect a hypothesis", async () => {
+    mockCallOpenAIWithFallback.mockResolvedValue({
+      value: {
+        verdict: {
+          headline: "Even-split race in 2:31:30.",
+          perDiscipline: { swim: null, bike: null, run: null },
+          coachTake: { target: "t", scope: "s", successCriterion: "x", progression: "p" },
+          emotionalFrame: null
+        },
+        raceStory: {
+          overall: "Solid race.",
+          perLeg: { swim: null, bike: null, run: null },
+          transitions: null,
+          // AI invents an insight; orchestrator must overwrite to null.
+          crossDisciplineInsight: "Bike fade caused run HR drift — the AI invented this."
+        }
+      },
+      source: "ai"
+    });
+
+    const { supabase, trace } = buildSupabaseStub({
+      segmentRows: [
+        { id: "a1", race_segment_role: "swim", race_segment_index: 0, duration_sec: 1500, sport_type: "swim", distance_m: 1500, avg_hr: 145, avg_power: null, metrics_v2: null },
+        { id: "a2", race_segment_role: "bike", race_segment_index: 1, duration_sec: 4500, sport_type: "bike", distance_m: 40000, avg_hr: 152, avg_power: 220, metrics_v2: null },
+        { id: "a3", race_segment_role: "run",  race_segment_index: 2, duration_sec: 2400, sport_type: "run",  distance_m: 10000, avg_hr: 158, avg_power: null, metrics_v2: null }
+      ],
+      linkRows: [
+        { planned_session_id: "session-race", confirmation_status: "confirmed" },
+        { planned_session_id: "session-race", confirmation_status: "confirmed" },
+        { planned_session_id: "session-race", confirmation_status: "confirmed" }
+      ]
+    });
+
+    const result = await generateRaceReview({ supabase: supabase as any, userId: "user-1", bundleId: "bundle-1" });
+    expect(result.status).toBe("ok");
+
+    const persisted = (trace.upserts[0].payload as any).race_story;
+    expect(persisted.crossDisciplineInsight).toBeNull();
+    expect((trace.upserts[0].payload as any).cross_discipline_insight).toBeNull();
   });
 });

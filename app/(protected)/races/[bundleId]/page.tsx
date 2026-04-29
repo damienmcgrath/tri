@@ -3,6 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadRaceBundleSummary, type RaceBundleSummary } from "@/lib/race/bundle-helpers";
 import { RaceSegmentList } from "../../sessions/[sessionId]/components/race-segment-list";
+import { RaceVerdictCard, type VerdictPayload } from "./components/race-verdict-card";
+import { RaceStoryCard, type RaceStoryPayload } from "./components/race-story-card";
+import { UnifiedPacingArc } from "./components/unified-pacing-arc";
+import type { PacingArcData } from "@/lib/race-review/pacing-arc";
 
 export const dynamic = "force-dynamic";
 
@@ -156,7 +160,7 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
 
       <SubjectiveSection bundle={bundle} bundleId={bundleId} />
 
-      <AiPlaceholder review={review} bundleId={bundleId} />
+      <RaceReviewLayered review={review} bundle={bundle} bundleId={bundleId} />
     </div>
   );
 }
@@ -354,50 +358,139 @@ function SubjectiveSection({
   );
 }
 
-function AiPlaceholder({
+function RaceReviewLayered({
   review,
+  bundle,
   bundleId
 }: {
   review: RaceBundleSummary["review"];
+  bundle: RaceBundleSummary["bundle"];
   bundleId: string;
 }) {
-  if (review && review.headline) {
+  // Subjective inputs gate AI generation.
+  if (!bundle.subjective_captured_at) {
     return (
       <article className="surface p-5">
-        <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race review</p>
-          {review.is_provisional ? (
-            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-amber-300">
-              Provisional
-            </span>
-          ) : null}
-        </div>
-        <h2 className="mt-3 text-base font-semibold text-[rgba(255,255,255,0.92)]">{review.headline}</h2>
-        {review.narrative ? (
-          <p className="mt-2 whitespace-pre-wrap text-sm text-[rgba(255,255,255,0.78)]">{review.narrative}</p>
-        ) : null}
-        {review.coach_take ? (
-          <div className="mt-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] p-3">
-            <p className="text-[10px] uppercase tracking-[0.12em] text-tertiary">Coach take</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-[rgba(255,255,255,0.86)]">{review.coach_take}</p>
-          </div>
-        ) : null}
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race review</p>
+        <p className="mt-2 text-sm text-muted">
+          Add your race notes (rating, issues, anything we can&apos;t see in the data) and the verdict will appear within ~15 seconds.
+        </p>
+        <Link
+          href={`/races/${bundleId}/notes`}
+          className="mt-3 inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-3 py-1.5 text-sm text-[rgba(255,255,255,0.92)] transition hover:border-[rgba(255,255,255,0.18)]"
+        >
+          Add race notes →
+        </Link>
+      </article>
+    );
+  }
+
+  // Subjective captured but no review yet — generation is in flight.
+  const verdictPayload = parseVerdict(review?.verdict);
+  const storyPayload = parseRaceStory(review?.race_story);
+  const arcPayload = parseArc(review?.pacing_arc_data);
+  // "Updated based on your notes" indicates the current review reflects the
+  // most recent subjective submission — i.e. the review's generated_at is
+  // at-or-after the subjective_captured_at timestamp. Stale reviews (review
+  // older than notes) deliberately show no badge; the regenerator fires
+  // post-submit and will update generated_at within ~15s.
+  const noteIndicator =
+    review && review.generated_at && bundle.subjective_captured_at
+      ? new Date(review.generated_at).getTime() >= new Date(bundle.subjective_captured_at).getTime()
+      : false;
+
+  if (!verdictPayload || !storyPayload) {
+    return (
+      <article className="surface p-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race review</p>
+        <p className="mt-2 text-sm text-[rgba(255,255,255,0.78)]">
+          Generating your verdict and race story… this usually takes about 15 seconds. Refresh the page if it doesn&apos;t appear shortly.
+        </p>
       </article>
     );
   }
 
   return (
-    <article className="surface p-5">
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race review</p>
-      <p className="mt-2 text-sm text-muted">
-        Race review will appear here once you&apos;ve added your race notes.
-      </p>
-      <Link
-        href={`/races/${bundleId}/notes`}
-        className="mt-3 inline-flex items-center gap-2 text-xs text-tertiary underline-offset-2 hover:underline"
-      >
-        Add race notes →
-      </Link>
-    </article>
+    <>
+      <RaceVerdictCard
+        verdict={verdictPayload}
+        isProvisional={Boolean(review?.is_provisional)}
+        modelUsed={review?.model_used ?? null}
+        generatedAt={review?.generated_at ?? null}
+        noteIndicator={noteIndicator}
+      />
+      {arcPayload ? <UnifiedPacingArc data={arcPayload} /> : null}
+      <RaceStoryCard story={storyPayload} />
+    </>
   );
+}
+
+function parseVerdict(value: unknown): VerdictPayload | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.headline !== "string") return null;
+  const perDiscipline = (v.perDiscipline as Record<string, unknown>) ?? {};
+  const coachTake = v.coachTake as Record<string, unknown> | undefined;
+  if (!coachTake) return null;
+  return {
+    headline: v.headline,
+    perDiscipline: {
+      swim: parsePerDiscipline(perDiscipline.swim),
+      bike: parsePerDiscipline(perDiscipline.bike),
+      run: parsePerDiscipline(perDiscipline.run)
+    },
+    coachTake: {
+      target: String(coachTake.target ?? ""),
+      scope: String(coachTake.scope ?? ""),
+      successCriterion: String(coachTake.successCriterion ?? ""),
+      progression: String(coachTake.progression ?? "")
+    },
+    emotionalFrame: typeof v.emotionalFrame === "string" ? v.emotionalFrame : null
+  };
+}
+
+function parsePerDiscipline(value: unknown): VerdictPayload["perDiscipline"]["swim"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.status !== "string" || typeof v.summary !== "string") return null;
+  return {
+    status: v.status as VerdictPayload["perDiscipline"]["swim"] extends infer T
+      ? T extends { status: infer S } ? S : never : never,
+    summary: v.summary
+  };
+}
+
+function parseRaceStory(value: unknown): RaceStoryPayload | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.overall !== "string") return null;
+  const perLeg = (v.perLeg as Record<string, unknown>) ?? {};
+  return {
+    overall: v.overall,
+    perLeg: {
+      swim: parsePerLegStory(perLeg.swim),
+      bike: parsePerLegStory(perLeg.bike),
+      run: parsePerLegStory(perLeg.run)
+    },
+    transitions: typeof v.transitions === "string" ? v.transitions : null,
+    crossDisciplineInsight: typeof v.crossDisciplineInsight === "string" ? v.crossDisciplineInsight : null
+  };
+}
+
+function parsePerLegStory(value: unknown): RaceStoryPayload["perLeg"]["swim"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.narrative !== "string") return null;
+  const evidence = Array.isArray(v.keyEvidence)
+    ? v.keyEvidence.filter((s): s is string => typeof s === "string")
+    : [];
+  return { narrative: v.narrative, keyEvidence: evidence };
+}
+
+function parseArc(value: unknown): PacingArcData | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.totalDurationSec !== "number") return null;
+  if (!Array.isArray(v.points)) return null;
+  return v as unknown as PacingArcData;
 }

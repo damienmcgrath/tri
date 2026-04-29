@@ -64,10 +64,14 @@ describe("RaceReviewCard", () => {
 });
 
 describe("RaceReviewPlaceholder", () => {
-  it("renders generation copy and a regenerate trigger", () => {
+  it("invites the athlete to add notes and exposes a regenerate fallback", () => {
     render(<RaceReviewPlaceholder bundleId="bundle-1" />);
 
-    expect(screen.getByText(/Generating your race review/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Generate race review/i })).toBeInTheDocument();
+    expect(screen.getByText(/Add your race notes/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Add race notes/i })).toHaveAttribute(
+      "href",
+      "/races/bundle-1/notes"
+    );
+    expect(screen.getByRole("button", { name: /regenerate review/i })).toBeInTheDocument();
   });
 });
