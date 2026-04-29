@@ -94,7 +94,9 @@ export type RaceReviewNarrative = {
 
 export const raceReviewNarrativeSchema = z.object({
   headline: z.string().min(1).max(120),
-  narrative: z.string().min(1).max(900),
+  // Story not data dump — keep tight so the AI doesn't restate per-leg numbers
+  // already shown in the segment list and per-leg pacing block.
+  narrative: z.string().min(1).max(420),
   coachTake: z.string().min(1).max(220),
   transitionNotes: z.string().max(220).nullable(),
   pacingNotes: z.object({
@@ -442,7 +444,7 @@ export function buildDeterministicRaceReview(facts: RaceFacts): RaceReviewNarrat
 
   return {
     headline: clip(headline, 120),
-    narrative: clip(narrative, 900),
+    narrative: clip(narrative, 420),
     coachTake: clip(coachTake, 220),
     transitionNotes: transitionNotes ? clip(transitionNotes, 220) : null,
     pacingNotes
@@ -462,43 +464,80 @@ export function buildRaceReviewInstructions(): string {
     "- If halves data is missing for a leg, set its pacingNotes entry to null. Do not fabricate a number.",
     "- The coachTake must be a single concrete next-step in NEXT-format: name a target (pace/power/structure) and a progression trigger.",
     "",
+    "Formatting rules — CRITICAL, never break these:",
+    "- ALWAYS use the pre-formatted *Label fields when writing prose ('durationLabel', 'distanceLabel', 'paceLabel', 'firstHalfLabel', etc.). They are already in the right unit/format.",
+    "- NEVER write raw seconds (no '1601 s', '4634 s', '131 s', '96 s') — these read as alien numbers to athletes.",
+    "- NEVER write raw meters when the value is ≥1000 (no '9357 m'); the *Label field uses km.",
+    "- Durations: 'mm:ss' for under an hour, 'h:mm:ss' for over.",
+    "- Pace: 'M:SS /km' for run, 'M:SS /100m' for swim.",
+    "- Power: 'XXXW' (no decimals, no space).",
+    "- Percentages: one decimal place, with sign for deltas (+1.5%, −2.3%).",
+    "",
     "Output shape:",
-    "- headline (≤120 chars): one-line execution summary, e.g. 'Even-split execution; bike held within 1.5%'.",
-    "- narrative (≤900 chars, 2–4 sentences): race-wide story grounded in the supplied facts. Mention pacing on each leg where halves data is available, transitions if T1/T2 are present, and the actual-vs-ideal discipline distribution if the race profile is supplied.",
-    "- coachTake (≤220 chars): one prescriptive takeaway. Single NEXT-format prescription.",
-    "- transitionNotes (≤220 chars or null): commentary on T1/T2. Null when both transitions are missing.",
-    "- pacingNotes.{swim,bike,run}: per-leg quantitative observation grounded in the halves data. Null when halves data is unavailable.",
+    "- headline (≤120 chars): one-line execution summary using *Label values. Example: 'Even-split Olympic; bike held 220→216W (−1.8%) across halves.'",
+    "- narrative (≤420 chars, 2–3 sentences): the STORY, not a data dump. The segment durations + distances are already shown in the segment list below — DO NOT restate them. Instead, describe HOW the race was executed (controlled / aggressive / faded), what the halves data reveals, and what the discipline distribution suggests if a race profile was provided. Numbers should feature only when load-bearing for the story.",
+    "- coachTake (≤220 chars): one prescriptive takeaway. Single NEXT-format prescription using *Label values.",
+    "- transitionNotes (≤220 chars or null): one short observation on T1/T2 using durationLabel ('T1 2:11, T2 1:36 — both efficient'). Null when both transitions are missing.",
+    "- pacingNotes.{swim,bike,run}: one short observation per leg grounded in the halves data, using *Label values. Null when halves data for that leg is unavailable.",
     "",
-    "Inputs you receive (JSON):",
-    "- bundle: id, startedAt, totalDurationSec, totalDistanceM, source.",
-    "- segments: per-leg duration, distance, avg HR, avg power, role (swim/t1/bike/t2/run).",
-    "- plannedSession: type and target (if known), or null.",
-    "- raceProfile: name, distanceType, idealDisciplineDistribution {swim,bike,run}, or null.",
-    "- disciplineDistributionActual: actual share-of-time per role.",
-    "- disciplineDistributionDelta: actual minus ideal {swim,bike,run}, or null when no race profile.",
-    "- pacing: per-leg halves splits with units (watts for bike, sec_per_km for run, sec_per_100m for swim).",
-    "- transitions: T1/T2 elapsed seconds.",
-    "",
-    "Reference units when describing pacing: watts for bike, seconds per kilometer for run, seconds per 100m for swim. Always cite the actual numbers from the inputs."
+    "Inputs you receive (JSON). Each leg has both raw machine fields AND human *Label strings — always quote the *Label strings in prose:",
+    "- bundle: { totalDurationLabel: 'h:mm:ss', totalDistanceLabel: 'NN.NN km', source }",
+    "- segments[]: { role, durationLabel, distanceLabel, avgHr, avgPowerLabel? }",
+    "- plannedSession: { type, target } or null.",
+    "- raceProfile: { name, distanceType, idealDisciplineDistribution } or null.",
+    "- disciplineDistributionActual: { swim: 0.18, bike: 0.51, run: 0.29, ... } (use as percentages).",
+    "- disciplineDistributionDelta: { swim, bike, run } or null when no race profile.",
+    "- pacing.{swim,bike,run}: { firstHalfLabel, lastHalfLabel, deltaPctLabel, unit } or { halvesAvailable: false }.",
+    "- transitions: { t1Label, t2Label } (already mm:ss or null when missing)."
   ].join("\n");
+}
+
+function formatDurationLabel(sec: number | null | undefined): string | null {
+  if (sec === null || sec === undefined || !Number.isFinite(sec)) return null;
+  const total = Math.max(0, Math.round(sec));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatDistanceLabel(m: number | null | undefined): string | null {
+  if (m === null || m === undefined || !Number.isFinite(m)) return null;
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${(m / 1000).toFixed(2)} km`;
+}
+
+function formatHalvesUnitLabel(value: number, unit: "watts" | "sec_per_km" | "sec_per_100m"): string {
+  if (unit === "watts") return `${Math.round(value)}W`;
+  return formatPaceFromSeconds(value, unit);
+}
+
+function formatPaceFromSeconds(sec: number, unit: "sec_per_km" | "sec_per_100m"): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  const suffix = unit === "sec_per_km" ? " /km" : " /100m";
+  return `${m}:${String(s).padStart(2, "0")}${suffix}`;
+}
+
+function formatDeltaPctLabel(pct: number): string {
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
 export function buildRaceReviewInput(facts: RaceFacts): unknown {
   return {
     bundle: {
-      id: facts.bundle.id,
-      startedAt: facts.bundle.startedAt,
-      totalDurationSec: facts.bundle.totalDurationSec,
-      totalDistanceM: facts.bundle.totalDistanceM,
+      totalDurationLabel: formatDurationLabel(facts.bundle.totalDurationSec),
+      totalDistanceLabel: formatDistanceLabel(facts.bundle.totalDistanceM),
       source: facts.bundle.source
     },
     segments: facts.segments.map((s) => ({
       role: s.role,
-      sportType: s.sportType,
-      durationSec: s.durationSec,
-      distanceM: s.distanceM,
+      durationLabel: formatDurationLabel(s.durationSec),
+      distanceLabel: formatDistanceLabel(s.distanceM),
       avgHr: s.avgHr,
-      avgPower: s.avgPower
+      avgPowerLabel: typeof s.avgPower === "number" ? `${Math.round(s.avgPower)}W` : null
     })),
     plannedSession: facts.plannedSession,
     raceProfile: facts.raceProfile
@@ -510,8 +549,36 @@ export function buildRaceReviewInput(facts: RaceFacts): unknown {
       : null,
     disciplineDistributionActual: facts.disciplineDistributionActual,
     disciplineDistributionDelta: facts.disciplineDistributionDelta,
-    pacing: facts.pacing,
-    transitions: facts.transitions
+    pacing: {
+      swim: facts.pacing.swim?.halvesAvailable
+        ? {
+            firstHalfLabel: formatHalvesUnitLabel(facts.pacing.swim.firstHalf, facts.pacing.swim.unit),
+            lastHalfLabel: formatHalvesUnitLabel(facts.pacing.swim.lastHalf, facts.pacing.swim.unit),
+            deltaPctLabel: formatDeltaPctLabel(facts.pacing.swim.deltaPct),
+            unit: facts.pacing.swim.unit
+          }
+        : { halvesAvailable: false },
+      bike: facts.pacing.bike?.halvesAvailable
+        ? {
+            firstHalfLabel: formatHalvesUnitLabel(facts.pacing.bike.firstHalf, facts.pacing.bike.unit),
+            lastHalfLabel: formatHalvesUnitLabel(facts.pacing.bike.lastHalf, facts.pacing.bike.unit),
+            deltaPctLabel: formatDeltaPctLabel(facts.pacing.bike.deltaPct),
+            unit: facts.pacing.bike.unit
+          }
+        : { halvesAvailable: false },
+      run: facts.pacing.run?.halvesAvailable
+        ? {
+            firstHalfLabel: formatHalvesUnitLabel(facts.pacing.run.firstHalf, facts.pacing.run.unit),
+            lastHalfLabel: formatHalvesUnitLabel(facts.pacing.run.lastHalf, facts.pacing.run.unit),
+            deltaPctLabel: formatDeltaPctLabel(facts.pacing.run.deltaPct),
+            unit: facts.pacing.run.unit
+          }
+        : { halvesAvailable: false }
+    },
+    transitions: {
+      t1Label: formatDurationLabel(facts.transitions.t1DurationSec),
+      t2Label: formatDurationLabel(facts.transitions.t2DurationSec)
+    }
   };
 }
 
