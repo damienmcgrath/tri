@@ -23,6 +23,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 282, "sec_per_km"), // 0.7% slowdown
       runHrDriftBpm: 7,
       swimRating: null,
+      bikeStatus: "faded",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(true);
@@ -32,16 +33,44 @@ describe("detectCrossDisciplineSignal", () => {
     }
   });
 
-  it("detects swim_overcook → bike_under when swim rated ≤2 and bike fades", () => {
+  it("detects swim_overcook → bike_under when swim rated ≤2 AND bike status is 'under' (target signal, not fade)", () => {
     const result = detectCrossDisciplineSignal({
-      bikePacing: halves(220, 210, "watts"),
+      bikePacing: halves(206, 207, "watts"), // stable but below target
       runPacing: halves(290, 292, "sec_per_km"),
       runHrDriftBpm: 1,
       swimRating: 2,
+      bikeStatus: "under",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(true);
     if (result.detected) expect(result.hypothesis).toBe("swim_overcook_to_bike_under");
+  });
+
+  it("does NOT fire swim_overcook when bike merely fades (no target-under signal)", () => {
+    const result = detectCrossDisciplineSignal({
+      bikePacing: halves(220, 210, "watts"), // fades but average is at target — bike status would be "faded"
+      runPacing: halves(290, 292, "sec_per_km"),
+      runHrDriftBpm: 1,
+      swimRating: 2,
+      bikeStatus: "faded",
+      athleteAccountSuppresses: false
+    });
+    // Falls through to bike_fade hypothesis only if run HR drifts; here it should fall through to no detection.
+    if (result.detected) {
+      expect(result.hypothesis).not.toBe("swim_overcook_to_bike_under");
+    }
+  });
+
+  it("does NOT fire swim_overcook when target inference is missing (bikeStatus null)", () => {
+    const result = detectCrossDisciplineSignal({
+      bikePacing: halves(206, 207, "watts"),
+      runPacing: halves(290, 292, "sec_per_km"),
+      runHrDriftBpm: 1,
+      swimRating: 1,
+      bikeStatus: null,
+      athleteAccountSuppresses: false
+    });
+    expect(result.detected).toBe(false);
   });
 
   it("detects run_fade_at_constant_pace when pace held but HR drifted", () => {
@@ -50,6 +79,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 281, "sec_per_km"),
       runHrDriftBpm: 8,
       swimRating: null,
+      bikeStatus: "on_plan",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(true);
@@ -64,6 +94,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 281, "sec_per_km"),
       runHrDriftBpm: 1,
       swimRating: 4,
+      bikeStatus: "on_plan",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(false);
@@ -75,6 +106,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 290, "sec_per_km"), // run also faded but on its own
       runHrDriftBpm: 0,
       swimRating: 4,
+      bikeStatus: "faded",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(false);
@@ -86,6 +118,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 295, "sec_per_km"), // run faded 5%
       runHrDriftBpm: 2, // no clear HR signal
       swimRating: 4,
+      bikeStatus: "on_plan",
       athleteAccountSuppresses: false
     });
     expect(result.detected).toBe(false);
@@ -97,6 +130,7 @@ describe("detectCrossDisciplineSignal", () => {
       runPacing: halves(280, 282, "sec_per_km"),
       runHrDriftBpm: 7,
       swimRating: null,
+      bikeStatus: "faded",
       athleteAccountSuppresses: true
     });
     expect(result.detected).toBe(false);

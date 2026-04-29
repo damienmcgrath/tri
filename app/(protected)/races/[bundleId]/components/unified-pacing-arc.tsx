@@ -58,8 +58,15 @@ export function UnifiedPacingArc({ data }: Props) {
   const paceY = (sec: number) =>
     PADDING.top + innerH - ((paceMax - sec) / paceRange) * innerH;
 
-  const hrPath = pathFromPoints(hrPoints.map((p) => [xScale(p.tSec), hrY(p.hr!)]));
-  // Bike power as its own segment (already filtered to role=bike).
+  // HR is drawn as one path-per-leg so transitions render as visible gaps
+  // (honesty over aesthetics). Joining swim/bike/run with a single L would
+  // bridge the T1/T2 bands with an interpolated line — misleading on
+  // Strava-stitched bundles where the transitions are inferred from gaps,
+  // and not meaningful on Garmin Multisport either since transitions carry
+  // no race-pace HR signal worth interpolating.
+  const hrPath = pathFromPointsByGroup(hrPoints, (p) => p.role, (p) => [xScale(p.tSec), hrY(p.hr!)]);
+  // Bike power and run pace are inherently single-leg, so they're naturally
+  // gap-free; pathFromPoints emits one subpath each.
   const powerPath = pathFromPoints(powerPoints.map((p) => [xScale(p.tSec), powerY(p.power!)]));
   const pacePath = pathFromPoints(runPacePoints.map((p) => [xScale(p.tSec), paceY(p.paceSec!)]));
 
@@ -250,6 +257,33 @@ function pathFromPoints(points: Array<[number, number]>): string | null {
   const head = `M ${first[0].toFixed(1)} ${first[1].toFixed(1)}`;
   const tail = rest.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
   return rest.length > 0 ? `${head} ${tail}` : head;
+}
+
+/**
+ * Build a single SVG path string with multiple `M` commands so each group
+ * (e.g. each leg of the race) renders as its own visible subpath. Points
+ * are visited in input order; whenever the group key changes, the next
+ * point starts a fresh subpath instead of continuing with `L`.
+ */
+function pathFromPointsByGroup<T>(
+  points: T[],
+  getGroup: (p: T) => string,
+  toCoords: (p: T) => [number, number]
+): string | null {
+  if (points.length === 0) return null;
+  const segments: string[] = [];
+  let lastGroup: string | null = null;
+  for (const point of points) {
+    const group = getGroup(point);
+    const [x, y] = toCoords(point);
+    if (group !== lastGroup) {
+      segments.push(`M ${x.toFixed(1)} ${y.toFixed(1)}`);
+      lastGroup = group;
+    } else {
+      segments.push(`L ${x.toFixed(1)} ${y.toFixed(1)}`);
+    }
+  }
+  return segments.join(" ");
 }
 
 function minOf(values: number[], fallback: number): number {

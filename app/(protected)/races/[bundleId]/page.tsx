@@ -389,9 +389,14 @@ function RaceReviewLayered({
   const verdictPayload = parseVerdict(review?.verdict);
   const storyPayload = parseRaceStory(review?.race_story);
   const arcPayload = parseArc(review?.pacing_arc_data);
+  // "Updated based on your notes" indicates the current review reflects the
+  // most recent subjective submission — i.e. the review's generated_at is
+  // at-or-after the subjective_captured_at timestamp. Stale reviews (review
+  // older than notes) deliberately show no badge; the regenerator fires
+  // post-submit and will update generated_at within ~15s.
   const noteIndicator =
     review && review.generated_at && bundle.subjective_captured_at
-      ? new Date(review.generated_at).getTime() < new Date(bundle.subjective_captured_at).getTime()
+      ? new Date(review.generated_at).getTime() >= new Date(bundle.subjective_captured_at).getTime()
       : false;
 
   if (!verdictPayload || !storyPayload) {

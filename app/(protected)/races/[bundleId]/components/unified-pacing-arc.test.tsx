@@ -37,6 +37,17 @@ describe("UnifiedPacingArc", () => {
     expect(paths.length).toBeGreaterThan(0);
   });
 
+  it("breaks the HR path at each leg boundary (one M-command per leg, not one continuous line)", () => {
+    // Three legs (swim/bike/run) should produce three M commands in the HR
+    // path — one per leg — so transitions render as visible discontinuities.
+    const { container } = render(<UnifiedPacingArc data={makeData()} />);
+    const paths = Array.from(container.querySelectorAll("svg path"));
+    const hrPath = paths
+      .map((p) => p.getAttribute("d") ?? "")
+      .find((d) => d.split(" ").filter((tok) => tok === "M").length >= 3);
+    expect(hrPath).toBeDefined();
+  });
+
   it("annotates stitched bundles with an inferred-gaps caption", () => {
     const { getByText } = render(
       <UnifiedPacingArc

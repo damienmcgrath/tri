@@ -19,6 +19,7 @@
  */
 
 import type { LegPacing } from "@/lib/race-review";
+import type { LegStatusLabel } from "./leg-status";
 
 export type CrossDisciplineHypothesis =
   | "bike_fade_to_run_hr_drift"
@@ -40,6 +41,14 @@ export type CrossDisciplineInput = {
   runHrDriftBpm: number | null;
   /** Athlete's 1–5 rating for the swim, if captured. */
   swimRating: number | null;
+  /**
+   * Deterministic bike leg status from the classifier. We use this — not a
+   * fade proxy — to detect "bike under target" since target inference may
+   * be unavailable (e.g. no FTP), in which case `under` is never returned
+   * and the swim_overcook hypothesis can't fire. That is the desired
+   * conservative default: no target signal → no hypothesis.
+   */
+  bikeStatus: LegStatusLabel | null;
   /**
    * True when the athlete's notes mention a discrete event (illness, GI,
    * mechanical, crash). When true, all hypotheses are suppressed — the
@@ -84,24 +93,23 @@ export function detectCrossDisciplineSignal(input: CrossDisciplineInput): CrossD
   }
 
   // ─── 2. swim_overcook → bike_under ──────────────────────────────────────
-  // Athlete rated swim ≤2 AND bike average came in materially under target —
-  // checked via bike pacing showing first-half AT or BELOW target floor.
-  // We use a simple proxy here: if bike pacing fades AND swim rating is low,
-  // the swim cooking is a plausible cause, but only when no athlete-account
-  // override applies (suppressed above).
-  if (
-    input.swimRating !== null &&
-    input.swimRating <= 2 &&
-    bikeDropPct !== null &&
-    bikeDropPct >= 3
-  ) {
+  // Athlete rated swim ≤2 AND the deterministic leg-status classifier
+  // already labeled bike as "under" — i.e. the bike average came in ≥5%
+  // below the inferred target with stable halves. We require the actual
+  // target signal here, not a fade proxy: when target inference is missing
+  // (no FTP), the classifier returns null and this hypothesis cannot fire.
+  if (input.swimRating !== null && input.swimRating <= 2 && input.bikeStatus === "under") {
+    const evidence: string[] = [
+      `Swim rated ${input.swimRating}/5 by the athlete.`,
+      "Bike came in under target (deterministic classifier label: under)."
+    ];
+    if (bike) {
+      evidence.push(`Bike halves: ${bike.firstHalf}W → ${bike.lastHalf}W.`);
+    }
     return {
       detected: true,
       hypothesis: "swim_overcook_to_bike_under",
-      evidence: [
-        `Swim rated ${input.swimRating}/5 by the athlete.`,
-        `Bike power eased ${bikeDropPct.toFixed(1)}% across halves (${bike!.firstHalf}W → ${bike!.lastHalf}W).`
-      ]
+      evidence
     };
   }
 

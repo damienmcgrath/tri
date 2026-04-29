@@ -561,6 +561,7 @@ export function buildRaceFacts(args: {
     runPacing: pacing.run,
     runHrDriftBpm: hrDrift.run,
     swimRating: bundle.athleteRating, // overall rating, used as proxy when leg-specific not captured
+    bikeStatus: legStatus.bike?.label ?? null,
     athleteAccountSuppresses: accountSuppresses
   });
 
