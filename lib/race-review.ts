@@ -187,12 +187,19 @@ const BUNDLE_COLUMNS_FOR_REVIEW =
   "subjective_captured_at,inferred_transitions";
 
 async function loadBundle(supabase: SupabaseClient, userId: string, bundleId: string): Promise<RaceBundleData | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("race_bundles")
     .select(BUNDLE_COLUMNS_FOR_REVIEW)
     .eq("id", bundleId)
     .eq("user_id", userId)
     .maybeSingle();
+  if (error) {
+    // Surface the cause so a missing column or RLS denial doesn't masquerade
+    // as `bundle_not_found`. Re-throwing forces the API route into its 500
+    // path with a readable message instead of "Could not regenerate race
+    // review: bundle_not_found".
+    throw new Error(`race_bundles select failed: ${error.message}`);
+  }
   if (!data) return null;
   const row = data as unknown as Record<string, unknown>;
   return {
