@@ -60,6 +60,12 @@ import {
 } from "@/lib/race-review/segment-diagnostics-schemas";
 import type { ComparableCandidate } from "@/lib/race-review/best-comparable";
 import { generateRaceLessons } from "@/lib/race-review/lessons";
+import {
+  buildTrainingToRaceLinks,
+  type RaceLegSummary as TrainingLinksRaceLegSummary,
+  type TrainingLinksDiscipline
+} from "@/lib/race-review/training-links";
+import { buildPreRaceRetrospective } from "@/lib/race-review/retrospective";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1490,18 +1496,161 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
   // Phase 1D — fire Lessons generation. Tail-call so the review row is
   // visible to the loader before lessons read it; failures don't roll back
   // the review.
-  await generateRaceLessons({ supabase, userId, bundleId }).catch((err) => {
-    console.warn("[race-review] lessons generation failed (review still saved)", {
-      bundleId,
-      error: err instanceof Error ? err.message : String(err)
-    });
-  });
+  // Phase 3 — fire Training-to-Race Linking (3.2) and Pre-race Retrospective (3.3)
+  // alongside lessons. All three are tail calls; failures persist null in
+  // their columns rather than rolling back the review.
+  await Promise.all([
+    generateRaceLessons({ supabase, userId, bundleId }).catch((err) => {
+      console.warn("[race-review] lessons generation failed (review still saved)", {
+        bundleId,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }),
+    persistTrainingToRaceLinks({ supabase, userId, bundleId, segments, raceDateIso: bundle.startedAt }).catch((err) => {
+      console.warn("[race-review] training-links generation failed (review still saved)", {
+        bundleId,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }),
+    persistPreRaceRetrospective({ supabase, userId, bundleId, bundle, raceDateIso: bundle.startedAt }).catch((err) => {
+      console.warn("[race-review] retrospective generation failed (review still saved)", {
+        bundleId,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    })
+  ]);
 
   return {
     status: "ok",
     reviewId: upsertData.id as string,
     source,
     plannedSessionId
+  };
+}
+
+/**
+ * Phase 3.2 tail call. Builds the training-to-race-links artifact and
+ * writes it to the existing race_reviews row.
+ */
+async function persistTrainingToRaceLinks(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  bundleId: string;
+  segments: RaceSegmentData[];
+  raceDateIso: string;
+}): Promise<void> {
+  const legs = buildTrainingLinksLegs(args.segments);
+  if (legs.length === 0) return;
+  const result = await buildTrainingToRaceLinks({
+    supabase: args.supabase,
+    userId: args.userId,
+    bundleId: args.bundleId,
+    raceDateIso: args.raceDateIso,
+    legs
+  });
+  if (result.status !== "ok") return;
+  const { error } = await args.supabase
+    .from("race_reviews")
+    .update({ training_to_race_links: result.payload })
+    .eq("user_id", args.userId)
+    .eq("race_bundle_id", args.bundleId);
+  if (error) {
+    console.warn("[race-review] training-links persist failed", {
+      bundleId: args.bundleId,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Project the loaded race segments into the RaceLegSummary input shape
+ * required by buildTrainingToRaceLinks. Segments that aren't swim/bike/run
+ * (transitions) are skipped.
+ */
+function buildTrainingLinksLegs(segments: RaceSegmentData[]): TrainingLinksRaceLegSummary[] {
+  const out: TrainingLinksRaceLegSummary[] = [];
+  for (const seg of segments) {
+    if (seg.role !== "swim" && seg.role !== "bike" && seg.role !== "run") continue;
+    out.push(buildTrainingLinksLegFromSegment(seg));
+  }
+  return out;
+}
+
+/**
+ * Phase 3.3 tail call. Computes the pre-race retrospective from the
+ * existing snapshot columns + athlete_fitness time series and writes it
+ * to race_reviews.
+ */
+async function persistPreRaceRetrospective(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  bundleId: string;
+  bundle: RaceBundleData;
+  raceDateIso: string;
+}): Promise<void> {
+  const result = await buildPreRaceRetrospective({
+    supabase: args.supabase,
+    userId: args.userId,
+    bundleId: args.bundleId,
+    raceDateIso: args.raceDateIso,
+    bundle: {
+      pre_race_ctl: args.bundle.preRaceCtl,
+      pre_race_atl: args.bundle.preRaceAtl,
+      pre_race_tsb: args.bundle.preRaceTsb,
+      taper_compliance_score: args.bundle.taperComplianceScore,
+      taper_compliance_summary: args.bundle.taperComplianceSummary
+    }
+  });
+  if (result.status !== "ok") return;
+  const { error } = await args.supabase
+    .from("race_reviews")
+    .update({ pre_race_retrospective: result.payload })
+    .eq("user_id", args.userId)
+    .eq("race_bundle_id", args.bundleId);
+  if (error) {
+    console.warn("[race-review] retrospective persist failed", {
+      bundleId: args.bundleId,
+      error: error.message
+    });
+  }
+}
+
+function buildTrainingLinksLegFromSegment(seg: RaceSegmentData): TrainingLinksRaceLegSummary {
+  const role = seg.role as TrainingLinksDiscipline;
+  let avgPace: number | null = null;
+  let normalizedPower: number | null = null;
+  if (role === "swim") {
+    if (seg.distanceM && seg.distanceM > 0 && seg.durationSec > 0) {
+      avgPace = Math.round(seg.durationSec / (seg.distanceM / 100));
+    }
+  } else if (role === "run") {
+    if (seg.distanceM && seg.distanceM > 0 && seg.durationSec > 0) {
+      avgPace = Math.round(seg.durationSec / (seg.distanceM / 1000));
+    }
+  } else if (role === "bike") {
+    const m = seg.metricsV2;
+    if (m && typeof m === "object") {
+      const np = (m as Record<string, unknown>).normalizedPower;
+      if (typeof np === "number" && np > 0) normalizedPower = np;
+      if (normalizedPower == null) {
+        const halves = (m as Record<string, unknown>).halves;
+        if (halves && typeof halves === "object") {
+          const hh = halves as Record<string, unknown>;
+          const f = typeof hh.firstHalfAvgPower === "number" ? hh.firstHalfAvgPower : null;
+          const l = typeof hh.lastHalfAvgPower === "number" ? hh.lastHalfAvgPower : null;
+          if (f != null && l != null) normalizedPower = Math.round((f + l) / 2);
+        }
+      }
+    }
+    if (normalizedPower == null && seg.avgPower != null) normalizedPower = seg.avgPower;
+  }
+  return {
+    role,
+    durationSec: seg.durationSec,
+    avgPower: seg.avgPower,
+    avgHr: seg.avgHr,
+    avgPace,
+    normalizedPower
   };
 }
 

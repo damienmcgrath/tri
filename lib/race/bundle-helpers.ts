@@ -126,6 +126,10 @@ export type RaceBundleSummary = {
     segment_diagnostics: unknown;
     /** Phase 1C — transitions analysis vs population norms. */
     transitions_analysis: unknown;
+    /** Phase 3.2 — training sessions that mirrored race-day capability. */
+    training_to_race_links: unknown;
+    /** Phase 3.3 — pre-race retrospective (CTL trajectory, taper, key-session execution). */
+    pre_race_retrospective: unknown;
     model_used: string | null;
   } | null;
   lessons: {
@@ -215,6 +219,7 @@ export async function loadRaceBundleSummary(
         "discipline_distribution_actual,discipline_distribution_delta," +
         "verdict,race_story,leg_status,emotional_frame,cross_discipline_insight," +
         "pacing_arc_data,tone_violations,segment_diagnostics,transitions_analysis," +
+        "training_to_race_links,pre_race_retrospective," +
         "model_used,is_provisional,generated_at"
     )
     .eq("race_bundle_id", bundleId)
@@ -256,6 +261,8 @@ export async function loadRaceBundleSummary(
         tone_violations: reviewRecord.tone_violations ?? null,
         segment_diagnostics: reviewRecord.segment_diagnostics ?? null,
         transitions_analysis: reviewRecord.transitions_analysis ?? null,
+        training_to_race_links: reviewRecord.training_to_race_links ?? null,
+        pre_race_retrospective: reviewRecord.pre_race_retrospective ?? null,
         model_used: (reviewRecord.model_used as string | null) ?? null,
         is_provisional: Boolean(reviewRecord.is_provisional),
         generated_at: (reviewRecord.generated_at as string | null) ?? null

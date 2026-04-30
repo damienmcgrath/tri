@@ -57,6 +57,8 @@ function buildSummary(overrides: {
     tone_violations: null,
     segment_diagnostics: null,
     transitions_analysis: null,
+    training_to_race_links: null,
+    pre_race_retrospective: null,
     model_used: "test"
   };
 
@@ -236,5 +238,138 @@ describe("generateRaceSeededPrompts", () => {
     const prompts = generateRaceSeededPrompts(input);
     expect(prompts.length).toBeGreaterThanOrEqual(2);
     expect(prompts.find((p) => p.reason === "fallback_overall")).toBeDefined();
+  });
+
+  // ─── Phase 3 rules ────────────────────────────────────────────────────
+
+  it("Phase 3.1 — produces a progression_compare prompt when same-distance prior race exists", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary(),
+      priorRaces: [
+        { bundleId: "prior-1", name: "Bled 2025", date: "2025-08-15", distanceType: "olympic" }
+      ],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "progression_compare")).toBeDefined();
+  });
+
+  it("Phase 3.1 — does NOT fire progression_compare when distance types differ", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary(),
+      priorRaces: [
+        { bundleId: "prior-1", name: "Half 2025", date: "2025-08-15", distanceType: "half" }
+      ],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "progression_compare")).toBeUndefined();
+  });
+
+  it("Phase 3.2 — fires training_origin when at least one leg has matched sessions", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary({
+        review: {
+          training_to_race_links: {
+            windowWeeks: 8,
+            perLeg: { swim: [], bike: [{ sessionId: "x" }], run: [] },
+            warningsMissed: [],
+            aiNarrative: null,
+            source: "fallback",
+            generatedAt: "2026-04-15T20:00:00.000Z"
+          }
+        }
+      }),
+      priorRaces: [],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "training_origin")).toBeDefined();
+  });
+
+  it("Phase 3.2 — does NOT fire training_origin when every leg is empty", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary({
+        review: {
+          training_to_race_links: {
+            windowWeeks: 8,
+            perLeg: { swim: [], bike: [], run: [] },
+            warningsMissed: [],
+            aiNarrative: null,
+            source: "fallback",
+            generatedAt: "2026-04-15T20:00:00.000Z"
+          }
+        }
+      }),
+      priorRaces: [],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "training_origin")).toBeUndefined();
+  });
+
+  it("Phase 3.2 — fires warning_signs_missed when warnings list is non-empty", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary({
+        review: {
+          training_to_race_links: {
+            windowWeeks: 8,
+            perLeg: { swim: [], bike: [], run: [] },
+            warningsMissed: [{ sessionId: "x", date: "2026-04-12", sessionName: "Brick", observation: "..." }],
+            aiNarrative: null,
+            source: "fallback",
+            generatedAt: "2026-04-15T20:00:00.000Z"
+          }
+        }
+      }),
+      priorRaces: [],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "warning_signs_missed")).toBeDefined();
+  });
+
+  it("Phase 3.3 — fires periodisation_check when CTL peaked >14 days before race", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary({
+        review: {
+          pre_race_retrospective: {
+            buildWindowDays: 56,
+            ctlTrajectory: { sport: "total", series: [], peakCtl: 70, peakCtlDate: "2026-04-10", targetPeakCtl: null, daysFromPeakToRace: 21, raceMorningCtl: 65 },
+            taperReadOut: { complianceScore: 0.9, summary: null },
+            keySessionExecutionRate: { totalKeySessions: 8, completedKeySessions: 8, rate: 1, keySessionsList: [] },
+            verdict: { headline: "x", body: "y", actionableAdjustment: "z" },
+            source: "fallback",
+            generatedAt: "2026-04-15T20:00:00.000Z"
+          }
+        }
+      }),
+      priorRaces: [],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "periodisation_check")).toBeDefined();
+  });
+
+  it("Phase 3.3 — does NOT fire periodisation_check when peak landed in the 7-14 day window", () => {
+    const input: SeededPromptsInput = {
+      summary: buildSummary({
+        review: {
+          pre_race_retrospective: {
+            buildWindowDays: 56,
+            ctlTrajectory: { sport: "total", series: [], peakCtl: 70, peakCtlDate: "2026-04-20", targetPeakCtl: null, daysFromPeakToRace: 10, raceMorningCtl: 65 },
+            taperReadOut: { complianceScore: 0.9, summary: null },
+            keySessionExecutionRate: { totalKeySessions: 8, completedKeySessions: 8, rate: 1, keySessionsList: [] },
+            verdict: { headline: "x", body: "y", actionableAdjustment: "z" },
+            source: "fallback",
+            generatedAt: "2026-04-15T20:00:00.000Z"
+          }
+        }
+      }),
+      priorRaces: [],
+      nextRace: null
+    };
+    const prompts = generateRaceSeededPrompts(input);
+    expect(prompts.find((p) => p.reason === "periodisation_check")).toBeUndefined();
   });
 });

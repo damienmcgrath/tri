@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadRaceBundleSummary, type RaceBundleSummary } from "@/lib/race/bundle-helpers";
+import { loadPriorRaceCandidates } from "@/lib/race-review/comparison";
 import { RaceSegmentList } from "../../sessions/[sessionId]/components/race-segment-list";
 import { RaceVerdictCard, type VerdictPayload } from "./components/race-verdict-card";
 import { RaceStoryCard, type RaceStoryPayload } from "./components/race-story-card";
@@ -9,9 +10,13 @@ import { UnifiedPacingArc } from "./components/unified-pacing-arc";
 import { SegmentDiagnosticCard, type SegmentDiagnosticPayload } from "./components/segment-diagnostic-card";
 import { TransitionsAnalysisCard, type TransitionsAnalysisPayload } from "./components/transitions-analysis-card";
 import { LessonsCard } from "./components/lessons-card";
+import { TrainingToRaceLinksCard } from "./components/training-to-race-links-card";
+import { PreRaceRetrospectiveCard } from "./components/pre-race-retrospective-card";
 import { RegenerateRaceReviewButton } from "../../sessions/[sessionId]/components/regenerate-race-review-button";
 import { AskCoachButton } from "./components/ask-coach-button";
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
+import { trainingToRaceLinksSchema } from "@/lib/race-review/training-links-schemas";
+import { preRaceRetrospectiveSchema } from "@/lib/race-review/retrospective-schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +113,20 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
 
   const { bundle, raceProfile, segments, review } = summary;
 
+  // Phase 3 — load prior-race candidates so we know whether to show the Compare button.
+  const priorCandidates = await loadPriorRaceCandidates(supabase, user!.id, bundleId).catch(() => []);
+
+  // Phase 3 — extract the persisted artifacts from the review row, validating shape.
+  const trainingLinksRaw = review?.training_to_race_links ?? null;
+  const trainingLinksParsed = trainingLinksRaw
+    ? trainingToRaceLinksSchema.safeParse(trainingLinksRaw)
+    : null;
+  const trainingLinks = trainingLinksParsed && trainingLinksParsed.success ? trainingLinksParsed.data : null;
+
+  const retroRaw = review?.pre_race_retrospective ?? null;
+  const retroParsed = retroRaw ? preRaceRetrospectiveSchema.safeParse(retroRaw) : null;
+  const retro = retroParsed && retroParsed.success ? retroParsed.data : null;
+
   const heroDate = bundle.started_at.slice(0, 10);
   const title = raceProfile?.name ?? `Race on ${formatRaceDate(heroDate)}`;
   const finishSec = bundle.total_duration_sec;
@@ -178,12 +197,47 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
 
       <RaceReviewLayered review={review} bundle={bundle} bundleId={bundleId} />
 
+      {trainingLinks ? (
+        <section id="training-to-race" className="scroll-mt-20">
+          <TrainingToRaceLinksCard links={trainingLinks} />
+        </section>
+      ) : null}
+
+      {retro ? (
+        <section id="pre-race-retrospective" className="scroll-mt-20">
+          <PreRaceRetrospectiveCard retro={retro} />
+        </section>
+      ) : null}
+
+      {priorCandidates.length > 0 ? (
+        <CompareCallout bundleId={bundleId} priorCount={priorCandidates.length} />
+      ) : null}
+
       {summary.lessons ? (
         <section id="lessons" className="scroll-mt-20">
           <LessonsCard lessons={summary.lessons} />
         </section>
       ) : null}
     </div>
+  );
+}
+
+function CompareCallout({ bundleId, priorCount }: { bundleId: string; priorCount: number }) {
+  return (
+    <article className="surface flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Compare to prior race</p>
+        <p className="text-sm text-muted">
+          {priorCount} prior race{priorCount === 1 ? "" : "s"} at this distance available.
+        </p>
+      </div>
+      <Link
+        href={`/races/${bundleId}/compare`}
+        className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
+      >
+        Open comparison →
+      </Link>
+    </article>
   );
 }
 

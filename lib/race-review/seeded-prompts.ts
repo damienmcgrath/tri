@@ -48,6 +48,10 @@ export type SeededPrompt = {
     | "fatigued_at_start"
     | "cross_discipline_insight"
     | "prior_race_compare"
+    | "progression_compare"
+    | "training_origin"
+    | "warning_signs_missed"
+    | "periodisation_check"
     | "next_race_implication"
     | "subjective_issue"
     | "fallback_overall"
@@ -158,6 +162,60 @@ export function generateRaceSeededPrompts(input: SeededPromptsInput): SeededProm
       priority: 65,
       reason: "prior_race_compare"
     });
+    // Phase 3.1 — explicit progression frame, distinct from a single-race compare.
+    if (matchingPrior.distanceType === thisDistance) {
+      prompts.push({
+        prompt: `How have I progressed since ${formatRaceShortLabel(matchingPrior)}?`,
+        priority: 64,
+        reason: "progression_compare"
+      });
+    }
+  }
+
+  // Phase 3.2 — training origin rule. Always relevant once training-to-race
+  // links are present.
+  const trainingLinks = (review as Record<string, unknown> | null)?.training_to_race_links;
+  if (trainingLinks && typeof trainingLinks === "object") {
+    const tl = trainingLinks as Record<string, unknown>;
+    const perLeg = tl.perLeg as Record<string, unknown[]> | undefined;
+    const matchedAny = perLeg
+      ? ["swim", "bike", "run"].some((k) => Array.isArray(perLeg[k]) && (perLeg[k] as unknown[]).length > 0)
+      : false;
+    if (matchedAny) {
+      prompts.push({
+        prompt: "Which training sessions produced this race?",
+        priority: 62,
+        reason: "training_origin"
+      });
+    }
+    const warnings = tl.warningsMissed;
+    if (Array.isArray(warnings) && warnings.length > 0) {
+      prompts.push({
+        prompt: "Which sessions warned about how the race would go?",
+        priority: 67,
+        reason: "warning_signs_missed"
+      });
+    }
+  }
+
+  // Phase 3.3 — periodisation-check rule. Fires when the build's CTL
+  // peaked early (>14 days before race) or key-session execution dipped.
+  const retro = (review as Record<string, unknown> | null)?.pre_race_retrospective;
+  if (retro && typeof retro === "object") {
+    const r = retro as Record<string, unknown>;
+    const trajectory = r.ctlTrajectory as Record<string, unknown> | undefined;
+    const exec = r.keySessionExecutionRate as Record<string, unknown> | undefined;
+    const daysFromPeak = typeof trajectory?.daysFromPeakToRace === "number" ? trajectory.daysFromPeakToRace : null;
+    const execRate = typeof exec?.rate === "number" ? exec.rate : null;
+    const totalKey = typeof exec?.totalKeySessions === "number" ? exec.totalKeySessions : 0;
+    const fired = (daysFromPeak != null && daysFromPeak > 14) || (totalKey > 0 && execRate != null && execRate < 0.7);
+    if (fired) {
+      prompts.push({
+        prompt: "Did my training peak in time for this race?",
+        priority: 68,
+        reason: "periodisation_check"
+      });
+    }
   }
 
   // Rule 5 — next race within horizon

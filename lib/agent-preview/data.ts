@@ -2442,7 +2442,139 @@ export function createPreviewDatabase(): PreviewDatabase {
           inferredGaps: true,
           thresholdHrBpm: 168
         },
-        tone_violations: []
+        tone_violations: [],
+        // Phase 3.2 — Training-to-Race Linking artifact. Two matched bike
+        // sessions plus a missed-warning brick for the run. Lets the
+        // TrainingToRaceLinksCard render against seeded data.
+        training_to_race_links: {
+          windowWeeks: 8,
+          perLeg: {
+            swim: [
+              {
+                sessionId: "77777777-7777-4777-8777-777777777771",
+                date: "2026-04-12",
+                sessionName: "1500m race-pace pool set",
+                durationSec: 1500,
+                matchedAxis: "pace",
+                matchScore: 0.82,
+                metricsV2: { avgPower: null, normalizedPower: null, avgPace: 100, avgHr: 158 },
+                narrative:
+                  "Race swim pace of 1:39/100m matched “1500m race-pace pool set” (1:40/100m, 2026-04-12)."
+              }
+            ],
+            bike: [
+              {
+                sessionId: "77777777-7777-4777-8777-777777777772",
+                date: "2026-04-05",
+                sessionName: "Vrhnika 2hr brick",
+                durationSec: 7200,
+                matchedAxis: "np",
+                matchScore: 0.91,
+                metricsV2: { avgPower: 218, normalizedPower: 224, avgPace: null, avgHr: 152 },
+                narrative:
+                  "Race bike NP of 224W matched “Vrhnika 2hr brick” (224W NP, 2026-04-05)."
+              },
+              {
+                sessionId: "77777777-7777-4777-8777-777777777773",
+                date: "2026-03-29",
+                sessionName: "FTP intervals 4×8min",
+                durationSec: 4200,
+                matchedAxis: "hr_at_power",
+                matchScore: 0.74,
+                metricsV2: { avgPower: 230, normalizedPower: 232, avgPace: null, avgHr: 158 },
+                narrative:
+                  "Bike HR ran at 154bpm on race day; “FTP intervals 4×8min” held 158bpm at comparable load (2026-03-29)."
+              }
+            ],
+            run: [
+              {
+                sessionId: "77777777-7777-4777-8777-777777777774",
+                date: "2026-04-09",
+                sessionName: "10K race-pace tempo",
+                durationSec: 2700,
+                matchedAxis: "pace",
+                matchScore: 0.86,
+                metricsV2: { avgPower: null, normalizedPower: null, avgPace: 260, avgHr: 165 },
+                narrative:
+                  "Race run pace of 4:23/km tracked closely against “10K race-pace tempo” (4:20/km, 2026-04-09)."
+              }
+            ]
+          },
+          warningsMissed: [
+            {
+              sessionId: "77777777-7777-4777-8777-777777777775",
+              date: "2026-04-16",
+              sessionName: "Brick run off-the-bike",
+              observation:
+                "Threshold target slipped — pace 8% under target through the back half. Same shape as the race-day fade."
+            }
+          ],
+          aiNarrative:
+            "Build had it in you. Bike NP 224W matched your best 2-hour brick; the run pace was close to your tempo session. The April 16 brick warned that race-pace effort was hard to hold off the bike — that's a distribution problem to fix in the next block.",
+          source: "ai",
+          generatedAt: new Date().toISOString()
+        },
+        // Phase 3.3 — Pre-race Retrospective artifact. Peak CTL fell 12 days
+        // before the race, taper held, key sessions executed cleanly.
+        pre_race_retrospective: {
+          buildWindowDays: 56,
+          ctlTrajectory: {
+            sport: "total",
+            series: [
+              { date: "2026-03-05", ctl: 58, atl: 50, tsb: 8 },
+              { date: "2026-03-19", ctl: 65, atl: 60, tsb: 5 },
+              { date: "2026-04-02", ctl: 70, atl: 62, tsb: 8 },
+              { date: "2026-04-15", ctl: 73, atl: 58, tsb: 15 },
+              { date: "2026-04-29", ctl: 70, atl: 35, tsb: 35 }
+            ],
+            peakCtl: 73,
+            peakCtlDate: "2026-04-15",
+            targetPeakCtl: null,
+            daysFromPeakToRace: 12,
+            raceMorningCtl: 70
+          },
+          taperReadOut: {
+            complianceScore: 0.92,
+            summary: "Reasonable taper, slight overshoot mid-week."
+          },
+          keySessionExecutionRate: {
+            totalKeySessions: 8,
+            completedKeySessions: 7,
+            rate: 0.88,
+            keySessionsList: [
+              {
+                sessionId: "77777777-7777-4777-8777-777777777772",
+                date: "2026-04-05",
+                name: "Vrhnika 2hr brick",
+                executed: true,
+                executionScore: 1
+              },
+              {
+                sessionId: "77777777-7777-4777-8777-777777777773",
+                date: "2026-03-29",
+                name: "FTP intervals 4×8min",
+                executed: true,
+                executionScore: 1
+              },
+              {
+                sessionId: "77777777-7777-4777-8777-777777777775",
+                date: "2026-04-16",
+                name: "Brick run off-the-bike",
+                executed: true,
+                executionScore: 0.5
+              }
+            ]
+          },
+          verdict: {
+            headline: "Build executed cleanly into a clean taper.",
+            body:
+              "Peak CTL 73 on 2026-04-15, 12 days before race. Taper compliance 92%. Key sessions: 7/8 (88%).",
+            actionableAdjustment:
+              "Hold the same periodisation shape for the next build cycle."
+          },
+          source: "ai",
+          generatedAt: new Date().toISOString()
+        }
       }
     ],
     // Phase 1D — pre-populated lessons row so the LessonsCard renders. The

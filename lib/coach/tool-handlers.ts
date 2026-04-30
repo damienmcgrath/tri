@@ -20,7 +20,10 @@ import {
   getRaceSegmentMetrics,
   getPriorRacesForComparison,
   getBestComparableTrainingForSegment,
-  getAthleteThresholds
+  getAthleteThresholds,
+  getTrainingToRaceLinks,
+  getPreRaceRetrospective,
+  compareToPriorRace
 } from "@/lib/coach/race-tool-handlers";
 import { RACE_SCOPED_TOOLS } from "@/lib/coach/tools";
 import { runWhatIfScenario } from "@/lib/race-review/what-if-scenarios";
@@ -571,6 +574,20 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
         result = await runWhatIfScenario(deps.supabase, deps.ctx.userId, scenario);
         break;
       }
+      case "get_training_to_race_links":
+        coachToolSchemas.get_training_to_race_links.parse(args);
+        result = await getTrainingToRaceLinks({ supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! });
+        break;
+      case "get_pre_race_retrospective":
+        coachToolSchemas.get_pre_race_retrospective.parse(args);
+        result = await getPreRaceRetrospective({ supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! });
+        break;
+      case "compare_to_prior_race":
+        result = await compareToPriorRace(
+          coachToolSchemas.compare_to_prior_race.parse(args),
+          { supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! }
+        );
+        break;
       default:
         throw new Error(`Unsupported tool: ${String(name)}`);
     }
