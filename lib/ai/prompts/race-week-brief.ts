@@ -66,6 +66,39 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
     "- Do NOT undermine confidence. If their data supports it, say so directly.",
   ];
 
+  // Carry-forward lives at the top of the per-proximity rules so it
+  // outranks the brevity/structure prescriptions below. We inline the
+  // EXACT instruction text — the model cannot truncate or paraphrase
+  // across a section break it never sees. A post-AI override
+  // (enforceCarryForwardOnAiOutput) backs this up so non-compliant
+  // outputs are still corrected after the fact.
+  if (
+    raceCtx.carryForward &&
+    (raceCtx.proximity === "race_day" || raceCtx.proximity === "day_before")
+  ) {
+    lines.push(
+      "",
+      "MANDATORY CARRY-FORWARD — non-negotiable, overrides every other rule below:",
+      `- The athlete's prior race produced this portable lesson from ${raceCtx.carryForward.fromRaceName ?? `the race on ${raceCtx.carryForward.fromRaceDate}`}:`,
+      `    Headline: "${raceCtx.carryForward.headline}"`,
+      `    Instruction: "${raceCtx.carryForward.instruction}"`,
+      `    Success criterion: "${raceCtx.carryForward.successCriterion}"`,
+      "- `race_guidance` MUST contain the Instruction string verbatim. Do not paraphrase, summarise, or omit it. If you only have room for one sentence today, that sentence is the Instruction.",
+      "- `brief_text` MUST also include the Instruction (or its key number — e.g. the wattage or pace target — written naturally into the sentence) so the athlete sees it as part of the brief.",
+      "- Do NOT invent new pacing/equipment/strategy advice that contradicts the Instruction.",
+      "- The brevity rules in the proximity block below DO NOT exempt you from including the carry-forward."
+    );
+  } else if (raceCtx.carryForward && raceCtx.proximity !== "post_race") {
+    // Earlier in race week — surface for context but no mandatory repeat yet.
+    lines.push(
+      "",
+      "CARRY-FORWARD from prior race (context only this far out):",
+      "- See the 'Carry-forward from {{race}}' section in the input.",
+      "- Do NOT invent advice that contradicts it.",
+      "- The mandatory verbatim repeat kicks in on day_before / race_day."
+    );
+  }
+
   if (raceCtx.proximity === "day_before") {
     lines.push(
       "",
@@ -81,7 +114,7 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
       "",
       "This is RACE DAY. Be brief, warm, and focused.",
       "- No training advice. Just confidence and a pacing reminder.",
-      "- Keep the brief to 2-3 lines maximum.",
+      "- Keep the brief to 2-3 lines maximum (carry-forward included).",
       "- Remind them of their pacing plan if data is available."
     );
   }
@@ -96,17 +129,6 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
       "- Day 4-5: Light swimming is fine. No intensity.",
       "- Day 6-7: Easy sessions can resume. Rebuild gradually.",
       "- Celebrate the achievement. Be warm and encouraging."
-    );
-  }
-
-  if (raceCtx.carryForward && raceCtx.proximity !== "post_race") {
-    lines.push(
-      "",
-      "CARRY-FORWARD from prior race:",
-      "- The athlete's prior race produced one portable lesson: see the input section 'Carry-forward from {{race}}'.",
-      "- When proximity is race_day or day_before, repeat that exact instruction once in `race_guidance`.",
-      "- Do NOT invent new pacing/equipment/strategy advice that contradicts it.",
-      "- Treat the carry-forward as the single most important coaching cue for this race morning."
     );
   }
 
@@ -230,6 +252,62 @@ export function buildRaceWeekBriefFallback(
   };
 }
 
+/**
+ * Deterministic post-AI override that guarantees the carry-forward
+ * Instruction is present in `race_guidance` (and woven into `brief_text`)
+ * on race_day / day_before — regardless of what the model wrote.
+ *
+ * The model is instructed to repeat the Instruction verbatim, but model
+ * output is non-deterministic and brevity prescriptions for race_day
+ * historically beat the carry-forward rule. Rather than hope the prompt
+ * wins, we treat the Instruction as a hard contract and fix any output
+ * that fails to honor it.
+ *
+ * No-op when:
+ *   - There is no carry-forward in context.
+ *   - Proximity is anywhere other than race_day or day_before.
+ *   - The AI output already contains the Instruction (substring match).
+ */
+export function enforceCarryForwardOnAiOutput(
+  output: RaceWeekBriefOutput,
+  raceCtx: RaceWeekContext
+): RaceWeekBriefOutput {
+  const cf = raceCtx.carryForward;
+  if (!cf) return output;
+  if (raceCtx.proximity !== "race_day" && raceCtx.proximity !== "day_before") {
+    return output;
+  }
+
+  const instruction = cf.instruction.trim();
+  const guidance = (output.race_guidance ?? "").trim();
+  const briefText = (output.brief_text ?? "").trim();
+
+  // Substring match is intentionally lenient: if the model wrote the
+  // Instruction verbatim, even with surrounding sentences, the contract
+  // is satisfied. Otherwise we replace race_guidance and prepend to
+  // brief_text. The headline is included so the cue is read as guidance,
+  // not just an isolated number.
+  const carryForwardLine = `${cf.headline} — ${instruction}`;
+
+  const guidanceHasInstruction = guidance.includes(instruction);
+  const briefHasInstruction = briefText.includes(instruction);
+
+  if (guidanceHasInstruction && briefHasInstruction) return output;
+
+  const nextRaceGuidance = guidanceHasInstruction ? output.race_guidance : carryForwardLine;
+  const nextBriefText = briefHasInstruction
+    ? output.brief_text
+    : briefText.length > 0
+      ? `${carryForwardLine} ${briefText}`
+      : carryForwardLine;
+
+  return {
+    ...output,
+    race_guidance: nextRaceGuidance,
+    brief_text: nextBriefText
+  };
+}
+
 export async function generateRaceWeekBriefAI(
   raceCtx: RaceWeekContext,
   todaySession: TodaySessionInfo,
@@ -256,5 +334,5 @@ export async function generateRaceWeekBriefAI(
     },
   });
 
-  return result.value;
+  return enforceCarryForwardOnAiOutput(result.value, raceCtx);
 }

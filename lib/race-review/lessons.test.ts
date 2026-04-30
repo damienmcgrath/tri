@@ -5,7 +5,11 @@ import {
 } from "./lessons";
 import { raceLessonsSchema } from "./lessons-schemas";
 import { getCarryForwardForUpcomingRace, type RaceWeekContext } from "@/lib/training/race-week";
-import { buildRaceWeekBriefFallback } from "@/lib/ai/prompts/race-week-brief";
+import {
+  buildRaceWeekBriefFallback,
+  enforceCarryForwardOnAiOutput,
+  type RaceWeekBriefOutput
+} from "@/lib/ai/prompts/race-week-brief";
 
 // ─── Supabase mock for race_lessons + race_bundles tables ────────────────────
 
@@ -476,6 +480,114 @@ describe("buildRaceWeekBriefFallback", () => {
     );
     // The confidence statement is the better surface 10 days out.
     expect(out.race_guidance ?? "").not.toContain("155W");
+  });
+});
+
+describe("enforceCarryForwardOnAiOutput", () => {
+  function makeCtx(overrides: Partial<RaceWeekContext> = {}): RaceWeekContext {
+    return {
+      proximity: "race_day",
+      race: {
+        id: "race-1",
+        name: "Galway 70.3",
+        date: "2026-04-30",
+        type: "70.3",
+        priority: "A",
+        daysUntil: 0,
+        swimDistanceM: 1900,
+        bikeDistanceKm: 90,
+        runDistanceKm: 21.1,
+        bikeElevationM: null,
+        courseType: null,
+        expectedConditions: null
+      },
+      readiness: { tsb: 5, readinessState: "fresh", ctlTrend: "stable" },
+      recentExecution: { lastWeekScore: 80, keySessionsHit: 3, keySessionsTotal: 4, feelTrend: [4, 4, 5], averageFeel: 4.3 },
+      taperStatus: { inTaper: true, taperWeek: 2, volumeReductionPct: 50 },
+      carryForward: null,
+      ...overrides
+    };
+  }
+
+  const cf = {
+    headline: "Open the bike controlled",
+    instruction: "Open at 155W not 165W for the first 5 minutes; let HR rise after.",
+    successCriterion: "Halves move <2%",
+    fromRaceName: "Olympic Prior",
+    fromRaceDate: "2026-02-15"
+  };
+
+  function makeAiOutput(overrides: Partial<RaceWeekBriefOutput> = {}): RaceWeekBriefOutput {
+    return {
+      session_preview: null,
+      readiness_context: "TSB 5 — fresh",
+      week_context: "Galway 70.3 today",
+      pending_actions: [],
+      brief_text: "Race day. Trust the work you've done.",
+      race_guidance: "Trust your taper and stay calm.",
+      readiness_summary: "fresh — TSB 5",
+      ...overrides
+    };
+  }
+
+  it("replaces race_guidance and prepends brief_text when AI omitted the carry-forward on race_day", () => {
+    const ctx = makeCtx({ carryForward: cf, proximity: "race_day" });
+    const out = enforceCarryForwardOnAiOutput(makeAiOutput(), ctx);
+    expect(out.race_guidance).toContain("155W");
+    expect(out.race_guidance).toContain(cf.instruction);
+    expect(out.brief_text).toContain("155W");
+  });
+
+  it("also fires on day_before", () => {
+    const ctx = makeCtx({
+      carryForward: cf,
+      proximity: "day_before",
+      race: { ...makeCtx().race, daysUntil: 1 }
+    });
+    const out = enforceCarryForwardOnAiOutput(makeAiOutput(), ctx);
+    expect(out.race_guidance).toContain("155W");
+  });
+
+  it("leaves output untouched when the AI already included the instruction in both fields", () => {
+    const ctx = makeCtx({ carryForward: cf, proximity: "race_day" });
+    const compliant = makeAiOutput({
+      race_guidance: `Open the bike controlled — ${cf.instruction}`,
+      brief_text: `Race day. ${cf.instruction} You've done the work.`
+    });
+    const out = enforceCarryForwardOnAiOutput(compliant, ctx);
+    expect(out.race_guidance).toBe(compliant.race_guidance);
+    expect(out.brief_text).toBe(compliant.brief_text);
+  });
+
+  it("only fixes the missing field when the AI included the instruction in race_guidance but not brief_text", () => {
+    const ctx = makeCtx({ carryForward: cf, proximity: "race_day" });
+    const partial = makeAiOutput({
+      race_guidance: `Listen up: ${cf.instruction}`,
+      brief_text: "Race day. Trust the plan."
+    });
+    const out = enforceCarryForwardOnAiOutput(partial, ctx);
+    expect(out.race_guidance).toBe(partial.race_guidance);
+    expect(out.brief_text).toContain(cf.instruction);
+  });
+
+  it("is a no-op outside race_day / day_before", () => {
+    for (const proximity of ["race_week", "pre_race_week", "post_race", "normal"] as const) {
+      const ctx = makeCtx({
+        carryForward: cf,
+        proximity,
+        race: { ...makeCtx().race, daysUntil: proximity === "post_race" ? -1 : 5 }
+      });
+      const out = enforceCarryForwardOnAiOutput(makeAiOutput(), ctx);
+      expect(out.race_guidance).not.toContain("155W");
+      expect(out.brief_text).not.toContain("155W");
+    }
+  });
+
+  it("is a no-op when there is no carry-forward in context", () => {
+    const ctx = makeCtx({ carryForward: null });
+    const aiOut = makeAiOutput();
+    const out = enforceCarryForwardOnAiOutput(aiOut, ctx);
+    expect(out).toEqual(aiOut);
   });
 });
 
