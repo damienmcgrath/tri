@@ -204,6 +204,14 @@ function buildLapSummaries(laps: StravaLap[] | undefined, sport: string): Record
       }
     } else {
       base.avgCadence = roundOrNull(lap.average_cadence);
+      // Per-lap pace for run (sec/km) so halves-from-laps and lap-level
+      // pacing analyses can compute. Strava stops short of providing a
+      // pace field — derive it from elapsed_time / distance when both are
+      // present and non-zero. Bike doesn't get a pace field; bike halves
+      // come from avgPower (already on `base` above).
+      if (sport === "run" && lap.distance > 0 && lap.elapsed_time > 0) {
+        base.avgPaceSecPerKm = Math.round(lap.elapsed_time / (lap.distance / 1000));
+      }
     }
 
     return base;

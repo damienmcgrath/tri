@@ -14,8 +14,16 @@
  * - faded     — second half drops ≥4% (power/pace) vs first half
  * - cooked    — fade ≥8% OR second-half HR drift while output drops
  *
- * `null` is used when we don't have enough data for the leg (no halves,
- * no target). The AI is told to omit per-discipline verdict for that leg.
+ * `null` is used when we don't have enough data for the leg (no halves AND
+ * no leg-average + target). The AI is told to omit per-discipline verdict
+ * for that leg.
+ *
+ * **Whole-leg fallback.** When halves data isn't available (e.g. a swim leg
+ * imported from Strava with a single lap), but we have the leg-average
+ * output AND a target, we still emit `on_plan` / `strong` / `under` from
+ * the average alone. We CANNOT emit `over` / `faded` / `cooked` without
+ * halves — those depend on intra-leg shape — so the fallback is
+ * intentionally limited to the three target-anchored labels.
  */
 
 import type { LegPacing } from "@/lib/race-review";
@@ -42,6 +50,17 @@ export type LegStatusInput = {
    * Positive = HR rose vs first half. Null when not computable.
    */
   hrDriftBpm?: number | null;
+  /**
+   * Whole-leg average output in the same unit as `targetOutput`. Used by
+   * the fallback path when halves aren't available. Null when the segment
+   * doesn't carry enough fields (e.g. distance unknown).
+   */
+  legAverageOutput?: number | null;
+  /**
+   * Unit for `legAverageOutput`. Required when `legAverageOutput` is
+   * provided so the higher-is-better direction is unambiguous.
+   */
+  legAverageUnit?: "watts" | "sec_per_km" | "sec_per_100m";
 };
 
 export type LegStatusResult = {
@@ -58,13 +77,25 @@ export type LegStatusResult = {
  * target and no fade signal).
  */
 export function classifyLegStatus(input: LegStatusInput): LegStatusResult | null {
-  const { pacing, targetOutput, hrDriftBpm } = input;
+  const { pacing, targetOutput, hrDriftBpm, legAverageOutput, legAverageUnit } = input;
 
-  // Without halves data we can't infer fade; fall back to target-only.
+  // Whole-leg fallback when halves data isn't available.
   if (!pacing || !pacing.halvesAvailable) {
-    if (targetOutput === null || targetOutput === undefined) return null;
-    // Without halves we don't have an actual either, so abort.
-    return null;
+    if (
+      targetOutput === null ||
+      targetOutput === undefined ||
+      targetOutput <= 0 ||
+      legAverageOutput === null ||
+      legAverageOutput === undefined ||
+      !legAverageUnit
+    ) {
+      return null;
+    }
+    return classifyFromLegAverage({
+      avg: legAverageOutput,
+      target: targetOutput,
+      unit: legAverageUnit
+    });
   }
 
   const { firstHalf, lastHalf, deltaPct, unit } = pacing;
@@ -135,6 +166,39 @@ export function classifyLegStatus(input: LegStatusInput): LegStatusResult | null
     ev.push(`Halves moved ${signed(deltaPct)}% across the leg.`);
   }
   return { label: "on_plan", evidence: ev };
+}
+
+/**
+ * Target-only fallback. Emits `strong` / `under` / `on_plan` from the leg
+ * average alone. Cannot emit `over` / `faded` / `cooked` (those need halves
+ * shape).
+ */
+function classifyFromLegAverage(args: {
+  avg: number;
+  target: number;
+  unit: "watts" | "sec_per_km" | "sec_per_100m";
+}): LegStatusResult {
+  const { avg, target, unit } = args;
+  const higherIsBetter = unit === "watts";
+  const sign = higherIsBetter ? 1 : -1;
+  const avgDeltaPct = sign * ((avg - target) / target) * 100;
+
+  if (avgDeltaPct >= 3) {
+    return {
+      label: "strong",
+      evidence: [`Average ${avgDeltaPct.toFixed(1)}% above target (halves not available — leg-average only).`]
+    };
+  }
+  if (avgDeltaPct <= -5) {
+    return {
+      label: "under",
+      evidence: [`Average ${Math.abs(avgDeltaPct).toFixed(1)}% under target (halves not available — leg-average only).`]
+    };
+  }
+  return {
+    label: "on_plan",
+    evidence: [`Average within ${Math.abs(avgDeltaPct).toFixed(1)}% of target (halves not available — leg-average only).`]
+  };
 }
 
 function signed(n: number): string {

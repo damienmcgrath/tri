@@ -367,6 +367,23 @@ describe("normalizeStravaActivity", () => {
       expect(laps[0]).not.toHaveProperty("avgPacePer100mSec");
     });
 
+    it("run laps derive avgPaceSecPerKm from elapsed_time / distance", () => {
+      const runWithLaps: StravaActivitySummary = {
+        ...baseActivity,
+        sport_type: "Run",
+        laps: [
+          { lap_index: 0, elapsed_time: 270, moving_time: 268, distance: 1000, average_cadence: 86 },
+          { lap_index: 1, elapsed_time: 285, moving_time: 282, distance: 1000, average_cadence: 84 },
+          { lap_index: 2, elapsed_time: 0, moving_time: 0, distance: 0 } // skipped: zero values
+        ]
+      };
+      const result = normalizeStravaActivity(runWithLaps, "user-abc");
+      const laps = result.metrics_v2.laps as Record<string, unknown>[];
+      expect(laps[0].avgPaceSecPerKm).toBe(270);
+      expect(laps[1].avgPaceSecPerKm).toBe(285);
+      expect(laps[2]).not.toHaveProperty("avgPaceSecPerKm");
+    });
+
     it("swim activity puts cadence into stroke section", () => {
       const swim: StravaActivitySummary = {
         ...baseActivity,
