@@ -20,8 +20,15 @@ type Props = {
   adaptationsBySession: Record<string, boolean>;
   completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
   onSelectSession?: (sessionId: string) => void;
+  onSessionContextMenu?: (sessionId: string, x: number, y: number) => void;
   onEmptyCellClick?: (weekId: string, date: string) => void;
   onEmptyCellContextMenu?: (weekId: string, date: string, x: number, y: number) => void;
+  /**
+   * Block id for every cell in this grid render. When provided, cells become
+   * @dnd-kit drop targets and pills become draggable. Cross-block drag is not
+   * supported in v1, so a single id is sufficient.
+   */
+  blockId?: string | null;
 };
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -51,8 +58,10 @@ export function BlockGrid({
   adaptationsBySession,
   completedByWeek,
   onSelectSession,
+  onSessionContextMenu,
   onEmptyCellClick,
-  onEmptyCellContextMenu
+  onEmptyCellContextMenu,
+  blockId
 }: Props) {
   const sortedWeeks = useMemo(
     () => [...weeks].sort((a, b) => a.week_index - b.week_index),
@@ -69,6 +78,23 @@ export function BlockGrid({
       const weekMap = map.get(weekId)!;
       if (!weekMap.has(date)) weekMap.set(date, []);
       weekMap.get(date)!.push(session);
+    }
+    // Order each day's stack by day_order so an optimistic move that bumps
+    // day_order to "append" actually appears at the bottom of the cell. Rows
+    // without a day_order (legacy / pre-migration) sort last.
+    for (const weekMap of map.values()) {
+      for (const list of weekMap.values()) {
+        list.sort((a, b) => {
+          const aOrder = (a as { day_order?: number | null }).day_order;
+          const bOrder = (b as { day_order?: number | null }).day_order;
+          const aHas = typeof aOrder === "number";
+          const bHas = typeof bOrder === "number";
+          if (aHas && bHas) return (aOrder as number) - (bOrder as number);
+          if (aHas) return -1;
+          if (bHas) return 1;
+          return 0;
+        });
+      }
     }
     return map;
   }, [sessions]);
@@ -145,6 +171,12 @@ export function BlockGrid({
                       isToday={isToday}
                       adaptationsBySession={adaptationsBySession}
                       onSelectSession={onSelectSession}
+                      onSessionContextMenu={onSessionContextMenu}
+                      droppable={
+                        blockId
+                          ? { weekId: week.id, date: dayIso, blockId }
+                          : undefined
+                      }
                       emptyAffordance={
                         onEmptyCellClick && onEmptyCellContextMenu
                           ? {

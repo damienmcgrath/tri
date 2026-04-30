@@ -2,14 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { DndContext, type DragEndEvent } from "@dnd-kit/core";
+import { toast } from "sonner";
 import { addDays } from "@/lib/date-utils";
 import { inferDefaultDiscipline } from "@/lib/training/discipline-defaults";
 import { BlockHeader } from "./components/block-header";
 import { BlockGrid } from "./components/block-grid";
 import { CellContextMenu, type CellContextMenuAction } from "./components/cell-context-menu";
+import {
+  SessionPillContextMenu,
+  buildWeekDays,
+  type SessionPillContextMenuAction
+} from "./components/session-pill-context-menu";
 import type { SessionPillSession } from "./components/session-pill";
 import { SessionDrawer, type AdaptationEntry, type DrawerCreateCell, type DrawerSession } from "./components/session-drawer";
-import { createSessionFromCellAction } from "./actions";
+import { useBlockGridDndSensors } from "./components/use-block-grid-dnd";
+import {
+  convertSessionToRestAction,
+  createSessionFromCellAction,
+  duplicateSessionAction,
+  deleteSessionAction,
+  rescheduleSessionAction,
+  updateSessionDetailsAction
+} from "./actions";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 
@@ -82,7 +97,14 @@ export function PlanGrid({
     x: number;
     y: number;
   } | null>(null);
+  const [pillContextMenu, setPillContextMenu] = useState<{
+    sessionId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [lastEditedDiscipline, setLastEditedDiscipline] = useState<string | null>(null);
+
+  const dndSensors = useBlockGridDndSensors();
 
   useEffect(() => {
     setLocalSessions(sessions);
@@ -309,6 +331,96 @@ export function PlanGrid({
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeCreateDrawer = useCallback(() => setCreateCell(null), []);
+  const closePillContextMenu = useCallback(() => setPillContextMenu(null), []);
+
+  const handleSessionContextMenu = useCallback(
+    (sessionId: string, x: number, y: number) => {
+      setContextMenu(null);
+      setPillContextMenu({ sessionId, x, y });
+    },
+    []
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || !plan) return;
+
+      const activeData = active.data.current as
+        | { sessionId: string; blockId: string; sourceWeekId: string; sourceDate: string }
+        | undefined;
+      const overData = over.data.current as
+        | { weekId: string; date: string; blockId: string }
+        | undefined;
+      if (!activeData || !overData) return;
+
+      // No-op when the pill is dropped on its own cell.
+      if (
+        activeData.sourceWeekId === overData.weekId &&
+        activeData.sourceDate === overData.date
+      ) {
+        return;
+      }
+
+      // Cross-block drag is not supported in v1 (per spec §5.1).
+      if (activeData.blockId !== overData.blockId) {
+        toast.error("Drag across blocks is not supported yet.");
+        return;
+      }
+
+      const sessionId = activeData.sessionId;
+      const previous = localSessions;
+      const source = previous.find((s) => s.id === sessionId);
+      if (!source) return;
+
+      // Optimistic update: append to the target day's stack.
+      const targetDayCount = previous.filter(
+        (s) =>
+          s.week_id === overData.weekId && s.date === overData.date && s.id !== sessionId
+      ).length;
+      const targetHasRest = previous.some(
+        (s) =>
+          s.week_id === overData.weekId &&
+          s.date === overData.date &&
+          (s.type ?? "").toLowerCase() === "rest"
+      );
+
+      setLocalSessions((prev) =>
+        prev
+          .filter(
+            (s) =>
+              !(
+                s.week_id === overData.weekId &&
+                s.date === overData.date &&
+                (s.type ?? "").toLowerCase() === "rest"
+              )
+          )
+          .map((s) =>
+            s.id === sessionId
+              ? {
+                  ...s,
+                  week_id: overData.weekId,
+                  date: overData.date,
+                  day_order: targetHasRest ? 0 : targetDayCount
+                }
+              : s
+          )
+      );
+
+      try {
+        await rescheduleSessionAction({
+          sessionId,
+          planId: plan.id,
+          targetWeekId: overData.weekId,
+          targetDate: overData.date
+        });
+      } catch (err) {
+        setLocalSessions(previous);
+        toast.error(err instanceof Error ? err.message : "Could not move session.");
+      }
+    },
+    [plan, localSessions]
+  );
 
   const handleContextMenuAction = useCallback(
     async (action: CellContextMenuAction) => {
@@ -357,6 +469,221 @@ export function PlanGrid({
     },
     [contextMenu, plan, handleEmptyCellClick, appendCreatedSession]
   );
+
+  const handlePillContextMenuAction = useCallback(
+    async (action: SessionPillContextMenuAction) => {
+      const target = pillContextMenu;
+      if (!target || !plan) return;
+      const session = localSessions.find((s) => s.id === target.sessionId);
+      setPillContextMenu(null);
+      if (!session) return;
+
+      if (action.type === "duplicate-next-day") {
+        const nextDate = addDays(session.date, 1);
+        const targetWeek =
+          weeks.find((w) => {
+            const end = addDays(w.week_start_date, 6);
+            return w.week_start_date <= nextDate && nextDate <= end;
+          }) ?? null;
+        if (!targetWeek) {
+          toast.error("Next day is outside this plan.");
+          return;
+        }
+        try {
+          const result = await duplicateSessionAction({
+            sessionId: session.id,
+            planId: plan.id,
+            targetWeekId: targetWeek.id,
+            targetDate: nextDate
+          });
+          const removed = new Set(result.removedRestIds);
+          setLocalSessions((prev) => {
+            const filtered = removed.size > 0 ? prev.filter((s) => !removed.has(s.id)) : prev;
+            return [
+              ...filtered,
+              {
+                id: result.created.id,
+                sport: result.created.sport,
+                type: result.created.type,
+                session_name: result.created.session_name,
+                intent_category: result.created.intent_category,
+                target: result.created.target,
+                notes: result.created.notes,
+                duration_minutes: result.created.duration_minutes,
+                session_role: result.created.session_role,
+                is_key: result.created.is_key,
+                status: "planned",
+                week_id: result.created.week_id,
+                date: result.created.date,
+                day_order: null,
+                plan_id: result.created.plan_id
+              }
+            ];
+          });
+          setLastEditedDiscipline(result.created.sport);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Could not duplicate session.");
+        }
+        return;
+      }
+
+      if (action.type === "move-to") {
+        const previous = localSessions;
+        if (action.date === session.date && action.weekId === session.week_id) return;
+        const targetDayCount = previous.filter(
+          (s) =>
+            s.week_id === action.weekId && s.date === action.date && s.id !== session.id
+        ).length;
+        const targetHasRest = previous.some(
+          (s) =>
+            s.week_id === action.weekId &&
+            s.date === action.date &&
+            (s.type ?? "").toLowerCase() === "rest"
+        );
+        setLocalSessions((prev) =>
+          prev
+            .filter(
+              (s) =>
+                !(
+                  s.week_id === action.weekId &&
+                  s.date === action.date &&
+                  (s.type ?? "").toLowerCase() === "rest"
+                )
+            )
+            .map((s) =>
+              s.id === session.id
+                ? {
+                    ...s,
+                    week_id: action.weekId,
+                    date: action.date,
+                    day_order: targetHasRest ? 0 : targetDayCount
+                  }
+                : s
+            )
+        );
+        try {
+          await rescheduleSessionAction({
+            sessionId: session.id,
+            planId: plan.id,
+            targetWeekId: action.weekId,
+            targetDate: action.date
+          });
+        } catch (err) {
+          setLocalSessions(previous);
+          toast.error(err instanceof Error ? err.message : "Could not move session.");
+        }
+        return;
+      }
+
+      if (action.type === "toggle-key") {
+        const nextIsKey = !(session.is_key ?? false);
+        const previous = localSessions;
+        setLocalSessions((prev) =>
+          prev.map((s) =>
+            s.id === session.id
+              ? {
+                  ...s,
+                  is_key: nextIsKey,
+                  session_role: nextIsKey ? "Key" : s.session_role === "Key" ? "Supporting" : s.session_role
+                }
+              : s
+          )
+        );
+        try {
+          await updateSessionDetailsAction({
+            sessionId: session.id,
+            planId: plan.id,
+            weekId: session.week_id,
+            sport: (session.sport ?? "other") as "swim" | "bike" | "run" | "strength" | "other",
+            sessionType: session.type,
+            sessionName: session.session_name ?? null,
+            intentCategory: session.intent_category ?? null,
+            durationMinutes: session.duration_minutes,
+            target: session.target ?? null,
+            notes: session.notes ?? null,
+            sessionRole: nextIsKey
+              ? "Key"
+              : session.session_role === "Key"
+                ? "Supporting"
+                : ((session.session_role ?? null) as "Key" | "Supporting" | "Recovery" | null)
+          });
+        } catch (err) {
+          setLocalSessions(previous);
+          toast.error(err instanceof Error ? err.message : "Could not update session.");
+        }
+        return;
+      }
+
+      if (action.type === "convert-to-rest") {
+        const previous = localSessions;
+        try {
+          const result = await convertSessionToRestAction({
+            sessionId: session.id,
+            planId: plan.id,
+            weekId: session.week_id,
+            date: session.date
+          });
+          setLocalSessions((prev) => {
+            let next = prev.filter((s) => s.id !== session.id);
+            if (result.restCreated) {
+              next = [
+                ...next,
+                {
+                  id: result.restCreated.id,
+                  sport: result.restCreated.sport,
+                  type: result.restCreated.type,
+                  session_name: result.restCreated.session_name,
+                  intent_category: result.restCreated.intent_category,
+                  target: result.restCreated.target,
+                  notes: result.restCreated.notes,
+                  duration_minutes: result.restCreated.duration_minutes,
+                  session_role: result.restCreated.session_role,
+                  is_key: result.restCreated.is_key,
+                  status: "planned",
+                  week_id: result.restCreated.week_id,
+                  date: result.restCreated.date,
+                  day_order: null,
+                  plan_id: result.restCreated.plan_id
+                }
+              ];
+            }
+            return next;
+          });
+        } catch (err) {
+          setLocalSessions(previous);
+          toast.error(err instanceof Error ? err.message : "Could not convert to rest.");
+        }
+        return;
+      }
+
+      if (action.type === "delete") {
+        if (!window.confirm("Delete this session? This cannot be undone.")) return;
+        const previous = localSessions;
+        setLocalSessions((prev) => prev.filter((s) => s.id !== session.id));
+        try {
+          const formData = new FormData();
+          formData.set("sessionId", session.id);
+          await deleteSessionAction(formData);
+        } catch (err) {
+          setLocalSessions(previous);
+          toast.error(err instanceof Error ? err.message : "Could not delete session.");
+        }
+      }
+    },
+    [pillContextMenu, plan, localSessions, weeks]
+  );
+
+  const pillContextMenuSession = useMemo(() => {
+    if (!pillContextMenu) return null;
+    return localSessions.find((s) => s.id === pillContextMenu.sessionId) ?? null;
+  }, [pillContextMenu, localSessions]);
+
+  const pillContextMenuWeekDays = useMemo(() => {
+    if (!pillContextMenu || !pillContextMenuSession) return [];
+    const week = weeks.find((w) => w.id === pillContextMenuSession.week_id);
+    if (!week) return [];
+    return buildWeekDays(week.week_start_date, week.id, pillContextMenuSession.date);
+  }, [pillContextMenu, pillContextMenuSession, weeks]);
 
   const drawerSession = useMemo<DrawerSession | null>(() => {
     if (!openSessionId) return null;
@@ -412,16 +739,20 @@ export function PlanGrid({
           onSelectBlock={handleSelectBlock}
         />
       ) : null}
-      <BlockGrid
-        weeks={weeksInBlock}
-        sessions={sessionsInBlock}
-        todayIso={todayIso}
-        adaptationsBySession={adaptationsBySession}
-        completedByWeek={completedByWeek}
-        onSelectSession={handleOpenSession}
-        onEmptyCellClick={handleEmptyCellClick}
-        onEmptyCellContextMenu={handleEmptyCellContextMenu}
-      />
+      <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+        <BlockGrid
+          weeks={weeksInBlock}
+          sessions={sessionsInBlock}
+          todayIso={todayIso}
+          adaptationsBySession={adaptationsBySession}
+          completedByWeek={completedByWeek}
+          onSelectSession={handleOpenSession}
+          onSessionContextMenu={handleSessionContextMenu}
+          onEmptyCellClick={handleEmptyCellClick}
+          onEmptyCellContextMenu={handleEmptyCellContextMenu}
+          blockId={activeBlock?.id ?? null}
+        />
+      </DndContext>
       <SessionDrawer
         session={drawerSession}
         adaptations={drawerAdaptations}
@@ -446,6 +777,16 @@ export function PlanGrid({
           y={contextMenu.y}
           onSelect={handleContextMenuAction}
           onClose={closeContextMenu}
+        />
+      ) : null}
+      {pillContextMenu && pillContextMenuSession ? (
+        <SessionPillContextMenu
+          x={pillContextMenu.x}
+          y={pillContextMenu.y}
+          isKey={pillContextMenuSession.is_key === true}
+          weekDays={pillContextMenuWeekDays}
+          onSelect={handlePillContextMenuAction}
+          onClose={closePillContextMenu}
         />
       ) : null}
     </div>

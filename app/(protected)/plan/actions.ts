@@ -933,6 +933,330 @@ export async function deleteSessionAction(formData: FormData) {
   revalidatePath("/calendar");
 }
 
+const rescheduleSessionSchema = z.object({
+  sessionId: uuidSchema,
+  planId: uuidSchema,
+  targetWeekId: uuidSchema,
+  targetDate: z.string().date()
+});
+
+export type RescheduleSessionInput = z.infer<typeof rescheduleSessionSchema>;
+
+export type RescheduleSessionResult = {
+  sessionId: string;
+  weekId: string;
+  date: string;
+  dayOrder: number;
+  removedRestIds: string[];
+};
+
+// "Rest" sentinel rows are emitted by createSessionFromCellAction with kind='rest'
+// (type='Rest', duration_minutes=0). Keep the detector keyed on `type` so it
+// stays consistent if we later switch sport away from "other".
+function isRestRow(row: { type?: string | null }) {
+  return (row.type ?? "").toLowerCase() === "rest";
+}
+
+/**
+ * Moves a session to a different (week, day). If the target day has a Rest
+ * sentinel row, that row is deleted first so the dragged session takes its
+ * place (per spec §5.1: "Drop on a Rest cell promotes the cell to a session
+ * day automatically"). day_order is computed server-side as the next slot
+ * after the (rest-cleared) target day's existing sessions.
+ */
+export async function rescheduleSessionAction(
+  input: RescheduleSessionInput
+): Promise<RescheduleSessionResult> {
+  const parsed = rescheduleSessionSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.targetWeekId, parsed.planId);
+
+  const { data: targetDay, error: targetDayError } = await supabase
+    .from("sessions")
+    .select("id, type")
+    .eq("week_id", parsed.targetWeekId)
+    .eq("date", parsed.targetDate);
+
+  if (targetDayError && !isMissingTableError(targetDayError, "public.sessions")) {
+    throw new Error(targetDayError.message);
+  }
+
+  const removedRestIds: string[] = [];
+  const survivingRows: Array<{ id: string }> = [];
+  for (const row of targetDay ?? []) {
+    if (row.id === parsed.sessionId) continue;
+    if (isRestRow(row)) {
+      removedRestIds.push(row.id as string);
+    } else {
+      survivingRows.push({ id: row.id as string });
+    }
+  }
+
+  if (removedRestIds.length > 0) {
+    const { error: deleteRestError } = await supabase
+      .from("sessions")
+      .delete()
+      .in("id", removedRestIds);
+    if (deleteRestError) {
+      throw new Error(deleteRestError.message);
+    }
+  }
+
+  const nextDayOrder = survivingRows.length;
+
+  const { error: updateError } = await supabase
+    .from("sessions")
+    .update({
+      date: parsed.targetDate,
+      week_id: parsed.targetWeekId,
+      day_order: nextDayOrder
+    })
+    .eq("id", parsed.sessionId)
+    .eq("plan_id", parsed.planId);
+
+  if (updateError && isMissingColumnError(updateError, "day_order")) {
+    const { error: retryError } = await supabase
+      .from("sessions")
+      .update({ date: parsed.targetDate, week_id: parsed.targetWeekId })
+      .eq("id", parsed.sessionId)
+      .eq("plan_id", parsed.planId);
+    if (retryError) {
+      throw new Error(retryError.message);
+    }
+  } else if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidatePath("/plan");
+  revalidatePath("/calendar");
+
+  return {
+    sessionId: parsed.sessionId,
+    weekId: parsed.targetWeekId,
+    date: parsed.targetDate,
+    dayOrder: nextDayOrder,
+    removedRestIds
+  };
+}
+
+const duplicateSessionSchema = z.object({
+  sessionId: uuidSchema,
+  planId: uuidSchema,
+  targetWeekId: uuidSchema,
+  targetDate: z.string().date()
+});
+
+export type DuplicateSessionInput = z.infer<typeof duplicateSessionSchema>;
+
+export type DuplicateSessionResult = {
+  created: CreatedSessionRow;
+  removedRestIds: string[];
+};
+
+/**
+ * Duplicates an existing session to a (week, day). If a Rest sentinel
+ * occupies the target day it is deleted before insert (matching the drop-on-
+ * Rest semantics in rescheduleSessionAction). Returns the new row plus any
+ * removed Rest ids so the caller can reconcile local state.
+ */
+export async function duplicateSessionAction(
+  input: DuplicateSessionInput
+): Promise<DuplicateSessionResult> {
+  const parsed = duplicateSessionSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.targetWeekId, parsed.planId);
+
+  const { data: source, error: sourceError } = await supabase
+    .from("sessions")
+    .select(
+      "id, plan_id, user_id, sport, type, session_name, intent_category, target, notes, duration_minutes, status, is_key, session_role"
+    )
+    .eq("id", parsed.sessionId)
+    .maybeSingle();
+
+  if (sourceError) {
+    throw new Error(sourceError.message);
+  }
+  if (!source || source.user_id !== user.id || source.plan_id !== parsed.planId) {
+    throw new Error("Session not found or not owned by current user.");
+  }
+
+  const { data: daySessions, error: daySessionsError } = await supabase
+    .from("sessions")
+    .select("id, type")
+    .eq("week_id", parsed.targetWeekId)
+    .eq("date", parsed.targetDate);
+
+  if (daySessionsError && !isMissingTableError(daySessionsError, "public.sessions")) {
+    throw new Error(daySessionsError.message);
+  }
+
+  const removedRestIds: string[] = [];
+  let surviving = 0;
+  for (const row of (daySessions ?? []) as Array<{ id: string; type: string | null }>) {
+    if (isRestRow(row)) {
+      removedRestIds.push(row.id);
+    } else {
+      surviving += 1;
+    }
+  }
+
+  if (removedRestIds.length > 0) {
+    const { error: deleteRestError } = await supabase
+      .from("sessions")
+      .delete()
+      .in("id", removedRestIds);
+    if (deleteRestError) {
+      throw new Error(deleteRestError.message);
+    }
+  }
+
+  const canonicalPayload = {
+    user_id: user.id,
+    plan_id: parsed.planId,
+    week_id: parsed.targetWeekId,
+    date: parsed.targetDate,
+    sport: source.sport,
+    type: source.type,
+    session_name: source.session_name ?? null,
+    intent_category: source.intent_category ?? null,
+    target: source.target ?? null,
+    notes: source.notes ?? null,
+    duration_minutes: source.duration_minutes,
+    day_order: surviving,
+    status: "planned",
+    is_key: source.is_key ?? false,
+    session_role: source.session_role ?? null
+  };
+
+  let insertResult = await supabase
+    .from("sessions")
+    .insert(canonicalPayload)
+    .select("id")
+    .single();
+
+  if (insertResult.error && isMissingColumnError(insertResult.error)) {
+    const stripped: Record<string, unknown> = { ...canonicalPayload };
+    for (const col of SESSIONS_OPTIONAL_COLUMNS_SET) delete stripped[col];
+    insertResult = await supabase
+      .from("sessions")
+      .insert(stripped)
+      .select("id")
+      .single();
+  }
+
+  if (insertResult.error) {
+    throw new Error(insertResult.error.message);
+  }
+
+  const id = (insertResult.data as { id?: unknown } | null)?.id;
+  if (typeof id !== "string") {
+    throw new Error("Could not duplicate session: missing id from insert response.");
+  }
+
+  revalidatePath("/plan");
+  revalidatePath("/calendar");
+
+  return {
+    created: {
+      id,
+      plan_id: parsed.planId,
+      week_id: parsed.targetWeekId,
+      date: parsed.targetDate,
+      sport: source.sport as string,
+      type: source.type as string,
+      session_name: canonicalPayload.session_name,
+      intent_category: canonicalPayload.intent_category,
+      duration_minutes: canonicalPayload.duration_minutes as number,
+      target: canonicalPayload.target,
+      notes: canonicalPayload.notes,
+      session_role: canonicalPayload.session_role as string | null,
+      is_key: canonicalPayload.is_key as boolean | null
+    },
+    removedRestIds
+  };
+}
+
+const convertSessionToRestSchema = z.object({
+  sessionId: uuidSchema,
+  planId: uuidSchema,
+  weekId: uuidSchema,
+  date: z.string().date()
+});
+
+export type ConvertSessionToRestInput = z.infer<typeof convertSessionToRestSchema>;
+
+export type ConvertSessionToRestResult = {
+  deletedSessionId: string;
+  restCreated: CreatedSessionRow | null;
+};
+
+/**
+ * Replaces a session with a Rest sentinel for that day. Deletes the source
+ * session and, if no other non-rest sessions remain on that day, inserts a
+ * Rest row (matching the shape produced by createSessionFromCellAction with
+ * kind='rest').
+ */
+export async function convertSessionToRestAction(
+  input: ConvertSessionToRestInput
+): Promise<ConvertSessionToRestResult> {
+  const parsed = convertSessionToRestSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
+
+  const { error: deleteError } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("id", parsed.sessionId)
+    .eq("plan_id", parsed.planId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  const { data: remaining, error: remainingError } = await supabase
+    .from("sessions")
+    .select("id, type")
+    .eq("week_id", parsed.weekId)
+    .eq("date", parsed.date);
+
+  if (remainingError && !isMissingTableError(remainingError, "public.sessions")) {
+    throw new Error(remainingError.message);
+  }
+
+  const remainingRows = (remaining ?? []) as Array<{ id: string; type: string | null }>;
+  const hasOtherSessions = remainingRows.some((row) => !isRestRow(row));
+  const hasExistingRest = remainingRows.some((row) => isRestRow(row));
+
+  if (hasOtherSessions || hasExistingRest) {
+    revalidatePath("/plan");
+    revalidatePath("/calendar");
+    return { deletedSessionId: parsed.sessionId, restCreated: null };
+  }
+
+  const restCreated = await createSessionFromCellAction({
+    kind: "rest",
+    planId: parsed.planId,
+    weekId: parsed.weekId,
+    date: parsed.date,
+    sport: "other",
+    sessionName: null,
+    intentCategory: null,
+    durationMinutes: 0,
+    target: null,
+    notes: null,
+    sessionRole: "Recovery"
+  });
+
+  return { deletedSessionId: parsed.sessionId, restCreated };
+}
+
 
 async function assertBlockOwnership(
   supabase: Awaited<ReturnType<typeof createClient>>,

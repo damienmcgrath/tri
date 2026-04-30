@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
 import { isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { signOutAction } from "./actions";
@@ -88,6 +89,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         </div>
 
         <MobileBottomTabs />
+        <Toaster theme="dark" position="bottom-right" richColors closeButton />
       </div>
     </CoachPanelWrapper>
   );
