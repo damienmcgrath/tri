@@ -31,6 +31,7 @@ const PREVIEW_RACE_SESSION_ID = "77777777-7777-4777-8777-777777777795";
 const PREVIEW_RACE_BUNDLE_ID = "99999999-9999-4999-8999-999999999991";
 const PREVIEW_RACE_PROFILE_ID = "99999999-9999-4999-8999-999999999992";
 const PREVIEW_RACE_REVIEW_ID = "99999999-9999-4999-8999-999999999993";
+const PREVIEW_RACE_LESSONS_ID = "99999999-9999-4999-8999-999999999994";
 const PREVIEW_RACE_ACT_SWIM_ID = "99999999-9999-4999-8999-99999999999a";
 const PREVIEW_RACE_ACT_T1_ID = "99999999-9999-4999-8999-99999999999b";
 const PREVIEW_RACE_ACT_BIKE_ID = "99999999-9999-4999-8999-99999999999c";
@@ -118,7 +119,8 @@ type PreviewTableName =
   | "session_load"
   | "race_bundles"
   | "race_profiles"
-  | "race_reviews";
+  | "race_reviews"
+  | "race_lessons";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -2390,6 +2392,56 @@ export function createPreviewDatabase(): PreviewDatabase {
         },
         tone_violations: []
       }
+    ],
+    // Phase 1D — pre-populated lessons row so the LessonsCard renders. The
+    // shape mirrors what generateRaceLessons writes; confidence is "low"
+    // because this is the only seeded race in preview.
+    race_lessons: [
+      {
+        id: PREVIEW_RACE_LESSONS_ID,
+        user_id: PREVIEW_USER_ID,
+        race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+        race_review_id: PREVIEW_RACE_REVIEW_ID,
+        athlete_profile_takeaways: [
+          {
+            headline: "You execute Olympic distance with controlled bike pacing",
+            body:
+              "Bike held 220→216W (−1.8%) across halves at NP 224W (IF 0.91), and the run still faded only 4.7%. The pattern suggests you can hold race-pace bike efforts without cooking the run — at least at this distance.",
+            confidence: "low",
+            referencesCount: 0
+          }
+        ],
+        training_implications: [
+          {
+            headline: "Repeat the bike-pacing template at the next race",
+            change:
+              "Hold 220–225W NP for the bike at the next Olympic-distance race; cap effort at IF 0.92 across halves.",
+            priority: "high",
+            rationale: "Bike was the strongest leg of this race; repeating the template should hold."
+          },
+          {
+            headline: "Add 1 long run with race-pace finish per week",
+            change:
+              "Run 60–75 minutes at endurance, finishing the last 15 minutes at 4:15/km — twice a week for 3 weeks.",
+            priority: "medium",
+            rationale: "Run faded 4.7% in the second half (4:17 → 4:29 /km); race-pace finishes target the fade."
+          }
+        ],
+        carry_forward: {
+          headline: "Open the bike at NP 220W, not 230W",
+          instruction:
+            "Hold first 5km of the bike at NP 220W. Only let power rise after HR settles below 158.",
+          successCriterion: "Bike halves move <2% (target NP within 220–225W).",
+          expiresAfterRaceId: PREVIEW_RACE_BUNDLE_ID
+        },
+        references_race_ids: [],
+        superseded_by_race_id: null,
+        model_used: "gpt-5-mini",
+        is_provisional: false,
+        generated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     ]
   };
 }
@@ -2397,7 +2449,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 10;
+const PREVIEW_DATABASE_VERSION = 11;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;
