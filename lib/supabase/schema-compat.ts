@@ -36,7 +36,7 @@ export function isMissingColumnError(
 }
 
 /** Column names that may not exist on the `sessions` table before certain migrations. */
-export const SESSIONS_OPTIONAL_COLUMNS = ["day_order", "target", "is_key", "session_role"] as const;
+export const SESSIONS_OPTIONAL_COLUMNS = ["day_order", "target", "is_key", "session_role", "intent_category", "session_name"] as const;
 
 /** Column names that may not exist on the `completed_activities` table before certain migrations. */
 export const COMPLETED_ACTIVITIES_OPTIONAL_COLUMNS = ["is_unplanned", "schedule_status"] as const;

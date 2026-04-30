@@ -19,6 +19,7 @@ type Props = {
   todayIso: string;
   adaptationsBySession: Record<string, boolean>;
   completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
+  onSelectSession?: (sessionId: string) => void;
 };
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -41,7 +42,7 @@ function isCurrentWeek(weekStart: string, todayIso: string) {
   return weekStart <= todayIso && todayIso <= end;
 }
 
-export function BlockGrid({ weeks, sessions, todayIso, adaptationsBySession, completedByWeek }: Props) {
+export function BlockGrid({ weeks, sessions, todayIso, adaptationsBySession, completedByWeek, onSelectSession }: Props) {
   const sortedWeeks = useMemo(
     () => [...weeks].sort((a, b) => a.week_index - b.week_index),
     [weeks]
@@ -132,6 +133,7 @@ export function BlockGrid({ weeks, sessions, todayIso, adaptationsBySession, com
                       sessions={cellSessions}
                       isToday={isToday}
                       adaptationsBySession={adaptationsBySession}
+                      onSelectSession={onSelectSession}
                     />
                   </div>
                 );

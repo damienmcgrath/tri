@@ -6,9 +6,10 @@ type Props = {
   sessions: SessionPillSession[];
   isToday?: boolean;
   adaptationsBySession?: Record<string, boolean>;
+  onSelectSession?: (sessionId: string) => void;
 };
 
-export function BlockGridCell({ sessions, isToday, adaptationsBySession }: Props) {
+export function BlockGridCell({ sessions, isToday, adaptationsBySession, onSelectSession }: Props) {
   return (
     <div
       className={`relative flex min-h-[52px] flex-col gap-1 border-l border-[rgba(255,255,255,0.04)] px-1.5 py-1 ${
@@ -26,6 +27,7 @@ export function BlockGridCell({ sessions, isToday, adaptationsBySession }: Props
           key={session.id}
           session={session}
           hasAdaptation={adaptationsBySession?.[session.id] === true}
+          onSelect={onSelectSession}
         />
       ))}
     </div>

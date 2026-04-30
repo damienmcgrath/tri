@@ -78,7 +78,7 @@ function isMissingTableError(error: { code?: string; message?: string } | null, 
   return (error.message ?? "").toLowerCase().includes(`could not find the table '${tableName.toLowerCase()}' in the schema cache`);
 }
 
-export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string; block?: string } }) {
+export default async function PlanPage({ searchParams }: { searchParams?: { plan?: string; week?: string; block?: string; session?: string } }) {
   const supabase = await createClient();
   const {
     data: { user }
@@ -223,20 +223,30 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   const selectedBlock = explicitBlock ?? currentBlock ?? blocksData[0] ?? null;
 
   const adaptationsBySession: Record<string, boolean> = {};
+  const adaptationEntriesBySession: Record<string, Array<{ id: string; trigger_type: string; rationale_text: string; created_at: string }>> = {};
   if (selectedPlan) {
     const { data: rationaleRows, error: rationaleError } = await supabase
       .from("adaptation_rationales")
-      .select("affected_sessions,status")
+      .select("id,trigger_type,rationale_text,created_at,affected_sessions,status")
       .eq("user_id", user.id)
-      .neq("status", "overridden");
+      .neq("status", "overridden")
+      .order("created_at", { ascending: false });
 
     if (rationaleError && !isMissingTableError(rationaleError, "public.adaptation_rationales")) {
       throw new Error(rationaleError.message);
     }
 
-    for (const row of (rationaleRows ?? []) as Array<{ affected_sessions: string[] | null }>) {
+    for (const row of (rationaleRows ?? []) as Array<{ id: string; trigger_type: string; rationale_text: string; created_at: string; affected_sessions: string[] | null }>) {
       for (const sessionId of row.affected_sessions ?? []) {
-        if (sessionId) adaptationsBySession[sessionId] = true;
+        if (!sessionId) continue;
+        adaptationsBySession[sessionId] = true;
+        if (!adaptationEntriesBySession[sessionId]) adaptationEntriesBySession[sessionId] = [];
+        adaptationEntriesBySession[sessionId].push({
+          id: row.id,
+          trigger_type: row.trigger_type,
+          rationale_text: row.rationale_text,
+          created_at: row.created_at
+        });
       }
     }
   }
@@ -259,7 +269,8 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
     status: session.status,
     week_id: session.week_id,
     date: session.date,
-    day_order: session.day_order ?? null
+    day_order: session.day_order ?? null,
+    plan_id: session.plan_id
   }));
 
   const completedByWeek: Record<string, Array<{ duration_minutes: number }>> = {};
@@ -278,7 +289,9 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
         sessions={gridSessions}
         selectedBlockId={selectedBlock?.id ?? null}
         adaptationsBySession={adaptationsBySession}
+        adaptationEntriesBySession={adaptationEntriesBySession}
         completedByWeek={completedByWeek}
+        initialOpenSessionId={searchParams?.session ?? null}
       />
     </section>
   );

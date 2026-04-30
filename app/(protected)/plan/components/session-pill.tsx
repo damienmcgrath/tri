@@ -27,6 +27,7 @@ export type SessionPillSession = {
 type Props = {
   session: SessionPillSession;
   hasAdaptation?: boolean;
+  onSelect?: (sessionId: string) => void;
 };
 
 const DISCIPLINE_BAR: Record<string, string> = {
@@ -65,7 +66,7 @@ function truncate(text: string, max: number) {
   return `${text.slice(0, Math.max(1, max - 1))}…`;
 }
 
-export function SessionPill({ session, hasAdaptation }: Props) {
+export function SessionPill({ session, hasAdaptation, onSelect }: Props) {
   const sport = (session.sport ?? "other").toLowerCase();
   const disciplineColour = DISCIPLINE_BAR[sport] ?? DISCIPLINE_BAR.other;
   const disciplineLabel = getDisciplineMeta(sport).label;
@@ -101,6 +102,32 @@ export function SessionPill({ session, hasAdaptation }: Props) {
     session.is_key === true || (session.session_role ?? "").toString().toLowerCase() === "key";
   const isCompleted = session.status === "completed" || session.execution_result != null;
 
+  const ariaLabel = `${disciplineLabel} · ${fullName} · ${session.duration_minutes} minutes`;
+
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        title={`${disciplineLabel} · ${fullName} · ${session.duration_minutes} min`}
+        aria-label={`Open ${ariaLabel}`}
+        onClick={() => onSelect(session.id)}
+        className="relative flex w-full items-stretch gap-1.5 overflow-hidden rounded-sm bg-[rgba(255,255,255,0.03)] pr-1.5 text-left hover:bg-[rgba(255,255,255,0.06)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgba(190,255,0,0.7)]"
+        style={{ minHeight: "22px" }}
+      >
+        <span aria-hidden className="w-[3px] shrink-0" style={{ backgroundColor: disciplineColour }} />
+        <PillBody
+          fullName={fullName}
+          displayName={displayName}
+          duration={session.duration_minutes}
+          isKey={isKey}
+          hasAdaptation={hasAdaptation}
+          isCompleted={isCompleted}
+          underlineColour={underlineColour}
+        />
+      </button>
+    );
+  }
+
   return (
     <div
       title={`${disciplineLabel} · ${fullName} · ${session.duration_minutes} min`}
@@ -108,12 +135,43 @@ export function SessionPill({ session, hasAdaptation }: Props) {
       style={{ minHeight: "22px" }}
     >
       <span aria-hidden className="w-[3px] shrink-0" style={{ backgroundColor: disciplineColour }} />
+      <PillBody
+        fullName={fullName}
+        displayName={displayName}
+        duration={session.duration_minutes}
+        isKey={isKey}
+        hasAdaptation={hasAdaptation}
+        isCompleted={isCompleted}
+        underlineColour={underlineColour}
+      />
+    </div>
+  );
+}
+
+function PillBody({
+  displayName,
+  duration,
+  isKey,
+  hasAdaptation,
+  isCompleted,
+  underlineColour
+}: {
+  fullName: string;
+  displayName: string;
+  duration: number;
+  isKey: boolean;
+  hasAdaptation: boolean | undefined;
+  isCompleted: boolean;
+  underlineColour: string;
+}) {
+  return (
+    <>
       <div className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5">
         <span className="min-w-0 flex-1 truncate text-[11px] text-[rgba(255,255,255,0.78)]">
           {displayName}
         </span>
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-[rgba(255,255,255,0.55)]">
-          {session.duration_minutes}
+          {duration}
         </span>
       </div>
       {isKey ? (
@@ -145,6 +203,6 @@ export function SessionPill({ session, hasAdaptation }: Props) {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px]"
         style={{ backgroundColor: underlineColour }}
       />
-    </div>
+    </>
   );
 }
