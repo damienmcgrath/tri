@@ -99,6 +99,17 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
     );
   }
 
+  if (raceCtx.carryForward && raceCtx.proximity !== "post_race") {
+    lines.push(
+      "",
+      "CARRY-FORWARD from prior race:",
+      "- The athlete's prior race produced one portable lesson: see the input section 'Carry-forward from {{race}}'.",
+      "- When proximity is race_day or day_before, repeat that exact instruction once in `race_guidance`.",
+      "- Do NOT invent new pacing/equipment/strategy advice that contradicts it.",
+      "- Treat the carry-forward as the single most important coaching cue for this race morning."
+    );
+  }
+
   return lines.join("\n");
 }
 
@@ -145,6 +156,14 @@ function buildRaceWeekInput(
     if (raceCtx.taperStatus.volumeReductionPct) {
       lines.push(`Volume reduced: ~${raceCtx.taperStatus.volumeReductionPct}%`);
     }
+  }
+
+  if (raceCtx.carryForward) {
+    lines.push("");
+    lines.push(`## Carry-forward from ${raceCtx.carryForward.fromRaceName ?? `prior race on ${raceCtx.carryForward.fromRaceDate}`}`);
+    lines.push(`Headline: ${raceCtx.carryForward.headline}`);
+    lines.push(`Instruction: ${raceCtx.carryForward.instruction}`);
+    lines.push(`Success criterion: ${raceCtx.carryForward.successCriterion}`);
   }
 
   if (todaySession) {

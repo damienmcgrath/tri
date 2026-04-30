@@ -59,6 +59,7 @@ import {
   type TransitionsAnalysis
 } from "@/lib/race-review/segment-diagnostics-schemas";
 import type { ComparableCandidate } from "@/lib/race-review/best-comparable";
+import { generateRaceLessons } from "@/lib/race-review/lessons";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1485,6 +1486,16 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
     console.error("[race-review] upsert failed", { bundleId, error: upsertError?.message });
     return { status: "skipped", reason: `upsert_failed:${upsertError?.message ?? "unknown"}` };
   }
+
+  // Phase 1D — fire Lessons generation. Tail-call so the review row is
+  // visible to the loader before lessons read it; failures don't roll back
+  // the review.
+  await generateRaceLessons({ supabase, userId, bundleId }).catch((err) => {
+    console.warn("[race-review] lessons generation failed (review still saved)", {
+      bundleId,
+      error: err instanceof Error ? err.message : String(err)
+    });
+  });
 
   return {
     status: "ok",

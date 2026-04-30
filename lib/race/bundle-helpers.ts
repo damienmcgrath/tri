@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RaceSegmentSummary } from "@/app/(protected)/sessions/[sessionId]/components/race-segment-list";
+import type {
+  AthleteProfileTakeaway,
+  TrainingImplication,
+  CarryForward
+} from "@/lib/race-review/lessons-schemas";
 
 export type RaceProfileSnapshotInput = {
   id: string;
@@ -123,6 +128,16 @@ export type RaceBundleSummary = {
     transitions_analysis: unknown;
     model_used: string | null;
   } | null;
+  lessons: {
+    athleteProfileTakeaways: AthleteProfileTakeaway[];
+    trainingImplications: TrainingImplication[];
+    carryForward: CarryForward | null;
+    referencesRaceIds: string[];
+    supersededByRaceId: string | null;
+    isProvisional: boolean;
+    generatedAt: string | null;
+    modelUsed: string | null;
+  } | null;
 };
 
 const BUNDLE_COLUMNS =
@@ -206,6 +221,20 @@ export async function loadRaceBundleSummary(
     .eq("user_id", userId)
     .maybeSingle();
 
+  const { data: lessonsRow } = await supabase
+    .from("race_lessons")
+    .select(
+      "athlete_profile_takeaways,training_implications,carry_forward," +
+        "references_race_ids,superseded_by_race_id,is_provisional,model_used,generated_at"
+    )
+    .eq("race_bundle_id", bundleId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const lessons: RaceBundleSummary["lessons"] = lessonsRow
+    ? normalizeLessonsRow(lessonsRow as unknown as Record<string, unknown>)
+    : null;
+
   const reviewRecord = reviewRow ? (reviewRow as unknown as Record<string, unknown>) : null;
   const review: RaceBundleSummary["review"] = reviewRecord
     ? {
@@ -233,7 +262,93 @@ export async function loadRaceBundleSummary(
       }
     : null;
 
-  return { bundle, raceProfile, segments, review };
+  return { bundle, raceProfile, segments, review, lessons };
+}
+
+function normalizeLessonsRow(row: Record<string, unknown>): RaceBundleSummary["lessons"] {
+  const takeawaysRaw = Array.isArray(row.athlete_profile_takeaways)
+    ? (row.athlete_profile_takeaways as unknown[])
+    : [];
+  const implicationsRaw = Array.isArray(row.training_implications)
+    ? (row.training_implications as unknown[])
+    : [];
+
+  const athleteProfileTakeaways = takeawaysRaw
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const e = entry as Record<string, unknown>;
+      const headline = e.headline;
+      const body = e.body;
+      const confidence = e.confidence;
+      const referencesCount = e.referencesCount;
+      if (
+        typeof headline !== "string" ||
+        typeof body !== "string" ||
+        (confidence !== "low" && confidence !== "medium" && confidence !== "high") ||
+        typeof referencesCount !== "number"
+      ) {
+        return null;
+      }
+      return {
+        headline,
+        body,
+        confidence,
+        referencesCount
+      } as AthleteProfileTakeaway;
+    })
+    .filter((t): t is AthleteProfileTakeaway => t !== null);
+
+  const trainingImplications = implicationsRaw
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const e = entry as Record<string, unknown>;
+      const headline = e.headline;
+      const change = e.change;
+      const priority = e.priority;
+      const rationale = e.rationale;
+      if (
+        typeof headline !== "string" ||
+        typeof change !== "string" ||
+        (priority !== "high" && priority !== "medium" && priority !== "low") ||
+        typeof rationale !== "string"
+      ) {
+        return null;
+      }
+      return { headline, change, priority, rationale } as TrainingImplication;
+    })
+    .filter((i): i is TrainingImplication => i !== null);
+
+  let carryForward: CarryForward | null = null;
+  const cf = row.carry_forward;
+  if (cf && typeof cf === "object") {
+    const c = cf as Record<string, unknown>;
+    if (
+      typeof c.headline === "string" &&
+      typeof c.instruction === "string" &&
+      typeof c.successCriterion === "string" &&
+      typeof c.expiresAfterRaceId === "string"
+    ) {
+      carryForward = {
+        headline: c.headline,
+        instruction: c.instruction,
+        successCriterion: c.successCriterion,
+        expiresAfterRaceId: c.expiresAfterRaceId
+      };
+    }
+  }
+
+  return {
+    athleteProfileTakeaways,
+    trainingImplications,
+    carryForward,
+    referencesRaceIds: Array.isArray(row.references_race_ids)
+      ? (row.references_race_ids as string[])
+      : [],
+    supersededByRaceId: (row.superseded_by_race_id as string | null) ?? null,
+    isProvisional: Boolean(row.is_provisional),
+    generatedAt: (row.generated_at as string | null) ?? null,
+    modelUsed: (row.model_used as string | null) ?? null
+  };
 }
 
 function normalizeBundleRow(row: Record<string, unknown>): RaceBundleSummary["bundle"] {
