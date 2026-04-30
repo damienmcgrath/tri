@@ -1479,6 +1479,13 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
         // Phase 1C columns.
         segment_diagnostics: segmentDiagnosticsPersisted.length > 0 ? segmentDiagnosticsPersisted : null,
         transitions_analysis: transitionsAnalysis,
+        // Phase 3 columns: clear here so regeneration cannot leave stale
+        // training_to_race_links / pre_race_retrospective from a prior run
+        // attached to a freshly regenerated review. The tail-call writers
+        // below repopulate these on success; a failure leaves them null,
+        // which is the correct "no current artifact" state.
+        training_to_race_links: null,
+        pre_race_retrospective: null,
         model_used: modelUsed,
         is_provisional: isProvisional,
         generated_at: new Date().toISOString()

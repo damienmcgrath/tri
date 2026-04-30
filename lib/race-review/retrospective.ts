@@ -106,7 +106,13 @@ export function buildDeterministicVerdict(args: {
   } else if (execution.totalKeySessions > 0 && execution.rate < 0.7) {
     headline = `Key sessions executed at ${exPct}%.`;
     actionable = `Next build: protect the ${execution.totalKeySessions} key-session blocks — execution dropped to ${exPct}% this cycle.`;
-  } else if (taperPct != null && taperPct >= 90 && execution.rate >= 0.85) {
+  } else if (execution.totalKeySessions === 0) {
+    // No key sessions in the build window — execution rate is not evidence.
+    // Don't assert clean-build framing; the trajectory + taper still drive
+    // the actionable adjustment.
+    headline = "Build read inconclusive — no key sessions logged this cycle.";
+    actionable = "Next build: tag at least one key session per discipline so execution can be measured against intent.";
+  } else if (taperPct != null && taperPct >= 90 && execution.totalKeySessions > 0 && execution.rate >= 0.85) {
     headline = "Build executed cleanly into a clean taper.";
     actionable = "Hold the same periodisation shape for the next build cycle.";
   }
@@ -208,7 +214,11 @@ async function loadKeySessionsInWindow(
 
   const totalKeySessions = list.length;
   const completedKeySessions = list.filter((s) => s.executed).length;
-  const rate = totalKeySessions === 0 ? 1 : completedKeySessions / totalKeySessions;
+  // Zero key sessions in the window is "no execution evidence", not "100%".
+  // Set rate to 0 so downstream callers must inspect totalKeySessions before
+  // drawing conclusions; the clean-build verdict path explicitly requires
+  // totalKeySessions > 0.
+  const rate = totalKeySessions === 0 ? 0 : completedKeySessions / totalKeySessions;
   return { totalKeySessions, completedKeySessions, rate: round1(rate * 100) / 100, keySessionsList: list.slice(0, 20) };
 }
 
@@ -318,6 +328,11 @@ export function buildRetrospectiveInstructions(): string {
     "",
     "Empathy cue: if the build executed cleanly (taper ≥90% AND execution ≥85% AND days-from-peak 7-14),",
     "lead the verdict with a direct 'the build worked' framing. Don't soften.",
+    "",
+    "Insufficient evidence: when `execution.totalKeySessions` is 0, do NOT infer build quality",
+    "from execution rate (it is 0 by convention, not because the athlete missed sessions).",
+    "Frame the verdict as 'inconclusive — no key sessions tagged' and direct the actionable",
+    "adjustment at fixing the measurement, e.g. 'tag at least one key session per discipline'.",
     "",
     "When the build undershot taper or execution, frame it as 'distribution to fix' rather than 'effort missing'."
   ].join("\n");

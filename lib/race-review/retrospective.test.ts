@@ -90,6 +90,17 @@ describe("buildDeterministicVerdict", () => {
     expect(out.actionableAdjustment.toLowerCase()).toContain("hold");
   });
 
+  it("returns an inconclusive verdict when no key sessions exist (does NOT claim clean build)", () => {
+    const out = buildDeterministicVerdict({
+      taper: { complianceScore: 0.95, summary: null },
+      trajectory: baseTrajectory,
+      execution: { totalKeySessions: 0, completedKeySessions: 0, rate: 0, keySessionsList: [] }
+    });
+    expect(out.headline.toLowerCase()).toContain("inconclusive");
+    expect(out.headline.toLowerCase()).not.toContain("clean");
+    expect(out.actionableAdjustment.toLowerCase()).toContain("tag");
+  });
+
   it("never uses moralising verbs", () => {
     const out = buildDeterministicVerdict({
       taper: { complianceScore: 0.4, summary: null },
