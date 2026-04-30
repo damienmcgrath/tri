@@ -194,69 +194,82 @@ export async function getRaceWeekContext(
  * supersede this one. That keeps the morning brief read-only and avoids
  * surprising state changes if the athlete reads the brief twice.
  */
-async function getCarryForwardForUpcomingRace(
+export async function getCarryForwardForUpcomingRace(
   supabase: SupabaseClient,
   userId: string,
   today: string,
   upcomingRaceId: string
 ): Promise<RaceWeekContext["carryForward"]> {
-  // Most recent prior race bundle for this athlete that has lessons.
+  // Find the single ACTIVE prior race lesson — the one not superseded by a
+  // newer race. Anything older has already been replaced; falling through to
+  // it would resurrect spent advice.
+  const { data: lessonsRows } = await supabase
+    .from("race_lessons")
+    .select("race_bundle_id,carry_forward")
+    .eq("user_id", userId)
+    .is("superseded_by_race_id", null);
+
+  const candidates = (lessonsRows ?? []).filter(
+    (r) => typeof (r as any).race_bundle_id === "string"
+  );
+  if (candidates.length === 0) return null;
+
+  // Hydrate bundle dates so we can pick the most-recent prior race and
+  // ignore upcoming bundles. Querying by id keeps RLS in play.
+  const candidateIds = candidates.map((r) => (r as any).race_bundle_id as string);
   const { data: bundles } = await supabase
     .from("race_bundles")
     .select("id,started_at,race_profile_id")
     .eq("user_id", userId)
+    .in("id", candidateIds)
     .lt("started_at", `${today}T00:00:00.000Z`)
     .order("started_at", { ascending: false })
     .limit(5);
 
-  if (!bundles || bundles.length === 0) return null;
+  const priorBundles = (bundles ?? []).filter((b) => {
+    const profileId = ((b as any).race_profile_id as string | null) ?? null;
+    return profileId !== upcomingRaceId;
+  });
+  if (priorBundles.length === 0) return null;
 
-  for (const bundle of bundles) {
-    const bundleId = (bundle as any).id as string;
-    // Defensive: ignore a lessons row whose source race profile equals the
-    // upcoming race — should not normally happen since the bundle is in the
-    // past, but we filter anyway to keep the contract clean.
-    const profileId = ((bundle as any).race_profile_id as string | null) ?? null;
-    if (profileId === upcomingRaceId) continue;
+  // The most-recent prior race speaks. If it intentionally produced no
+  // carry-forward, we return null — we do NOT fall through to even older
+  // races. That advice has been replaced.
+  const latest = priorBundles[0] as any;
+  const latestBundleId = latest.id as string;
+  const latestProfileId = (latest.race_profile_id as string | null) ?? null;
 
-    const { data: lessonsRow } = await supabase
-      .from("race_lessons")
-      .select("carry_forward")
-      .eq("user_id", userId)
-      .eq("race_bundle_id", bundleId)
-      .maybeSingle();
-
-    const cf = (lessonsRow as any)?.carry_forward;
-    if (!cf || typeof cf !== "object") continue;
-    if (
-      typeof cf.headline !== "string" ||
-      typeof cf.instruction !== "string" ||
-      typeof cf.successCriterion !== "string"
-    ) {
-      continue;
-    }
-
-    let fromRaceName: string | null = null;
-    if (profileId) {
-      const { data: profile } = await supabase
-        .from("race_profiles")
-        .select("name")
-        .eq("id", profileId)
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (profile) fromRaceName = ((profile as any).name as string | null) ?? null;
-    }
-
-    return {
-      headline: cf.headline as string,
-      instruction: cf.instruction as string,
-      successCriterion: cf.successCriterion as string,
-      fromRaceName,
-      fromRaceDate: ((bundle as any).started_at as string).slice(0, 10)
-    };
+  const lessonForLatest = candidates.find(
+    (r) => ((r as any).race_bundle_id as string) === latestBundleId
+  );
+  const cf = (lessonForLatest as any)?.carry_forward;
+  if (!cf || typeof cf !== "object") return null;
+  if (
+    typeof cf.headline !== "string" ||
+    typeof cf.instruction !== "string" ||
+    typeof cf.successCriterion !== "string"
+  ) {
+    return null;
   }
 
-  return null;
+  let fromRaceName: string | null = null;
+  if (latestProfileId) {
+    const { data: profile } = await supabase
+      .from("race_profiles")
+      .select("name")
+      .eq("id", latestProfileId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (profile) fromRaceName = ((profile as any).name as string | null) ?? null;
+  }
+
+  return {
+    headline: cf.headline as string,
+    instruction: cf.instruction as string,
+    successCriterion: cf.successCriterion as string,
+    fromRaceName,
+    fromRaceDate: (latest.started_at as string).slice(0, 10)
+  };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

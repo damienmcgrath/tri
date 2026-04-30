@@ -485,25 +485,82 @@ export function lessonsSanityCheck(parsed: RaceLessons): string | undefined {
 
 // ─── Persistence ────────────────────────────────────────────────────────────
 
-async function supersedePriorLessons(
+/**
+ * Recompute supersession for every race_lessons row owned by `userId` from
+ * race chronology — NOT lesson generation timestamps. The active reading
+ * is whichever race (by race_bundles.started_at) is most recent. Every
+ * other row is superseded by that race's bundle id.
+ *
+ * This is called after every upsert. Doing a full recompute (instead of a
+ * differential sweep) keeps the invariant correct even when the athlete
+ * regenerates an older race: the older row gets re-superseded by the
+ * already-existing newer race instead of becoming "current" again.
+ *
+ * Returns the number of rows updated to a different supersession value.
+ */
+export async function recomputeSupersession(
   supabase: SupabaseClient,
-  userId: string,
-  thisBundleId: string,
-  thisRaceDate: string
+  userId: string
 ): Promise<number> {
-  const { data, error } = await supabase
+  const { data: lessons, error: lessonsErr } = await supabase
     .from("race_lessons")
-    .update({ superseded_by_race_id: thisBundleId })
+    .select("id,race_bundle_id,superseded_by_race_id")
+    .eq("user_id", userId);
+  if (lessonsErr || !lessons || lessons.length === 0) return 0;
+
+  const bundleIds = Array.from(
+    new Set(lessons.map((row) => (row as any).race_bundle_id as string))
+  );
+
+  const { data: bundles, error: bundlesErr } = await supabase
+    .from("race_bundles")
+    .select("id,started_at")
     .eq("user_id", userId)
-    .neq("race_bundle_id", thisBundleId)
-    .is("superseded_by_race_id", null)
-    .lt("generated_at", `${thisRaceDate}T23:59:59.999Z`)
-    .select("id");
-  if (error) {
-    console.warn("[race-lessons] supersession failed", { error: error.message });
-    return 0;
+    .in("id", bundleIds);
+  if (bundlesErr || !bundles) return 0;
+
+  const startedAtByBundle = new Map<string, string>();
+  for (const b of bundles) {
+    startedAtByBundle.set((b as any).id as string, (b as any).started_at as string);
   }
-  return data?.length ?? 0;
+
+  // Identify the most-recent race that has lessons. That's the active row;
+  // all others become superseded by it.
+  let latestBundleId: string | null = null;
+  let latestStartedAt: string | null = null;
+  for (const row of lessons) {
+    const bundleId = (row as any).race_bundle_id as string;
+    const startedAt = startedAtByBundle.get(bundleId);
+    if (!startedAt) continue;
+    if (latestStartedAt === null || startedAt > latestStartedAt) {
+      latestStartedAt = startedAt;
+      latestBundleId = bundleId;
+    }
+  }
+  if (!latestBundleId) return 0;
+
+  let changed = 0;
+  for (const row of lessons) {
+    const id = (row as any).id as string;
+    const bundleId = (row as any).race_bundle_id as string;
+    const current = ((row as any).superseded_by_race_id as string | null) ?? null;
+    const desired = bundleId === latestBundleId ? null : latestBundleId;
+    if (current === desired) continue;
+    const { error: updateErr } = await supabase
+      .from("race_lessons")
+      .update({ superseded_by_race_id: desired })
+      .eq("id", id)
+      .eq("user_id", userId);
+    if (updateErr) {
+      console.warn("[race-lessons] supersession update failed", {
+        id,
+        error: updateErr.message
+      });
+      continue;
+    }
+    changed += 1;
+  }
+  return changed;
 }
 
 // ─── Main entry ─────────────────────────────────────────────────────────────
@@ -562,6 +619,10 @@ export async function generateRaceLessons(
 
   const referencesRaceIds = priorRaces.map((r) => r.bundleId);
 
+  // Note: we deliberately do NOT write superseded_by_race_id in the upsert
+  // payload. recomputeSupersession runs after the row lands and assigns
+  // every row's supersession from race chronology — so regenerating an
+  // older race doesn't accidentally make it "current" again.
   const { data: upsertData, error: upsertError } = await supabase
     .from("race_lessons")
     .upsert(
@@ -573,8 +634,6 @@ export async function generateRaceLessons(
         training_implications: lessons.trainingImplications,
         carry_forward: lessons.carryForward,
         references_race_ids: referencesRaceIds,
-        // Generating fresh lessons clears any prior supersession of this row.
-        superseded_by_race_id: null,
         model_used: modelUsed,
         is_provisional: isProvisional,
         generated_at: new Date().toISOString()
@@ -589,12 +648,7 @@ export async function generateRaceLessons(
     return { status: "skipped", reason: `upsert_failed:${upsertError?.message ?? "unknown"}` };
   }
 
-  const supersededCount = await supersedePriorLessons(
-    supabase,
-    userId,
-    bundleId,
-    thisRace.raceDate
-  );
+  const supersededCount = await recomputeSupersession(supabase, userId);
 
   return {
     status: "ok",

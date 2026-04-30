@@ -181,21 +181,41 @@ function buildRaceWeekInput(
   return lines.join("\n");
 }
 
-export async function generateRaceWeekBriefAI(
+/**
+ * Deterministic fallback for the race-week brief. Used when OpenAI is
+ * unavailable, returns nothing, or fails schema validation. Exported so
+ * tests can verify the fallback surfaces Phase 1D carry-forward — the AI
+ * prompt path is not the only place the carry-forward must appear.
+ */
+export function buildRaceWeekBriefFallback(
   raceCtx: RaceWeekContext,
-  todaySession: TodaySessionInfo,
-  isRestDay: boolean
-): Promise<RaceWeekBriefOutput> {
+  todaySession: TodaySessionInfo
+): RaceWeekBriefOutput {
   const confidenceStatement = getConfidenceStatement(raceCtx);
-  const distanceStr = formatRaceDistance(raceCtx);
+
+  // Carry-forward (Phase 1D) is the single most important coaching cue on
+  // race morning. Surface it in the deterministic fallback the same way the
+  // AI prompt is asked to — otherwise on any AI fallback / schema failure
+  // the athlete loses the exact instruction the prior race left them with.
+  const carryForwardLine = raceCtx.carryForward
+    ? `${raceCtx.carryForward.headline} — ${raceCtx.carryForward.instruction}`
+    : null;
 
   const fallbackBrief = raceCtx.proximity === "post_race"
     ? `Recovery mode — ${Math.abs(raceCtx.race.daysUntil)} days since ${raceCtx.race.name}. Take it easy and let your body recover.`
     : raceCtx.proximity === "race_day"
-      ? `Race day. ${confidenceStatement}`
+      ? `Race day. ${carryForwardLine ?? confidenceStatement}`
       : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} days. ${confidenceStatement}`;
 
-  const fallback: RaceWeekBriefOutput = {
+  // Surface the carry-forward in race_guidance for race_day / day_before
+  // (the morning when the athlete will read it). Outside of those windows
+  // the confidence statement is the better default.
+  const fallbackRaceGuidance =
+    carryForwardLine && (raceCtx.proximity === "race_day" || raceCtx.proximity === "day_before")
+      ? carryForwardLine
+      : confidenceStatement;
+
+  return {
     session_preview: todaySession
       ? `${todaySession.sessionName ?? todaySession.type} (${todaySession.durationMinutes} min ${todaySession.sport})`
       : null,
@@ -205,9 +225,17 @@ export async function generateRaceWeekBriefAI(
       : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} day${raceCtx.race.daysUntil === 1 ? "" : "s"}`,
     pending_actions: [],
     brief_text: fallbackBrief,
-    race_guidance: confidenceStatement,
-    readiness_summary: `${raceCtx.readiness.readinessState} — TSB ${raceCtx.readiness.tsb}`,
+    race_guidance: fallbackRaceGuidance,
+    readiness_summary: `${raceCtx.readiness.readinessState} — TSB ${raceCtx.readiness.tsb}`
   };
+}
+
+export async function generateRaceWeekBriefAI(
+  raceCtx: RaceWeekContext,
+  todaySession: TodaySessionInfo,
+  isRestDay: boolean
+): Promise<RaceWeekBriefOutput> {
+  const fallback: RaceWeekBriefOutput = buildRaceWeekBriefFallback(raceCtx, todaySession);
 
   const result = await callOpenAIWithFallback({
     logTag: "race-week-brief",
