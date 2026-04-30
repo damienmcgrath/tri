@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { PlanEditor } from "./plan-editor";
+import { PlanGrid, type PlanGridSession } from "./plan-grid";
 
 type Plan = {
   id: string;
@@ -222,16 +222,63 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
   );
   const selectedBlock = explicitBlock ?? currentBlock ?? blocksData[0] ?? null;
 
+  const adaptationsBySession: Record<string, boolean> = {};
+  if (selectedPlan) {
+    const { data: rationaleRows, error: rationaleError } = await supabase
+      .from("adaptation_rationales")
+      .select("affected_sessions,status")
+      .eq("user_id", user.id)
+      .neq("status", "overridden");
+
+    if (rationaleError && !isMissingTableError(rationaleError, "public.adaptation_rationales")) {
+      throw new Error(rationaleError.message);
+    }
+
+    for (const row of (rationaleRows ?? []) as Array<{ affected_sessions: string[] | null }>) {
+      for (const sessionId of row.affected_sessions ?? []) {
+        if (sessionId) adaptationsBySession[sessionId] = true;
+      }
+    }
+  }
+
+  const gridSessions: PlanGridSession[] = sessionsData.map((session) => ({
+    id: session.id,
+    sport: session.sport,
+    type: session.type,
+    session_name: session.session_name ?? null,
+    discipline: session.discipline ?? null,
+    subtype: session.subtype ?? null,
+    workout_type: session.workout_type ?? null,
+    target: session.target ?? null,
+    notes: session.notes ?? null,
+    intent_category: session.intent_category ?? null,
+    duration_minutes: session.duration_minutes,
+    session_role: (session.session_role ?? null) as string | null,
+    is_key: session.is_key ?? null,
+    execution_result: session.execution_result ?? null,
+    status: session.status,
+    week_id: session.week_id,
+    date: session.date,
+    day_order: session.day_order ?? null
+  }));
+
+  const completedByWeek: Record<string, Array<{ duration_minutes: number }>> = {};
+  for (const session of sessionsData) {
+    if (session.status !== "completed" || !session.week_id) continue;
+    if (!completedByWeek[session.week_id]) completedByWeek[session.week_id] = [];
+    completedByWeek[session.week_id].push({ duration_minutes: session.duration_minutes });
+  }
+
   return (
     <section className="plan-editor-motion-lock">
-      <PlanEditor
-        plans={plans}
+      <PlanGrid
+        plan={selectedPlan ?? null}
         blocks={blocksData}
         weeks={weeksData}
-        sessions={sessionsData}
-        selectedPlanId={selectedPlan?.id}
-        selectedBlockId={selectedBlock?.id}
-        initialWeekId={searchParams?.week}
+        sessions={gridSessions}
+        selectedBlockId={selectedBlock?.id ?? null}
+        adaptationsBySession={adaptationsBySession}
+        completedByWeek={completedByWeek}
       />
     </section>
   );
