@@ -1,5 +1,8 @@
 "use client";
 
+import { useRef } from "react";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { computeSessionIntensityProfile, type ZoneKey } from "@/lib/training/intensity-profile";
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
@@ -28,6 +31,21 @@ type Props = {
   session: SessionPillSession;
   hasAdaptation?: boolean;
   onSelect?: (sessionId: string) => void;
+  /**
+   * When provided, enables drag-to-reschedule on this pill via @dnd-kit. The
+   * value is the draggable id and is also threaded into `data` so onDragEnd
+   * can resolve the source session without an extra lookup.
+   */
+  draggable?: {
+    blockId: string;
+    sourceWeekId: string;
+    sourceDate: string;
+  };
+  /**
+   * Right-click / long-press handler. When provided, the pill exposes a
+   * contextual menu trigger at the given client coordinates.
+   */
+  onContextMenu?: (sessionId: string, x: number, y: number) => void;
 };
 
 const DISCIPLINE_BAR: Record<string, string> = {
@@ -66,7 +84,10 @@ function truncate(text: string, max: number) {
   return `${text.slice(0, Math.max(1, max - 1))}…`;
 }
 
-export function SessionPill({ session, hasAdaptation, onSelect }: Props) {
+const PILL_LONG_PRESS_MS = 500;
+const PILL_LONG_PRESS_TOLERANCE_PX = 8;
+
+export function SessionPill({ session, hasAdaptation, onSelect, draggable, onContextMenu }: Props) {
   const sport = (session.sport ?? "other").toLowerCase();
   const disciplineColour = DISCIPLINE_BAR[sport] ?? DISCIPLINE_BAR.other;
   const disciplineLabel = getDisciplineMeta(sport).label;
@@ -106,13 +127,13 @@ export function SessionPill({ session, hasAdaptation, onSelect }: Props) {
 
   if (onSelect) {
     return (
-      <button
-        type="button"
+      <DraggablePillButton
+        sessionId={session.id}
         title={`${disciplineLabel} · ${fullName} · ${session.duration_minutes} min`}
-        aria-label={`Open ${ariaLabel}`}
-        onClick={() => onSelect(session.id)}
-        className="relative flex w-full items-stretch gap-1.5 overflow-hidden rounded-sm bg-[rgba(255,255,255,0.03)] pr-1.5 text-left hover:bg-[rgba(255,255,255,0.06)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgba(190,255,0,0.7)]"
-        style={{ minHeight: "22px" }}
+        ariaLabel={`Open ${ariaLabel}`}
+        onSelect={onSelect}
+        onContextMenu={onContextMenu}
+        draggable={draggable}
       >
         <span aria-hidden className="w-[3px] shrink-0" style={{ backgroundColor: disciplineColour }} />
         <PillBody
@@ -124,7 +145,7 @@ export function SessionPill({ session, hasAdaptation, onSelect }: Props) {
           isCompleted={isCompleted}
           underlineColour={underlineColour}
         />
-      </button>
+      </DraggablePillButton>
     );
   }
 
@@ -145,6 +166,120 @@ export function SessionPill({ session, hasAdaptation, onSelect }: Props) {
         underlineColour={underlineColour}
       />
     </div>
+  );
+}
+
+function DraggablePillButton({
+  sessionId,
+  title,
+  ariaLabel,
+  onSelect,
+  onContextMenu,
+  draggable,
+  children
+}: {
+  sessionId: string;
+  title: string;
+  ariaLabel: string;
+  onSelect: (sessionId: string) => void;
+  onContextMenu?: (sessionId: string, x: number, y: number) => void;
+  draggable?: { blockId: string; sourceWeekId: string; sourceDate: string };
+  children: React.ReactNode;
+}) {
+  const dragData = draggable
+    ? {
+        sessionId,
+        blockId: draggable.blockId,
+        sourceWeekId: draggable.sourceWeekId,
+        sourceDate: draggable.sourceDate
+      }
+    : undefined;
+
+  // Always call useDraggable (rules of hooks) but disable it when no
+  // draggable prop is supplied. Disabled draggables don't intercept pointer
+  // events, so the click → onSelect path stays clean.
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
+    id: sessionId,
+    data: dragData,
+    disabled: !draggable
+  });
+
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const longPressFired = useRef(false);
+
+  function clearLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressOrigin.current = null;
+  }
+
+  function handleClick() {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onSelect(sessionId);
+  }
+
+  function handleContextMenu(event: React.MouseEvent<HTMLButtonElement>) {
+    if (!onContextMenu) return;
+    event.preventDefault();
+    onContextMenu(sessionId, event.clientX, event.clientY);
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    longPressFired.current = false;
+    if (event.pointerType === "touch" && onContextMenu) {
+      longPressOrigin.current = { x: event.clientX, y: event.clientY };
+      longPressTimer.current = setTimeout(() => {
+        longPressFired.current = true;
+        onContextMenu(sessionId, event.clientX, event.clientY);
+        longPressTimer.current = null;
+      }, PILL_LONG_PRESS_MS);
+    }
+    listeners?.onPointerDown?.(event);
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    if (longPressOrigin.current) {
+      const dx = event.clientX - longPressOrigin.current.x;
+      const dy = event.clientY - longPressOrigin.current.y;
+      if (Math.hypot(dx, dy) > PILL_LONG_PRESS_TOLERANCE_PX) clearLongPress();
+    }
+  }
+
+  const style = transform
+    ? {
+        minHeight: "22px",
+        transform: CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : 1,
+        cursor: isDragging ? "grabbing" : "grab",
+        zIndex: isDragging ? 50 : undefined
+      }
+    : { minHeight: "22px", cursor: draggable ? "grab" : "pointer" };
+
+  return (
+    <button
+      {...attributes}
+      type="button"
+      ref={setNodeRef}
+      title={title}
+      aria-label={ariaLabel}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPress}
+      onPointerCancel={clearLongPress}
+      onPointerLeave={clearLongPress}
+      className="relative flex w-full items-stretch gap-1.5 overflow-hidden rounded-sm bg-[rgba(255,255,255,0.03)] pr-1.5 text-left hover:bg-[rgba(255,255,255,0.06)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgba(190,255,0,0.7)]"
+      style={style}
+    >
+      {children}
+    </button>
   );
 }
 

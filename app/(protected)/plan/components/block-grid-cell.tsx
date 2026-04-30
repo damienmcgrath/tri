@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { SessionPill, type SessionPillSession } from "./session-pill";
+import { makeDroppableId } from "./use-block-grid-dnd";
 
 type EmptyAffordance = {
   weekId: string;
@@ -10,12 +12,25 @@ type EmptyAffordance = {
   onContextMenu: (weekId: string, date: string, x: number, y: number) => void;
 };
 
+type DroppableConfig = {
+  weekId: string;
+  date: string;
+  blockId: string;
+};
+
 type Props = {
   sessions: SessionPillSession[];
   isToday?: boolean;
   adaptationsBySession?: Record<string, boolean>;
   onSelectSession?: (sessionId: string) => void;
+  onSessionContextMenu?: (sessionId: string, x: number, y: number) => void;
   emptyAffordance?: EmptyAffordance;
+  /**
+   * When provided, the cell registers a drop target via @dnd-kit. The pill
+   * draggable inside this cell is configured with the same week/date so
+   * onDragEnd in the parent can short-circuit drops onto the source cell.
+   */
+  droppable?: DroppableConfig;
 };
 
 const LONG_PRESS_MS = 500;
@@ -26,8 +41,15 @@ export function BlockGridCell({
   isToday,
   adaptationsBySession,
   onSelectSession,
-  emptyAffordance
+  onSessionContextMenu,
+  emptyAffordance,
+  droppable
 }: Props) {
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: droppable ? makeDroppableId(droppable.weekId, droppable.date) : "__noop__",
+    data: droppable ?? undefined,
+    disabled: !droppable
+  });
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
   const longPressFired = useRef(false);
@@ -92,8 +114,14 @@ export function BlockGridCell({
 
   return (
     <div
+      ref={setDropRef}
+      data-over={droppable && isOver ? "true" : undefined}
       className={`relative flex min-h-[52px] flex-col gap-1 border-l border-[rgba(255,255,255,0.04)] px-1.5 py-1 ${
         isToday ? "bg-[rgba(190,255,0,0.04)]" : ""
+      } ${
+        droppable && isOver
+          ? "ring-1 ring-inset ring-[rgba(190,255,0,0.55)] bg-[rgba(190,255,0,0.06)]"
+          : ""
       }`}
     >
       {isToday ? (
@@ -108,6 +136,16 @@ export function BlockGridCell({
           session={session}
           hasAdaptation={adaptationsBySession?.[session.id] === true}
           onSelect={onSelectSession}
+          onContextMenu={onSessionContextMenu}
+          draggable={
+            droppable
+              ? {
+                  blockId: droppable.blockId,
+                  sourceWeekId: droppable.weekId,
+                  sourceDate: droppable.date
+                }
+              : undefined
+          }
         />
       ))}
       {showAffordance ? (
