@@ -96,6 +96,7 @@ describe("SessionDrawer", () => {
         sessionId: baseSession.id,
         durationMinutes: 60,
         sport: "run",
+        sessionType: "Easy Z2",
         sessionRole: "Supporting"
       })
     );
@@ -214,6 +215,7 @@ describe("SessionDrawer", () => {
           weekId: cell.week_id,
           date: cell.date,
           sport: "bike",
+          sessionType: "Endurance",
           intentCategory: "Endurance",
           durationMinutes: 60
         })

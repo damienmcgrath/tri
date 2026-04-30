@@ -275,7 +275,7 @@ export function SessionDrawer({
         return;
       }
       const sessionName = form.name.trim() || null;
-      const intent = resolvedIntent(form);
+      const sessionType = resolvedIntent(form);
       const target = form.target.trim() || null;
       const notes = form.notes.trim() || null;
       try {
@@ -285,8 +285,9 @@ export function SessionDrawer({
           weekId: cell.week_id,
           date: cell.date,
           sport: form.discipline,
+          sessionType,
           sessionName,
-          intentCategory: intent,
+          intentCategory: sessionType,
           durationMinutes: duration,
           target,
           notes,
@@ -324,7 +325,10 @@ export function SessionDrawer({
     const optimistic: DrawerSession = {
       ...session,
       sport: form.discipline,
-      type: form.name.trim() || form.discipline.charAt(0).toUpperCase() + form.discipline.slice(1),
+      type:
+        form.name.trim() ||
+        resolvedIntent(form) ||
+        form.discipline.charAt(0).toUpperCase() + form.discipline.slice(1),
       session_name: form.name.trim() || null,
       intent_category: resolvedIntent(form),
       duration_minutes: duration,
@@ -340,6 +344,7 @@ export function SessionDrawer({
         planId: session.plan_id,
         weekId: session.week_id,
         sport: form.discipline,
+        sessionType: optimistic.intent_category,
         sessionName: optimistic.session_name,
         intentCategory: optimistic.intent_category,
         durationMinutes: duration,

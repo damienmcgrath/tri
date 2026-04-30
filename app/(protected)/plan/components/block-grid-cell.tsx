@@ -65,9 +65,12 @@ export function BlockGridCell({
 
   function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
     if (!showAffordance) return;
+    // Reset any stale suppression from a previous long-press before starting
+    // a fresh gesture. Some mobile browsers won't emit a click after the
+    // context-menu gesture, so the next tap must start cleanly.
+    longPressFired.current = false;
     if (event.pointerType !== "touch") return;
     longPressOrigin.current = { x: event.clientX, y: event.clientY };
-    longPressFired.current = false;
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       emptyAffordance!.onContextMenu(

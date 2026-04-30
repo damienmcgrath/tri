@@ -699,6 +699,7 @@ const sessionDetailsSchema = z.object({
   planId: uuidSchema,
   weekId: uuidSchema,
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
+  sessionType: z.string().trim().max(120).nullable().optional(),
   sessionName: z.string().trim().max(200).nullable().optional(),
   intentCategory: z.string().trim().max(120).nullable().optional(),
   durationMinutes: z.coerce.number().int().min(1).max(1440),
@@ -713,6 +714,7 @@ const createFromCellSchema = z.object({
   weekId: uuidSchema,
   date: z.string().date(),
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
+  sessionType: z.string().trim().max(120).nullable().optional(),
   sessionName: z.string().trim().max(200).nullable().optional(),
   intentCategory: z.string().trim().max(120).nullable().optional(),
   durationMinutes: z.coerce.number().int().min(0).max(1440),
@@ -770,7 +772,9 @@ export async function createSessionFromCellAction(
     : parsed.sessionName?.length
       ? parsed.sessionName
       : null;
-  const type = isRest ? "Rest" : fallbackSessionType(parsed.sport, sessionName);
+  const type = isRest
+    ? "Rest"
+    : fallbackSessionType(parsed.sport, parsed.sessionType ?? sessionName);
   const intentCategory = isRest
     ? "Recovery"
     : parsed.intentCategory?.length
@@ -860,14 +864,12 @@ export async function updateSessionDetailsAction(input: SessionDetailsInput) {
   await assertPlanOwnership(supabase, user.id, parsed.planId);
   await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
 
-  // The drawer schema dropped the explicit `sessionType` field in favour of
-  // `intent_category`, but the legacy `type` column is still NOT NULL on older
-  // rows. Mirror `session_name` into `type` so the column stays populated;
-  // intent lives in `intent_category`. Diverges from create/updateSessionAction
-  // which still pass an explicit sessionType.
   const canonicalPayload = {
     sport: parsed.sport,
-    type: fallbackSessionType(parsed.sport, parsed.sessionName ?? undefined),
+    type: fallbackSessionType(
+      parsed.sport,
+      parsed.sessionType ?? parsed.sessionName ?? undefined
+    ),
     session_name: parsed.sessionName?.length ? parsed.sessionName : null,
     intent_category: parsed.intentCategory?.length ? parsed.intentCategory : null,
     target: parsed.target?.length ? parsed.target : null,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { BlockGridCell } from "./block-grid-cell";
 import type { SessionPillSession } from "./session-pill";
 
@@ -13,6 +13,16 @@ const sampleSession: SessionPillSession = {
 };
 
 describe("BlockGridCell empty-cell affordance", () => {
+  function dispatchTouchPointerEvent(
+    element: HTMLElement,
+    type: "pointerdown" | "pointerup",
+    coords: { clientX: number; clientY: number }
+  ) {
+    const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent;
+    Object.assign(event, { pointerType: "touch", ...coords });
+    fireEvent(element, event);
+  }
+
   it("renders the Add affordance only when emptyAffordance is provided and cell is empty", () => {
     const onClick = jest.fn();
     const onContextMenu = jest.fn();
@@ -90,5 +100,42 @@ describe("BlockGridCell empty-cell affordance", () => {
     const prevented = !button.dispatchEvent(event);
     expect(prevented).toBe(true);
     expect(onContextMenu).toHaveBeenCalledWith("wk-1", "2026-05-04", 120, 240);
+  });
+
+  it("does not swallow the next tap after a long-press opens the context menu", () => {
+    jest.useFakeTimers();
+    try {
+      const onClick = jest.fn();
+      const onContextMenu = jest.fn();
+      render(
+        <BlockGridCell
+          sessions={[]}
+          emptyAffordance={{
+            weekId: "wk-1",
+            date: "2026-05-04",
+            onClick,
+            onContextMenu
+          }}
+        />
+      );
+
+      const button = screen.getByRole("button", { name: "Add session" });
+      dispatchTouchPointerEvent(button, "pointerdown", { clientX: 80, clientY: 90 });
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      dispatchTouchPointerEvent(button, "pointerup", { clientX: 80, clientY: 90 });
+
+      expect(onContextMenu).toHaveBeenCalledWith("wk-1", "2026-05-04", 80, 90);
+      expect(onClick).not.toHaveBeenCalled();
+
+      dispatchTouchPointerEvent(button, "pointerdown", { clientX: 82, clientY: 92 });
+      dispatchTouchPointerEvent(button, "pointerup", { clientX: 82, clientY: 92 });
+      fireEvent.click(button);
+
+      expect(onClick).toHaveBeenCalledWith("wk-1", "2026-05-04");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
