@@ -719,6 +719,11 @@ export async function updateSessionDetailsAction(input: SessionDetailsInput) {
   await assertPlanOwnership(supabase, user.id, parsed.planId);
   await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
 
+  // The drawer schema dropped the explicit `sessionType` field in favour of
+  // `intent_category`, but the legacy `type` column is still NOT NULL on older
+  // rows. Mirror `session_name` into `type` so the column stays populated;
+  // intent lives in `intent_category`. Diverges from create/updateSessionAction
+  // which still pass an explicit sessionType.
   const canonicalPayload = {
     sport: parsed.sport,
     type: fallbackSessionType(parsed.sport, parsed.sessionName ?? undefined),

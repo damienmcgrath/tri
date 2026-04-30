@@ -109,17 +109,25 @@ export function PlanGrid({
 
   // If a deep-linked session lives in a different block than the current
   // selection, switch the active block to the one that contains it so the
-  // pill is visible behind the drawer.
+  // pill is visible behind the drawer. Also sync the URL so a subsequent copy
+  // of the URL reflects the block the user is actually looking at.
   useEffect(() => {
     if (!openSessionId) return;
     const target = sessions.find((session) => session.id === openSessionId);
     if (!target) return;
     const targetWeek = sortedAllWeeks.find((week) => week.id === target.week_id);
     if (!targetWeek?.block_id) return;
-    if (targetWeek.block_id !== activeBlockId) {
-      setActiveBlockId(targetWeek.block_id);
-    }
-  }, [openSessionId, sessions, sortedAllWeeks, activeBlockId]);
+    if (targetWeek.block_id === activeBlockId) return;
+    setActiveBlockId(targetWeek.block_id);
+    if (!plan) return;
+    const params = new URLSearchParams();
+    params.set("plan", plan.id);
+    params.set("block", targetWeek.block_id);
+    params.set("session", openSessionId);
+    startTransition(() => {
+      router.replace(`/plan?${params.toString()}`);
+    });
+  }, [openSessionId, sessions, sortedAllWeeks, activeBlockId, plan, router]);
 
   const activeBlock = useMemo(
     () => sortedBlocks.find((block) => block.id === activeBlockId) ?? sortedBlocks[0] ?? null,

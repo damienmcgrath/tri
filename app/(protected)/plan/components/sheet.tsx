@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Props = {
@@ -20,6 +20,13 @@ const FOCUSABLE_SELECTOR =
 export function Sheet({ open, onClose, ariaLabel, children }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
+  // Defer the portal until after hydration so SSR (which renders nothing) and
+  // the client's first render agree, even when `open` is true on first paint
+  // (e.g. ?session=<id> deep links).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +74,7 @@ export function Sheet({ open, onClose, ariaLabel, children }: Props) {
   }, [open, onClose]);
 
   if (!open) return null;
-  if (typeof document === "undefined") return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50">
