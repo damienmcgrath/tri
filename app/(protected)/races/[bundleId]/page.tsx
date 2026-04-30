@@ -8,6 +8,7 @@ import { RaceStoryCard, type RaceStoryPayload } from "./components/race-story-ca
 import { UnifiedPacingArc } from "./components/unified-pacing-arc";
 import { SegmentDiagnosticCard, type SegmentDiagnosticPayload } from "./components/segment-diagnostic-card";
 import { TransitionsAnalysisCard, type TransitionsAnalysisPayload } from "./components/transitions-analysis-card";
+import { RegenerateRaceReviewButton } from "../../sessions/[sessionId]/components/regenerate-race-review-button";
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
 
 export const dynamic = "force-dynamic";
@@ -410,6 +411,9 @@ function RaceReviewLayered({
         <p className="mt-2 text-sm text-[rgba(255,255,255,0.78)]">
           Generating your verdict and race story… this usually takes about 15 seconds. Refresh the page if it doesn&apos;t appear shortly.
         </p>
+        <div className="mt-3">
+          <RegenerateRaceReviewButton bundleId={bundleId} label="Regenerate now" />
+        </div>
       </article>
     );
   }
@@ -429,6 +433,9 @@ function RaceReviewLayered({
         <SegmentDiagnosticCard key={diag.discipline} diagnostic={diag} />
       ))}
       {transitionsAnalysis ? <TransitionsAnalysisCard analysis={transitionsAnalysis} /> : null}
+      <div className="flex justify-end">
+        <RegenerateRaceReviewButton bundleId={bundleId} />
+      </div>
     </>
   );
 }
