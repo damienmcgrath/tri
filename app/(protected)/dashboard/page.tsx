@@ -542,6 +542,7 @@ export default async function DashboardPage({
           {raceWeekCtx.readiness.readinessState === "fresh" ? (
             <p className="mt-2 text-xs text-emerald-400">Readiness: Fresh (TSB +{Math.round(raceWeekCtx.readiness.tsb)})</p>
           ) : null}
+          <CarryForwardCue carryForward={raceWeekCtx.carryForward} />
         </article>
       ) : dashboardMoment === "race_eve" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.06)] px-5 py-4">
@@ -553,6 +554,7 @@ export default async function DashboardPage({
             <p>Lay out all race gear tonight. Pin your number. Charge your watch.</p>
             <p>Eat a familiar dinner. Hydrate well. Set two alarms.</p>
           </div>
+          <CarryForwardCue carryForward={raceWeekCtx.carryForward} />
         </article>
       ) : dashboardMoment === "race_week" && raceWeekCtx ? (
         <article className="rounded-xl border border-[rgba(6,182,212,0.3)] bg-[rgba(6,182,212,0.06)] px-5 py-4">
@@ -933,6 +935,43 @@ export default async function DashboardPage({
         <DashboardTrends supabase={supabase} userId={user.id} />
       </Suspense>
     </section>
+  );
+}
+
+// ── Race-day carry-forward cue (Phase 1D) ────────────────────────────────
+
+/**
+ * Renders the carry-forward instruction from the prior race directly on
+ * the race-day / day-before hero. Bypasses the morning-brief card's
+ * collapse-to-summary behaviour so the most important coaching cue on
+ * race morning is visible without a tap.
+ *
+ * No-op when raceCtx.carryForward is null.
+ */
+function CarryForwardCue({
+  carryForward
+}: {
+  carryForward: RaceWeekContext["carryForward"];
+}) {
+  if (!carryForward) return null;
+  const fromLabel = carryForward.fromRaceName
+    ? `Today's cue from ${carryForward.fromRaceName}`
+    : `Today's cue from ${carryForward.fromRaceDate}`;
+  return (
+    <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-300/80">
+        {fromLabel}
+      </p>
+      <p className="mt-1 text-sm font-medium text-[rgba(255,255,255,0.94)]">
+        {carryForward.headline}
+      </p>
+      <p className="mt-1 text-sm text-[rgba(255,255,255,0.82)]">
+        {carryForward.instruction}
+      </p>
+      <p className="mt-2 text-xs text-tertiary">
+        Success criterion: {carryForward.successCriterion}
+      </p>
+    </div>
   );
 }
 
