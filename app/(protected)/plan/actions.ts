@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { insertWithCompat, insertBatchWithCompat, updateWithCompat, isMissingColumnError, SESSIONS_OPTIONAL_COLUMNS } from "@/lib/supabase/schema-compat";
+
+const SESSIONS_OPTIONAL_COLUMNS_SET = new Set<string>(SESSIONS_OPTIONAL_COLUMNS);
 import { getActivePlanId } from "@/lib/supabase/queries";
 
 const uuidSchema = z.string().uuid();
@@ -704,6 +706,145 @@ const sessionDetailsSchema = z.object({
   notes: z.string().trim().max(2000).nullable().optional(),
   sessionRole: z.enum(["Key", "Supporting", "Recovery"]).nullable().optional()
 });
+
+const createFromCellSchema = z.object({
+  kind: z.enum(["session", "rest"]),
+  planId: uuidSchema,
+  weekId: uuidSchema,
+  date: z.string().date(),
+  sport: z.enum(["swim", "bike", "run", "strength", "other"]),
+  sessionName: z.string().trim().max(200).nullable().optional(),
+  intentCategory: z.string().trim().max(120).nullable().optional(),
+  durationMinutes: z.coerce.number().int().min(0).max(1440),
+  target: z.string().trim().max(2000).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  sessionRole: z.enum(["Key", "Supporting", "Recovery"]).nullable().optional()
+});
+
+export type CreateFromCellInput = z.infer<typeof createFromCellSchema>;
+
+export type CreatedSessionRow = {
+  id: string;
+  plan_id: string;
+  week_id: string;
+  date: string;
+  sport: string;
+  type: string;
+  session_name: string | null;
+  intent_category: string | null;
+  duration_minutes: number;
+  target: string | null;
+  notes: string | null;
+  session_role: string | null;
+  is_key: boolean | null;
+};
+
+/**
+ * JSON-input variant of createSessionAction tailored for the empty-cell
+ * create flow in SessionDrawer. Inserts a session (or a Rest day placeholder
+ * when kind === "rest") and returns the new row mapped into DrawerSession
+ * shape so the caller can splice it into local state.
+ */
+export async function createSessionFromCellAction(
+  input: CreateFromCellInput
+): Promise<CreatedSessionRow> {
+  const parsed = createFromCellSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
+
+  const { data: daySessions, error: daySessionsError } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("week_id", parsed.weekId)
+    .eq("date", parsed.date);
+
+  if (daySessionsError && !isMissingTableError(daySessionsError, "public.sessions")) {
+    throw new Error(daySessionsError.message);
+  }
+
+  const isRest = parsed.kind === "rest";
+  const sessionName = isRest
+    ? "Rest day"
+    : parsed.sessionName?.length
+      ? parsed.sessionName
+      : null;
+  const type = isRest ? "Rest" : fallbackSessionType(parsed.sport, sessionName);
+  const intentCategory = isRest
+    ? "Recovery"
+    : parsed.intentCategory?.length
+      ? parsed.intentCategory
+      : null;
+  const sessionRole = isRest ? "Recovery" : (parsed.sessionRole ?? null);
+  const durationMinutes = isRest ? 0 : parsed.durationMinutes;
+  const isKey = !isRest && sessionRole === "Key";
+
+  const canonicalPayload = {
+    user_id: user.id,
+    plan_id: parsed.planId,
+    week_id: parsed.weekId,
+    date: parsed.date,
+    sport: parsed.sport,
+    type,
+    session_name: sessionName,
+    intent_category: intentCategory,
+    target: parsed.target?.length ? parsed.target : null,
+    day_order: daySessions?.length ?? 0,
+    duration_minutes: durationMinutes,
+    notes: parsed.notes?.length ? parsed.notes : null,
+    status: "planned",
+    is_key: isKey,
+    session_role: sessionRole
+  };
+
+  // Insert with `.select("id").single()` so we can return the new row id;
+  // fall back to a payload stripped of optional columns on missing-column
+  // errors, mirroring insertWithCompat's behaviour.
+  let insertResult = await supabase
+    .from("sessions")
+    .insert(canonicalPayload)
+    .select("id")
+    .single();
+
+  if (insertResult.error && isMissingColumnError(insertResult.error)) {
+    const stripped: Record<string, unknown> = { ...canonicalPayload };
+    for (const col of SESSIONS_OPTIONAL_COLUMNS_SET) delete stripped[col];
+    insertResult = await supabase
+      .from("sessions")
+      .insert(stripped)
+      .select("id")
+      .single();
+  }
+
+  if (insertResult.error) {
+    throw new Error(insertResult.error.message);
+  }
+
+  const id = (insertResult.data as { id?: unknown } | null)?.id;
+  if (typeof id !== "string") {
+    throw new Error("Could not create session: missing id from insert response.");
+  }
+
+  revalidatePath("/plan");
+  revalidatePath("/calendar");
+
+  return {
+    id,
+    plan_id: parsed.planId,
+    week_id: parsed.weekId,
+    date: parsed.date,
+    sport: parsed.sport,
+    type,
+    session_name: sessionName,
+    intent_category: intentCategory,
+    duration_minutes: durationMinutes,
+    target: canonicalPayload.target,
+    notes: canonicalPayload.notes,
+    session_role: sessionRole,
+    is_key: isKey
+  };
+}
 
 export type SessionDetailsInput = z.infer<typeof sessionDetailsSchema>;
 

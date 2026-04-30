@@ -3,13 +3,15 @@ import React from "react";
 
 const updateMock = jest.fn();
 const deleteMock = jest.fn();
+const createMock = jest.fn();
 
 jest.mock("../actions", () => ({
   updateSessionDetailsAction: (...args: unknown[]) => updateMock(...args),
-  deleteSessionAction: (...args: unknown[]) => deleteMock(...args)
+  deleteSessionAction: (...args: unknown[]) => deleteMock(...args),
+  createSessionFromCellAction: (...args: unknown[]) => createMock(...args)
 }));
 
-import { SessionDrawer, type DrawerSession } from "./session-drawer";
+import { SessionDrawer, type DrawerCreateCell, type DrawerSession } from "./session-drawer";
 
 const baseSession: DrawerSession = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -31,8 +33,10 @@ describe("SessionDrawer", () => {
   beforeEach(() => {
     updateMock.mockReset();
     deleteMock.mockReset();
+    createMock.mockReset();
     updateMock.mockResolvedValue(undefined);
     deleteMock.mockResolvedValue(undefined);
+    createMock.mockResolvedValue(undefined);
   });
 
   function renderDrawer(overrides: Partial<React.ComponentProps<typeof SessionDrawer>> = {}) {
@@ -149,6 +153,93 @@ describe("SessionDrawer", () => {
     );
     expect(screen.getByLabelText(/adaptation log/i)).toBeInTheDocument();
     expect(screen.getByText(/lowered intensity/i)).toBeInTheDocument();
+  });
+
+  describe("create mode", () => {
+    const cell: DrawerCreateCell = {
+      plan_id: "22222222-2222-4222-8222-222222222222",
+      week_id: "33333333-3333-4333-8333-333333333333",
+      date: "2026-05-05",
+      defaultDiscipline: "bike"
+    };
+
+    function renderCreate(overrides: Partial<React.ComponentProps<typeof SessionDrawer>> = {}) {
+      const props = {
+        mode: "create" as const,
+        cell,
+        adaptations: [],
+        open: true,
+        onClose: jest.fn(),
+        onSaved: jest.fn(),
+        onDeleted: jest.fn(),
+        onCreated: jest.fn(),
+        ...overrides
+      } as React.ComponentProps<typeof SessionDrawer>;
+      const utils = render(<SessionDrawer {...props} />);
+      return { ...utils, props };
+    }
+
+    it("renders with the New session header and prefilled defaults", () => {
+      renderCreate();
+      expect(screen.getByText(/new session/i)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Bike" })).toHaveAttribute("aria-checked", "true");
+      expect(screen.getByLabelText("Duration (minutes)")).toHaveValue(60);
+      expect(screen.getByLabelText("Type / Intent")).toHaveValue("Endurance");
+      expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+    });
+
+    it("calls createSessionFromCellAction and onCreated on Save", async () => {
+      createMock.mockResolvedValueOnce({
+        id: "44444444-4444-4444-8444-444444444444",
+        plan_id: cell.plan_id,
+        week_id: cell.week_id,
+        date: cell.date,
+        sport: "bike",
+        type: "Bike",
+        session_name: null,
+        intent_category: "Endurance",
+        duration_minutes: 60,
+        target: null,
+        notes: null,
+        session_role: null,
+        is_key: false
+      });
+      const { props } = renderCreate();
+      fireEvent.click(screen.getByRole("button", { name: /create session/i }));
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: "session",
+          planId: cell.plan_id,
+          weekId: cell.week_id,
+          date: cell.date,
+          sport: "bike",
+          intentCategory: "Endurance",
+          durationMinutes: 60
+        })
+      );
+      const onCreatedMock = props.onCreated as jest.Mock;
+      expect(onCreatedMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "44444444-4444-4444-8444-444444444444", duration_minutes: 60 })
+      );
+      expect(props.onClose).toHaveBeenCalled();
+    });
+
+    it("does not call any action when cancelled", () => {
+      const { props } = renderCreate();
+      // Form is at its seeded state; cancel should close silently.
+      fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+      expect(createMock).not.toHaveBeenCalled();
+      expect(props.onClose).toHaveBeenCalled();
+    });
+
+    it("surfaces a validation error on invalid duration", () => {
+      renderCreate();
+      fireEvent.change(screen.getByLabelText("Duration (minutes)"), { target: { value: "0" } });
+      fireEvent.click(screen.getByRole("button", { name: /create session/i }));
+      expect(screen.getByRole("alert")).toHaveTextContent(/duration must be between/i);
+      expect(createMock).not.toHaveBeenCalled();
+    });
   });
 
   it("surfaces an error and stays open if save fails", async () => {
