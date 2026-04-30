@@ -70,6 +70,28 @@ const skippedSession = {
   is_key: false
 };
 
+const adaptationRationales = [
+  {
+    id: "rationale-1",
+    trigger_type: "recovery_signal",
+    rationale_text: "You showed elevated fatigue markers after Tuesday, so Thursday was shortened to protect the weekend long run.",
+    changes_summary: [
+      {
+        session_id: "s1",
+        session_label: "Tempo",
+        change_type: "duration_reduced",
+        before: "45 min tempo",
+        after: "30 min aerobic run"
+      }
+    ],
+    preserved_elements: ["Weekend long run kept in place"],
+    training_block: "Build 1",
+    week_number: 2,
+    status: "pending",
+    created_at: "2026-03-02T10:00:00.000Z"
+  }
+];
+
 describe("WeekCalendar", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
@@ -220,6 +242,36 @@ describe("WeekCalendar", () => {
     const activityLink = openDetailsLinks[openDetailsLinks.length - 1];
 
     expect(activityLink).toHaveAttribute("href", "/sessions/activity-a1");
+  });
+
+  it("renders adaptation rationale inline on affected planned session cards", () => {
+    render(
+      <WeekCalendar
+        weekDays={weekDays}
+        sessions={sessions}
+        adaptationRationales={adaptationRationales}
+        executionLabel="Execution"
+        completedCount={1}
+        plannedTotalCount={1}
+        skippedCount={0}
+        extraSessionCount={1}
+        plannedRemainingCount={1}
+        plannedMinutes={45}
+        completedMinutes={35}
+        remainingMinutes={10}
+      />
+    );
+
+    expect(screen.getByText("Adapted")).toBeInTheDocument();
+    expect(screen.getByText(/elevated fatigue markers/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Why this changed" }));
+
+    const tempoCard = screen.getByText("Tempo").closest("article");
+    expect(tempoCard).not.toBeNull();
+    expect(tempoCard as HTMLElement).toHaveTextContent("Weekend long run kept in place");
+    expect(tempoCard as HTMLElement).toHaveTextContent("45 min tempo");
+    expect(tempoCard as HTMLElement).toHaveTextContent("30 min aerobic run");
   });
 
   it("prefers a same-day same-sport session when opening upload assignment from the sidebar", () => {

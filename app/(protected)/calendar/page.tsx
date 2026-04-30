@@ -310,23 +310,24 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       .maybeSingle();
 
     if (weekRow?.block_id) {
-      const [{ data: block }, { count: blockWeekCount }] = await Promise.all([
+      const [{ data: block }, { count: weekInBlockCount }] = await Promise.all([
         supabase
           .from("training_blocks")
-          .select("block_type,emphasis")
+          .select("name,block_type,sort_order")
           .eq("id", weekRow.block_id)
           .maybeSingle(),
         supabase
           .from("training_weeks")
           .select("id", { count: "exact", head: true })
           .eq("block_id", weekRow.block_id)
+          .lte("week_start_date", weekStart)
       ]);
 
       if (block) {
-        const weekNum = (weekRow.week_index ?? 0) + 1;
-        const totalWeeks = typeof blockWeekCount === "number" && blockWeekCount > 0 ? blockWeekCount : null;
-        const weekLabel = totalWeeks ? `Week ${weekNum} of ${totalWeeks}` : `Week ${weekNum}`;
-        blockContextLine = `${weekLabel} · ${block.block_type}${weekRow.focus ? ` · ${weekRow.focus}` : ""}`;
+        const blockNumber = (block.sort_order ?? 0) + 1;
+        const blockLabel = block.name ?? block.block_type;
+        const weekInBlock = typeof weekInBlockCount === "number" && weekInBlockCount > 0 ? weekInBlockCount : 1;
+        blockContextLine = `Block ${blockNumber}: ${blockLabel} · Wk ${weekInBlock}`;
       }
     }
   }
@@ -409,6 +410,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
+        adaptationRationales={pendingRationales}
         pendingAdaptations={pendingAdaptations}
         weekStart={weekStart}
         executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : plannedSessionCount > 0 ? "No planned session today" : "No planned sessions this week yet"}
