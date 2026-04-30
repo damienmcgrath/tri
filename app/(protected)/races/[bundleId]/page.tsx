@@ -6,6 +6,8 @@ import { RaceSegmentList } from "../../sessions/[sessionId]/components/race-segm
 import { RaceVerdictCard, type VerdictPayload } from "./components/race-verdict-card";
 import { RaceStoryCard, type RaceStoryPayload } from "./components/race-story-card";
 import { UnifiedPacingArc } from "./components/unified-pacing-arc";
+import { SegmentDiagnosticCard, type SegmentDiagnosticPayload } from "./components/segment-diagnostic-card";
+import { TransitionsAnalysisCard, type TransitionsAnalysisPayload } from "./components/transitions-analysis-card";
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
 
 export const dynamic = "force-dynamic";
@@ -389,6 +391,8 @@ function RaceReviewLayered({
   const verdictPayload = parseVerdict(review?.verdict);
   const storyPayload = parseRaceStory(review?.race_story);
   const arcPayload = parseArc(review?.pacing_arc_data);
+  const segmentDiagnostics = parseSegmentDiagnostics(review?.segment_diagnostics);
+  const transitionsAnalysis = parseTransitionsAnalysis(review?.transitions_analysis);
   // "Updated based on your notes" indicates the current review reflects the
   // most recent subjective submission — i.e. the review's generated_at is
   // at-or-after the subjective_captured_at timestamp. Stale reviews (review
@@ -421,6 +425,10 @@ function RaceReviewLayered({
       />
       {arcPayload ? <UnifiedPacingArc data={arcPayload} /> : null}
       <RaceStoryCard story={storyPayload} />
+      {segmentDiagnostics.map((diag) => (
+        <SegmentDiagnosticCard key={diag.discipline} diagnostic={diag} />
+      ))}
+      {transitionsAnalysis ? <TransitionsAnalysisCard analysis={transitionsAnalysis} /> : null}
     </>
   );
 }
@@ -493,4 +501,141 @@ function parseArc(value: unknown): PacingArcData | null {
   if (typeof v.totalDurationSec !== "number") return null;
   if (!Array.isArray(v.points)) return null;
   return v as unknown as PacingArcData;
+}
+
+function parseSegmentDiagnostics(value: unknown): SegmentDiagnosticPayload[] {
+  if (!Array.isArray(value)) return [];
+  const out: SegmentDiagnosticPayload[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    const discipline = r.discipline;
+    if (discipline !== "swim" && discipline !== "bike" && discipline !== "run") continue;
+    const refs = (r.referenceFrames ?? {}) as Record<string, unknown>;
+    const pacing = (r.pacingAnalysis ?? {}) as Record<string, unknown>;
+    const anomaliesRaw = Array.isArray(r.anomalies) ? r.anomalies : [];
+    out.push({
+      discipline,
+      referenceFrames: {
+        vsPlan: parseVsPlan(refs.vsPlan),
+        vsThreshold: parseVsThreshold(refs.vsThreshold),
+        vsBestComparableTraining: parseVsBestComparable(refs.vsBestComparableTraining),
+        vsPriorRace: parseVsPriorRace(refs.vsPriorRace)
+      },
+      pacingAnalysis: {
+        splitType: pacing.splitType === "even" || pacing.splitType === "positive" || pacing.splitType === "negative"
+          ? pacing.splitType
+          : null,
+        driftObservation: typeof pacing.driftObservation === "string" ? pacing.driftObservation : null,
+        decouplingObservation: typeof pacing.decouplingObservation === "string" ? pacing.decouplingObservation : null
+      },
+      anomalies: anomaliesRaw
+        .map((a): SegmentDiagnosticPayload["anomalies"][number] | null => {
+          if (!a || typeof a !== "object") return null;
+          const o = a as Record<string, unknown>;
+          if (
+            (o.type === "hr_spike" || o.type === "power_dropout" || o.type === "pace_break" || o.type === "cadence_drop") &&
+            typeof o.atSec === "number" &&
+            typeof o.observation === "string"
+          ) {
+            return { type: o.type, atSec: o.atSec, observation: o.observation };
+          }
+          return null;
+        })
+        .filter((a): a is SegmentDiagnosticPayload["anomalies"][number] => a !== null),
+      aiNarrative: typeof r.aiNarrative === "string" ? r.aiNarrative : null
+    });
+  }
+  return out;
+}
+
+function parseVsPlan(value: unknown): SegmentDiagnosticPayload["referenceFrames"]["vsPlan"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (
+    (v.label === "on_plan" || v.label === "under" || v.label === "over") &&
+    typeof v.deltaPct === "number" &&
+    typeof v.summary === "string"
+  ) {
+    return { label: v.label, deltaPct: v.deltaPct, summary: v.summary };
+  }
+  return null;
+}
+
+function parseVsThreshold(value: unknown): SegmentDiagnosticPayload["referenceFrames"]["vsThreshold"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.thresholdValue === "number" &&
+    (v.thresholdUnit === "watts" || v.thresholdUnit === "sec_per_km" || v.thresholdUnit === "sec_per_100m") &&
+    typeof v.intensityFactor === "number" &&
+    typeof v.summary === "string"
+  ) {
+    return {
+      thresholdValue: v.thresholdValue,
+      thresholdUnit: v.thresholdUnit,
+      intensityFactor: v.intensityFactor,
+      summary: v.summary
+    };
+  }
+  return null;
+}
+
+function parseVsBestComparable(value: unknown): SegmentDiagnosticPayload["referenceFrames"]["vsBestComparableTraining"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.sessionId === "string" &&
+    typeof v.sessionDate === "string" &&
+    typeof v.sessionName === "string" &&
+    typeof v.comparison === "string"
+  ) {
+    return {
+      sessionId: v.sessionId,
+      sessionDate: v.sessionDate,
+      sessionName: v.sessionName,
+      comparison: v.comparison
+    };
+  }
+  return null;
+}
+
+function parseVsPriorRace(value: unknown): SegmentDiagnosticPayload["referenceFrames"]["vsPriorRace"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.bundleId === "string" &&
+    typeof v.raceName === "string" &&
+    typeof v.raceDate === "string" &&
+    typeof v.comparison === "string"
+  ) {
+    return {
+      bundleId: v.bundleId,
+      raceName: v.raceName,
+      raceDate: v.raceDate,
+      comparison: v.comparison
+    };
+  }
+  return null;
+}
+
+function parseTransitionsAnalysis(value: unknown): TransitionsAnalysisPayload | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const t1 = parseTransitionEntry(v.t1);
+  const t2 = parseTransitionEntry(v.t2);
+  if (!t1 && !t2) return null;
+  return { t1, t2 };
+}
+
+function parseTransitionEntry(value: unknown): TransitionsAnalysisPayload["t1"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.athleteSec !== "number" || typeof v.summary !== "string") return null;
+  return {
+    athleteSec: v.athleteSec,
+    populationMedianSec: typeof v.populationMedianSec === "number" ? v.populationMedianSec : null,
+    hrAtEnd: typeof v.hrAtEnd === "number" ? v.hrAtEnd : null,
+    summary: v.summary
+  };
 }

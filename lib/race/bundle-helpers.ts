@@ -117,6 +117,10 @@ export type RaceBundleSummary = {
     pacing_arc_data: unknown;
     /** Tone-guard telemetry for the spot-check audit. */
     tone_violations: unknown;
+    /** Phase 1C — per-segment diagnostic packets (one per discipline). */
+    segment_diagnostics: unknown;
+    /** Phase 1C — transitions analysis vs population norms. */
+    transitions_analysis: unknown;
     model_used: string | null;
   } | null;
 };
@@ -195,7 +199,8 @@ export async function loadRaceBundleSummary(
       "headline,narrative,coach_take,transition_notes,pacing_notes," +
         "discipline_distribution_actual,discipline_distribution_delta," +
         "verdict,race_story,leg_status,emotional_frame,cross_discipline_insight," +
-        "pacing_arc_data,tone_violations,model_used,is_provisional,generated_at"
+        "pacing_arc_data,tone_violations,segment_diagnostics,transitions_analysis," +
+        "model_used,is_provisional,generated_at"
     )
     .eq("race_bundle_id", bundleId)
     .eq("user_id", userId)
@@ -220,6 +225,8 @@ export async function loadRaceBundleSummary(
         cross_discipline_insight: (reviewRecord.cross_discipline_insight as string | null) ?? null,
         pacing_arc_data: reviewRecord.pacing_arc_data ?? null,
         tone_violations: reviewRecord.tone_violations ?? null,
+        segment_diagnostics: reviewRecord.segment_diagnostics ?? null,
+        transitions_analysis: reviewRecord.transitions_analysis ?? null,
         model_used: (reviewRecord.model_used as string | null) ?? null,
         is_provisional: Boolean(reviewRecord.is_provisional),
         generated_at: (reviewRecord.generated_at as string | null) ?? null
