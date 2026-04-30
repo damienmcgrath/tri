@@ -138,6 +138,76 @@ function summarizeSegmentDiagnostics(value: unknown): string | null {
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+function summarizeTrainingLinks(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const lines: string[] = [];
+  const windowWeeks = typeof v.windowWeeks === "number" ? v.windowWeeks : null;
+  if (windowWeeks != null) lines.push(`window: ${windowWeeks} weeks`);
+  if (typeof v.aiNarrative === "string" && v.aiNarrative.length > 0) {
+    lines.push(`narrative: ${v.aiNarrative}`);
+  }
+  const perLeg = v.perLeg as Record<string, unknown> | undefined;
+  if (perLeg) {
+    for (const leg of ["swim", "bike", "run"] as const) {
+      const arr = perLeg[leg];
+      if (Array.isArray(arr) && arr.length > 0) {
+        for (const entry of arr) {
+          if (!entry || typeof entry !== "object") continue;
+          const e = entry as Record<string, unknown>;
+          if (typeof e.sessionName === "string" && typeof e.narrative === "string") {
+            lines.push(`  ${leg}: ${e.sessionName} — ${e.narrative}`);
+          }
+        }
+      }
+    }
+  }
+  const warnings = v.warningsMissed;
+  if (Array.isArray(warnings) && warnings.length > 0) {
+    lines.push("warning signs missed:");
+    for (const entry of warnings) {
+      if (!entry || typeof entry !== "object") continue;
+      const e = entry as Record<string, unknown>;
+      if (typeof e.sessionName === "string" && typeof e.observation === "string") {
+        lines.push(`  - ${e.sessionName}: ${e.observation}`);
+      }
+    }
+  }
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+function summarizeRetrospective(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const lines: string[] = [];
+  const trajectory = v.ctlTrajectory as Record<string, unknown> | undefined;
+  if (trajectory) {
+    const peakCtl = typeof trajectory.peakCtl === "number" ? trajectory.peakCtl : null;
+    const peakDate = typeof trajectory.peakCtlDate === "string" ? trajectory.peakCtlDate : null;
+    const days = typeof trajectory.daysFromPeakToRace === "number" ? trajectory.daysFromPeakToRace : null;
+    if (peakCtl != null && peakDate && days != null) {
+      lines.push(`peak CTL ${peakCtl} on ${peakDate} (${days}d before race)`);
+    }
+  }
+  const taper = v.taperReadOut as Record<string, unknown> | undefined;
+  if (taper && typeof taper.complianceScore === "number") {
+    lines.push(`taper compliance: ${Math.round(taper.complianceScore * 100)}%`);
+  }
+  const exec = v.keySessionExecutionRate as Record<string, unknown> | undefined;
+  if (exec && typeof exec.totalKeySessions === "number" && typeof exec.completedKeySessions === "number") {
+    lines.push(`key sessions: ${exec.completedKeySessions}/${exec.totalKeySessions}`);
+  }
+  const verdict = v.verdict as Record<string, unknown> | undefined;
+  if (verdict) {
+    if (typeof verdict.headline === "string") lines.push(`verdict: ${verdict.headline}`);
+    if (typeof verdict.body === "string") lines.push(`  ${verdict.body}`);
+    if (typeof verdict.actionableAdjustment === "string") {
+      lines.push(`  next build: ${verdict.actionableAdjustment}`);
+    }
+  }
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 function summarizeLessons(lessons: RaceBundleSummary["lessons"]): string | null {
   if (!lessons) return null;
   const lines: string[] = [];
@@ -240,6 +310,12 @@ export function formatRaceContextBlock(summary: RaceBundleSummary): string {
     if (review.cross_discipline_insight) {
       sections.push(`\ncross-discipline insight: ${review.cross_discipline_insight}`);
     }
+
+    const trainingLinks = summarizeTrainingLinks(review.training_to_race_links);
+    if (trainingLinks) sections.push(`\ntraining-to-race links:\n${trainingLinks}`);
+
+    const retro = summarizeRetrospective(review.pre_race_retrospective);
+    if (retro) sections.push(`\npre-race retrospective:\n${retro}`);
   }
 
   const lessonsBlock = summarizeLessons(lessons);

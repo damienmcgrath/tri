@@ -14,8 +14,10 @@ import {
   coachToolSchemas,
   type getRaceSegmentMetricsArgsSchema,
   type getPriorRacesForComparisonArgsSchema,
-  type getBestComparableTrainingForSegmentArgsSchema
+  type getBestComparableTrainingForSegmentArgsSchema,
+  type compareToPriorRaceArgsSchema
 } from "@/lib/coach/tools";
+import { getOrGenerateRaceComparison } from "@/lib/race-review/comparison";
 import { getAthleteContextSnapshot } from "@/lib/athlete-context";
 import type { z } from "zod";
 
@@ -227,6 +229,53 @@ export async function getBestComparableTrainingForSegment(
           metricsV2: activity.metrics_v2 ?? null
         }
       : null
+  };
+}
+
+// ─── Phase 3 race-scoped tools ──────────────────────────────────────────────
+
+export async function getTrainingToRaceLinks(deps: RaceToolDeps) {
+  const summary = await loadSummaryOrThrow(deps);
+  const links = (summary.review as Record<string, unknown> | null)?.training_to_race_links;
+  if (!links) {
+    return { found: false } as const;
+  }
+  return { found: true, trainingToRaceLinks: links };
+}
+
+export async function getPreRaceRetrospective(deps: RaceToolDeps) {
+  const summary = await loadSummaryOrThrow(deps);
+  const retro = (summary.review as Record<string, unknown> | null)?.pre_race_retrospective;
+  if (!retro) {
+    return { found: false } as const;
+  }
+  return { found: true, preRaceRetrospective: retro };
+}
+
+export async function compareToPriorRace(
+  args: z.infer<typeof compareToPriorRaceArgsSchema>,
+  deps: RaceToolDeps
+) {
+  ensureScope(deps);
+  const parsed = coachToolSchemas.compare_to_prior_race.parse(args);
+  if (parsed.priorBundleId === deps.bundleId) {
+    return { error: "same_bundle", message: "priorBundleId must differ from the scoped race." } as const;
+  }
+
+  const result = await getOrGenerateRaceComparison({
+    supabase: deps.supabase,
+    userId: deps.ctx.userId,
+    bundleId: deps.bundleId,
+    priorBundleId: parsed.priorBundleId
+  });
+
+  if (result.status !== "ok") {
+    return { error: result.reason } as const;
+  }
+  return {
+    found: true as const,
+    payload: result.payload,
+    narrative: result.narrative
   };
 }
 

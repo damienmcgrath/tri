@@ -45,10 +45,24 @@ export function findBestComparableTraining(args: {
   raceLegDurationSec: number;
   candidates: ComparableCandidate[];
 }): ComparableMatch | null {
-  const { discipline, raceLegDurationSec, candidates } = args;
-  if (raceLegDurationSec <= 0 || candidates.length === 0) return null;
+  const top = findBestComparableTrainingTopN({ ...args, limit: 1 });
+  return top[0] ?? null;
+}
 
-  let best: ComparableMatch | null = null;
+/**
+ * Phase 3.2 top-N variant. Returns up to `limit` matches sorted by score
+ * descending. Same scoring + score floor as the single-best version.
+ */
+export function findBestComparableTrainingTopN(args: {
+  discipline: "swim" | "bike" | "run";
+  raceLegDurationSec: number;
+  candidates: ComparableCandidate[];
+  limit: number;
+}): ComparableMatch[] {
+  const { discipline, raceLegDurationSec, candidates, limit } = args;
+  if (raceLegDurationSec <= 0 || candidates.length === 0 || limit <= 0) return [];
+
+  const scored: ComparableMatch[] = [];
   for (const c of candidates) {
     if (c.sport !== discipline) continue;
     if (c.durationSec <= 0) continue;
@@ -57,17 +71,16 @@ export function findBestComparableTraining(args: {
     const intentScore = scoreIntent(c.sessionName, c.type, c.sessionRole);
     const score = durationScore * intentScore;
     if (score < SCORE_FLOOR) continue;
-    if (!best || score > best.score) {
-      best = {
-        sessionId: c.sessionId,
-        date: c.date,
-        sessionName: c.sessionName ?? c.type ?? `${capitalize(discipline)} session`,
-        durationSec: c.durationSec,
-        score
-      };
-    }
+    scored.push({
+      sessionId: c.sessionId,
+      date: c.date,
+      sessionName: c.sessionName ?? c.type ?? `${capitalize(discipline)} session`,
+      durationSec: c.durationSec,
+      score
+    });
   }
-  return best;
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
 }
 
 function scoreDuration(candidateSec: number, targetSec: number): number {

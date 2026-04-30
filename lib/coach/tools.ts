@@ -27,6 +27,11 @@ export const getRaceObjectArgsSchema = z.object({}).strict();
 export const getRaceSegmentMetricsArgsSchema = z.object({
   role: raceDisciplineEnum
 }).strict();
+export const getTrainingToRaceLinksArgsSchema = z.object({}).strict();
+export const getPreRaceRetrospectiveArgsSchema = z.object({}).strict();
+export const compareToPriorRaceArgsSchema = z.object({
+  priorBundleId: z.string().uuid()
+}).strict();
 export const getPriorRacesForComparisonArgsSchema = z.object({
   sameDistanceOnly: z.boolean().default(true),
   limit: z.number().int().min(1).max(10).default(5)
@@ -75,7 +80,10 @@ export const coachToolSchemas = {
   get_prior_races_for_comparison: getPriorRacesForComparisonArgsSchema,
   get_best_comparable_training_for_segment: getBestComparableTrainingForSegmentArgsSchema,
   get_athlete_thresholds: getAthleteThresholdsArgsSchema,
-  get_what_if_scenario: getWhatIfScenarioArgsSchema
+  get_what_if_scenario: getWhatIfScenarioArgsSchema,
+  get_training_to_race_links: getTrainingToRaceLinksArgsSchema,
+  get_pre_race_retrospective: getPreRaceRetrospectiveArgsSchema,
+  compare_to_prior_race: compareToPriorRaceArgsSchema
 } as const;
 
 export const coachTools = [
@@ -262,6 +270,32 @@ export const coachTools = [
   },
   {
     type: "function" as const,
+    name: "get_training_to_race_links",
+    description: "RACE MODE ONLY. Return the persisted Training-to-Race Linking artifact for this race: top training sessions per leg whose execution mirrored race-day capability, plus warning-sign sessions where intent was missed. Pre-computed deterministically.",
+    strict: false,
+    parameters: { type: "object", additionalProperties: false, properties: {} }
+  },
+  {
+    type: "function" as const,
+    name: "get_pre_race_retrospective",
+    description: "RACE MODE ONLY. Return the persisted Pre-race Retrospective artifact: 8-week CTL trajectory, peak CTL date, taper compliance score, key-session execution rate, plus the verdict + actionable adjustment for the NEXT build cycle.",
+    strict: false,
+    parameters: { type: "object", additionalProperties: false, properties: {} }
+  },
+  {
+    type: "function" as const,
+    name: "compare_to_prior_race",
+    description: "RACE MODE ONLY. Generate (or return cached) per-leg / finish / IF deltas + AI progression narrative comparing this race to a specific prior race. Both races must share the same distance_type. Use the prior race's bundleId from get_prior_races_for_comparison.",
+    strict: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["priorBundleId"],
+      properties: { priorBundleId: { type: "string", format: "uuid" } }
+    }
+  },
+  {
+    type: "function" as const,
     name: "get_what_if_scenario",
     description: "RACE MODE ONLY. Run a deterministic what-if sketch grounded in the athlete's own training history. Output is a scenario sketch, not a precise prediction; you MUST hedge and cite the basedOn entries. Three kinds: pace_at_target (given role + target HR/power, return historical pace at that intensity), run_off_bike_at_if (given a bike IF, return run-off-bike pace from comparable bricks), sustainable_load (return pre-race CTL from prior races where the athlete arrived fresh and rated the experience 4+).",
     strict: false,
@@ -296,5 +330,8 @@ export const RACE_SCOPED_TOOLS: ReadonlySet<CoachToolName> = new Set([
   "get_race_segment_metrics",
   "get_prior_races_for_comparison",
   "get_best_comparable_training_for_segment",
-  "get_what_if_scenario"
+  "get_what_if_scenario",
+  "get_training_to_race_links",
+  "get_pre_race_retrospective",
+  "compare_to_prior_race"
 ]);
