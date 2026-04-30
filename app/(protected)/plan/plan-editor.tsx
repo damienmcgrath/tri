@@ -1,3 +1,6 @@
+// Deprecated: superseded by plan-grid.tsx as of Phase 1 plan redesign (issue #315).
+// Kept in tree until BlockOverview, BlockContextCard, WeeklyIntensityHeader and
+// related charts can be audited for other consumers. Not imported anywhere.
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
