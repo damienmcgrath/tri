@@ -7,9 +7,10 @@
  */
 
 import { z } from "zod";
-import { buildContextualPrompts, buildRaceWeekPrompts, COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS } from "@/lib/coach/instructions";
+import { buildContextualPrompts, buildRaceWeekPrompts, COACH_STRUCTURING_INSTRUCTIONS, COACH_SYSTEM_INSTRUCTIONS, RACE_COACH_INSTRUCTIONS } from "@/lib/coach/instructions";
 import { executeCoachTool } from "@/lib/coach/tool-handlers";
 import { coachToolSchemas, coachTools, type CoachToolName } from "@/lib/coach/tools";
+import { loadRaceCoachContext } from "@/lib/coach/race-context";
 import { getLatestFitness, getTsbTrend, getReadinessState } from "@/lib/training/fitness-model";
 import { detectCrossDisciplineFatigue } from "@/lib/training/fatigue-detection";
 import { getRaceWeekContext } from "@/lib/training/race-week";
@@ -23,6 +24,7 @@ export type ConversationMessageRow = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  citations?: unknown;
 };
 
 type StreamWriters = {
@@ -74,7 +76,8 @@ function safeStructuredFallback(answer: string): CoachStructuredResponse {
     answer,
     insights: [],
     actions: [],
-    warnings: []
+    warnings: [],
+    citations: []
   };
 }
 
@@ -90,7 +93,8 @@ export function buildServiceFallback(): CoachResponseFlowResult {
       answer,
       insights: [],
       actions: [],
-      warnings: []
+      warnings: [],
+      citations: []
     },
     responseId: undefined,
     previousResponseId: undefined
@@ -233,6 +237,12 @@ export async function runCoachResponseFlow(params: {
   priorMessages: ConversationMessageRow[];
   previousResponseId?: string;
   supabaseConversationId: string;
+  /**
+   * When set, this conversation is scoped to a race bundle. Phase 2 wires
+   * the actual race-context loading and tool exposure; this param is the
+   * plumbing seam.
+   */
+  raceBundleId?: string;
   toolDeps: Parameters<typeof executeCoachTool>[2];
   signal: AbortSignal;
   streamWriters?: StreamWriters;
@@ -259,19 +269,33 @@ export async function runCoachResponseFlow(params: {
     contextualPrompts.push(...raceWeekPrompts);
   }
 
-  const contextBlock = contextualPrompts.length > 0
+  const directivesBlock = contextualPrompts.length > 0
     ? `\n\nCoaching directives for this conversation:\n${contextualPrompts.map((p) => `- ${p}`).join("\n")}`
+    : "";
+
+  // Race-scoped conversations get the race object pre-loaded into context
+  // and the race-coach instruction block appended to the system prompt.
+  const raceCoachContext = params.raceBundleId
+    ? await loadRaceCoachContext(params.toolDeps.supabase, params.toolDeps.ctx.userId, params.raceBundleId).catch(() => null)
+    : null;
+
+  const systemInstructions = raceCoachContext
+    ? `${COACH_SYSTEM_INSTRUCTIONS}\n\n${RACE_COACH_INSTRUCTIONS}`
+    : COACH_SYSTEM_INSTRUCTIONS;
+
+  const raceBlock = raceCoachContext
+    ? `\n\n${raceCoachContext.promptBlock}`
     : "";
 
   let response = await collectResponseStream({
     request: {
       model: getCoachModel(),
-      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      instructions: systemInstructions,
       previous_response_id: params.previousResponseId,
       input: [
         {
           role: "user",
-          content: [{ type: "input_text", text: `<context>\nConversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}${contextBlock}\n</context>` }]
+          content: [{ type: "input_text", text: `<context>\nConversation ID: ${params.supabaseConversationId}\nRecent chat:\n${history || "(none)"}${directivesBlock}${raceBlock}\n</context>` }]
         },
         {
           role: "user",
@@ -319,7 +343,11 @@ export async function runCoachResponseFlow(params: {
       const parsedArgs = parseToolArgs(call.argumentsJson);
 
       try {
-        const output = await executeCoachTool(toolName, parsedArgs, params.toolDeps);
+        const output = await executeCoachTool(
+          toolName,
+          parsedArgs,
+          { ...params.toolDeps, raceBundleId: params.raceBundleId }
+        );
         toolOutputs.push({ type: "function_call_output", call_id: call.callId, output: JSON.stringify(output) });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown tool error";
@@ -332,7 +360,7 @@ export async function runCoachResponseFlow(params: {
         model: getCoachModel(),
         previous_response_id: response.responseId,
         input: toolOutputs,
-        instructions: COACH_SYSTEM_INSTRUCTIONS
+        instructions: systemInstructions
       },
       signal: params.signal,
       emitAnswerText: false
@@ -343,7 +371,7 @@ export async function runCoachResponseFlow(params: {
     request: {
       model: getCoachModel(),
       previous_response_id: response.responseId,
-      instructions: COACH_SYSTEM_INSTRUCTIONS,
+      instructions: systemInstructions,
       input: [
         {
           role: "user",
