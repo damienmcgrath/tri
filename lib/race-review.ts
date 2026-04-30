@@ -550,12 +550,42 @@ export function buildRaceFacts(args: {
   // Goal delta (positive = slower than goal).
   const goalDeltaSec = bundle.goalTimeSec ? totalDurationSec - bundle.goalTimeSec : null;
 
-  // Per-leg status (deterministic).
+  // Per-leg status (deterministic). Leg-average outputs feed the whole-leg
+  // fallback in classifyLegStatus when halves data isn't available (e.g.
+  // a Strava swim that imports as a single lap).
   const targets = inferTargetOutputs({ bundle, segments, raceProfile });
+  const swimSeg = segments.find((s) => s.role === "swim");
+  const bikeSeg = segments.find((s) => s.role === "bike");
+  const runSeg = segments.find((s) => s.role === "run");
+  const swimAvg = swimSeg && swimSeg.distanceM && swimSeg.distanceM > 0 && swimSeg.durationSec > 0
+    ? swimSeg.durationSec / (swimSeg.distanceM / 100)
+    : null;
+  const runAvg = runSeg && runSeg.distanceM && runSeg.distanceM > 0 && runSeg.durationSec > 0
+    ? runSeg.durationSec / (runSeg.distanceM / 1000)
+    : null;
+  const bikeAvgWatts = bikeSeg && typeof bikeSeg.avgPower === "number" && bikeSeg.avgPower > 0
+    ? bikeSeg.avgPower
+    : null;
   const legStatus: RaceFacts["legStatus"] = {
-    swim: classifyLegStatus({ pacing: pacing.swim, targetOutput: targets.swim }),
-    bike: classifyLegStatus({ pacing: pacing.bike, targetOutput: targets.bike }),
-    run: classifyLegStatus({ pacing: pacing.run, targetOutput: targets.run, hrDriftBpm: hrDrift.run })
+    swim: classifyLegStatus({
+      pacing: pacing.swim,
+      targetOutput: targets.swim,
+      legAverageOutput: swimAvg,
+      legAverageUnit: "sec_per_100m"
+    }),
+    bike: classifyLegStatus({
+      pacing: pacing.bike,
+      targetOutput: targets.bike,
+      legAverageOutput: bikeAvgWatts,
+      legAverageUnit: "watts"
+    }),
+    run: classifyLegStatus({
+      pacing: pacing.run,
+      targetOutput: targets.run,
+      hrDriftBpm: hrDrift.run,
+      legAverageOutput: runAvg,
+      legAverageUnit: "sec_per_km"
+    })
   };
 
   // Cross-discipline gate (deterministic; AI only narrates if detected).
