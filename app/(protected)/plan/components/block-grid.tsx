@@ -20,6 +20,8 @@ type Props = {
   adaptationsBySession: Record<string, boolean>;
   completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
   onSelectSession?: (sessionId: string) => void;
+  onEmptyCellClick?: (weekId: string, date: string) => void;
+  onEmptyCellContextMenu?: (weekId: string, date: string, x: number, y: number) => void;
 };
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -42,7 +44,16 @@ function isCurrentWeek(weekStart: string, todayIso: string) {
   return weekStart <= todayIso && todayIso <= end;
 }
 
-export function BlockGrid({ weeks, sessions, todayIso, adaptationsBySession, completedByWeek, onSelectSession }: Props) {
+export function BlockGrid({
+  weeks,
+  sessions,
+  todayIso,
+  adaptationsBySession,
+  completedByWeek,
+  onSelectSession,
+  onEmptyCellClick,
+  onEmptyCellContextMenu
+}: Props) {
   const sortedWeeks = useMemo(
     () => [...weeks].sort((a, b) => a.week_index - b.week_index),
     [weeks]
@@ -134,6 +145,16 @@ export function BlockGrid({ weeks, sessions, todayIso, adaptationsBySession, com
                       isToday={isToday}
                       adaptationsBySession={adaptationsBySession}
                       onSelectSession={onSelectSession}
+                      emptyAffordance={
+                        onEmptyCellClick && onEmptyCellContextMenu
+                          ? {
+                              weekId: week.id,
+                              date: dayIso,
+                              onClick: onEmptyCellClick,
+                              onContextMenu: onEmptyCellContextMenu
+                            }
+                          : undefined
+                      }
                     />
                   </div>
                 );

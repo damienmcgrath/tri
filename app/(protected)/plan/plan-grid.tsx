@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addDays } from "@/lib/date-utils";
+import { inferDefaultDiscipline } from "@/lib/training/discipline-defaults";
 import { BlockHeader } from "./components/block-header";
 import { BlockGrid } from "./components/block-grid";
+import { CellContextMenu, type CellContextMenuAction } from "./components/cell-context-menu";
 import type { SessionPillSession } from "./components/session-pill";
-import { SessionDrawer, type AdaptationEntry, type DrawerSession } from "./components/session-drawer";
+import { SessionDrawer, type AdaptationEntry, type DrawerCreateCell, type DrawerSession } from "./components/session-drawer";
+import { createSessionFromCellAction } from "./actions";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 
@@ -72,6 +75,14 @@ export function PlanGrid({
   const [activeBlockId, setActiveBlockId] = useState<string | null>(selectedBlockId);
   const [localSessions, setLocalSessions] = useState<PlanGridSession[]>(sessions);
   const [openSessionId, setOpenSessionId] = useState<string | null>(initialOpenSessionId ?? null);
+  const [createCell, setCreateCell] = useState<DrawerCreateCell | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    weekId: string;
+    date: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [lastEditedDiscipline, setLastEditedDiscipline] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalSessions(sessions);
@@ -204,6 +215,7 @@ export function PlanGrid({
   }, [router, buildPlanUrl]);
 
   const handleSessionSaved = useCallback((next: DrawerSession) => {
+    setLastEditedDiscipline(next.sport);
     setLocalSessions((prev) =>
       prev.map((session) =>
         session.id === next.id
@@ -227,6 +239,124 @@ export function PlanGrid({
   const handleSessionDeleted = useCallback((id: string) => {
     setLocalSessions((prev) => prev.filter((session) => session.id !== id));
   }, []);
+
+  const appendCreatedSession = useCallback(
+    (created: DrawerSession) => {
+      setLocalSessions((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          sport: created.sport,
+          type: created.type,
+          session_name: created.session_name,
+          intent_category: created.intent_category,
+          target: created.target,
+          notes: created.notes,
+          duration_minutes: created.duration_minutes,
+          session_role: created.session_role,
+          is_key: created.is_key,
+          status: "planned",
+          week_id: created.week_id,
+          date: created.date,
+          day_order: null,
+          plan_id: created.plan_id ?? plan?.id ?? null
+        }
+      ]);
+      setLastEditedDiscipline(created.sport);
+    },
+    [plan]
+  );
+
+  const handleSessionCreated = useCallback(
+    (created: DrawerSession) => {
+      appendCreatedSession(created);
+    },
+    [appendCreatedSession]
+  );
+
+  const sessionsInActiveBlock = useCallback(
+    (weekIds: Set<string>) => localSessions.filter((session) => weekIds.has(session.week_id)),
+    [localSessions]
+  );
+
+  const handleEmptyCellClick = useCallback(
+    (weekId: string, date: string) => {
+      if (!plan) return;
+      const weekIds = new Set(weeks.filter((w) => w.block_id === activeBlockId).map((w) => w.id));
+      const blockSessions = sessionsInActiveBlock(weekIds);
+      const defaultDiscipline = inferDefaultDiscipline({
+        cellDate: date,
+        weekSessions: blockSessions.map((s) => ({ date: s.date, sport: s.sport })),
+        lastEditedDiscipline
+      });
+      setContextMenu(null);
+      setCreateCell({
+        plan_id: plan.id,
+        week_id: weekId,
+        date,
+        defaultDiscipline
+      });
+    },
+    [plan, weeks, activeBlockId, sessionsInActiveBlock, lastEditedDiscipline]
+  );
+
+  const handleEmptyCellContextMenu = useCallback(
+    (weekId: string, date: string, x: number, y: number) => {
+      setContextMenu({ weekId, date, x, y });
+    },
+    []
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeCreateDrawer = useCallback(() => setCreateCell(null), []);
+
+  const handleContextMenuAction = useCallback(
+    async (action: CellContextMenuAction) => {
+      const target = contextMenu;
+      setContextMenu(null);
+      if (!target || !plan) return;
+      if (action === "add") {
+        handleEmptyCellClick(target.weekId, target.date);
+        return;
+      }
+      // "rest"
+      try {
+        const created = await createSessionFromCellAction({
+          kind: "rest",
+          planId: plan.id,
+          weekId: target.weekId,
+          date: target.date,
+          sport: "other",
+          sessionName: null,
+          intentCategory: null,
+          durationMinutes: 0,
+          target: null,
+          notes: null,
+          sessionRole: "Recovery"
+        });
+        appendCreatedSession({
+          id: created.id,
+          plan_id: created.plan_id,
+          week_id: created.week_id,
+          date: created.date,
+          sport: created.sport,
+          type: created.type,
+          session_name: created.session_name,
+          intent_category: created.intent_category,
+          duration_minutes: created.duration_minutes,
+          target: created.target,
+          notes: created.notes,
+          session_role: created.session_role,
+          is_key: created.is_key
+        });
+      } catch (err) {
+        // Best-effort: log to console; surfacing a toast is out of scope for
+        // this phase. The failure is recoverable by the user retrying.
+        console.error("Failed to create rest day", err);
+      }
+    },
+    [contextMenu, plan, handleEmptyCellClick, appendCreatedSession]
+  );
 
   const drawerSession = useMemo<DrawerSession | null>(() => {
     if (!openSessionId) return null;
@@ -289,6 +419,8 @@ export function PlanGrid({
         adaptationsBySession={adaptationsBySession}
         completedByWeek={completedByWeek}
         onSelectSession={handleOpenSession}
+        onEmptyCellClick={handleEmptyCellClick}
+        onEmptyCellContextMenu={handleEmptyCellContextMenu}
       />
       <SessionDrawer
         session={drawerSession}
@@ -298,6 +430,24 @@ export function PlanGrid({
         onSaved={handleSessionSaved}
         onDeleted={handleSessionDeleted}
       />
+      <SessionDrawer
+        mode="create"
+        cell={createCell}
+        adaptations={[]}
+        open={createCell !== null}
+        onClose={closeCreateDrawer}
+        onSaved={handleSessionSaved}
+        onDeleted={handleSessionDeleted}
+        onCreated={handleSessionCreated}
+      />
+      {contextMenu ? (
+        <CellContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onSelect={handleContextMenuAction}
+          onClose={closeContextMenu}
+        />
+      ) : null}
     </div>
   );
 }

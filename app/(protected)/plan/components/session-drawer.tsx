@@ -6,7 +6,11 @@ import {
   getIntentCategoriesForDiscipline,
   isCuratedIntent
 } from "@/lib/training/intent-categories";
-import { deleteSessionAction, updateSessionDetailsAction } from "../actions";
+import {
+  createSessionFromCellAction,
+  deleteSessionAction,
+  updateSessionDetailsAction
+} from "../actions";
 
 export type DrawerSession = {
   id: string;
@@ -22,6 +26,14 @@ export type DrawerSession = {
   notes: string | null;
   session_role: string | null;
   is_key: boolean | null;
+};
+
+export type DrawerCreateCell = {
+  plan_id: string;
+  week_id: string;
+  date: string;
+  defaultDiscipline: string;
+  defaultIntent?: string | null;
 };
 
 export type AdaptationEntry = {
@@ -102,6 +114,30 @@ function buildInitialState(session: DrawerSession): FormState {
   };
 }
 
+const CREATE_DEFAULT_INTENTS: Record<Discipline, string> = {
+  swim: "Aerobic",
+  bike: "Endurance",
+  run: "Easy Z2",
+  strength: "Mobility",
+  other: "Cross-training"
+};
+
+function buildCreateInitialState(cell: DrawerCreateCell): FormState {
+  const discipline = normaliseDiscipline(cell.defaultDiscipline);
+  const seed = cell.defaultIntent ?? CREATE_DEFAULT_INTENTS[discipline];
+  const intent = isCuratedIntent(seed, discipline) ? seed : "";
+  return {
+    discipline,
+    intent,
+    customIntent: "",
+    name: "",
+    duration: "60",
+    target: "",
+    role: null,
+    notes: ""
+  };
+}
+
 function statesEqual(a: FormState, b: FormState): boolean {
   return (
     a.discipline === b.discipline &&
@@ -124,15 +160,30 @@ function resolvedIntent(state: FormState): string | null {
 }
 
 export type SessionDrawerProps = {
-  session: DrawerSession | null;
+  mode?: "edit" | "create";
+  session?: DrawerSession | null;
+  cell?: DrawerCreateCell | null;
   adaptations: AdaptationEntry[];
   open: boolean;
   onClose: () => void;
   onSaved: (next: DrawerSession) => void;
   onDeleted: (id: string) => void;
+  onCreated?: (created: DrawerSession) => void;
 };
 
-export function SessionDrawer({ session, adaptations, open, onClose, onSaved, onDeleted }: SessionDrawerProps) {
+export function SessionDrawer({
+  mode = "edit",
+  session = null,
+  cell = null,
+  adaptations,
+  open,
+  onClose,
+  onSaved,
+  onDeleted,
+  onCreated
+}: SessionDrawerProps) {
+  const isCreate = mode === "create";
+
   const initialRef = useRef<FormState | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [pendingClose, setPendingClose] = useState(false);
@@ -142,7 +193,29 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !session) {
+    if (!open) {
+      initialRef.current = null;
+      setForm(null);
+      setPendingClose(false);
+      setPendingDelete(false);
+      setError(null);
+      return;
+    }
+    if (isCreate) {
+      if (!cell) {
+        initialRef.current = null;
+        setForm(null);
+        return;
+      }
+      const initial = buildCreateInitialState(cell);
+      initialRef.current = initial;
+      setForm(initial);
+      setPendingClose(false);
+      setPendingDelete(false);
+      setError(null);
+      return;
+    }
+    if (!session) {
       initialRef.current = null;
       setForm(null);
       setPendingClose(false);
@@ -156,7 +229,7 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
     setPendingClose(false);
     setPendingDelete(false);
     setError(null);
-  }, [open, session]);
+  }, [open, session, cell, isCreate]);
 
   const isDirty = useMemo(() => {
     if (!form || !initialRef.current) return false;
@@ -186,19 +259,76 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
   }
 
   async function handleSave() {
-    if (!session || !form) return;
+    if (!form) return;
     const duration = Number.parseInt(form.duration, 10);
     if (!Number.isFinite(duration) || duration < 1 || duration > 1440) {
       setError("Duration must be between 1 and 1440 minutes.");
       return;
     }
+
     setSaving(true);
     setError(null);
+
+    if (isCreate) {
+      if (!cell) {
+        setSaving(false);
+        return;
+      }
+      const sessionName = form.name.trim() || null;
+      const sessionType = resolvedIntent(form);
+      const target = form.target.trim() || null;
+      const notes = form.notes.trim() || null;
+      try {
+        const created = await createSessionFromCellAction({
+          kind: "session",
+          planId: cell.plan_id,
+          weekId: cell.week_id,
+          date: cell.date,
+          sport: form.discipline,
+          sessionType,
+          sessionName,
+          intentCategory: sessionType,
+          durationMinutes: duration,
+          target,
+          notes,
+          sessionRole: form.role
+        });
+        onCreated?.({
+          id: created.id,
+          plan_id: created.plan_id,
+          week_id: created.week_id,
+          date: created.date,
+          sport: created.sport,
+          type: created.type,
+          session_name: created.session_name,
+          intent_category: created.intent_category,
+          duration_minutes: created.duration_minutes,
+          target: created.target,
+          notes: created.notes,
+          session_role: created.session_role,
+          is_key: created.is_key
+        });
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not create session.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (!session) {
+      setSaving(false);
+      return;
+    }
 
     const optimistic: DrawerSession = {
       ...session,
       sport: form.discipline,
-      type: form.name.trim() || form.discipline.charAt(0).toUpperCase() + form.discipline.slice(1),
+      type:
+        form.name.trim() ||
+        resolvedIntent(form) ||
+        form.discipline.charAt(0).toUpperCase() + form.discipline.slice(1),
       session_name: form.name.trim() || null,
       intent_category: resolvedIntent(form),
       duration_minutes: duration,
@@ -214,6 +344,7 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
         planId: session.plan_id,
         weekId: session.week_id,
         sport: form.discipline,
+        sessionType: optimistic.intent_category,
         sessionName: optimistic.session_name,
         intentCategory: optimistic.intent_category,
         durationMinutes: duration,
@@ -248,14 +379,21 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
     }
   }
 
+  const headerDate = isCreate ? cell?.date ?? null : session?.date ?? null;
+  const headerEyebrow = isCreate ? "New session" : "Session";
+  const showForm = form !== null && (isCreate ? cell !== null : session !== null);
+  const canSave = isCreate ? form !== null : isDirty;
+  const saveLabel = isCreate ? "Create session" : "Save";
+  const saveActiveLabel = isCreate ? "Creating…" : "Saving…";
+
   return (
-    <Sheet open={open} onClose={handleClose} ariaLabel="Session details">
-      {session && form ? (
+    <Sheet open={open} onClose={handleClose} ariaLabel={isCreate ? "Create session" : "Session details"}>
+      {showForm && form ? (
         <>
           <header className="flex items-start justify-between gap-3 border-b border-[rgba(255,255,255,0.08)] px-4 py-3">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-tertiary">Session</div>
-              <div className="text-sm font-semibold text-white">{formatDay(session.date)}</div>
+              <div className="text-[10px] uppercase tracking-wide text-tertiary">{headerEyebrow}</div>
+              <div className="text-sm font-semibold text-white">{headerDate ? formatDay(headerDate) : ""}</div>
             </div>
             <button
               type="button"
@@ -389,7 +527,7 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
                 />
               </Field>
 
-              {adaptations.length > 0 ? (
+              {!isCreate && adaptations.length > 0 ? (
                 <section aria-label="Adaptation log" className="space-y-2 rounded-md border border-[rgba(140,200,255,0.2)] bg-[rgba(140,200,255,0.04)] p-3">
                   <div className="text-[10px] uppercase tracking-wide text-[rgba(140,200,255,0.85)]">
                     Coach notes
@@ -463,18 +601,20 @@ export function SessionDrawer({ session, adaptations, open, onClose, onSaved, on
                   <button
                     type="button"
                     onClick={handleSave}
-                    disabled={saving || !isDirty}
+                    disabled={saving || !canSave}
                     className="rounded-md border border-[rgba(190,255,0,0.5)] bg-[rgba(190,255,0,0.15)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
-                    {saving ? "Saving…" : "Save"}
+                    {saving ? saveActiveLabel : saveLabel}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(true)}
-                    className="rounded-md border border-[rgba(255,80,80,0.4)] px-3 py-1.5 text-xs text-[rgba(255,180,180,0.95)] hover:bg-[rgba(255,80,80,0.08)]"
-                  >
-                    Delete
-                  </button>
+                  {isCreate ? null : (
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(true)}
+                      className="rounded-md border border-[rgba(255,80,80,0.4)] px-3 py-1.5 text-xs text-[rgba(255,180,180,0.95)] hover:bg-[rgba(255,80,80,0.08)]"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"
