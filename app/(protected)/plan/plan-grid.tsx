@@ -16,7 +16,9 @@ import {
 } from "./components/session-pill-context-menu";
 import type { SessionPillSession } from "./components/session-pill";
 import { SessionDrawer, type AdaptationEntry, type DrawerCreateCell, type DrawerSession } from "./components/session-drawer";
+import { MobilePlanView } from "./components/mobile-plan-view";
 import { useBlockGridDndSensors } from "./components/use-block-grid-dnd";
+import { useViewport } from "./hooks/use-viewport";
 import {
   convertSessionToRestAction,
   createSessionFromCellAction,
@@ -105,6 +107,8 @@ export function PlanGrid({
   const [lastEditedDiscipline, setLastEditedDiscipline] = useState<string | null>(null);
 
   const dndSensors = useBlockGridDndSensors();
+  const { isPhone } = useViewport();
+  const drawerSide = isPhone ? "bottom" : "right";
 
   useEffect(() => {
     setLocalSessions(sessions);
@@ -739,8 +743,8 @@ export function PlanGrid({
           onSelectBlock={handleSelectBlock}
         />
       ) : null}
-      <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
-        <BlockGrid
+      {isPhone ? (
+        <MobilePlanView
           weeks={weeksInBlock}
           sessions={sessionsInBlock}
           todayIso={todayIso}
@@ -749,10 +753,23 @@ export function PlanGrid({
           onSelectSession={handleOpenSession}
           onSessionContextMenu={handleSessionContextMenu}
           onEmptyCellClick={handleEmptyCellClick}
-          onEmptyCellContextMenu={handleEmptyCellContextMenu}
-          blockId={activeBlock?.id ?? null}
         />
-      </DndContext>
+      ) : (
+        <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+          <BlockGrid
+            weeks={weeksInBlock}
+            sessions={sessionsInBlock}
+            todayIso={todayIso}
+            adaptationsBySession={adaptationsBySession}
+            completedByWeek={completedByWeek}
+            onSelectSession={handleOpenSession}
+            onSessionContextMenu={handleSessionContextMenu}
+            onEmptyCellClick={handleEmptyCellClick}
+            onEmptyCellContextMenu={handleEmptyCellContextMenu}
+            blockId={activeBlock?.id ?? null}
+          />
+        </DndContext>
+      )}
       <SessionDrawer
         session={drawerSession}
         adaptations={drawerAdaptations}
@@ -760,6 +777,7 @@ export function PlanGrid({
         onClose={handleCloseDrawer}
         onSaved={handleSessionSaved}
         onDeleted={handleSessionDeleted}
+        side={drawerSide}
       />
       <SessionDrawer
         mode="create"
@@ -770,6 +788,7 @@ export function PlanGrid({
         onSaved={handleSessionSaved}
         onDeleted={handleSessionDeleted}
         onCreated={handleSessionCreated}
+        side={drawerSide}
       />
       {contextMenu ? (
         <CellContextMenu
