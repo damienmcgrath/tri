@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getConnection, refreshIfExpired } from "@/lib/integrations/token-service";
 import { backfillStravaMetrics } from "@/lib/integrations/strava-metrics-backfill";
@@ -12,10 +12,19 @@ export const maxDuration = 300;
  *
  * Re-fetches existing Strava activities from the detailed endpoint and
  * enriches them with metrics_v2 (normalized power, laps, pace, HR drift, etc.).
- * Only processes activities that don't already have metrics_v2.
+ *
+ * By default only processes activities missing metrics_v2. Pass an optional
+ * JSON body to target specific activities or force re-processing — useful
+ * when the normalizer output shape has changed and historical rows need
+ * to be rewritten.
+ *
+ * Body (all optional):
+ *   { "force": true,
+ *     "externalActivityIds": ["12345", "67890"] }
+ *
  * Respects Strava rate limits and stops early if throttled.
  */
-export async function POST(): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
   const supabase = await createClient();
   const {
     data: { user }
@@ -30,11 +39,30 @@ export async function POST(): Promise<Response> {
     return NextResponse.json({ error: "No Strava account connected." }, { status: 404 });
   }
 
-  console.log(`[STRAVA_BACKFILL] Starting metrics backfill for user ${user.id}`);
+  // Body is optional; tolerate empty / non-JSON bodies.
+  let body: { force?: unknown; externalActivityIds?: unknown } = {};
+  try {
+    const text = await request.text();
+    if (text.trim().length > 0) body = JSON.parse(text);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const force = body.force === true;
+  const externalActivityIds = Array.isArray(body.externalActivityIds)
+    ? body.externalActivityIds.map((v) => String(v)).filter((v) => v.length > 0)
+    : undefined;
+
+  console.log(`[STRAVA_BACKFILL] Starting metrics backfill for user ${user.id}`, {
+    force,
+    targetCount: externalActivityIds?.length ?? "all"
+  });
 
   try {
     const freshConnection = await refreshIfExpired(connection);
-    const result = await backfillStravaMetrics(user.id, freshConnection);
+    const result = await backfillStravaMetrics(user.id, freshConnection, {
+      force,
+      externalActivityIds
+    });
 
     console.log(`[STRAVA_BACKFILL] Done for user ${user.id}:`, result);
     return NextResponse.json(result);
