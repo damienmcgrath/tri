@@ -70,7 +70,7 @@ describe("classifyLegStatus", () => {
   });
 
   describe("whole-leg fallback (halves not available)", () => {
-    it("returns null when no leg average is provided", () => {
+    it("returns null when neither leg average nor halves are available", () => {
       const result = classifyLegStatus({
         pacing: { halvesAvailable: false },
         targetOutput: 100
@@ -140,6 +140,40 @@ describe("classifyLegStatus", () => {
         legAverageUnit: "sec_per_100m"
       });
       expect(["on_plan", "strong", "under"]).toContain(result?.label);
+    });
+
+    describe("no target available", () => {
+      it("emits on_plan with leg-average evidence when only leg-average is known (swim)", () => {
+        const result = classifyLegStatus({
+          pacing: { halvesAvailable: false },
+          targetOutput: null,
+          legAverageOutput: 120, // 2:00 /100m
+          legAverageUnit: "sec_per_100m"
+        });
+        expect(result?.label).toBe("on_plan");
+        expect(result?.evidence[0]).toMatch(/2:00 \/100m/);
+        expect(result?.evidence[0]).toMatch(/no plan target/i);
+      });
+
+      it("formats run leg-average as M:SS /km", () => {
+        const result = classifyLegStatus({
+          pacing: { halvesAvailable: false },
+          targetOutput: null,
+          legAverageOutput: 270, // 4:30 /km
+          legAverageUnit: "sec_per_km"
+        });
+        expect(result?.evidence[0]).toMatch(/4:30 \/km/);
+      });
+
+      it("formats bike leg-average as watts", () => {
+        const result = classifyLegStatus({
+          pacing: { halvesAvailable: false },
+          targetOutput: null,
+          legAverageOutput: 207,
+          legAverageUnit: "watts"
+        });
+        expect(result?.evidence[0]).toMatch(/207W/);
+      });
     });
   });
 });
