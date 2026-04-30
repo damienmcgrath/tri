@@ -82,20 +82,28 @@ export function classifyLegStatus(input: LegStatusInput): LegStatusResult | null
   // Whole-leg fallback when halves data isn't available.
   if (!pacing || !pacing.halvesAvailable) {
     if (
-      targetOutput === null ||
-      targetOutput === undefined ||
-      targetOutput <= 0 ||
       legAverageOutput === null ||
       legAverageOutput === undefined ||
       !legAverageUnit
     ) {
       return null;
     }
-    return classifyFromLegAverage({
-      avg: legAverageOutput,
-      target: targetOutput,
-      unit: legAverageUnit
-    });
+    if (targetOutput !== null && targetOutput !== undefined && targetOutput > 0) {
+      return classifyFromLegAverage({
+        avg: legAverageOutput,
+        target: targetOutput,
+        unit: legAverageUnit
+      });
+    }
+    // No target available → emit on_plan with informational evidence.
+    // Mirrors the no-target path further down for legs WITH halves: when
+    // we can't compare to a plan we don't make claims, we just surface
+    // the leg average so the verdict tile shows real data rather than
+    // "No data".
+    return {
+      label: "on_plan",
+      evidence: [`Average ${formatLegAverage(legAverageOutput, legAverageUnit)} — no plan target captured for this leg.`]
+    };
   }
 
   const { firstHalf, lastHalf, deltaPct, unit } = pacing;
@@ -204,4 +212,12 @@ function classifyFromLegAverage(args: {
 function signed(n: number): string {
   if (n === 0) return "0.0";
   return n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
+}
+
+function formatLegAverage(value: number, unit: "watts" | "sec_per_km" | "sec_per_100m"): string {
+  if (unit === "watts") return `${Math.round(value)}W`;
+  const m = Math.floor(value / 60);
+  const s = Math.round(value % 60);
+  const suffix = unit === "sec_per_km" ? " /km" : " /100m";
+  return `${m}:${String(s).padStart(2, "0")}${suffix}`;
 }
