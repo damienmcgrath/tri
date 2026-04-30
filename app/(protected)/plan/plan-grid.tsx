@@ -490,27 +490,37 @@ export function PlanGrid({
           return;
         }
         try {
-          const created = await duplicateSessionAction({
+          const result = await duplicateSessionAction({
             sessionId: session.id,
             planId: plan.id,
             targetWeekId: targetWeek.id,
             targetDate: nextDate
           });
-          appendCreatedSession({
-            id: created.id,
-            plan_id: created.plan_id,
-            week_id: created.week_id,
-            date: created.date,
-            sport: created.sport,
-            type: created.type,
-            session_name: created.session_name,
-            intent_category: created.intent_category,
-            duration_minutes: created.duration_minutes,
-            target: created.target,
-            notes: created.notes,
-            session_role: created.session_role,
-            is_key: created.is_key
+          const removed = new Set(result.removedRestIds);
+          setLocalSessions((prev) => {
+            const filtered = removed.size > 0 ? prev.filter((s) => !removed.has(s.id)) : prev;
+            return [
+              ...filtered,
+              {
+                id: result.created.id,
+                sport: result.created.sport,
+                type: result.created.type,
+                session_name: result.created.session_name,
+                intent_category: result.created.intent_category,
+                target: result.created.target,
+                notes: result.created.notes,
+                duration_minutes: result.created.duration_minutes,
+                session_role: result.created.session_role,
+                is_key: result.created.is_key,
+                status: "planned",
+                week_id: result.created.week_id,
+                date: result.created.date,
+                day_order: null,
+                plan_id: result.created.plan_id
+              }
+            ];
           });
+          setLastEditedDiscipline(result.created.sport);
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Could not duplicate session.");
         }
@@ -660,7 +670,7 @@ export function PlanGrid({
         }
       }
     },
-    [pillContextMenu, plan, localSessions, weeks, appendCreatedSession]
+    [pillContextMenu, plan, localSessions, weeks]
   );
 
   const pillContextMenuSession = useMemo(() => {

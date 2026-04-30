@@ -79,6 +79,23 @@ export function BlockGrid({
       if (!weekMap.has(date)) weekMap.set(date, []);
       weekMap.get(date)!.push(session);
     }
+    // Order each day's stack by day_order so an optimistic move that bumps
+    // day_order to "append" actually appears at the bottom of the cell. Rows
+    // without a day_order (legacy / pre-migration) sort last.
+    for (const weekMap of map.values()) {
+      for (const list of weekMap.values()) {
+        list.sort((a, b) => {
+          const aOrder = (a as { day_order?: number | null }).day_order;
+          const bOrder = (b as { day_order?: number | null }).day_order;
+          const aHas = typeof aOrder === "number";
+          const bHas = typeof bOrder === "number";
+          if (aHas && bHas) return (aOrder as number) - (bOrder as number);
+          if (aHas) return -1;
+          if (bHas) return 1;
+          return 0;
+        });
+      }
+    }
     return map;
   }, [sessions]);
 

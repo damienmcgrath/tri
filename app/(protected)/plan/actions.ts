@@ -1050,13 +1050,20 @@ const duplicateSessionSchema = z.object({
 
 export type DuplicateSessionInput = z.infer<typeof duplicateSessionSchema>;
 
+export type DuplicateSessionResult = {
+  created: CreatedSessionRow;
+  removedRestIds: string[];
+};
+
 /**
- * Duplicates an existing session to a (week, day). Returns the new row in
- * CreatedSessionRow shape so the caller can splice it into local state.
+ * Duplicates an existing session to a (week, day). If a Rest sentinel
+ * occupies the target day it is deleted before insert (matching the drop-on-
+ * Rest semantics in rescheduleSessionAction). Returns the new row plus any
+ * removed Rest ids so the caller can reconcile local state.
  */
 export async function duplicateSessionAction(
   input: DuplicateSessionInput
-): Promise<CreatedSessionRow> {
+): Promise<DuplicateSessionResult> {
   const parsed = duplicateSessionSchema.parse(input);
   const { supabase, user } = await getAuthedClient();
 
@@ -1080,12 +1087,32 @@ export async function duplicateSessionAction(
 
   const { data: daySessions, error: daySessionsError } = await supabase
     .from("sessions")
-    .select("id")
+    .select("id, type")
     .eq("week_id", parsed.targetWeekId)
     .eq("date", parsed.targetDate);
 
   if (daySessionsError && !isMissingTableError(daySessionsError, "public.sessions")) {
     throw new Error(daySessionsError.message);
+  }
+
+  const removedRestIds: string[] = [];
+  let surviving = 0;
+  for (const row of (daySessions ?? []) as Array<{ id: string; type: string | null }>) {
+    if (isRestRow(row)) {
+      removedRestIds.push(row.id);
+    } else {
+      surviving += 1;
+    }
+  }
+
+  if (removedRestIds.length > 0) {
+    const { error: deleteRestError } = await supabase
+      .from("sessions")
+      .delete()
+      .in("id", removedRestIds);
+    if (deleteRestError) {
+      throw new Error(deleteRestError.message);
+    }
   }
 
   const canonicalPayload = {
@@ -1100,7 +1127,7 @@ export async function duplicateSessionAction(
     target: source.target ?? null,
     notes: source.notes ?? null,
     duration_minutes: source.duration_minutes,
-    day_order: daySessions?.length ?? 0,
+    day_order: surviving,
     status: "planned",
     is_key: source.is_key ?? false,
     session_role: source.session_role ?? null
@@ -1135,19 +1162,22 @@ export async function duplicateSessionAction(
   revalidatePath("/calendar");
 
   return {
-    id,
-    plan_id: parsed.planId,
-    week_id: parsed.targetWeekId,
-    date: parsed.targetDate,
-    sport: source.sport as string,
-    type: source.type as string,
-    session_name: canonicalPayload.session_name,
-    intent_category: canonicalPayload.intent_category,
-    duration_minutes: canonicalPayload.duration_minutes as number,
-    target: canonicalPayload.target,
-    notes: canonicalPayload.notes,
-    session_role: canonicalPayload.session_role as string | null,
-    is_key: canonicalPayload.is_key as boolean | null
+    created: {
+      id,
+      plan_id: parsed.planId,
+      week_id: parsed.targetWeekId,
+      date: parsed.targetDate,
+      sport: source.sport as string,
+      type: source.type as string,
+      session_name: canonicalPayload.session_name,
+      intent_category: canonicalPayload.intent_category,
+      duration_minutes: canonicalPayload.duration_minutes as number,
+      target: canonicalPayload.target,
+      notes: canonicalPayload.notes,
+      session_role: canonicalPayload.session_role as string | null,
+      is_key: canonicalPayload.is_key as boolean | null
+    },
+    removedRestIds
   };
 }
 
