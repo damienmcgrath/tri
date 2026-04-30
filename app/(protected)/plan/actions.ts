@@ -33,9 +33,11 @@ const createSessionSchema = z.object({
   date: z.string().date(),
   sport: z.enum(["swim", "bike", "run", "strength", "other"]),
   sessionType: z.string().trim().max(100).optional(),
-  target: z.string().trim().max(200).optional(),
+  sessionName: z.string().trim().max(200).optional(),
+  intentCategory: z.string().trim().max(120).optional(),
+  target: z.string().trim().max(2000).optional(),
   durationMinutes: z.coerce.number().int().min(1).max(1440),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z.string().trim().max(2000).optional(),
   distanceValue: z.union([z.literal(""), z.coerce.number().positive()]).optional(),
   distanceUnit: z.union([z.literal(""), z.enum(["m", "km", "mi", "yd"])]).optional(),
   dayOrder: z.coerce.number().int().min(0).max(100).optional(),
@@ -621,6 +623,8 @@ export async function createSessionAction(formData: FormData) {
     date: parsed.date,
     sport: parsed.sport,
     type: fallbackSessionType(parsed.sport, parsed.sessionType),
+    session_name: parsed.sessionName?.length ? parsed.sessionName : null,
+    intent_category: parsed.intentCategory?.length ? parsed.intentCategory : null,
     target: parsed.target || null,
     day_order: parsed.dayOrder ?? (daySessions?.length ?? 0),
     duration_minutes: parsed.durationMinutes,
@@ -635,6 +639,7 @@ export async function createSessionAction(formData: FormData) {
   await insertWithCompat(supabase, "sessions", canonicalPayload, SESSIONS_OPTIONAL_COLUMNS);
 
   revalidatePath("/plan");
+  revalidatePath("/calendar");
 }
 
 export async function updateSessionAction(formData: FormData) {
@@ -645,6 +650,8 @@ export async function updateSessionAction(formData: FormData) {
     date: formData.get("date"),
     sport: formData.get("sport"),
     sessionType: getOptionalFormValue(formData, "sessionType"),
+    sessionName: getOptionalFormValue(formData, "sessionName"),
+    intentCategory: getOptionalFormValue(formData, "intentCategory"),
     target: getOptionalFormValue(formData, "target"),
     durationMinutes: formData.get("durationMinutes"),
     notes: getOptionalFormValue(formData, "notes"),
@@ -666,6 +673,8 @@ export async function updateSessionAction(formData: FormData) {
     date: parsed.date,
     sport: parsed.sport,
     type: fallbackSessionType(parsed.sport, parsed.sessionType),
+    session_name: parsed.sessionName?.length ? parsed.sessionName : null,
+    intent_category: parsed.intentCategory?.length ? parsed.intentCategory : null,
     target: parsed.target || null,
     notes: parsed.notes ?? null,
     distance_value: parsed.distanceValue === "" ? null : parsed.distanceValue,
@@ -680,6 +689,58 @@ export async function updateSessionAction(formData: FormData) {
   await updateWithCompat(supabase, "sessions", parsed.sessionId, canonicalPayload, SESSIONS_OPTIONAL_COLUMNS);
 
   revalidatePath("/plan");
+  revalidatePath("/calendar");
+}
+
+const sessionDetailsSchema = z.object({
+  sessionId: uuidSchema,
+  planId: uuidSchema,
+  weekId: uuidSchema,
+  sport: z.enum(["swim", "bike", "run", "strength", "other"]),
+  sessionName: z.string().trim().max(200).nullable().optional(),
+  intentCategory: z.string().trim().max(120).nullable().optional(),
+  durationMinutes: z.coerce.number().int().min(1).max(1440),
+  target: z.string().trim().max(2000).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  sessionRole: z.enum(["Key", "Supporting", "Recovery"]).nullable().optional()
+});
+
+export type SessionDetailsInput = z.infer<typeof sessionDetailsSchema>;
+
+/**
+ * JSON-input variant of updateSessionAction used by the SessionDrawer for
+ * optimistic UX. Returns void; caller is responsible for splicing the new
+ * values into local state before awaiting and reverting on rejection.
+ */
+export async function updateSessionDetailsAction(input: SessionDetailsInput) {
+  const parsed = sessionDetailsSchema.parse(input);
+  const { supabase, user } = await getAuthedClient();
+
+  await assertPlanOwnership(supabase, user.id, parsed.planId);
+  await assertWeekOwnership(supabase, user.id, parsed.weekId, parsed.planId);
+
+  // The drawer schema dropped the explicit `sessionType` field in favour of
+  // `intent_category`, but the legacy `type` column is still NOT NULL on older
+  // rows. Mirror `session_name` into `type` so the column stays populated;
+  // intent lives in `intent_category`. Diverges from create/updateSessionAction
+  // which still pass an explicit sessionType.
+  const canonicalPayload = {
+    sport: parsed.sport,
+    type: fallbackSessionType(parsed.sport, parsed.sessionName ?? undefined),
+    session_name: parsed.sessionName?.length ? parsed.sessionName : null,
+    intent_category: parsed.intentCategory?.length ? parsed.intentCategory : null,
+    target: parsed.target?.length ? parsed.target : null,
+    notes: parsed.notes?.length ? parsed.notes : null,
+    duration_minutes: parsed.durationMinutes,
+    is_key: parsed.sessionRole === "Key",
+    session_role: parsed.sessionRole ?? null,
+    user_id: user.id
+  };
+
+  await updateWithCompat(supabase, "sessions", parsed.sessionId, canonicalPayload, SESSIONS_OPTIONAL_COLUMNS);
+
+  revalidatePath("/plan");
+  revalidatePath("/calendar");
 }
 
 export async function reorderSessionAction(input: z.infer<typeof reorderSessionSchema>) {
@@ -726,6 +787,7 @@ export async function deleteSessionAction(formData: FormData) {
   }
 
   revalidatePath("/plan");
+  revalidatePath("/calendar");
 }
 
 
