@@ -21,6 +21,7 @@ export type SessionPillSession = {
   session_role?: string | null;
   is_key?: boolean | null;
   execution_result?: { status?: ExecutionResultStatus | null; summary?: string | null } | null;
+  status?: "planned" | "completed" | "skipped" | null;
 };
 
 type Props = {
@@ -98,7 +99,7 @@ export function SessionPill({ session, hasAdaptation }: Props) {
 
   const isKey =
     session.is_key === true || (session.session_role ?? "").toString().toLowerCase() === "key";
-  const isCompleted = session.execution_result != null;
+  const isCompleted = session.status === "completed" || session.execution_result != null;
 
   return (
     <div

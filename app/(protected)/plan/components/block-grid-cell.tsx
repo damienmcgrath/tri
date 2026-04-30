@@ -11,12 +11,15 @@ type Props = {
 export function BlockGridCell({ sessions, isToday, adaptationsBySession }: Props) {
   return (
     <div
-      className={`flex min-h-[52px] flex-col gap-1 border-l border-[rgba(255,255,255,0.04)] px-1.5 py-1 ${
+      className={`relative flex min-h-[52px] flex-col gap-1 border-l border-[rgba(255,255,255,0.04)] px-1.5 py-1 ${
         isToday ? "bg-[rgba(190,255,0,0.04)]" : ""
       }`}
     >
       {isToday ? (
-        <span aria-hidden className="absolute h-1 w-1 -translate-y-0.5 rounded-full bg-[rgba(190,255,0,0.85)]" />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-1.5 top-1 h-1.5 w-1.5 rounded-full bg-[rgba(190,255,0,0.85)]"
+        />
       ) : null}
       {sessions.map((session) => (
         <SessionPill

@@ -153,6 +153,11 @@ class PreviewQueryBuilder {
     return this;
   }
 
+  neq(column: string, value: unknown) {
+    this.filters.push({ type: "not", column, operator: "eq", value });
+    return this;
+  }
+
   in(column: string, values: unknown[]) {
     this.filters.push({ type: "in", column, values });
     return this;

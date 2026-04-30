@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addDays } from "@/lib/date-utils";
 import { BlockHeader } from "./components/block-header";
@@ -41,6 +41,7 @@ type Props = {
   sessions: PlanGridSession[];
   selectedBlockId: string | null;
   adaptationsBySession: Record<string, boolean>;
+  completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
 };
 
 function getLocalTodayIso() {
@@ -57,7 +58,8 @@ export function PlanGrid({
   weeks,
   sessions,
   selectedBlockId,
-  adaptationsBySession
+  adaptationsBySession,
+  completedByWeek
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -68,17 +70,36 @@ export function PlanGrid({
     [blocks]
   );
 
+  // Reconcile local state when the URL-driven prop changes (back/forward,
+  // or any external link that mounts the same PlanGrid with a new ?block=).
+  useEffect(() => {
+    if (!sortedBlocks.length) {
+      if (activeBlockId !== null) setActiveBlockId(null);
+      return;
+    }
+    if (activeBlockId && sortedBlocks.some((block) => block.id === activeBlockId)) {
+      if (selectedBlockId && selectedBlockId !== activeBlockId && sortedBlocks.some((b) => b.id === selectedBlockId)) {
+        setActiveBlockId(selectedBlockId);
+      }
+      return;
+    }
+    setActiveBlockId(selectedBlockId ?? sortedBlocks[0].id);
+  }, [sortedBlocks, selectedBlockId, activeBlockId]);
+
   const activeBlock = useMemo(
     () => sortedBlocks.find((block) => block.id === activeBlockId) ?? sortedBlocks[0] ?? null,
     [sortedBlocks, activeBlockId]
   );
 
+  const sortedAllWeeks = useMemo(
+    () => [...weeks].sort((a, b) => a.week_index - b.week_index),
+    [weeks]
+  );
+
   const weeksInBlock = useMemo(() => {
-    if (!activeBlock) return [];
-    return weeks
-      .filter((week) => week.block_id === activeBlock.id)
-      .sort((a, b) => a.week_index - b.week_index);
-  }, [weeks, activeBlock]);
+    if (!activeBlock) return sortedAllWeeks;
+    return sortedAllWeeks.filter((week) => week.block_id === activeBlock.id);
+  }, [sortedAllWeeks, activeBlock]);
 
   const sessionsInBlock = useMemo(() => {
     const weekIds = new Set(weeksInBlock.map((w) => w.id));
@@ -116,7 +137,7 @@ export function PlanGrid({
     );
   }
 
-  if (!activeBlock) {
+  if (!activeBlock && weeksInBlock.length === 0) {
     return (
       <div className="surface-subtle px-4 py-8 text-center text-sm text-tertiary">
         No training blocks have been set up for this plan yet.
@@ -126,19 +147,22 @@ export function PlanGrid({
 
   return (
     <div className="space-y-3">
-      <BlockHeader
-        block={activeBlock}
-        blocks={sortedBlocks}
-        blockIndex={blockIndex}
-        currentWeekIndexInBlock={currentWeekIndexInBlock}
-        totalWeeksInBlock={weeksInBlock.length}
-        onSelectBlock={handleSelectBlock}
-      />
+      {activeBlock ? (
+        <BlockHeader
+          block={activeBlock}
+          blocks={sortedBlocks}
+          blockIndex={blockIndex}
+          currentWeekIndexInBlock={currentWeekIndexInBlock}
+          totalWeeksInBlock={weeksInBlock.length}
+          onSelectBlock={handleSelectBlock}
+        />
+      ) : null}
       <BlockGrid
         weeks={weeksInBlock}
         sessions={sessionsInBlock}
         todayIso={todayIso}
         adaptationsBySession={adaptationsBySession}
+        completedByWeek={completedByWeek}
       />
     </div>
   );

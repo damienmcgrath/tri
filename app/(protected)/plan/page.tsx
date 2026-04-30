@@ -256,10 +256,18 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
     session_role: (session.session_role ?? null) as string | null,
     is_key: session.is_key ?? null,
     execution_result: session.execution_result ?? null,
+    status: session.status,
     week_id: session.week_id,
     date: session.date,
     day_order: session.day_order ?? null
   }));
+
+  const completedByWeek: Record<string, Array<{ duration_minutes: number }>> = {};
+  for (const session of sessionsData) {
+    if (session.status !== "completed" || !session.week_id) continue;
+    if (!completedByWeek[session.week_id]) completedByWeek[session.week_id] = [];
+    completedByWeek[session.week_id].push({ duration_minutes: session.duration_minutes });
+  }
 
   return (
     <section className="plan-editor-motion-lock">
@@ -270,6 +278,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { plan
         sessions={gridSessions}
         selectedBlockId={selectedBlock?.id ?? null}
         adaptationsBySession={adaptationsBySession}
+        completedByWeek={completedByWeek}
       />
     </section>
   );
