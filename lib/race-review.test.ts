@@ -773,4 +773,240 @@ describe("generateRaceReview", () => {
     expect(persisted.crossDisciplineInsight).toBeNull();
     expect((trace.upserts[0].payload as any).cross_discipline_insight).toBeNull();
   });
+
+  it("persists Phase 1C segment_diagnostics with reference frames + AI narratives", async () => {
+    // Layered AI call returns the full Phase 1B shape; segment narrative call
+    // returns one paragraph per discipline. mockResolvedValueOnce ordering
+    // mirrors the call order in generateRaceReview: layered first, then
+    // segment narratives.
+    mockCallOpenAIWithFallback.mockResolvedValueOnce({
+      value: {
+        verdict: {
+          headline: "Finished in 2:31:30 with bike held 220→218W across halves.",
+          perDiscipline: {
+            swim: { status: "on_plan", summary: "Swim came in steady." },
+            bike: { status: "on_plan", summary: "Held within 1% across halves." },
+            run: { status: "on_plan", summary: "Run held even." }
+          },
+          coachTake: {
+            target: "Hold 220W ±2% across halves",
+            scope: "next race-pace ride",
+            successCriterion: "Halves move less than 2%",
+            progression: "If steady, extend duration by 10 minutes"
+          },
+          emotionalFrame: null
+        },
+        raceStory: {
+          overall: "Race came together — swim controlled, bike steady, run held shape.",
+          perLeg: {
+            swim: null,
+            bike: { narrative: "Bike held 220→218W.", keyEvidence: ["Halves moved -0.9%."] },
+            run: null
+          },
+          transitions: "T1 2:10, T2 1:39.",
+          crossDisciplineInsight: null
+        }
+      },
+      source: "ai"
+    });
+    mockCallOpenAIWithFallback.mockResolvedValueOnce({
+      value: {
+        swim: "Swim came in steady at 1:40 /100m.",
+        bike: "Bike held 220W average — IF 0.88, in the appropriate range.",
+        run: "Run paced even at 4:30 /km."
+      },
+      source: "ai"
+    });
+
+    const segmentRows = [
+      { id: "a1", race_segment_role: "swim", race_segment_index: 0, duration_sec: 1601, sport_type: "swim", distance_m: 1500, avg_hr: 145, avg_power: null, metrics_v2: { laps: [{ index: 0, durationSec: 800, avgPacePer100mSec: 100, avgHr: 142 }, { index: 1, durationSec: 801, avgPacePer100mSec: 100, avgHr: 148 }] } },
+      { id: "a2", race_segment_role: "t1",   race_segment_index: 1, duration_sec: 130,  sport_type: "strength", distance_m: 200, avg_hr: 140, avg_power: null, metrics_v2: null },
+      { id: "a3", race_segment_role: "bike", race_segment_index: 2, duration_sec: 4619, sport_type: "bike",  distance_m: 40000, avg_hr: 152, avg_power: 220, metrics_v2: { halves: { firstHalfAvgPower: 222, lastHalfAvgPower: 218 } } },
+      { id: "a4", race_segment_role: "t2",   race_segment_index: 3, duration_sec: 99,   sport_type: "strength", distance_m: 150, avg_hr: 142, avg_power: null, metrics_v2: null },
+      { id: "a5", race_segment_role: "run",  race_segment_index: 4, duration_sec: 2641, sport_type: "run",   distance_m: 10000, avg_hr: 158, avg_power: null, metrics_v2: { laps: [{ index: 0, durationSec: 800, avgPaceSecPerKm: 270, avgHr: 156 }, { index: 1, durationSec: 800, avgPaceSecPerKm: 272, avgHr: 159 }, { index: 2, durationSec: 1041, avgPaceSecPerKm: 274, avgHr: 161 }] } }
+    ];
+
+    // Custom supabase that handles the Phase 1C tables (athlete_ftp_history,
+    // race_profiles for prior-race lookup, sessions for the comparable pool).
+    const trace: SupabaseStub = { inserts: [], upserts: [] };
+    const supabase: any = {};
+    supabase.from = (table: string) => {
+      if (table === "race_bundles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    id: "bundle-1",
+                    user_id: "user-1",
+                    started_at: "2026-04-26T08:03:08.000Z",
+                    ended_at: "2026-04-26T10:34:00.000Z",
+                    total_duration_sec: 9090,
+                    total_distance_m: 50000,
+                    source: "garmin_multisport",
+                    subjective_captured_at: "2026-04-26T20:00:00.000Z",
+                    athlete_rating: 4,
+                    athlete_notes: null,
+                    issues_flagged: [],
+                    finish_position: null,
+                    age_group_position: null,
+                    goal_time_sec: 9000,
+                    goal_strategy_summary: null,
+                    pre_race_ctl: null,
+                    pre_race_atl: null,
+                    pre_race_tsb: null,
+                    pre_race_tsb_state: null,
+                    taper_compliance_score: null,
+                    taper_compliance_summary: null,
+                    inferred_transitions: false
+                  },
+                  error: null
+                })
+              })
+            })
+          })
+        };
+      }
+      if (table === "completed_activities") {
+        return {
+          select: () => ({
+            eq: (col: string, val: unknown) => ({
+              eq: (_col: string, _val: unknown) => ({
+                order: async () => ({ data: segmentRows, error: null }),
+                // For prior-race leg lookup (no order chained).
+                _data: segmentRows
+              })
+            })
+          })
+        };
+      }
+      if (table === "session_activity_links") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                in: async () => ({
+                  data: [
+                    { planned_session_id: "session-race", confirmation_status: "confirmed" },
+                    { planned_session_id: "session-race", confirmation_status: "confirmed" },
+                    { planned_session_id: "session-race", confirmation_status: "confirmed" },
+                    { planned_session_id: "session-race", confirmation_status: "confirmed" },
+                    { planned_session_id: "session-race", confirmation_status: "confirmed" }
+                  ],
+                  error: null
+                })
+              })
+            })
+          })
+        };
+      }
+      if (table === "sessions") {
+        // Two distinct chains: planned-session lookup uses
+        // .eq().eq().maybeSingle(); recent-session pool uses
+        // .eq().gte().lt().eq() (then awaited as the array result).
+        const recentPool = [
+          { id: "best-bike", date: "2026-04-12", sport: "bike", type: "tempo", session_name: "Race-pace 40km", session_role: "key", duration_minutes: 75, status: "completed" },
+          { id: "long-run", date: "2026-04-08", sport: "run", type: "long", session_name: "Long endurance run", session_role: "supporting", duration_minutes: 45, status: "completed" }
+        ];
+        const eqAfterLt = () => Promise.resolve({ data: recentPool, error: null });
+        const ltAfterGte = () => ({ eq: eqAfterLt });
+        const gteAfterFirstEq = () => ({ lt: ltAfterGte });
+        const eqAfterFirstEq = () => ({
+          maybeSingle: async () => ({
+            data: { id: "session-race", type: "Olympic (race)", session_name: "Joe Hannon Olympic", target: null },
+            error: null
+          })
+        });
+        const firstEq = () => ({
+          eq: eqAfterFirstEq,
+          gte: gteAfterFirstEq
+        });
+        return {
+          select: () => ({ eq: firstEq })
+        };
+      }
+      if (table === "race_profiles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({
+                      data: {
+                        id: "profile-1",
+                        name: "Joe Hannon Olympic",
+                        date: "2026-04-26",
+                        distance_type: "olympic",
+                        ideal_discipline_distribution: { swim: 0.15, bike: 0.55, run: 0.30 }
+                      },
+                      error: null
+                    })
+                  })
+                }),
+                lt: () => ({
+                  order: () => ({
+                    limit: async () => ({
+                      data: [],
+                      error: null
+                    })
+                  })
+                })
+              })
+            })
+          })
+        };
+      }
+      if (table === "athlete_ftp_history") {
+        return {
+          select: () => ({
+            eq: () => ({
+              lte: () => ({
+                order: () => ({
+                  order: () => ({
+                    limit: () => ({
+                      maybeSingle: async () => ({
+                        data: { value: 250, recorded_at: "2026-04-01" },
+                        error: null
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          })
+        };
+      }
+      if (table === "race_reviews") {
+        return {
+          upsert: (payload: unknown, options: { onConflict?: string }) => {
+            trace.upserts.push({ table, payload, onConflict: options?.onConflict ?? null });
+            return {
+              select: () => ({
+                single: async () => ({ data: { id: "review-1" }, error: null })
+              })
+            };
+          }
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    };
+
+    const result = await generateRaceReview({ supabase: supabase as any, userId: "user-1", bundleId: "bundle-1" });
+    expect(result.status).toBe("ok");
+
+    const payload = trace.upserts[0].payload as any;
+    expect(payload.segment_diagnostics).not.toBeNull();
+    const diags = payload.segment_diagnostics as any[];
+    expect(diags.map((d) => d.discipline).sort()).toEqual(["bike", "run", "swim"]);
+    const bike = diags.find((d) => d.discipline === "bike");
+    expect(bike.referenceFrames.vsThreshold).not.toBeNull();
+    expect(bike.referenceFrames.vsThreshold.thresholdValue).toBe(250);
+    expect(bike.referenceFrames.vsThreshold.intensityFactor).toBeGreaterThan(0.8);
+    expect(bike.referenceFrames.vsBestComparableTraining).not.toBeNull();
+    expect(bike.aiNarrative).toMatch(/IF 0\.88/);
+    expect(payload.transitions_analysis).not.toBeNull();
+    expect(payload.transitions_analysis.t1.populationMedianSec).toBe(150);
+  });
 });

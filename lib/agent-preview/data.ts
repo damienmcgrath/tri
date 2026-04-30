@@ -2259,6 +2259,113 @@ export function createPreviewDatabase(): PreviewDatabase {
         },
         emotional_frame: null,
         cross_discipline_insight: null,
+        // Phase 1C — per-segment diagnostic packets. The bike packet shows
+        // the populated reference frames (vs Plan + vs Threshold + vs Best
+        // Comparable Training); the run packet shows decoupling fired since
+        // HR drifted at slowing pace; the swim packet has the minimum
+        // populated state for visual coverage.
+        segment_diagnostics: [
+          {
+            discipline: "swim",
+            referenceFrames: {
+              vsPlan: {
+                label: "on_plan",
+                deltaPct: -1.0,
+                summary: "Avg 1:40 /100m vs plan 1:41 /100m (-1.0%)."
+              },
+              vsThreshold: null,
+              vsBestComparableTraining: null,
+              vsPriorRace: null
+            },
+            pacingAnalysis: {
+              splitType: "negative",
+              driftObservation: null,
+              decouplingObservation: null
+            },
+            anomalies: [],
+            aiNarrative:
+              "Swim came in just under plan — 1:42 → 1:39 /100m across halves, a clean 3% negative split off a controlled first half."
+          },
+          {
+            discipline: "bike",
+            referenceFrames: {
+              vsPlan: {
+                label: "on_plan",
+                deltaPct: 0.4,
+                summary: "Bike split 1:14:28 vs plan 1:14:00 (+0.4%)."
+              },
+              vsThreshold: {
+                thresholdValue: 245,
+                thresholdUnit: "watts",
+                intensityFactor: 0.91,
+                summary: "224W avg vs FTP 245W = IF 0.91 — appropriate for olympic-distance race effort."
+              },
+              vsBestComparableTraining: {
+                sessionId: "preview-session-bike-tt",
+                sessionDate: "2026-04-12",
+                sessionName: "Race-pace 40km TT",
+                comparison:
+                  "Closest training analogue: Race-pace 40km TT (2026-04-12, 1:15:00). Race leg 1:14:28."
+              },
+              vsPriorRace: null
+            },
+            pacingAnalysis: {
+              splitType: "even",
+              driftObservation: null,
+              decouplingObservation: null
+            },
+            anomalies: [],
+            aiNarrative:
+              "Bike held the line: 224W avg at IF 0.91 sits squarely in olympic race-effort range, matched the recent race-pace 40km TT, and halves moved less than 2%."
+          },
+          {
+            discipline: "run",
+            referenceFrames: {
+              vsPlan: {
+                label: "under",
+                deltaPct: 4.7,
+                summary: "Avg 4:23 /km vs plan 4:11 /km (+4.7%)."
+              },
+              vsThreshold: null,
+              vsBestComparableTraining: {
+                sessionId: "preview-session-long-run",
+                sessionDate: "2026-04-08",
+                sessionName: "Long endurance run",
+                comparison:
+                  "Closest training analogue: Long endurance run (2026-04-08, 1:00:00). Race leg 45:00."
+              },
+              vsPriorRace: null
+            },
+            pacingAnalysis: {
+              splitType: "positive",
+              driftObservation: "Second half eased 4.7% (4:17 → 4:29 /km).",
+              decouplingObservation: null
+            },
+            anomalies: [
+              {
+                type: "cadence_drop",
+                atSec: 1500,
+                observation: "Cadence dropped from 178 → 176 spm in the second half — minor form drift."
+              }
+            ],
+            aiNarrative:
+              "Run eased 4.7% in the second half (4:17 → 4:29 /km) as HR climbed +6 bpm to 172. Cadence drift was minor (178 → 176 spm)."
+          }
+        ],
+        transitions_analysis: {
+          t1: {
+            athleteSec: 130,
+            populationMedianSec: 150,
+            hrAtEnd: 152,
+            summary: "T1 2:10 vs typical 2:30 (−0:20), end HR 152 bpm."
+          },
+          t2: {
+            athleteSec: 99,
+            populationMedianSec: 90,
+            hrAtEnd: 165,
+            summary: "T2 1:39 vs typical 1:30 (+0:09), end HR 165 bpm."
+          }
+        },
         pacing_arc_data: {
           totalDurationSec: RACE_TOTAL_DURATION_SEC,
           points: [
@@ -2290,7 +2397,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 9;
+const PREVIEW_DATABASE_VERSION = 10;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;

@@ -48,6 +48,17 @@ import {
   buildReinforcementSystemMessage,
   type ToneViolation
 } from "@/lib/race-review/tone-guard";
+import {
+  buildSegmentDiagnostics,
+  type PriorRaceComparison
+} from "@/lib/race-review/segment-diagnostics";
+import {
+  segmentNarrativesSchema,
+  type SegmentDiagnostics,
+  type SegmentNarratives,
+  type TransitionsAnalysis
+} from "@/lib/race-review/segment-diagnostics-schemas";
+import type { ComparableCandidate } from "@/lib/race-review/best-comparable";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -301,6 +312,138 @@ async function resolvePlannedSessionId(supabase: SupabaseClient, userId: string,
   const ids = new Set(confirmed.map((row: any) => row.planned_session_id as string));
   if (ids.size !== 1) return null;
   return [...ids][0];
+}
+
+// ─── Phase 1C loaders ───────────────────────────────────────────────────────
+
+/**
+ * Returns the most-recent FTP value recorded on or before the race date.
+ * Returns null when no FTP entry exists.
+ */
+async function loadFtpAtRace(
+  supabase: SupabaseClient,
+  athleteId: string,
+  raceDateIso: string
+): Promise<number | null> {
+  const date = raceDateIso.slice(0, 10);
+  const { data } = await supabase
+    .from("athlete_ftp_history")
+    .select("value,recorded_at")
+    .eq("athlete_id", athleteId)
+    .lte("recorded_at", date)
+    .order("recorded_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  const v = (data as Record<string, unknown>).value;
+  return typeof v === "number" && v > 0 ? v : null;
+}
+
+/**
+ * Find the most-recent prior race bundle by the same athlete at the same
+ * distance type, before this race. Returns null when no prior race exists.
+ * Distance type is sourced from race_profiles.
+ */
+async function loadPriorRaceComparison(
+  supabase: SupabaseClient,
+  userId: string,
+  thisBundleId: string,
+  thisRaceDateIso: string,
+  distanceType: string | null
+): Promise<PriorRaceComparison | null> {
+  if (!distanceType) return null;
+  const date = thisRaceDateIso.slice(0, 10);
+
+  const { data: priorProfiles } = await supabase
+    .from("race_profiles")
+    .select("id,name,date,distance_type")
+    .eq("user_id", userId)
+    .eq("distance_type", distanceType)
+    .lt("date", date)
+    .order("date", { ascending: false })
+    .limit(5);
+  if (!priorProfiles || priorProfiles.length === 0) return null;
+
+  // Walk the candidates newest-first looking for a corresponding bundle.
+  for (const profile of priorProfiles) {
+    const profileDate = profile.date as string;
+    const { data: priorBundle } = await supabase
+      .from("race_bundles")
+      .select("id,started_at")
+      .eq("user_id", userId)
+      .neq("id", thisBundleId)
+      .gte("started_at", `${profileDate}T00:00:00.000Z`)
+      .lt("started_at", `${profileDate}T23:59:59.999Z`)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!priorBundle) continue;
+
+    const bundleId = priorBundle.id as string;
+    const { data: segments } = await supabase
+      .from("completed_activities")
+      .select("race_segment_role,duration_sec")
+      .eq("user_id", userId)
+      .eq("race_bundle_id", bundleId);
+    const legDurations: PriorRaceComparison["legDurations"] = { swim: null, bike: null, run: null };
+    for (const row of segments ?? []) {
+      const role = (row as any).race_segment_role as string | null;
+      const dur = Number((row as any).duration_sec ?? 0);
+      if (role === "swim" || role === "bike" || role === "run") {
+        legDurations[role] = dur > 0 ? dur : null;
+      }
+    }
+    return {
+      bundleId,
+      raceName: profile.name as string,
+      raceDate: profileDate,
+      legDurations
+    };
+  }
+  return null;
+}
+
+/**
+ * Recent completed-session pool for the best-comparable finder. 12-week
+ * window ending at the race date; only sessions that already linked to a
+ * completed activity (so we know they actually happened with a duration).
+ */
+async function loadRecentSessionPool(
+  supabase: SupabaseClient,
+  userId: string,
+  raceDateIso: string
+): Promise<ComparableCandidate[]> {
+  const raceDate = new Date(raceDateIso);
+  const windowStart = new Date(raceDate.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
+  const windowStartIso = windowStart.toISOString().slice(0, 10);
+  const raceDateOnly = raceDateIso.slice(0, 10);
+
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("id,date,sport,type,session_name,session_role,duration_minutes,status")
+    .eq("user_id", userId)
+    .gte("date", windowStartIso)
+    .lt("date", raceDateOnly)
+    .eq("status", "completed");
+
+  const out: ComparableCandidate[] = [];
+  for (const row of sessions ?? []) {
+    const sport = (row as any).sport as string;
+    if (sport !== "swim" && sport !== "bike" && sport !== "run") continue;
+    const minutes = Number((row as any).duration_minutes ?? 0);
+    if (minutes <= 0) continue;
+    out.push({
+      sessionId: (row as any).id as string,
+      date: (row as any).date as string,
+      sport,
+      durationSec: minutes * 60,
+      sessionName: ((row as any).session_name as string | null) ?? null,
+      type: ((row as any).type as string | null) ?? null,
+      sessionRole: ((row as any).session_role as string | null) ?? null
+    });
+  }
+  return out;
 }
 
 // ─── Deterministic facts builder ────────────────────────────────────────────
@@ -812,6 +955,26 @@ export function buildDeterministicLayers(facts: RaceFacts): RaceReviewLayers {
 
 // ─── Prompt builders ────────────────────────────────────────────────────────
 
+export function buildSegmentDiagnosticInstructions(): string {
+  return [
+    "You are TriCoach AI, writing the narrative synthesis for AI Layer 3 — per-segment diagnostic drill-downs.",
+    "",
+    "INPUT: a JSON object containing `bundle` summary metadata and `diagnostics` (an array of per-discipline packets). Each packet carries the four reference frames (vsPlan, vsThreshold, vsBestComparableTraining, vsPriorRace), the pacing analysis (split type, drift observation, decoupling observation), and 0–3 anomalies — every value already grounded in this athlete's own numbers.",
+    "",
+    "OUTPUT: an object `{ swim, bike, run }` where each value is either a string narrative (≤500 chars) OR null. Return null for any discipline NOT present in the input diagnostics array.",
+    "",
+    "RULES — HARD:",
+    "- Every claim must cite a specific number that already appears in the input. No generic-sounding observations.",
+    "- Tie reference frames together where they reinforce each other (e.g. vsPlan + vsThreshold).",
+    "- If vsPriorRace is null, do NOT mention prior races. Same for vsBestComparableTraining and vsThreshold.",
+    "- Do not narrate drift or decoupling observations that aren't present (they only appear when the gates fired).",
+    "- Diagnose, don't moralize. Use 'ended up', 'came in at', 'eased', 'held' — never 'should have', 'failed', 'must'.",
+    "- Mention the pacing split (even/positive/negative) plainly when present.",
+    "- Mention 1–2 anomalies maximum, prioritizing the most severe.",
+    "- Keep narrative tight: 2–4 sentences."
+  ].join("\n");
+}
+
 export function buildRaceReviewInstructions(args?: { reinforcement?: string | null }): string {
   const reinforcement = args?.reinforcement?.trim();
   return [
@@ -1101,6 +1264,20 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
   const fallbackLegacy = buildDeterministicRaceReview(facts);
   const fallbackLayers = buildDeterministicLayers(facts);
 
+  // Phase 1C inputs: FTP at race date, prior-race comparison, recent session pool.
+  const [ftpAtRace, priorRace, comparableCandidates] = await Promise.all([
+    loadFtpAtRace(supabase, userId, bundle.startedAt).catch(() => null),
+    loadPriorRaceComparison(supabase, userId, bundleId, bundle.startedAt, raceProfile?.distanceType ?? null).catch(() => null),
+    loadRecentSessionPool(supabase, userId, bundle.startedAt).catch(() => [])
+  ]);
+
+  const { diagnostics: deterministicDiagnostics, transitionsAnalysis } = buildSegmentDiagnostics({
+    facts,
+    ftpAtRace,
+    priorRace,
+    comparableCandidates
+  });
+
   // Persist pacing-arc series alongside the narrative.
   const pacingArc: PacingArcData = buildPacingArcData({
     segments,
@@ -1187,6 +1364,52 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
   // frame, or cross-discipline insight presence.
   layers = enforceDeterministicGates(layers, facts);
 
+  // Phase 1C: AI narrative synthesis for the per-segment diagnostic. One
+  // round-trip; the model only writes wording, never picks reference frames.
+  const narrativeFallback: SegmentNarratives = { swim: null, bike: null, run: null };
+  const segmentNarrativesAttempt = deterministicDiagnostics.length > 0
+    ? await callOpenAIWithFallback<SegmentNarratives>({
+        logTag: "race-review-segment-diagnostics",
+        fallback: narrativeFallback,
+        buildRequest: () => ({
+          instructions: buildSegmentDiagnosticInstructions(),
+          reasoning: { effort: "low" },
+          max_output_tokens: 2000,
+          text: {
+            format: zodTextFormat(segmentNarrativesSchema, "segment_narratives", {
+              description: "One-paragraph narrative synthesis per discipline."
+            })
+          },
+          input: [
+            {
+              role: "user" as const,
+              content: [
+                {
+                  type: "input_text" as const,
+                  text: JSON.stringify({
+                    bundle: {
+                      totalDurationSec: facts.bundle.totalDurationSec,
+                      goalTimeSec: facts.bundle.goalTimeSec,
+                      goalDeltaSec: facts.goalDeltaSec
+                    },
+                    diagnostics: deterministicDiagnostics
+                  })
+                }
+              ]
+            }
+          ]
+        }),
+        schema: segmentNarrativesSchema,
+        logContext: { bundleId, plannedSessionId }
+      })
+    : { value: narrativeFallback, source: "fallback" as const };
+
+  const narratives = segmentNarrativesAttempt.value;
+  const segmentDiagnosticsPersisted: SegmentDiagnostics = deterministicDiagnostics.map((diag) => ({
+    ...diag,
+    aiNarrative: narratives[diag.discipline] ?? null
+  }));
+
   const isProvisional = source === "fallback";
   const modelUsed = source === "ai"
     ? getCoachModel()
@@ -1246,6 +1469,9 @@ export async function generateRaceReview(args: GenerateRaceReviewArgs): Promise<
         cross_discipline_insight: layers.raceStory.crossDisciplineInsight,
         pacing_arc_data: pacingArc,
         tone_violations: toneViolations,
+        // Phase 1C columns.
+        segment_diagnostics: segmentDiagnosticsPersisted.length > 0 ? segmentDiagnosticsPersisted : null,
+        transitions_analysis: transitionsAnalysis,
         model_used: modelUsed,
         is_provisional: isProvisional,
         generated_at: new Date().toISOString()
