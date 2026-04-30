@@ -66,6 +66,39 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
     "- Do NOT undermine confidence. If their data supports it, say so directly.",
   ];
 
+  // Carry-forward lives at the top of the per-proximity rules so it
+  // outranks the brevity/structure prescriptions below. We inline the
+  // EXACT instruction text — the model cannot truncate or paraphrase
+  // across a section break it never sees. A post-AI override
+  // (enforceCarryForwardOnAiOutput) backs this up so non-compliant
+  // outputs are still corrected after the fact.
+  if (
+    raceCtx.carryForward &&
+    (raceCtx.proximity === "race_day" || raceCtx.proximity === "day_before")
+  ) {
+    lines.push(
+      "",
+      "MANDATORY CARRY-FORWARD — non-negotiable, overrides every other rule below:",
+      `- The athlete's prior race produced this portable lesson from ${raceCtx.carryForward.fromRaceName ?? `the race on ${raceCtx.carryForward.fromRaceDate}`}:`,
+      `    Headline: "${raceCtx.carryForward.headline}"`,
+      `    Instruction: "${raceCtx.carryForward.instruction}"`,
+      `    Success criterion: "${raceCtx.carryForward.successCriterion}"`,
+      "- `race_guidance` MUST contain the Instruction string verbatim. Do not paraphrase, summarise, or omit it. If you only have room for one sentence today, that sentence is the Instruction.",
+      "- `brief_text` MUST also include the Instruction (or its key number — e.g. the wattage or pace target — written naturally into the sentence) so the athlete sees it as part of the brief.",
+      "- Do NOT invent new pacing/equipment/strategy advice that contradicts the Instruction.",
+      "- The brevity rules in the proximity block below DO NOT exempt you from including the carry-forward."
+    );
+  } else if (raceCtx.carryForward && raceCtx.proximity !== "post_race") {
+    // Earlier in race week — surface for context but no mandatory repeat yet.
+    lines.push(
+      "",
+      "CARRY-FORWARD from prior race (context only this far out):",
+      "- See the 'Carry-forward from {{race}}' section in the input.",
+      "- Do NOT invent advice that contradicts it.",
+      "- The mandatory verbatim repeat kicks in on day_before / race_day."
+    );
+  }
+
   if (raceCtx.proximity === "day_before") {
     lines.push(
       "",
@@ -81,7 +114,7 @@ function buildRaceWeekInstructions(raceCtx: RaceWeekContext): string {
       "",
       "This is RACE DAY. Be brief, warm, and focused.",
       "- No training advice. Just confidence and a pacing reminder.",
-      "- Keep the brief to 2-3 lines maximum.",
+      "- Keep the brief to 2-3 lines maximum (carry-forward included).",
       "- Remind them of their pacing plan if data is available."
     );
   }
@@ -147,6 +180,14 @@ function buildRaceWeekInput(
     }
   }
 
+  if (raceCtx.carryForward) {
+    lines.push("");
+    lines.push(`## Carry-forward from ${raceCtx.carryForward.fromRaceName ?? `prior race on ${raceCtx.carryForward.fromRaceDate}`}`);
+    lines.push(`Headline: ${raceCtx.carryForward.headline}`);
+    lines.push(`Instruction: ${raceCtx.carryForward.instruction}`);
+    lines.push(`Success criterion: ${raceCtx.carryForward.successCriterion}`);
+  }
+
   if (todaySession) {
     lines.push("");
     lines.push("## Today's Session");
@@ -162,21 +203,41 @@ function buildRaceWeekInput(
   return lines.join("\n");
 }
 
-export async function generateRaceWeekBriefAI(
+/**
+ * Deterministic fallback for the race-week brief. Used when OpenAI is
+ * unavailable, returns nothing, or fails schema validation. Exported so
+ * tests can verify the fallback surfaces Phase 1D carry-forward — the AI
+ * prompt path is not the only place the carry-forward must appear.
+ */
+export function buildRaceWeekBriefFallback(
   raceCtx: RaceWeekContext,
-  todaySession: TodaySessionInfo,
-  isRestDay: boolean
-): Promise<RaceWeekBriefOutput> {
+  todaySession: TodaySessionInfo
+): RaceWeekBriefOutput {
   const confidenceStatement = getConfidenceStatement(raceCtx);
-  const distanceStr = formatRaceDistance(raceCtx);
+
+  // Carry-forward (Phase 1D) is the single most important coaching cue on
+  // race morning. Surface it in the deterministic fallback the same way the
+  // AI prompt is asked to — otherwise on any AI fallback / schema failure
+  // the athlete loses the exact instruction the prior race left them with.
+  const carryForwardLine = raceCtx.carryForward
+    ? `${raceCtx.carryForward.headline} — ${raceCtx.carryForward.instruction}`
+    : null;
 
   const fallbackBrief = raceCtx.proximity === "post_race"
     ? `Recovery mode — ${Math.abs(raceCtx.race.daysUntil)} days since ${raceCtx.race.name}. Take it easy and let your body recover.`
     : raceCtx.proximity === "race_day"
-      ? `Race day. ${confidenceStatement}`
+      ? `Race day. ${carryForwardLine ?? confidenceStatement}`
       : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} days. ${confidenceStatement}`;
 
-  const fallback: RaceWeekBriefOutput = {
+  // Surface the carry-forward in race_guidance for race_day / day_before
+  // (the morning when the athlete will read it). Outside of those windows
+  // the confidence statement is the better default.
+  const fallbackRaceGuidance =
+    carryForwardLine && (raceCtx.proximity === "race_day" || raceCtx.proximity === "day_before")
+      ? carryForwardLine
+      : confidenceStatement;
+
+  return {
     session_preview: todaySession
       ? `${todaySession.sessionName ?? todaySession.type} (${todaySession.durationMinutes} min ${todaySession.sport})`
       : null,
@@ -186,9 +247,73 @@ export async function generateRaceWeekBriefAI(
       : `${raceCtx.race.name} in ${raceCtx.race.daysUntil} day${raceCtx.race.daysUntil === 1 ? "" : "s"}`,
     pending_actions: [],
     brief_text: fallbackBrief,
-    race_guidance: confidenceStatement,
-    readiness_summary: `${raceCtx.readiness.readinessState} — TSB ${raceCtx.readiness.tsb}`,
+    race_guidance: fallbackRaceGuidance,
+    readiness_summary: `${raceCtx.readiness.readinessState} — TSB ${raceCtx.readiness.tsb}`
   };
+}
+
+/**
+ * Deterministic post-AI override that guarantees the carry-forward
+ * Instruction is present in `race_guidance` (and woven into `brief_text`)
+ * on race_day / day_before — regardless of what the model wrote.
+ *
+ * The model is instructed to repeat the Instruction verbatim, but model
+ * output is non-deterministic and brevity prescriptions for race_day
+ * historically beat the carry-forward rule. Rather than hope the prompt
+ * wins, we treat the Instruction as a hard contract and fix any output
+ * that fails to honor it.
+ *
+ * No-op when:
+ *   - There is no carry-forward in context.
+ *   - Proximity is anywhere other than race_day or day_before.
+ *   - The AI output already contains the Instruction (substring match).
+ */
+export function enforceCarryForwardOnAiOutput(
+  output: RaceWeekBriefOutput,
+  raceCtx: RaceWeekContext
+): RaceWeekBriefOutput {
+  const cf = raceCtx.carryForward;
+  if (!cf) return output;
+  if (raceCtx.proximity !== "race_day" && raceCtx.proximity !== "day_before") {
+    return output;
+  }
+
+  const instruction = cf.instruction.trim();
+  const guidance = (output.race_guidance ?? "").trim();
+  const briefText = (output.brief_text ?? "").trim();
+
+  // Substring match is intentionally lenient: if the model wrote the
+  // Instruction verbatim, even with surrounding sentences, the contract
+  // is satisfied. Otherwise we replace race_guidance and prepend to
+  // brief_text. The headline is included so the cue is read as guidance,
+  // not just an isolated number.
+  const carryForwardLine = `${cf.headline} — ${instruction}`;
+
+  const guidanceHasInstruction = guidance.includes(instruction);
+  const briefHasInstruction = briefText.includes(instruction);
+
+  if (guidanceHasInstruction && briefHasInstruction) return output;
+
+  const nextRaceGuidance = guidanceHasInstruction ? output.race_guidance : carryForwardLine;
+  const nextBriefText = briefHasInstruction
+    ? output.brief_text
+    : briefText.length > 0
+      ? `${carryForwardLine} ${briefText}`
+      : carryForwardLine;
+
+  return {
+    ...output,
+    race_guidance: nextRaceGuidance,
+    brief_text: nextBriefText
+  };
+}
+
+export async function generateRaceWeekBriefAI(
+  raceCtx: RaceWeekContext,
+  todaySession: TodaySessionInfo,
+  isRestDay: boolean
+): Promise<RaceWeekBriefOutput> {
+  const fallback: RaceWeekBriefOutput = buildRaceWeekBriefFallback(raceCtx, todaySession);
 
   const result = await callOpenAIWithFallback({
     logTag: "race-week-brief",
@@ -209,5 +334,5 @@ export async function generateRaceWeekBriefAI(
     },
   });
 
-  return result.value;
+  return enforceCarryForwardOnAiOutput(result.value, raceCtx);
 }

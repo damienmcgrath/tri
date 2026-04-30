@@ -53,6 +53,19 @@ export type RaceWeekContext = {
     taperWeek: number | null;
     volumeReductionPct: number | null;
   };
+  /**
+   * Carry-forward insight from the most recent prior race (Phase 1D — AI
+   * Layer 4). Surfaced during race-week prep so the lesson the athlete left
+   * the last race with shows up on the morning of the next one. Null when
+   * there is no prior race or the prior race produced no carry-forward.
+   */
+  carryForward: {
+    headline: string;
+    instruction: string;
+    successCriterion: string;
+    fromRaceName: string | null;
+    fromRaceDate: string;
+  } | null;
 };
 
 // ─── Proximity helpers ──────────────────────────────────────────────────────
@@ -136,6 +149,14 @@ export async function getRaceWeekContext(
   // 4. Determine taper status
   const taperStatus = await getTaperStatus(supabase, userId, today);
 
+  // 5. Carry-forward from the prior race (Phase 1D). Only surfaced for
+  //    upcoming-race proximities — once the race is over the carry-forward
+  //    has been "spent" and the post_race brief should not reuse it.
+  const carryForward =
+    daysUntil >= 0
+      ? await getCarryForwardForUpcomingRace(supabase, userId, today, race.id).catch(() => null)
+      : null;
+
   return {
     proximity,
     race: {
@@ -159,6 +180,95 @@ export async function getRaceWeekContext(
     },
     recentExecution,
     taperStatus,
+    carryForward,
+  };
+}
+
+/**
+ * Find the most-recent prior race for this athlete and return its
+ * carry-forward insight. Returns null when there is no prior race, no
+ * lessons row, or the lessons row has no carry-forward.
+ *
+ * Note: we deliberately do NOT consume the carry-forward (no write) —
+ * the natural "expiry" is that the next race generates new lessons that
+ * supersede this one. That keeps the morning brief read-only and avoids
+ * surprising state changes if the athlete reads the brief twice.
+ */
+export async function getCarryForwardForUpcomingRace(
+  supabase: SupabaseClient,
+  userId: string,
+  today: string,
+  upcomingRaceId: string
+): Promise<RaceWeekContext["carryForward"]> {
+  // Find the single ACTIVE prior race lesson — the one not superseded by a
+  // newer race. Anything older has already been replaced; falling through to
+  // it would resurrect spent advice.
+  const { data: lessonsRows } = await supabase
+    .from("race_lessons")
+    .select("race_bundle_id,carry_forward")
+    .eq("user_id", userId)
+    .is("superseded_by_race_id", null);
+
+  const candidates = (lessonsRows ?? []).filter(
+    (r) => typeof (r as any).race_bundle_id === "string"
+  );
+  if (candidates.length === 0) return null;
+
+  // Hydrate bundle dates so we can pick the most-recent prior race and
+  // ignore upcoming bundles. Querying by id keeps RLS in play.
+  const candidateIds = candidates.map((r) => (r as any).race_bundle_id as string);
+  const { data: bundles } = await supabase
+    .from("race_bundles")
+    .select("id,started_at,race_profile_id")
+    .eq("user_id", userId)
+    .in("id", candidateIds)
+    .lt("started_at", `${today}T00:00:00.000Z`)
+    .order("started_at", { ascending: false })
+    .limit(5);
+
+  const priorBundles = (bundles ?? []).filter((b) => {
+    const profileId = ((b as any).race_profile_id as string | null) ?? null;
+    return profileId !== upcomingRaceId;
+  });
+  if (priorBundles.length === 0) return null;
+
+  // The most-recent prior race speaks. If it intentionally produced no
+  // carry-forward, we return null — we do NOT fall through to even older
+  // races. That advice has been replaced.
+  const latest = priorBundles[0] as any;
+  const latestBundleId = latest.id as string;
+  const latestProfileId = (latest.race_profile_id as string | null) ?? null;
+
+  const lessonForLatest = candidates.find(
+    (r) => ((r as any).race_bundle_id as string) === latestBundleId
+  );
+  const cf = (lessonForLatest as any)?.carry_forward;
+  if (!cf || typeof cf !== "object") return null;
+  if (
+    typeof cf.headline !== "string" ||
+    typeof cf.instruction !== "string" ||
+    typeof cf.successCriterion !== "string"
+  ) {
+    return null;
+  }
+
+  let fromRaceName: string | null = null;
+  if (latestProfileId) {
+    const { data: profile } = await supabase
+      .from("race_profiles")
+      .select("name")
+      .eq("id", latestProfileId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (profile) fromRaceName = ((profile as any).name as string | null) ?? null;
+  }
+
+  return {
+    headline: cf.headline as string,
+    instruction: cf.instruction as string,
+    successCriterion: cf.successCriterion as string,
+    fromRaceName,
+    fromRaceDate: (latest.started_at as string).slice(0, 10)
   };
 }
 

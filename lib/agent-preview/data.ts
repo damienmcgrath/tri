@@ -30,7 +30,9 @@ const PREVIEW_BLOCK_BUILD_ID = "88888888-8888-4888-8888-888888888882";
 const PREVIEW_RACE_SESSION_ID = "77777777-7777-4777-8777-777777777795";
 const PREVIEW_RACE_BUNDLE_ID = "99999999-9999-4999-8999-999999999991";
 const PREVIEW_RACE_PROFILE_ID = "99999999-9999-4999-8999-999999999992";
+const PREVIEW_FUTURE_RACE_PROFILE_ID = "99999999-9999-4999-8999-999999999995";
 const PREVIEW_RACE_REVIEW_ID = "99999999-9999-4999-8999-999999999993";
+const PREVIEW_RACE_LESSONS_ID = "99999999-9999-4999-8999-999999999994";
 const PREVIEW_RACE_ACT_SWIM_ID = "99999999-9999-4999-8999-99999999999a";
 const PREVIEW_RACE_ACT_T1_ID = "99999999-9999-4999-8999-99999999999b";
 const PREVIEW_RACE_ACT_BIKE_ID = "99999999-9999-4999-8999-99999999999c";
@@ -90,6 +92,19 @@ function previewDateOffset(mondayIso: string, offset: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Monday of the week BEFORE previewMonday(). Used to anchor the existing
+ * race (Joe Hannon Olympic) one week in the past so it counts as a "prior"
+ * race for race-week intelligence — letting us seed a future race for the
+ * current week and exercise the carry-forward surface.
+ */
+function previewPriorRaceMonday(): string {
+  const mon = previewMonday();
+  const d = new Date(`${mon}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 7);
+  return d.toISOString().slice(0, 10);
+}
+
 type PreviewTableName =
   | "profiles"
   | "training_plans"
@@ -118,7 +133,8 @@ type PreviewTableName =
   | "session_load"
   | "race_bundles"
   | "race_profiles"
-  | "race_reviews";
+  | "race_reviews"
+  | "race_lessons";
 
 export type PreviewDatabase = Record<PreviewTableName, Array<Record<string, unknown>>>;
 
@@ -735,16 +751,19 @@ export function createPreviewDatabase(): PreviewDatabase {
             is_key: true,
             execution_result: null
           },
-          // Sunday — completed Olympic-distance race. Surfaces the v2 race
-          // review feature: planned race session links to a 5-segment bundle
-          // via session_activity_links.match_method = 'race_bundle'.
+          // Sunday of LAST week — completed Olympic-distance race.
+          // Surfaces the v2 race review feature: planned race session
+          // links to a 5-segment bundle via
+          // session_activity_links.match_method = 'race_bundle'. Anchored
+          // to the prior week so the current week can host the upcoming
+          // Galway 70.3 race.
           {
             id: PREVIEW_RACE_SESSION_ID,
             user_id: PREVIEW_USER_ID,
             athlete_id: PREVIEW_USER_ID,
             plan_id: PREVIEW_PLAN_ID,
             week_id: PREVIEW_WEEK_FIVE_ID,
-            date: previewDateOffset(mon, 6),
+            date: previewDateOffset(previewPriorRaceMonday(), 6),
             sport: "other",
             discipline: "multi",
             type: "Olympic (race)",
@@ -1120,13 +1139,15 @@ export function createPreviewDatabase(): PreviewDatabase {
           ]
         }
       },
-      // ── Race bundle segments (Sunday of current week) ──
+      // ── Race bundle segments (Sunday of LAST week) ──
       // Five activities carrying race_bundle_id + race_segment_role +
       // race_segment_index. Bike halves are populated so the race-review
       // pipeline has real pacing data to chew on; run laps drive a
-      // computed-from-laps halves split.
+      // computed-from-laps halves split. Anchored one week in the past so
+      // race-week intelligence can use this race as the carry-forward
+      // source for the upcoming race seeded below.
       ...(() => {
-        const mon = previewMonday();
+        const mon = previewPriorRaceMonday();
         return [
           {
             id: PREVIEW_RACE_ACT_SWIM_ID,
@@ -2098,7 +2119,7 @@ export function createPreviewDatabase(): PreviewDatabase {
       ];
     })(),
     race_bundles: (() => {
-      const mon = previewMonday();
+      const mon = previewPriorRaceMonday();
       const startedAt = raceSegmentStartIso(mon, "swim");
       const endedAt = raceSegmentEndIso(mon, "run");
       return [
@@ -2149,14 +2170,22 @@ export function createPreviewDatabase(): PreviewDatabase {
       ];
     })(),
     race_profiles: (() => {
-      const mon = previewMonday();
+      // Past race: Joe Hannon Olympic on Sunday of LAST week. Already
+      // bundled / reviewed / lessons-generated → it's the carry-forward
+      // source for the upcoming race.
+      const priorMon = previewPriorRaceMonday();
+      // Future race: Galway 70.3 on TODAY's date. Putting it on race_day
+      // proximity guarantees the carry-forward surfaces in the morning
+      // brief regardless of which weekday the preview is loaded on
+      // (carry-forward is only repeated on race_day / day_before).
+      const upcomingDate = new Date().toISOString().slice(0, 10);
       return [
         {
           id: PREVIEW_RACE_PROFILE_ID,
           user_id: PREVIEW_USER_ID,
           athlete_id: PREVIEW_USER_ID,
           name: "Joe Hannon Olympic",
-          date: previewDateOffset(mon, 6),
+          date: previewDateOffset(priorMon, 6),
           distance_type: "olympic",
           priority: "B",
           course_profile: {
@@ -2172,6 +2201,31 @@ export function createPreviewDatabase(): PreviewDatabase {
           goal_strategy_summary:
             "Negative-split bike, hold 4:15/km on the first 5k, push final 2k if HR caps at 170.",
           notes: "B-race rehearsal slotted before Galway 70.3.",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: PREVIEW_FUTURE_RACE_PROFILE_ID,
+          user_id: PREVIEW_USER_ID,
+          athlete_id: PREVIEW_USER_ID,
+          name: "Galway 70.3",
+          date: upcomingDate,
+          distance_type: "70.3",
+          priority: "A",
+          course_profile: {
+            swim_distance_m: 1900,
+            bike_distance_km: 90,
+            run_distance_km: 21.1,
+            bike_elevation_m: 720,
+            course_type: "rolling",
+            expected_conditions: "windy"
+          },
+          ideal_discipline_distribution: { swim: 0.1, bike: 0.55, run: 0.35 },
+          goal_time_sec: 18000,
+          goal_strategy_summary:
+            "NP 220–225W on the bike, open the run at 4:30/km and hold through 16km, attack final 5km.",
+          notes:
+            "A-race target. Carry-forward from Joe Hannon Olympic should anchor the bike-pacing cue.",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -2390,6 +2444,56 @@ export function createPreviewDatabase(): PreviewDatabase {
         },
         tone_violations: []
       }
+    ],
+    // Phase 1D — pre-populated lessons row so the LessonsCard renders. The
+    // shape mirrors what generateRaceLessons writes; confidence is "low"
+    // because this is the only seeded race in preview.
+    race_lessons: [
+      {
+        id: PREVIEW_RACE_LESSONS_ID,
+        user_id: PREVIEW_USER_ID,
+        race_bundle_id: PREVIEW_RACE_BUNDLE_ID,
+        race_review_id: PREVIEW_RACE_REVIEW_ID,
+        athlete_profile_takeaways: [
+          {
+            headline: "You execute Olympic distance with controlled bike pacing",
+            body:
+              "Bike held 220→216W (−1.8%) across halves at NP 224W (IF 0.91), and the run still faded only 4.7%. The pattern suggests you can hold race-pace bike efforts without cooking the run — at least at this distance.",
+            confidence: "low",
+            referencesCount: 0
+          }
+        ],
+        training_implications: [
+          {
+            headline: "Repeat the bike-pacing template at the next race",
+            change:
+              "Hold 220–225W NP for the bike at the next Olympic-distance race; cap effort at IF 0.92 across halves.",
+            priority: "high",
+            rationale: "Bike was the strongest leg of this race; repeating the template should hold."
+          },
+          {
+            headline: "Add 1 long run with race-pace finish per week",
+            change:
+              "Run 60–75 minutes at endurance, finishing the last 15 minutes at 4:15/km — twice a week for 3 weeks.",
+            priority: "medium",
+            rationale: "Run faded 4.7% in the second half (4:17 → 4:29 /km); race-pace finishes target the fade."
+          }
+        ],
+        carry_forward: {
+          headline: "Open the bike at NP 220W, not 230W",
+          instruction:
+            "Hold first 5km of the bike at NP 220W. Only let power rise after HR settles below 158.",
+          successCriterion: "Bike halves move <2% (target NP within 220–225W).",
+          expiresAfterRaceId: PREVIEW_RACE_BUNDLE_ID
+        },
+        references_race_ids: [],
+        superseded_by_race_id: null,
+        model_used: "gpt-5-mini",
+        is_provisional: false,
+        generated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     ]
   };
 }
@@ -2397,7 +2501,7 @@ export function createPreviewDatabase(): PreviewDatabase {
 const globalKey = "__tri_preview_database__" as const;
 const globalVersionKey = "__tri_preview_database_version__" as const;
 // Bump this when the seed schema changes (new tables, new columns, etc.)
-const PREVIEW_DATABASE_VERSION = 10;
+const PREVIEW_DATABASE_VERSION = 12;
 
 function getOrCreateDatabase(): PreviewDatabase {
   const existing = (globalThis as Record<string, unknown>)[globalKey] as PreviewDatabase | undefined;

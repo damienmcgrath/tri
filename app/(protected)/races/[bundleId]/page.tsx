@@ -8,6 +8,7 @@ import { RaceStoryCard, type RaceStoryPayload } from "./components/race-story-ca
 import { UnifiedPacingArc } from "./components/unified-pacing-arc";
 import { SegmentDiagnosticCard, type SegmentDiagnosticPayload } from "./components/segment-diagnostic-card";
 import { TransitionsAnalysisCard, type TransitionsAnalysisPayload } from "./components/transitions-analysis-card";
+import { LessonsCard } from "./components/lessons-card";
 import { RegenerateRaceReviewButton } from "../../sessions/[sessionId]/components/regenerate-race-review-button";
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
 
@@ -164,6 +165,8 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
       <SubjectiveSection bundle={bundle} bundleId={bundleId} />
 
       <RaceReviewLayered review={review} bundle={bundle} bundleId={bundleId} />
+
+      {summary.lessons ? <LessonsCard lessons={summary.lessons} /> : null}
     </div>
   );
 }
