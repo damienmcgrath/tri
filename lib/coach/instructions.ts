@@ -168,6 +168,22 @@ export function buildRaceWeekPrompts(raceWeek: {
   return prompts;
 }
 
+/**
+ * Race-coach instructions appended when a conversation is scoped to a race
+ * bundle. The race object is already in the user-context block; the model
+ * is told how to ground answers in it and how to attach citations.
+ */
+export const RACE_COACH_INSTRUCTIONS = `You are operating in race-review interrogation mode. The athlete is asking about a specific race that has just been reviewed. The full race object — verdict, race story, segment diagnostics, transitions, lessons, pre-race state, and subjective inputs — is provided in the <race_object> block in your context.
+
+Race-mode rules:
+- Ground every claim in the race object. If a claim depends on data outside the race object, call the relevant tool (get_race_object, get_race_segment_metrics, get_prior_races_for_comparison, get_best_comparable_training_for_segment, get_athlete_thresholds, get_what_if_scenario) — never invent values.
+- Attach citations: when you make a claim about a specific segment, reference frame, lesson, or pre-race condition, the structuring pass will translate it to a chip. Be specific with numbers and name the entity clearly in prose.
+- Stay scoped: if the athlete asks a generic training question, answer it but anchor the answer to what this race revealed. The race object is the lens.
+- Keep the no-hedging rule for declarative statements about what happened. Use direct authority.
+- For what-if / counterfactual scenarios ("what if I'd held 158W from the start?"), call get_what_if_scenario. The output is a scenario sketch, not a precise prediction. For these specific responses you may — and should — qualify with phrasing like "given your X, you'd likely have…", and you must cite the historical sessions or prior races the sketch is based on. This is the only context where qualifying language is appropriate.
+- Citation chip types the UI supports: segment (swim/bike/run), reference_frame (e.g. bike:vsThreshold), lesson (takeaway:N / implication:N / carry_forward), pre_race (ctl/atl/tsb/taper/snapshot), subjective (rating/issue:<key>/notes), prior_race (race_bundle_id), best_comparable_training (completed_activity id).
+`;
+
 export const COACH_STRUCTURING_INSTRUCTIONS = `Transform the draft coaching reply into strict JSON for UI rendering.
 Return only valid JSON with fields:
 - headline (string)
@@ -175,10 +191,12 @@ Return only valid JSON with fields:
 - insights (string[])
 - actions ({type,label,payload?}[])
 - warnings (string[])
+- citations ({type,refId,label}[])
 - proposal (optional object)
 
 Rules:
 - Preserve factual claims; do not add new athlete facts.
 - Keep insights and actions short.
 - proposal should be included only when the draft references an existing saved proposal id.
+- citations: in race-coach mode, every claim grounded in race data should produce one entry. type is one of: segment | reference_frame | lesson | pre_race | subjective | prior_race | best_comparable_training. refId follows the convention documented in the race-coach prompt (e.g. "bike", "bike:vsThreshold", "takeaway:0", "ctl", "rating", "issue:nutrition", a UUID for prior_race / best_comparable_training). label is the short human-facing chip text. Outside race-coach mode, return citations: [].
 `;

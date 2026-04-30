@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
+import { CitationChips } from "./components/citation-chip";
+import type { CoachCitation } from "@/lib/coach/types";
 
 type Message = {
   id: string;
@@ -13,18 +15,21 @@ type Message = {
   pending?: boolean;
   failed?: boolean;
   retryText?: string;
+  citations?: CoachCitation[];
 };
 
 type CoachMessageProps = {
   message: Message;
   onRetry: (message: Message) => void;
+  raceBundleId?: string;
+  onCitationClick?: (citation: CoachCitation) => boolean | void;
 };
 
 // Message bubbles rarely change once rendered; only the streaming tail updates.
 // Memoising with a field-level comparator stops every bubble from re-rendering
 // on every keystroke in the input below.
 const CoachMessage = memo(
-  function CoachMessage({ message, onRetry }: CoachMessageProps) {
+  function CoachMessage({ message, onRetry, raceBundleId, onCitationClick }: CoachMessageProps) {
     return (
       <div className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
         <div
@@ -49,6 +54,9 @@ const CoachMessage = memo(
               {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
             </>
           )}
+          {message.role === "assistant" && message.citations && message.citations.length > 0 ? (
+            <CitationChips citations={message.citations} onCitationClick={onCitationClick} raceBundleId={raceBundleId} />
+          ) : null}
           {message.failed && message.role === "assistant" && message.retryText ? (
             <div className="mt-2">
               <button type="button" onClick={() => onRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
@@ -69,7 +77,10 @@ const CoachMessage = memo(
       a.content === b.content &&
       a.pending === b.pending &&
       a.failed === b.failed &&
-      a.retryText === b.retryText
+      a.retryText === b.retryText &&
+      JSON.stringify(a.citations ?? []) === JSON.stringify(b.citations ?? []) &&
+      prev.raceBundleId === next.raceBundleId &&
+      prev.onCitationClick === next.onCitationClick
     );
   }
 );
@@ -97,6 +108,7 @@ type StreamCompletePayload = {
     insights: string[];
     actions: Array<{ type: string; label: string; payload?: Record<string, unknown> }>;
     warnings: string[];
+    citations?: CoachCitation[];
   };
 };
 
@@ -435,18 +447,34 @@ export function CoachChat({
   diagnosisSessions,
   briefingContext,
   initialPrompt,
-  showBriefingPanel = true
+  showBriefingPanel = true,
+  raceBundleId,
+  seededPrompts,
+  openingOverride,
+  onCitationClick
 }: {
   diagnosisSessions: SessionDiagnosis[];
   briefingContext: CoachBriefingContext;
   initialPrompt?: string;
   showBriefingPanel?: boolean;
+  /** Race scope. When set, chat requests are tagged with this bundle. */
+  raceBundleId?: string;
+  /** Replaces the generic quickPrompts when in race mode. */
+  seededPrompts?: string[];
+  /** Override the default opening message (race-coach surface uses this). */
+  openingOverride?: string;
+  /** Called when a citation chip is clicked. Return true to claim the
+   *  click (chip will preventDefault — used by race-coach surface to open
+   *  the slide-up panel). Return void to let the chip's Link navigate. */
+  onCitationClick?: (citation: CoachCitation) => boolean | void;
 }) {
   const router = useRouter();
-  const openingMessage = useMemo(
-    () => buildOpeningMessage(briefingContext, diagnosisSessions),
-    [briefingContext, diagnosisSessions]
-  );
+  const openingMessage = useMemo<Message>(() => {
+    if (openingOverride && openingOverride.trim().length > 0) {
+      return { id: "coach-default", role: "assistant", content: openingOverride };
+    }
+    return buildOpeningMessage(briefingContext, diagnosisSessions);
+  }, [briefingContext, diagnosisSessions, openingOverride]);
   const [messages, setMessages] = useState<Message[]>([openingMessage]);
 
   // When the review-backfill effect triggers router.refresh(), props update but the
@@ -549,6 +577,13 @@ export function CoachChat({
   }, [summary?.completionPct, sessionDiagnoses, flaggedSessions, strongestTheme]);
 
   const quickPrompts = useMemo(() => {
+    // Race-coach surface supplies its own deterministic, race-specific
+    // seeded prompts. When provided, they fully replace the general
+    // quickPrompts heuristics below.
+    if (seededPrompts && seededPrompts.length > 0) {
+      return seededPrompts.slice(0, 5);
+    }
+
     // No diagnosis data — generic but useful starters
     if (sessionDiagnoses.length < 2) {
       return [
@@ -596,7 +631,7 @@ export function CoachChat({
     }
 
     return prompts.slice(0, 3);
-  }, [sessionDiagnoses, strongestTheme, summary?.completionPct, latestScoredSession, briefingContext.upcomingKeySessionNames]);
+  }, [seededPrompts, sessionDiagnoses, strongestTheme, summary?.completionPct, latestScoredSession, briefingContext.upcomingKeySessionNames]);
 
   const dataRecency = useMemo(() => {
     const activeConversation = conversations.find((conversation) => conversation.id === conversationId);
@@ -684,14 +719,23 @@ export function CoachChat({
 
     try {
       const response = await fetch(`/api/coach/chat?conversationId=${nextConversationId}`, { method: "GET" });
-      const data = (await response.json()) as { messages?: Message[]; error?: string };
+      const data = (await response.json()) as {
+        messages?: Array<{ role: "user" | "assistant"; content: string; created_at: string; citations?: unknown }>;
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.error ?? "Failed to load conversation.");
       }
 
       setConversationId(nextConversationId);
-      setMessages(data.messages?.length ? data.messages : [openingMessage]);
+      const hydrated: Message[] = (data.messages ?? []).map((row, idx) => ({
+        id: `history-${nextConversationId}-${idx}`,
+        role: row.role,
+        content: row.content,
+        citations: Array.isArray(row.citations) ? (row.citations as CoachCitation[]) : []
+      }));
+      setMessages(hydrated.length ? hydrated : [openingMessage]);
     } catch (conversationError) {
       setError(conversationError instanceof Error ? conversationError.message : "Failed to load conversation.");
     }
@@ -799,7 +843,7 @@ export function CoachChat({
       const response = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, conversationId }),
+        body: JSON.stringify({ message: trimmed, conversationId, raceBundleId }),
         signal: controller.signal
       });
 
@@ -869,6 +913,7 @@ export function CoachChat({
                     ? {
                         ...message,
                         content: completion.structured.answer ?? message.content,
+                        citations: Array.isArray(completion.structured.citations) ? completion.structured.citations : [],
                         pending: false,
                         failed: false
                       }
@@ -1116,7 +1161,13 @@ export function CoachChat({
               className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
             >
               {messages.map((message) => (
-                <CoachMessage key={message.id} message={message} onRetry={handleRetry} />
+                <CoachMessage
+                  key={message.id}
+                  message={message}
+                  onRetry={handleRetry}
+                  raceBundleId={raceBundleId}
+                  onCitationClick={onCitationClick}
+                />
               ))}
             </div>
 

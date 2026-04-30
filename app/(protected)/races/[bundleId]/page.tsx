@@ -10,6 +10,7 @@ import { SegmentDiagnosticCard, type SegmentDiagnosticPayload } from "./componen
 import { TransitionsAnalysisCard, type TransitionsAnalysisPayload } from "./components/transitions-analysis-card";
 import { LessonsCard } from "./components/lessons-card";
 import { RegenerateRaceReviewButton } from "../../sessions/[sessionId]/components/regenerate-race-review-button";
+import { AskCoachButton } from "./components/ask-coach-button";
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
 
 export const dynamic = "force-dynamic";
@@ -124,17 +125,24 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
     ? disciplineSplitFromReview(review)
     : disciplineSplitFromSegments(segments);
 
+  const askEnabled = Boolean(bundle.subjective_captured_at);
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 p-4 md:p-6">
-      <header className="flex flex-col gap-1">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race summary</p>
-        <h1 className="text-2xl font-semibold text-[rgba(255,255,255,0.92)]">{title}</h1>
-        <p className="text-sm text-muted">
-          {formatRaceDate(heroDate)}
-          {raceProfile?.distance_type ? <> · <span className="capitalize">{raceProfile.distance_type}</span></> : null}
-          {distanceLabel ? <> · {distanceLabel}</> : null}
-        </p>
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Race summary</p>
+            <h1 className="text-2xl font-semibold text-[rgba(255,255,255,0.92)]">{title}</h1>
+            <p className="text-sm text-muted">
+              {formatRaceDate(heroDate)}
+              {raceProfile?.distance_type ? <> · <span className="capitalize">{raceProfile.distance_type}</span></> : null}
+              {distanceLabel ? <> · {distanceLabel}</> : null}
+            </p>
+          </div>
+          {askEnabled ? <AskCoachButton bundleId={bundleId} /> : null}
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-mono text-3xl font-semibold text-[rgba(255,255,255,0.96)]">{formatDuration(finishSec)}</span>
           <span className="text-xs uppercase tracking-[0.12em] text-tertiary">finish time</span>
           {goalSec != null && goalDelta != null ? (
@@ -156,17 +164,25 @@ export default async function RaceBundlePage({ params }: { params: Promise<{ bun
         </div>
       </header>
 
-      <PreRaceStateStrip bundle={bundle} tsbBadge={tsbBadge} />
+      <section id="pre-race-state" className="scroll-mt-20">
+        <PreRaceStateStrip bundle={bundle} tsbBadge={tsbBadge} />
+      </section>
 
       <DisciplineSplit split={split} inferredTransitions={bundle.inferred_transitions} />
 
       <RaceSegmentList segments={segments} />
 
-      <SubjectiveSection bundle={bundle} bundleId={bundleId} />
+      <section id="race-notes" className="scroll-mt-20">
+        <SubjectiveSection bundle={bundle} bundleId={bundleId} />
+      </section>
 
       <RaceReviewLayered review={review} bundle={bundle} bundleId={bundleId} />
 
-      {summary.lessons ? <LessonsCard lessons={summary.lessons} /> : null}
+      {summary.lessons ? (
+        <section id="lessons" className="scroll-mt-20">
+          <LessonsCard lessons={summary.lessons} />
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -430,10 +446,12 @@ function RaceReviewLayered({
         generatedAt={review?.generated_at ?? null}
         noteIndicator={noteIndicator}
       />
-      {arcPayload ? <UnifiedPacingArc data={arcPayload} /> : null}
+      {arcPayload ? <UnifiedPacingArc data={arcPayload} bundleId={bundleId} /> : null}
       <RaceStoryCard story={storyPayload} />
       {segmentDiagnostics.map((diag) => (
-        <SegmentDiagnosticCard key={diag.discipline} diagnostic={diag} />
+        <section key={diag.discipline} id={`segment-${diag.discipline}`} className="scroll-mt-20">
+          <SegmentDiagnosticCard diagnostic={diag} bundleId={bundleId} />
+        </section>
       ))}
       {transitionsAnalysis ? <TransitionsAnalysisCard analysis={transitionsAnalysis} /> : null}
       <div className="flex justify-end">

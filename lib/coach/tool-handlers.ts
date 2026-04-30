@@ -15,10 +15,21 @@ import {
 import { logCoachAudit } from "@/lib/coach/audit";
 import { getNestedNumber } from "@/lib/workouts/metrics-v2";
 import { SESSION_BASE_COLUMNS } from "@/lib/supabase/queries";
+import {
+  getRaceObject,
+  getRaceSegmentMetrics,
+  getPriorRacesForComparison,
+  getBestComparableTrainingForSegment,
+  getAthleteThresholds
+} from "@/lib/coach/race-tool-handlers";
+import { RACE_SCOPED_TOOLS } from "@/lib/coach/tools";
+import { runWhatIfScenario } from "@/lib/race-review/what-if-scenarios";
 
 type ToolDeps = {
   supabase: SupabaseClient;
   ctx: CoachAuthContext;
+  /** Set when the conversation is scoped to a race bundle. */
+  raceBundleId?: string;
 };
 
 function addDays(date: Date, days: number) {
@@ -482,6 +493,11 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
     args
   });
 
+  // Race-scoped tools refuse to execute outside a race-scoped conversation.
+  if (RACE_SCOPED_TOOLS.has(name) && !deps.raceBundleId) {
+    throw new Error("This tool is only available when the conversation is scoped to a race.");
+  }
+
   try {
     let result: unknown;
 
@@ -520,6 +536,41 @@ export async function executeCoachTool(name: CoachToolName, args: unknown, deps:
       case "create_plan_change_proposal":
         result = await createPlanChangeProposal(args, deps);
         break;
+      case "get_race_object":
+        coachToolSchemas.get_race_object.parse(args);
+        result = await getRaceObject({ supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! });
+        break;
+      case "get_race_segment_metrics":
+        result = await getRaceSegmentMetrics(
+          coachToolSchemas.get_race_segment_metrics.parse(args),
+          { supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! }
+        );
+        break;
+      case "get_prior_races_for_comparison":
+        result = await getPriorRacesForComparison(
+          coachToolSchemas.get_prior_races_for_comparison.parse(args),
+          { supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! }
+        );
+        break;
+      case "get_best_comparable_training_for_segment":
+        result = await getBestComparableTrainingForSegment(
+          coachToolSchemas.get_best_comparable_training_for_segment.parse(args),
+          { supabase: deps.supabase, ctx: deps.ctx, bundleId: deps.raceBundleId! }
+        );
+        break;
+      case "get_athlete_thresholds":
+        coachToolSchemas.get_athlete_thresholds.parse(args);
+        result = await getAthleteThresholds({
+          supabase: deps.supabase,
+          ctx: deps.ctx,
+          bundleId: deps.raceBundleId ?? ""
+        });
+        break;
+      case "get_what_if_scenario": {
+        const scenario = coachToolSchemas.get_what_if_scenario.parse(args);
+        result = await runWhatIfScenario(deps.supabase, deps.ctx.userId, scenario);
+        break;
+      }
       default:
         throw new Error(`Unsupported tool: ${String(name)}`);
     }

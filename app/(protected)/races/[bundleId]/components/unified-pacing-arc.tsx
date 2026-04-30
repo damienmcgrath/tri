@@ -17,16 +17,19 @@
  */
 
 import type { PacingArcData } from "@/lib/race-review/pacing-arc";
+import { AskCoachButton } from "./ask-coach-button";
 
 type Props = {
   data: PacingArcData;
+  /** When set, renders a floating "Ask" pill in the arc's header. */
+  bundleId?: string;
 };
 
 const VIEW_W = 800;
 const VIEW_H = 240;
 const PADDING = { top: 16, right: 56, bottom: 28, left: 48 };
 
-export function UnifiedPacingArc({ data }: Props) {
+export function UnifiedPacingArc({ data, bundleId }: Props) {
   const innerW = VIEW_W - PADDING.left - PADDING.right;
   const innerH = VIEW_H - PADDING.top - PADDING.bottom;
   const totalSec = data.totalDurationSec || 1;
@@ -76,10 +79,13 @@ export function UnifiedPacingArc({ data }: Props) {
     <article className="surface p-5">
       <header className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">Pacing arc</p>
-        <p className="text-[10px] text-tertiary">
-          HR · Bike power · Run pace
-          {data.inferredGaps ? " · stitched" : null}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-tertiary">
+            HR · Bike power · Run pace
+            {data.inferredGaps ? " · stitched" : null}
+          </p>
+          {bundleId ? <AskCoachButton bundleId={bundleId} variant="floating" label="Ask" /> : null}
+        </div>
       </header>
 
       <svg

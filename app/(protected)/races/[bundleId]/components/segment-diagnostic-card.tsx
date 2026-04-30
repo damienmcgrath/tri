@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AskCoachButton } from "./ask-coach-button";
 
 export type SegmentDiagnosticPayload = {
   discipline: "swim" | "bike" | "run";
@@ -76,7 +77,13 @@ const ANOMALY_LABEL: Record<SegmentDiagnosticPayload["anomalies"][number]["type"
   cadence_drop: "Cadence drop"
 };
 
-export function SegmentDiagnosticCard({ diagnostic }: { diagnostic: SegmentDiagnosticPayload }) {
+export function SegmentDiagnosticCard({
+  diagnostic,
+  bundleId
+}: {
+  diagnostic: SegmentDiagnosticPayload;
+  bundleId?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { referenceFrames, pacingAnalysis, anomalies, aiNarrative, discipline } = diagnostic;
 
@@ -86,11 +93,21 @@ export function SegmentDiagnosticCard({ diagnostic }: { diagnostic: SegmentDiagn
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-tertiary">
           {DISCIPLINE_LABEL[discipline]} diagnostic
         </p>
-        {pacingAnalysis.splitType ? (
-          <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-tertiary">
-            {SPLIT_LABEL[pacingAnalysis.splitType]}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {pacingAnalysis.splitType ? (
+            <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-tertiary">
+              {SPLIT_LABEL[pacingAnalysis.splitType]}
+            </span>
+          ) : null}
+          {bundleId ? (
+            <AskCoachButton
+              bundleId={bundleId}
+              focus={`segment:${discipline}`}
+              variant="ghost"
+              label="Ask"
+            />
+          ) : null}
+        </div>
       </header>
 
       {aiNarrative ? (

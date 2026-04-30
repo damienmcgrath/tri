@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     }
     const { data, error } = await supabase
       .from("ai_messages")
-      .select("role,content,created_at")
+      .select("role,content,created_at,citations")
       .eq("user_id", ctx.userId)
       .eq("athlete_id", ctx.athleteId)
       .eq("conversation_id", conversationId)
@@ -208,6 +208,7 @@ export async function POST(request: Request) {
 
   let conversationId = payload.conversationId;
   let conversationLastResponseId: string | undefined;
+  let conversationRaceBundleId: string | undefined;
 
   if (conversationId) {
     if (!z.string().uuid().safeParse(conversationId).success) {
@@ -215,7 +216,7 @@ export async function POST(request: Request) {
     }
     const { data: existingConversation } = await supabase
       .from("ai_conversations")
-      .select("id,last_response_id")
+      .select("id,last_response_id,race_bundle_id")
       .eq("id", conversationId)
       .eq("user_id", ctx.userId)
       .eq("athlete_id", ctx.athleteId)
@@ -232,13 +233,51 @@ export async function POST(request: Request) {
     }
 
     conversationLastResponseId = existingConversation.last_response_id ?? undefined;
+    conversationRaceBundleId = (existingConversation.race_bundle_id as string | null) ?? undefined;
+
+    // Reject mid-conversation scope changes. The scope is a property of the
+    // conversation, not the request — it determines which system prompt and
+    // tools the model sees.
+    if (payload.raceBundleId && payload.raceBundleId !== conversationRaceBundleId) {
+      return NextResponse.json(
+        { error: "Cannot change race scope on an existing conversation." },
+        { status: 400 }
+      );
+    }
   }
 
   if (!conversationId) {
+    // Validate the requested race scope belongs to this user before creating
+    // the conversation row. Without this an unauthorised UUID would silently
+    // get persisted (FK passes, RLS doesn't apply to FK targets).
+    if (payload.raceBundleId) {
+      const { data: bundleRow } = await supabase
+        .from("race_bundles")
+        .select("id")
+        .eq("id", payload.raceBundleId)
+        .eq("user_id", ctx.userId)
+        .maybeSingle();
+
+      if (!bundleRow) {
+        logCoachAudit("warn", "coach.chat.invalid_race_scope", {
+          ctx,
+          route: "POST /api/coach/chat",
+          success: false,
+          reason: "Race bundle not owned by athlete"
+        });
+        return NextResponse.json({ error: "Race not found." }, { status: 404 });
+      }
+    }
+
     const { data: createdConversation, error: conversationError } = await supabase
       .from("ai_conversations")
-      .insert({ user_id: ctx.userId, athlete_id: ctx.athleteId, title: payload.message.slice(0, 60) })
-      .select("id,last_response_id")
+      .insert({
+        user_id: ctx.userId,
+        athlete_id: ctx.athleteId,
+        title: payload.message.slice(0, 60),
+        race_bundle_id: payload.raceBundleId ?? null
+      })
+      .select("id,last_response_id,race_bundle_id")
       .single();
 
     if (conversationError || !createdConversation) {
@@ -247,6 +286,7 @@ export async function POST(request: Request) {
 
     conversationId = createdConversation.id;
     conversationLastResponseId = createdConversation.last_response_id ?? undefined;
+    conversationRaceBundleId = (createdConversation.race_bundle_id as string | null) ?? undefined;
   }
 
   const resolvedConversationId = conversationId;
@@ -284,6 +324,7 @@ export async function POST(request: Request) {
             priorMessages: [...((recentMessages ?? []) as ConversationMessageRow[])].reverse(),
             previousResponseId: conversationLastResponseId,
             supabaseConversationId: resolvedConversationId,
+            raceBundleId: conversationRaceBundleId,
             toolDeps: { ctx, supabase },
             signal: request.signal,
             streamWriters: {
@@ -320,7 +361,8 @@ export async function POST(request: Request) {
             content: result.answer,
             response_id: result.responseId ?? null,
             previous_response_id: result.previousResponseId ?? null,
-            model: getCoachModel()
+            model: getCoachModel(),
+            citations: result.structured?.citations ?? []
           }
         ]);
 
