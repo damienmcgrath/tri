@@ -410,6 +410,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
       <WeekCalendar
         weekDays={weekDays}
         sessions={sessions}
+        adaptationRationales={pendingRationales}
         pendingAdaptations={pendingAdaptations}
         weekStart={weekStart}
         executionLabel={nextTodaySession ? `Next key session: ${getSessionDisplayName(nextTodaySession)}` : plannedSessionCount > 0 ? "No planned session today" : "No planned sessions this week yet"}

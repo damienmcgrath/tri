@@ -48,6 +48,26 @@ type CalendarSession = {
   }> | null;
 };
 
+type RationaleChangeItem = {
+  session_id?: string | null;
+  session_label: string;
+  change_type: string;
+  before: string;
+  after: string;
+};
+
+type AdaptationRationale = {
+  id: string;
+  trigger_type: string;
+  rationale_text: string;
+  changes_summary: RationaleChangeItem[];
+  preserved_elements: string[] | null;
+  training_block: string | null;
+  week_number: number | null;
+  status: string;
+  created_at: string;
+};
+
 type WeekDay = { iso: string; weekday: string; label: string };
 type RecentMove = { sessionId: string; fromDate: string; toDate: string };
 type AdaptationIssueType = "unmatched_upload" | "skipped_reassign" | "moved_session" | "extra_workout";
@@ -218,6 +238,20 @@ function getMovedFromDate(notes: string | null) {
   return match?.[1] ?? null;
 }
 
+function summarizeRationale(text: string): { summary: string; hasMore: boolean } {
+  const cleaned = text.trim();
+  if (cleaned.length === 0) return { summary: "", hasMore: false };
+  const sentenceMatch = cleaned.match(/^[^.!?\n]+[.!?]/);
+  if (sentenceMatch) {
+    const first = sentenceMatch[0].trim();
+    if (first.length <= 120) {
+      return { summary: first, hasMore: cleaned.length > first.length };
+    }
+  }
+  if (cleaned.length <= 120) return { summary: cleaned, hasMore: false };
+  return { summary: `${cleaned.slice(0, 117).trimEnd()}…`, hasMore: true };
+}
+
 function getActivityId(sessionId: string) {
   return sessionId.startsWith("activity-") ? sessionId.replace("activity-", "") : null;
 }
@@ -362,6 +396,7 @@ type PendingAdaptation = { id: string; trigger_type: string; options: unknown };
 export function WeekCalendar({
   weekDays,
   sessions,
+  adaptationRationales = [],
   completedCount,
   plannedRemainingCount,
   skippedCount,
@@ -371,6 +406,7 @@ export function WeekCalendar({
 }: {
   weekDays: WeekDay[];
   sessions: CalendarSession[];
+  adaptationRationales?: AdaptationRationale[];
   executionLabel: string;
   executionSubtext?: string;
   completedCount: number;
@@ -401,6 +437,7 @@ export function WeekCalendar({
   const [loadingAdaptations, setLoadingAdaptations] = useState(false);
   const [extraActivityIds, setExtraActivityIds] = useState<string[]>([]);
   const [recentMoves, setRecentMoves] = useState<RecentMove[]>([]);
+  const [expandedRationaleSessionId, setExpandedRationaleSessionId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [localSessions, setLocalSessions] = useState<CalendarSession[]>(sessions);
   const isOverlayOpen = Boolean(quickAddDate || moveSource || detailSession || assignSource);
@@ -497,6 +534,23 @@ export function WeekCalendar({
       }, {}),
     [localSessions, visibleIds, weekDays]
   );
+  const rationalesBySessionId = useMemo(() => {
+    const mapped = new Map<string, AdaptationRationale[]>();
+
+    for (const rationale of adaptationRationales) {
+      const changes = Array.isArray(rationale.changes_summary) ? rationale.changes_summary : [];
+      for (const change of changes) {
+        if (typeof change.session_id !== "string" || change.session_id.length === 0) continue;
+        const existing = mapped.get(change.session_id) ?? [];
+        if (!existing.some((item) => item.id === rationale.id)) {
+          existing.push(rationale);
+          mapped.set(change.session_id, existing);
+        }
+      }
+    }
+
+    return mapped;
+  }, [adaptationRationales]);
 
   const dayMetrics = useMemo(
     () =>
@@ -920,6 +974,14 @@ export function WeekCalendar({
                   const cardTitle = state === "unmatched_upload" ? "Uploaded workout" : getSessionTitle(session);
                   const raceSegments = session.raceSegments ?? null;
                   const isRaceCard = Boolean(raceSegments && raceSegments.length >= 3);
+                  const sessionRationales =
+                    session.displayType !== "completed_activity"
+                      ? (rationalesBySessionId.get(session.id) ?? [])
+                      : [];
+                  const primaryRationale = sessionRationales[0] ?? null;
+                  const primaryChange = primaryRationale?.changes_summary.find((change) => change.session_id === session.id) ?? null;
+                  const rationaleSummary = primaryRationale ? summarizeRationale(primaryRationale.rationale_text) : null;
+                  const rationaleExpanded = expandedRationaleSessionId === session.id;
                   const raceSubtitle = isRaceCard && raceSegments
                     ? raceSegments
                         .filter((seg) => seg.role === "swim" || seg.role === "bike" || seg.role === "run")
@@ -1022,6 +1084,52 @@ export function WeekCalendar({
                           </span>
                         ) : null}
                       </div>
+                      {primaryRationale ? (
+                        <div
+                          className="mt-2 rounded-lg border border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.07)] px-2 py-1.5"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex rounded-full border border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.12)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[rgb(251,191,36)]">
+                              Adapted
+                            </span>
+                            {rationaleSummary?.hasMore || primaryChange || (primaryRationale.preserved_elements?.length ?? 0) > 0 ? (
+                              <button
+                                type="button"
+                                className="text-[10px] font-medium text-[rgba(255,255,255,0.72)] hover:text-white"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setExpandedRationaleSessionId((current) => (current === session.id ? null : session.id));
+                                }}
+                              >
+                                {rationaleExpanded ? "Hide details" : "Why this changed"}
+                              </button>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-[11px] leading-relaxed text-[rgba(255,255,255,0.76)]">
+                            {rationaleExpanded ? primaryRationale.rationale_text : rationaleSummary?.summary}
+                          </p>
+                          {rationaleExpanded && (primaryChange || (primaryRationale.preserved_elements?.length ?? 0) > 0) ? (
+                            <div className="mt-2 space-y-2 border-t border-[rgba(251,191,36,0.12)] pt-2">
+                              {primaryChange ? (
+                                <div className="text-[10px] leading-relaxed text-[rgba(255,255,255,0.68)]">
+                                  <span className="font-medium text-white">{primaryChange.session_label}</span>
+                                  <span className="text-[rgba(255,255,255,0.5)]"> · </span>
+                                  <span className="line-through">{primaryChange.before}</span>
+                                  <span className="text-[rgba(255,255,255,0.5)]"> → </span>
+                                  <span className="text-white">{primaryChange.after}</span>
+                                </div>
+                              ) : null}
+                              {primaryRationale.preserved_elements?.length ? (
+                                <p className="text-[10px] text-[rgba(255,255,255,0.62)]">
+                                  Preserved: {primaryRationale.preserved_elements.join(" · ")}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {isNeedsAttentionCard && !showCompletedFooter ? (
                         <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[var(--color-warning)]">
                           <span aria-hidden="true" className="h-[6px] w-[6px] rounded-full bg-[var(--color-warning)]" />
