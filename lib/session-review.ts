@@ -1,6 +1,22 @@
 import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import type { ComponentScores } from "@/lib/coach/session-diagnosis";
+import {
+  durationLabel,
+  formatIntervalCompletion,
+  formatPacePer100m,
+  getNumber,
+  getString,
+  pct,
+  sanitizeFieldNames,
+  toneToBadgeClass,
+  toneToTextClass,
+  type Tone,
+} from "@/lib/session-review/formatters";
+
+// Re-export public formatters so callers that import them from
+// "@/lib/session-review" keep working without churn.
+export { durationLabel, sanitizeFieldNames, toneToBadgeClass, toneToTextClass };
 
 export type SessionReviewRow = {
   id: string;
@@ -23,9 +39,7 @@ export type SessionReviewRow = {
 };
 
 type SessionStatus = "planned" | "completed" | "skipped";
-type DiagnosisStatus = "matched_intent" | "partial_intent" | "missed_intent";
 type ScoreBand = "On target" | "Solid" | "Partial match" | "Missed intent";
-type Tone = "success" | "warning" | "risk" | "muted";
 type IntentBucket = "easy" | "recovery" | "threshold" | "long" | "swim_strength" | "unknown";
 
 export type ReviewViewModel = {
@@ -82,88 +96,6 @@ const SCORE_BAND_BY_VALUE = [
   { min: 55, label: "Partial match" },
   { min: 0, label: "Missed intent" }
 ] as const;
-
-function getString(result: Record<string, unknown> | null | undefined, keys: string[], fallback = "") {
-  if (!result) return fallback;
-  for (const key of keys) {
-    const value = result[key];
-    if (typeof value === "string" && value.trim().length > 0) return value.trim();
-  }
-  return fallback;
-}
-
-function getNumber(result: Record<string, unknown> | null | undefined, keys: string[]) {
-  if (!result) return null;
-  for (const key of keys) {
-    const value = result[key];
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-  }
-  return null;
-}
-
-function pct(value: number | null) {
-  if (value === null) return "—";
-  return `${Math.round(value * 100)}%`;
-}
-
-/** Format interval completion ratio as a human-readable string. */
-function formatIntervalCompletion(value: number): string {
-  const pctVal = Math.round(value * 100);
-  if (pctVal >= 100) return "All completed";
-  return `${pctVal}%`;
-}
-
-/** Sanitize raw camelCase field names that may appear in AI-generated text. */
-export function sanitizeFieldNames(text: string): string {
-  let result = text;
-  // intervalCompletionPct or intervalCompletion with comparison operators and values
-  // Match both "intervalCompletionPct" and "intervalCompletion" (with or without Pct suffix)
-  // ≥ 1.0 → "all planned intervals completed"
-  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[≥>=]+\s*1(?:\.0)?\b/gi, "all planned intervals completed");
-  // Comparator + value → operator-aware phrasing
-  result = result.replace(/\bintervalCompletion(?:Pct)?\s*([≥≤]|>=|<=|>|<)\s*([\d.]+)/gi, (_m, op, v) => {
-    const pct = Math.round(parseFloat(v) * 100);
-    if (pct >= 100) return "all planned intervals completed";
-    const isLessThan = /[<≤]/.test(op);
-    const isStrict = op === "<" || op === ">";
-    if (isLessThan) {
-      return isStrict
-        ? `less than ${pct}% of planned intervals completed`
-        : `at most ${pct}% of planned intervals completed`;
-    }
-    return isStrict
-      ? `more than ${pct}% of planned intervals completed`
-      : `at least ${pct}% of planned intervals completed`;
-  });
-  // = or : with value
-  result = result.replace(/\bintervalCompletion(?:Pct)?\s*[=:]\s*([\d.]+)/gi, (_m, v) => {
-    const pct = Math.round(parseFloat(v) * 100);
-    return pct >= 100 ? "all planned intervals completed" : `${pct}% of planned intervals completed`;
-  });
-  // Bare field name without value
-  result = result.replace(/\bintervalCompletion(?:Pct)?\b/gi, "interval completion");
-  result = result.replace(/\btimeAboveTargetPct\b/gi, "time above target");
-  result = result.replace(/\bavgPower\b/gi, "avg power");
-  result = result.replace(/\bavgHr\b/gi, "avg heart rate");
-  result = result.replace(/\bnormalizedPower\b/gi, "normalized power");
-  result = result.replace(/\bvariabilityIndex\b/gi, "variability index");
-  result = result.replace(/\btrainingStressScore\b/gi, "training stress score");
-  result = result.replace(/\btotalWorkKj\b/gi, "total work");
-  // Expand "NP" abbreviation — match when used as a standalone term (not inside a word)
-  // but only in metric contexts (followed by space + word/number, or at end after possessive)
-  result = result.replace(/\bNP\b(?=\s+(?:remains|target|within|of|from|rose|is|was|at|near|≈|~|\d))/g, "normalized power");
-  result = result.replace(/today's NP\b/g, "today's normalized power");
-  result = result.replace(/\bVI\b(?=\s+(?:of|was|is|at|\d))/g, "variability index");
-  return result;
-}
-
-export function durationLabel(minutes: number | null | undefined) {
-  if (!minutes || minutes <= 0) return "—";
-  const wholeMinutes = Math.round(minutes);
-  const h = Math.floor(wholeMinutes / 60);
-  const m = wholeMinutes % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
 
 function toStatusLabel(status: string | null | undefined) {
   const normalized = (status ?? "").toLowerCase();
@@ -445,20 +377,6 @@ function deriveWeekAction(params: { intentLabel: string; bucket: IntentBucket; i
   return "Use this session as feedback and keep the rest of the week steady rather than forcing extra load.";
 }
 
-export function toneToTextClass(tone: Tone) {
-  if (tone === "success") return "text-[hsl(var(--success))]";
-  if (tone === "warning") return "text-[hsl(var(--warning))]";
-  if (tone === "risk") return "text-[hsl(var(--signal-risk))]";
-  return "text-muted";
-}
-
-export function toneToBadgeClass(tone: Tone) {
-  if (tone === "success") return "border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]";
-  if (tone === "warning") return "border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.12)] text-[hsl(var(--warning))]";
-  if (tone === "risk") return "border-[hsl(var(--signal-risk)/0.35)] bg-[hsl(var(--signal-risk)/0.12)] text-[hsl(var(--signal-risk))]";
-  return "border-[hsl(var(--border))] bg-[hsl(var(--surface-subtle))] text-muted";
-}
-
 export function createReviewViewModel(session: SessionReviewRow, options?: { trendContext?: string | null; verdictAdaptationType?: string | null }): ReviewViewModel {
   const diagnosis = session.execution_result;
   const v2Review = parsePersistedExecutionReview(diagnosis);
@@ -550,12 +468,6 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
     ? durationLabel(Math.round((session.duration_minutes ?? 0) * durationCompletion))
     : null;
   const cadenceUnit = session.sport === "bike" ? "rpm" : "spm";
-  const formatPace100 = (seconds: number) => {
-    const rounded = Math.round(seconds);
-    const minutes = Math.floor(rounded / 60);
-    const secs = rounded % 60;
-    return `${minutes}:${secs.toString().padStart(2, "0")}/100m`;
-  };
 
   const actualExecutionSummary = aiWhatHappened || (
     isExtra
@@ -663,8 +575,8 @@ export function createReviewViewModel(session: SessionReviewRow, options?: { tre
   ];
   const swimMetrics = [
     durationCompleted ? { label: "Duration completed", value: durationCompleted } : durationCompletion !== null ? { label: "Duration completed", value: pct(durationCompletion) } : null,
-    avgPacePer100mSec !== null ? { label: "Average pace /100m", value: formatPace100(avgPacePer100mSec) } : null,
-    bestPacePer100mSec !== null ? { label: "Best pace /100m", value: formatPace100(bestPacePer100mSec) } : null,
+    avgPacePer100mSec !== null ? { label: "Average pace /100m", value: formatPacePer100m(avgPacePer100mSec) } : null,
+    bestPacePer100mSec !== null ? { label: "Best pace /100m", value: formatPacePer100m(bestPacePer100mSec) } : null,
     avgStrokeRateSpm !== null ? { label: "Average stroke rate", value: `${Math.round(avgStrokeRateSpm)} spm` } : null,
     avgSwolf !== null ? { label: "Average SWOLF", value: `${Math.round(avgSwolf)}` } : null,
     intervalCompletion !== null ? { label: "Key reps completed", value: formatIntervalCompletion(intervalCompletion) } : null,
