@@ -8,6 +8,7 @@ import { addDays } from "@/lib/date-utils";
 import { inferDefaultDiscipline } from "@/lib/training/discipline-defaults";
 import { BlockHeader } from "./components/block-header";
 import { BlockGrid } from "./components/block-grid";
+import { PhoneWeekView } from "./components/phone-week-view";
 import { CellContextMenu, type CellContextMenuAction } from "./components/cell-context-menu";
 import {
   SessionPillContextMenu,
@@ -739,8 +740,8 @@ export function PlanGrid({
           onSelectBlock={handleSelectBlock}
         />
       ) : null}
-      <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
-        <BlockGrid
+      <div className="sm:hidden">
+        <PhoneWeekView
           weeks={weeksInBlock}
           sessions={sessionsInBlock}
           todayIso={todayIso}
@@ -749,10 +750,24 @@ export function PlanGrid({
           onSelectSession={handleOpenSession}
           onSessionContextMenu={handleSessionContextMenu}
           onEmptyCellClick={handleEmptyCellClick}
-          onEmptyCellContextMenu={handleEmptyCellContextMenu}
-          blockId={activeBlock?.id ?? null}
         />
-      </DndContext>
+      </div>
+      <div className="hidden sm:block">
+        <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+          <BlockGrid
+            weeks={weeksInBlock}
+            sessions={sessionsInBlock}
+            todayIso={todayIso}
+            adaptationsBySession={adaptationsBySession}
+            completedByWeek={completedByWeek}
+            onSelectSession={handleOpenSession}
+            onSessionContextMenu={handleSessionContextMenu}
+            onEmptyCellClick={handleEmptyCellClick}
+            onEmptyCellContextMenu={handleEmptyCellContextMenu}
+            blockId={activeBlock?.id ?? null}
+          />
+        </DndContext>
+      </div>
       <SessionDrawer
         session={drawerSession}
         adaptations={drawerAdaptations}

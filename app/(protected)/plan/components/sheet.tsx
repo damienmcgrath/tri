@@ -13,6 +13,9 @@ type Props = {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const SWIPE_DISMISS_PX = 80;
+const SWIPE_HORIZONTAL_TOLERANCE_PX = 40;
+
 /**
  * Right-edge slide-in panel. Uses createPortal to escape stacking contexts.
  * Closes on backdrop click and Escape. Traps focus inside the panel while open.
@@ -20,6 +23,7 @@ const FOCUSABLE_SELECTOR =
 export function Sheet({ open, onClose, ariaLabel, children }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   // Defer the portal until after hydration so SSR (which renders nothing) and
   // the client's first render agree, even when `open` is true on first paint
   // (e.g. ?session=<id> deep links).
@@ -88,8 +92,31 @@ export function Sheet({ open, onClose, ariaLabel, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        className="absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col overflow-hidden border-l border-[rgba(255,255,255,0.08)] bg-[#0a0a0a] shadow-2xl"
+        className="absolute inset-x-0 bottom-0 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border-x border-t border-[rgba(255,255,255,0.08)] bg-[#0a0a0a] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:max-w-[440px] sm:rounded-none sm:border-x-0 sm:border-l sm:border-t-0"
       >
+        <div
+          aria-hidden
+          className="flex cursor-grab justify-center pt-2 sm:hidden"
+          onTouchStart={(e) => {
+            swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }}
+          onTouchMove={(e) => {
+            if (!swipeStartRef.current) return;
+            const dx = e.touches[0].clientX - swipeStartRef.current.x;
+            const dy = e.touches[0].clientY - swipeStartRef.current.y;
+            if (Math.abs(dx) > SWIPE_HORIZONTAL_TOLERANCE_PX) {
+              swipeStartRef.current = null;
+            } else if (dy > SWIPE_DISMISS_PX) {
+              swipeStartRef.current = null;
+              onClose();
+            }
+          }}
+          onTouchEnd={() => {
+            swipeStartRef.current = null;
+          }}
+        >
+          <span className="h-1 w-10 rounded-full bg-[rgba(255,255,255,0.2)]" />
+        </div>
         {children}
       </div>
     </div>,
