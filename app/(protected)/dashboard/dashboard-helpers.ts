@@ -193,14 +193,6 @@ export function getDayChipContent(day: { tone: DayTone; stateLabel: string; micr
   };
 }
 
-export function getDayChipTitleClass(day: { tone: DayTone; stateLabel: string }) {
-  if (day.tone === "upcoming" && day.stateLabel.length > 8) {
-    return "mt-1 line-clamp-2 text-[12px] font-medium leading-tight text-white";
-  }
-
-  return "mt-1 line-clamp-2 text-[13px] font-medium leading-tight text-white";
-}
-
 // F11 (revised): small status pip color per day tone. The pip is a 6px dot
 // at the top-right of each chip in the week-shape strip — it answers "is
 // this day done, missed, or upcoming?" without any numbers.
