@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { popOverlay, pushOverlay } from "@/lib/overlay-stack";
 import { useCoachPanel } from "./coach-panel-context";
 
 type Message = {
@@ -44,6 +45,17 @@ export function CoachPanel() {
     }
     return () => {
       document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  // Register on the overlay stack synchronously before paint so any
+  // floating affordances (CoachFAB) hide before the first paint, even on
+  // deep links that open the panel on initial render.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    pushOverlay();
+    return () => {
+      popOverlay();
     };
   }, [isOpen]);
 
