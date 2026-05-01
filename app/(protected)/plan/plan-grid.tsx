@@ -753,6 +753,7 @@ export function PlanGrid({
           onSelectSession={handleOpenSession}
           onSessionContextMenu={handleSessionContextMenu}
           onEmptyCellClick={handleEmptyCellClick}
+          onEmptyCellContextMenu={handleEmptyCellContextMenu}
         />
       ) : (
         <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>

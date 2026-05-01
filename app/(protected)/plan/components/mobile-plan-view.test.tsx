@@ -114,6 +114,41 @@ describe("MobilePlanView", () => {
     expect(onSelect).toHaveBeenCalledWith("s1");
   });
 
+  it("invokes onEmptyCellClick when an empty day's Add button is tapped", () => {
+    const onEmptyCellClick = jest.fn();
+    render(
+      <MobilePlanView
+        weeks={weeks}
+        sessions={[]}
+        todayIso="2026-04-28"
+        adaptationsBySession={{}}
+        onEmptyCellClick={onEmptyCellClick}
+      />
+    );
+
+    const addButtons = screen.getAllByRole("button", { name: "Add session" });
+    fireEvent.click(addButtons[0]);
+    expect(onEmptyCellClick).toHaveBeenCalledWith("wk-1", "2026-04-27");
+  });
+
+  it("invokes onEmptyCellContextMenu on right-click of an empty day", () => {
+    const onEmptyCellContextMenu = jest.fn();
+    render(
+      <MobilePlanView
+        weeks={weeks}
+        sessions={[]}
+        todayIso="2026-04-28"
+        adaptationsBySession={{}}
+        onEmptyCellClick={() => {}}
+        onEmptyCellContextMenu={onEmptyCellContextMenu}
+      />
+    );
+
+    const addButtons = screen.getAllByRole("button", { name: "Add session" });
+    fireEvent.contextMenu(addButtons[1], { clientX: 50, clientY: 60 });
+    expect(onEmptyCellContextMenu).toHaveBeenCalledWith("wk-1", "2026-04-28", 50, 60);
+  });
+
   it("renders empty placeholder when no weeks", () => {
     render(
       <MobilePlanView

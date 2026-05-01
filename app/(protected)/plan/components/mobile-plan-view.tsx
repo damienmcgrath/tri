@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays } from "@/lib/date-utils";
 import { SessionPill, type SessionPillSession } from "./session-pill";
 import { WeeklyTotalCell } from "./weekly-total-cell";
@@ -21,7 +21,11 @@ type Props = {
   onSelectSession?: (sessionId: string) => void;
   onSessionContextMenu?: (sessionId: string, x: number, y: number) => void;
   onEmptyCellClick?: (weekId: string, date: string) => void;
+  onEmptyCellContextMenu?: (weekId: string, date: string, x: number, y: number) => void;
 };
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_TOLERANCE_PX = 8;
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -57,7 +61,8 @@ export function MobilePlanView({
   completedByWeek,
   onSelectSession,
   onSessionContextMenu,
-  onEmptyCellClick
+  onEmptyCellClick,
+  onEmptyCellContextMenu
 }: Props) {
   const sortedWeeks = useMemo(
     () => [...weeks].sort((a, b) => a.week_index - b.week_index),
@@ -181,13 +186,12 @@ export function MobilePlanView({
                     />
                   ))
                 ) : onEmptyCellClick ? (
-                  <button
-                    type="button"
-                    onClick={() => onEmptyCellClick(week.id, dayIso)}
-                    className="rounded-sm border border-dashed border-[rgba(255,255,255,0.12)] py-1.5 text-[10px] uppercase tracking-wide text-tertiary"
-                  >
-                    + Add
-                  </button>
+                  <EmptyDayAddButton
+                    weekId={week.id}
+                    date={dayIso}
+                    onClick={onEmptyCellClick}
+                    onContextMenu={onEmptyCellContextMenu}
+                  />
                 ) : (
                   <div className="text-[10px] text-tertiary">—</div>
                 )}
@@ -208,5 +212,78 @@ export function MobilePlanView({
         />
       </div>
     </div>
+  );
+}
+
+function EmptyDayAddButton({
+  weekId,
+  date,
+  onClick,
+  onContextMenu
+}: {
+  weekId: string;
+  date: string;
+  onClick: (weekId: string, date: string) => void;
+  onContextMenu?: (weekId: string, date: string, x: number, y: number) => void;
+}) {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const longPressFired = useRef(false);
+
+  function clearLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressOrigin.current = null;
+  }
+
+  function handleClick() {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onClick(weekId, date);
+  }
+
+  function handleContextMenu(event: React.MouseEvent<HTMLButtonElement>) {
+    if (!onContextMenu) return;
+    event.preventDefault();
+    onContextMenu(weekId, date, event.clientX, event.clientY);
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    longPressFired.current = false;
+    if (event.pointerType !== "touch" || !onContextMenu) return;
+    longPressOrigin.current = { x: event.clientX, y: event.clientY };
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onContextMenu(weekId, date, event.clientX, event.clientY);
+      longPressTimer.current = null;
+    }, LONG_PRESS_MS);
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!longPressOrigin.current) return;
+    const dx = event.clientX - longPressOrigin.current.x;
+    const dy = event.clientY - longPressOrigin.current.y;
+    if (Math.hypot(dx, dy) > LONG_PRESS_TOLERANCE_PX) clearLongPress();
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label="Add session"
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPress}
+      onPointerCancel={clearLongPress}
+      onPointerLeave={clearLongPress}
+      className="rounded-sm border border-dashed border-[rgba(255,255,255,0.12)] py-1.5 text-[10px] uppercase tracking-wide text-tertiary"
+    >
+      + Add
+    </button>
   );
 }
