@@ -38,27 +38,32 @@ export type ProfileField = keyof ProfileRow;
 
 /**
  * Fetch a typed subset of `profiles` columns for a single user. Returns null
- * when no row exists. Pass `fields` as a `const` tuple so the return type
- * narrows to `Pick<ProfileRow, F>`:
+ * when no row exists.
  *
  *   const profile = await getProfileSnapshot(supabase, userId, [
  *     "active_plan_id",
  *     "race_name",
  *     "race_date",
- *   ] as const);
+ *   ]);
+ *
+ * The `const` type parameter forces TypeScript to infer the array as a
+ * tuple of literal field names, so the return type is always
+ * `Pick<ProfileRow, F[number]>` — the exact subset selected. This stays
+ * sound even if a caller drops `as const`: the inferred tuple cannot
+ * widen to `ProfileField[]` and pull in keys the query never selected.
  */
-export async function getProfileSnapshot<F extends ProfileField>(
+export async function getProfileSnapshot<const F extends readonly ProfileField[]>(
   supabase: SupabaseClient,
   userId: string,
-  fields: readonly F[]
-): Promise<Pick<ProfileRow, F> | null> {
+  fields: F
+): Promise<Pick<ProfileRow, F[number]> | null> {
   const { data } = await supabase
     .from("profiles")
     .select(fields.join(","))
     .eq("id", userId)
     .maybeSingle();
 
-  return (data as Pick<ProfileRow, F> | null) ?? null;
+  return (data as Pick<ProfileRow, F[number]> | null) ?? null;
 }
 
 /**
