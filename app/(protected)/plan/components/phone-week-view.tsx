@@ -18,6 +18,14 @@ type Props = {
   todayIso: string;
   adaptationsBySession: Record<string, boolean>;
   completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
+  /**
+   * When a deep link or in-app navigation opens a session drawer
+   * (`?session=<id>`), the phone view anchors on the week that contains
+   * that session so the pill stays visible behind the bottom sheet.
+   * Without this, every load defaults to the current week even when the
+   * deep-linked session lives in another week of the same block.
+   */
+  openSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
   onSessionContextMenu?: (sessionId: string, x: number, y: number) => void;
   onEmptyCellClick?: (weekId: string, date: string) => void;
@@ -62,6 +70,7 @@ export function PhoneWeekView({
   todayIso,
   adaptationsBySession,
   completedByWeek,
+  openSessionId,
   onSelectSession,
   onSessionContextMenu,
   onEmptyCellClick
@@ -71,22 +80,41 @@ export function PhoneWeekView({
     [weeks]
   );
 
-  // Default to the current week if it lives in this block; otherwise the first
+  // Resolve the week of the currently open (deep-linked) session, if any.
+  // This is the highest-priority anchor so /plan?session=<id> scrolls the
+  // phone view to the correct week instead of defaulting to "today".
+  const openSessionWeekIndex = useMemo(() => {
+    if (!openSessionId) return -1;
+    const target = (sessions as Array<{ id: string; week_id?: string }>).find(
+      (s) => s.id === openSessionId
+    );
+    if (!target?.week_id) return -1;
+    return sortedWeeks.findIndex((w) => w.id === target.week_id);
+  }, [openSessionId, sessions, sortedWeeks]);
+
+  // Default to the open session's week, then the current week, then the first
   // week. The state is purely phone-local — desktop keeps all weeks visible.
   const defaultIndex = useMemo(() => {
+    if (openSessionWeekIndex >= 0) return openSessionWeekIndex;
     const idx = sortedWeeks.findIndex((w) => isCurrentWeek(w.week_start_date, todayIso));
     return idx >= 0 ? idx : 0;
-  }, [sortedWeeks, todayIso]);
+  }, [openSessionWeekIndex, sortedWeeks, todayIso]);
 
   const [activeIndex, setActiveIndex] = useState(defaultIndex);
 
   // Keep activeIndex in range when the underlying weeks list changes (e.g. the
-  // user switches blocks) and re-anchor on the current week if available.
+  // user switches blocks) and re-anchor on the default whenever the
+  // deep-linked session id changes (so navigating to a session in another week
+  // of the same block snaps the phone view to the right week).
   useEffect(() => {
+    if (openSessionWeekIndex >= 0 && openSessionWeekIndex !== activeIndex) {
+      setActiveIndex(openSessionWeekIndex);
+      return;
+    }
     if (activeIndex < 0 || activeIndex >= sortedWeeks.length) {
       setActiveIndex(defaultIndex);
     }
-  }, [sortedWeeks.length, activeIndex, defaultIndex]);
+  }, [sortedWeeks.length, activeIndex, defaultIndex, openSessionWeekIndex]);
 
   if (sortedWeeks.length === 0) {
     return (

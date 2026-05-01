@@ -92,11 +92,11 @@ export function Sheet({ open, onClose, ariaLabel, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        className="absolute inset-x-0 bottom-0 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border-x border-t border-[rgba(255,255,255,0.08)] bg-[#0a0a0a] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:max-w-[440px] sm:rounded-none sm:border-x-0 sm:border-l sm:border-t-0"
+        className="absolute inset-x-0 bottom-0 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border-x border-t border-[rgba(255,255,255,0.08)] bg-[#0a0a0a] shadow-2xl min-[641px]:inset-x-auto min-[641px]:bottom-auto min-[641px]:right-0 min-[641px]:top-0 min-[641px]:h-full min-[641px]:max-h-none min-[641px]:max-w-[440px] min-[641px]:rounded-none min-[641px]:border-x-0 min-[641px]:border-l min-[641px]:border-t-0"
       >
         <div
           aria-hidden
-          className="flex cursor-grab justify-center pt-2 sm:hidden"
+          className="flex cursor-grab justify-center pt-2 min-[641px]:hidden"
           onTouchStart={(e) => {
             swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
           }}

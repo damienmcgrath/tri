@@ -740,19 +740,24 @@ export function PlanGrid({
           onSelectBlock={handleSelectBlock}
         />
       ) : null}
-      <div className="sm:hidden">
+      {/* Spec §8: phone is ≤640px, tablet is 641–767px. Tailwind's `sm:`
+          breakpoint is `min-width: 640px`, which would put 640px exactly
+          on the desktop side. Use a custom 641px boundary so the phone
+          view applies for the full ≤640px range as documented. */}
+      <div className="min-[641px]:hidden">
         <PhoneWeekView
           weeks={weeksInBlock}
           sessions={sessionsInBlock}
           todayIso={todayIso}
           adaptationsBySession={adaptationsBySession}
           completedByWeek={completedByWeek}
+          openSessionId={openSessionId}
           onSelectSession={handleOpenSession}
           onSessionContextMenu={handleSessionContextMenu}
           onEmptyCellClick={handleEmptyCellClick}
         />
       </div>
-      <div className="hidden sm:block">
+      <div className="hidden min-[641px]:block">
         <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
           <BlockGrid
             weeks={weeksInBlock}
