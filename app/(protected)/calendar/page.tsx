@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getActivePlanId } from "@/lib/supabase/queries";
 import { isValidIsoDate } from "@/lib/date/iso";
 import { WeekCalendar } from "./week-calendar";
 import { CoachNoteCards } from "./components/coach-note-card";
@@ -292,17 +293,13 @@ export default async function CalendarPage({ searchParams }: { searchParams?: { 
   let raceProximityLine: string | null = null;
 
   // Fetch active plan for block context
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("active_plan_id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const activePlanId = await getActivePlanId(supabase, user.id);
 
-  if (profile?.active_plan_id) {
+  if (activePlanId) {
     const { data: weekRow } = await supabase
       .from("training_weeks")
       .select("week_index,focus,block_id")
-      .eq("plan_id", profile.active_plan_id)
+      .eq("plan_id", activePlanId)
       .lte("week_start_date", weekStart)
       .gte("week_start_date", addDays(weekStart, -6))
       .order("week_start_date", { ascending: false })

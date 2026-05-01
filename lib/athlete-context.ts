@@ -2,6 +2,7 @@ import { cache } from "@/lib/shared/react-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { asStringArray } from "@/lib/openai";
+import { getProfileSnapshot } from "@/lib/supabase/queries";
 
 const experienceLevelSchema = z.enum(["beginner", "intermediate", "advanced"]);
 const goalTypeSchema = z.enum(["finish", "perform", "qualify", "build"]);
@@ -183,8 +184,18 @@ export const getAthleteContextSnapshot = cache(async function getAthleteContextS
   const weekEnd = new Date(new Date(`${weekStart}T00:00:00.000Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10);
   const todayIso = getTodayUtc();
 
-  const [{ data: profile }, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }, { data: latestFtp }] = await Promise.all([
-    supabase.from("profiles").select("id,display_name,race_name,race_date,active_plan_id,locale,units,timezone,week_start_day").eq("id", athleteId).maybeSingle(),
+  const [profile, { data: context }, { data: activePlan }, { data: checkin }, { data: patterns }, { data: upcomingSessions }, { data: latestFtp }] = await Promise.all([
+    getProfileSnapshot(supabase, athleteId, [
+      "id",
+      "display_name",
+      "race_name",
+      "race_date",
+      "active_plan_id",
+      "locale",
+      "units",
+      "timezone",
+      "week_start_day"
+    ] as const),
     supabase.from("athlete_context").select("*").eq("athlete_id", athleteId).maybeSingle(),
     supabase
       .from("training_plans")
