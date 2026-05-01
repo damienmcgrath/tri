@@ -1,6 +1,6 @@
 import "openai/shims/node";
 import { zodTextFormat } from "openai/helpers/zod";
-import { asObject, asString, asStringArray, clip } from "@/lib/openai";
+import { asObject, asString, asStringArray, clip } from "@/lib/shared/json-utils";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import {
   SESSION_VARIANCE_PROMPT,
