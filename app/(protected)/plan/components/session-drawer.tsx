@@ -169,6 +169,8 @@ export type SessionDrawerProps = {
   onSaved: (next: DrawerSession) => void;
   onDeleted: (id: string) => void;
   onCreated?: (created: DrawerSession) => void;
+  /** "right" on desktop, "bottom" on phone. Defaults to "right". */
+  side?: "right" | "bottom";
 };
 
 export function SessionDrawer({
@@ -180,7 +182,8 @@ export function SessionDrawer({
   onClose,
   onSaved,
   onDeleted,
-  onCreated
+  onCreated,
+  side = "right"
 }: SessionDrawerProps) {
   const isCreate = mode === "create";
 
@@ -387,7 +390,7 @@ export function SessionDrawer({
   const saveActiveLabel = isCreate ? "Creating…" : "Saving…";
 
   return (
-    <Sheet open={open} onClose={handleClose} ariaLabel={isCreate ? "Create session" : "Session details"}>
+    <Sheet open={open} onClose={handleClose} ariaLabel={isCreate ? "Create session" : "Session details"} side={side}>
       {showForm && form ? (
         <>
           <header className="flex items-start justify-between gap-3 border-b border-[rgba(255,255,255,0.08)] px-4 py-3">
