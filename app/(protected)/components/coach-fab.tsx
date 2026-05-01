@@ -1,15 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useCoachPanel } from "./coach-panel-context";
+
+/**
+ * Watches `document.body.style.overflow` for the `hidden` value that this app
+ * sets whenever a modal/drawer is open (Plan session-drawer Sheet, CoachPanel,
+ * Activity linking modal, etc.). Returns true while any such overlay is up so
+ * that floating affordances like the CoachFAB can step out of the way.
+ */
+function useIsModalOpen() {
+  const [isLocked, setIsLocked] = useState(false);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const update = () => {
+      setIsLocked(document.body.style.overflow === "hidden");
+    };
+
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return isLocked;
+}
 
 // Small, always-visible. Kept in its own module so the wrapper can hydrate it
 // eagerly while the heavier CoachPanel stays lazy.
 export function CoachFAB() {
   const { open, isOpen } = useCoachPanel();
   const pathname = usePathname();
+  const isModalOpen = useIsModalOpen();
 
   if (isOpen) return null;
+  if (isModalOpen) return null;
   if (pathname?.startsWith("/coach")) return null;
 
   return (
