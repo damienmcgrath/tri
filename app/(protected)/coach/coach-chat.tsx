@@ -2,88 +2,27 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
-import type { CoachBriefingContext, CoachDiagnosisSession } from "./types";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { CoachBriefingContext } from "./types";
 import { getDiagnosisDataState } from "@/lib/ui/sparse-data";
-import { CitationChips } from "./components/citation-chip";
 import type { CoachCitation } from "@/lib/coach/types";
-
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  pending?: boolean;
-  failed?: boolean;
-  retryText?: string;
-  citations?: CoachCitation[];
-};
-
-type CoachMessageProps = {
-  message: Message;
-  onRetry: (message: Message) => void;
-  raceBundleId?: string;
-  onCitationClick?: (citation: CoachCitation) => boolean | void;
-};
-
-// Message bubbles rarely change once rendered; only the streaming tail updates.
-// Memoising with a field-level comparator stops every bubble from re-rendering
-// on every keystroke in the input below.
-const CoachMessage = memo(
-  function CoachMessage({ message, onRetry, raceBundleId, onCitationClick }: CoachMessageProps) {
-    return (
-      <div className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-        <div
-          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
-            message.role === "user"
-              ? "bg-[hsl(var(--ai-accent-core))] text-[#0A0A0B]"
-              : message.failed
-                ? "border border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--text-secondary))]"
-                : "border border-[rgba(255,255,255,0.06)] bg-[#1F1F25] px-4 py-3.5 text-[rgba(255,255,255,0.8)]"
-          }`}
-        >
-          {message.pending && message.content.trim().length === 0 ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:120ms]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--text-secondary)/0.55)] [animation-delay:240ms]" />
-              <span className="ml-1">Coach is thinking</span>
-            </span>
-          ) : (
-            <>
-              {message.content}
-              {message.pending ? <span className="ml-1 animate-pulse text-tertiary">▍</span> : null}
-            </>
-          )}
-          {message.role === "assistant" && message.citations && message.citations.length > 0 ? (
-            <CitationChips citations={message.citations} onCitationClick={onCitationClick} raceBundleId={raceBundleId} />
-          ) : null}
-          {message.failed && message.role === "assistant" && message.retryText ? (
-            <div className="mt-2">
-              <button type="button" onClick={() => onRetry(message)} className="text-xs font-medium text-[hsl(var(--ai-accent-core))] hover:underline">
-                Retry
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
-  },
-  (prev, next) => {
-    const a = prev.message;
-    const b = next.message;
-    return (
-      a.id === b.id &&
-      a.role === b.role &&
-      a.content === b.content &&
-      a.pending === b.pending &&
-      a.failed === b.failed &&
-      a.retryText === b.retryText &&
-      JSON.stringify(a.citations ?? []) === JSON.stringify(b.citations ?? []) &&
-      prev.raceBundleId === next.raceBundleId &&
-      prev.onCitationClick === next.onCitationClick
-    );
-  }
-);
+import { CoachMessage, type Message } from "./components/coach-message";
+import {
+  buildOpeningMessage,
+  deriveTopInsight,
+  executionScoreBandTone,
+  pluralize,
+  rankFlaggedSessions,
+  scoreHeadline,
+  statusChip,
+  type SessionDiagnosis
+} from "./components/coach-briefing-insight";
+import {
+  CoachConversationHistory,
+  formatRecencyLabel,
+  groupConversations,
+  type Conversation
+} from "./components/coach-conversation-list";
 
 type CoachSummary = {
   plannedMinutes: number;
@@ -91,12 +30,6 @@ type CoachSummary = {
   completionPct: number;
   dominantSport: string;
   insights: string[];
-};
-
-type Conversation = {
-  id: string;
-  title: string;
-  updated_at: string;
 };
 
 type StreamCompletePayload = {
@@ -112,335 +45,12 @@ type StreamCompletePayload = {
   };
 };
 
-type IntentMatchStatus = "matched" | "partial" | "missed";
-type SessionDiagnosis = CoachDiagnosisSession;
-
-type TopCoachingInsight = {
-  headline: string;
-  rationale: string;
-  primaryAction: { label: string; href: string };
-  secondaryAction: { label: string; href: string };
-  confidenceNote: string | null;
-};
-
-type DiagnosisTheme = "easy_drift" | "recovery_slip" | "threshold_inconsistent" | "endurance_strong" | "general";
-
-type RankedSession = SessionDiagnosis & {
-  rankingScore: number;
-  themes: DiagnosisTheme[];
-};
-
-function buildOpeningMessage(
-  briefing: CoachBriefingContext,
-  diagnoses: SessionDiagnosis[]
-): Message {
-  const reviewed = briefing.reviewedSessionCount;
-  const onTarget = diagnoses.filter((d) => d.executionScoreBand === "On target").length;
-  const partial = diagnoses.filter((d) => d.executionScoreBand === "Partial match").length;
-  const missed = diagnoses.filter((d) => d.executionScoreBand === "Missed intent").length;
-  const latest = diagnoses[0];
-  const latestName = latest?.sessionName ?? null;
-  const nextKey = briefing.upcomingKeySessionNames?.[0] ?? null;
-
-  let content: string;
-  if (reviewed === 0 && briefing.uploadedSessionCount === 0) {
-    content = nextKey
-      ? `No sessions reviewed yet — once you upload activity data I can dig into execution. Want to talk through ${nextKey} in the meantime?`
-      : "No sessions reviewed yet. Upload an activity or link one to a planned session and I'll break down the execution.";
-  } else if (missed >= 2) {
-    content = `${missed} sessions came in below target recently${latestName ? `, most recently ${latestName}` : ""}. Want to look at what's driving that before we plan the next one?`;
-  } else if (partial >= 1 && missed === 0) {
-    content = `Mostly on track — ${onTarget} on target, ${partial} partial${latestName ? ` (latest: ${latestName})` : ""}. Anything about the partial sessions that felt off to you?`;
-  } else if (onTarget >= 3 && missed === 0) {
-    content = `You're stacking clean sessions — ${onTarget} on target and nothing missed. Before we talk about next week, is there anything that felt off?`;
-  } else if (latestName) {
-    content = `I've got ${reviewed} reviewed session${reviewed === 1 ? "" : "s"} in the picture, most recently ${latestName}. What do you want to dig into?`;
-  } else {
-    content = "I can use execution scores and intent-match review to explain what happened in completed sessions, then help you decide exactly what to adjust next.";
-  }
-
-  return { id: "coach-default", role: "assistant", content };
-}
-
 function createMessageId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
 
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function getMondayOf(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getUTCDay();
-  const offset = day === 0 ? -6 : 1 - day;
-  d.setUTCDate(d.getUTCDate() + offset);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function getWeekGroup(updatedAt: string): "this_week" | "last_week" | "older" {
-  const date = new Date(updatedAt);
-  const thisMonday = getMondayOf(new Date());
-  const lastMonday = new Date(thisMonday);
-  lastMonday.setUTCDate(lastMonday.getUTCDate() - 7);
-
-  if (date >= thisMonday) return "this_week";
-  if (date >= lastMonday) return "last_week";
-  return "older";
-}
-
-function groupConversations(conversations: Conversation[]): {
-  thisWeek: Conversation[];
-  lastWeek: Conversation[];
-  older: Conversation[];
-} {
-  const thisWeek: Conversation[] = [];
-  const lastWeek: Conversation[] = [];
-  const older: Conversation[] = [];
-
-  for (const conv of conversations) {
-    const group = getWeekGroup(conv.updated_at);
-    if (group === "this_week") thisWeek.push(conv);
-    else if (group === "last_week") lastWeek.push(conv);
-    else older.push(conv);
-  }
-
-  return { thisWeek, lastWeek, older };
-}
-
-function formatRecencyLabel(updatedAt?: string): string {
-  if (!updatedAt) {
-    return "Ready to start";
-  }
-
-  const diffMs = Date.now() - new Date(updatedAt).getTime();
-  const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
-
-  if (diffMinutes < 1) {
-    return "Updated just now";
-  }
-
-  if (diffMinutes < 60) {
-    return `Updated ${diffMinutes}m ago`;
-  }
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `Updated ${diffHours}h ago`;
-  }
-
-  const diffDays = Math.round(diffHours / 24);
-  return `Updated ${diffDays}d ago`;
-}
-
-function pluralize(count: number, singular: string, plural = `${singular}s`) {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function deriveTopInsight(sessions: SessionDiagnosis[], briefingContext: CoachBriefingContext): TopCoachingInsight {
-  const hasEnoughDiagnosis = sessions.length >= 2;
-  if (!hasEnoughDiagnosis) {
-    const latestScored = [...sessions].find((session) => session.executionScoreBand);
-    if (briefingContext.reviewedSessionCount > 0 || briefingContext.pendingReviewCount > 0 || briefingContext.linkedSessionCount > 0) {
-      return {
-        headline:
-          briefingContext.reviewedSessionCount > 0
-            ? `${briefingContext.reviewedSessionCount} session review${briefingContext.reviewedSessionCount > 1 ? "s" : ""} ready`
-            : `${briefingContext.linkedSessionCount} linked session${briefingContext.linkedSessionCount > 1 ? "s" : ""} waiting for review`,
-        rationale:
-          briefingContext.reviewedSessionCount > 0
-            ? `Coach already has ${briefingContext.reviewedSessionCount} reviewed session${briefingContext.reviewedSessionCount > 1 ? "s" : ""} to work from${briefingContext.pendingReviewCount > 0 ? `, with ${briefingContext.pendingReviewCount} more linked and still processing` : ""}. Use this as an execution snapshot while the review set grows.`
-            : `You have ${briefingContext.uploadedSessionCount} uploaded activit${briefingContext.uploadedSessionCount === 1 ? "y" : "ies"} and ${briefingContext.linkedSessionCount} linked session${briefingContext.linkedSessionCount > 1 ? "s" : ""}. Coach briefing should focus on what is already connected, not ask you to start from scratch.`,
-        primaryAction: { label: "Ask why", href: "#coaching-chat" },
-        secondaryAction: { label: "Review weekly plan", href: "/plan" },
-        confidenceNote: briefingContext.pendingReviewCount > 0 ? `${briefingContext.pendingReviewCount} pending review` : "Early review set"
-      };
-    }
-
-    return {
-      headline: latestScored ? `Latest review: ${scoreHeadline(latestScored)}` : "Start with 1–2 completed sessions to unlock intent-match coaching",
-      rationale:
-        latestScored
-          ? `${latestScored.sessionName} is already giving an execution-quality signal. One more reviewed session will make weekly coaching much more specific.`
-          : "You can already ask about missed-session recovery, schedule adjustments, and conservative load planning. As soon as more workouts are completed, session-quality diagnosis becomes specific.",
-      primaryAction: { label: "Ask why", href: "#coaching-chat" },
-      secondaryAction: { label: "Review weekly plan", href: "/plan" },
-      confidenceNote: "Provisional insight"
-    };
-  }
-
-  const rankedSessions = rankFlaggedSessions(sessions);
-  const strongestFlag = rankedSessions[0];
-  const onTargetCount = sessions.filter((session) => session.executionScoreBand === "On target").length;
-  const partialCountAll = sessions.filter((session) => session.executionScoreBand === "Partial match").length;
-  const missedCountAll = sessions.filter((session) => session.executionScoreBand === "Missed intent").length;
-  const provisionalCount = sessions.filter((session) => session.executionScoreProvisional).length;
-
-  if (!strongestFlag) {
-    const strongEnduranceSignal = sessions.some((session) => inferThemes(session).includes("endurance_strong"));
-
-    return {
-      headline: strongEnduranceSignal ? "Endurance execution is strong — stay the course" : "Execution quality is strong — stay the course",
-      rationale:
-        "Recent completed sessions are aligning with intended purpose. Maintain current structure and only progress if recovery remains stable.",
-      primaryAction: { label: "Review recommendation", href: "/plan" },
-      secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
-      confidenceNote: null
-    };
-  }
-
-  const missedCount = rankedSessions.filter((session) => session.status === "missed").length;
-  const partialCount = rankedSessions.filter((session) => session.status === "partial").length;
-
-  if (strongestFlag.themes.includes("easy_drift")) {
-    return {
-      headline: `Easy sessions are drifting too hard${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
-      rationale:
-        "Diagnosis is repeatedly detecting intensity drift away from easy intent. Protecting low-intensity execution now improves recovery and quality-session readiness.",
-      primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
-      secondaryAction: { label: "How to keep Z2 easy", href: "#coaching-chat" },
-      confidenceNote: "Diagnosis confidence: useful"
-    };
-  }
-
-  if (strongestFlag.themes.includes("recovery_slip")) {
-    return {
-      headline: `Recovery quality is slipping${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
-      rationale: strongestFlag.whyItMatters,
-      primaryAction: { label: "Protect recovery", href: "/plan" },
-      secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
-      confidenceNote: strongestFlag.confidenceNote ?? null
-    };
-  }
-
-  if (strongestFlag.themes.includes("threshold_inconsistent")) {
-    return {
-      headline: `Threshold execution is inconsistent${strongestFlag.executionScoreBand ? ` · ${scoreHeadline(strongestFlag)}` : ""}`,
-      rationale:
-        "Quality-session diagnosis shows uneven control versus planned intent. Tightening pacing before adding load will improve adaptation quality.",
-      primaryAction: { label: "Adjust this week", href: "/plan" },
-      secondaryAction: { label: "Ask why", href: "#coaching-chat" },
-      confidenceNote: strongestFlag.confidenceNote ?? null
-    };
-  }
-
-  if (strongestFlag.status === "missed") {
-    return {
-      headline:
-        missedCountAll > 1
-          ? `Execution is off-target in ${pluralize(missedCountAll, "session")} this week`
-          : `${strongestFlag.sessionName} needs attention this week`,
-      rationale:
-        missedCountAll > 1
-          ? `${pluralize(onTargetCount, "review")} are on target, but ${pluralize(missedCountAll, "session")} missed intent. Start by addressing ${strongestFlag.sessionName}, then keep the rest of the week steady.`
-          : `${pluralize(onTargetCount, "review")} are on target, but ${strongestFlag.sessionName} missed intent${provisionalCount > 0 ? ` and most scores are still provisional` : ""}.`,
-      primaryAction: { label: "Adjust this week", href: "/plan" },
-      secondaryAction: { label: "Review flagged sessions", href: "#sessions-needing-attention" },
-      confidenceNote: "Diagnosis confidence: useful"
-    };
-  }
-
-  if (missedCount >= 1 || partialCount >= 1) {
-    return {
-      headline:
-        onTargetCount > 0
-          ? `Execution is mostly on target, with ${pluralize(partialCountAll + missedCountAll, "session")} needing attention`
-          : "Execution quality is mixed — tighten session control this week",
-      rationale:
-        strongestFlag
-          ? `${pluralize(onTargetCount, "review")} are on target, but ${strongestFlag.sessionName} came up short${provisionalCount > 0 ? `. Most reviews are still early reads, so keep the signal in mind without over-correcting the week.` : "."}`
-          : "You have enough completion to progress, but easy/recovery intent is not consistently protected. Small execution changes now can improve adaptation quality this week.",
-      primaryAction: { label: "See what to change", href: "#sessions-needing-attention" },
-      secondaryAction: { label: "Ask why", href: "#coaching-chat" },
-      confidenceNote: null
-    };
-  }
-
-  return {
-    headline: "Execution quality is strong — stay the course",
-    rationale:
-      "Recent completed sessions are aligning with intended purpose. Maintain current structure and only progress if recovery remains stable.",
-    primaryAction: { label: "Review recommendation", href: "/plan" },
-    secondaryAction: { label: "What matters most now?", href: "#coaching-chat" },
-    confidenceNote: null
-  };
-}
-
-function inferThemes(session: SessionDiagnosis): DiagnosisTheme[] {
-  const searchable = [session.plannedIntent, session.executionSummary, session.nextAction, session.whyItMatters, ...session.evidence]
-    .join(" ")
-    .toLowerCase();
-  const themes = new Set<DiagnosisTheme>();
-
-  if (/(easy|z1|z2|recovery ride|recovery run|too hard|high intensity)/.test(searchable)) {
-    themes.add("easy_drift");
-  }
-
-  if (/(recover|fatigue|fresh|sleep|rest|carryover)/.test(searchable)) {
-    themes.add("recovery_slip");
-  }
-
-  if (/(threshold|tempo|interval|vo2|quality)/.test(searchable)) {
-    themes.add("threshold_inconsistent");
-  }
-
-  if (session.status === "matched" && /(endurance|long|aerobic|z2)/.test(searchable)) {
-    themes.add("endurance_strong");
-  }
-
-  if (themes.size === 0) {
-    themes.add("general");
-  }
-
-  return [...themes];
-}
-
-function rankFlaggedSessions(sessions: SessionDiagnosis[]): RankedSession[] {
-  return sessions
-    .filter((session) => session.status !== "matched")
-    .map((session) => {
-      const themes = inferThemes(session);
-      const statusWeight = session.status === "missed" ? 40 : 20;
-      const scorePenalty = session.executionScore === null ? 0 : Math.max(0, 30 - Math.round(session.executionScore / 3));
-      const bandWeight = session.executionScoreBand === "Missed intent" ? 20 : session.executionScoreBand === "Partial match" ? 10 : 0;
-      const evidenceWeight = Math.min(session.evidence.length * 3, 9);
-      const rankingScore = statusWeight + scorePenalty + bandWeight + evidenceWeight + session.importance;
-
-      return { ...session, rankingScore, themes };
-    })
-    .sort((a, b) => b.rankingScore - a.rankingScore)
-    .slice(0, 3);
-}
-
-function statusChip(status: IntentMatchStatus): { label: string; className: string } {
-  if (status === "matched") {
-    return { label: "Matched intent", className: "signal-ready" };
-  }
-  if (status === "partial") {
-    return { label: "Partially matched", className: "signal-load" };
-  }
-  return { label: "Missed intent", className: "signal-risk" };
-}
-
-function scoreHeadline(session: Pick<SessionDiagnosis, "executionScore" | "executionScoreBand" | "executionScoreProvisional">) {
-  if (!session.executionScoreBand) {
-    return session.executionScoreProvisional ? "Provisional review" : "Awaiting score";
-  }
-  if (session.executionScoreProvisional || session.executionScore === null) {
-    return `Provisional · ${session.executionScoreBand}`;
-  }
-  return `${session.executionScore} · ${session.executionScoreBand}`;
-}
-
-function executionScoreBandTone(band: SessionDiagnosis["executionScoreBand"]): string {
-  if (band === "On target") {
-    return "border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.08)] text-[hsl(var(--success))]";
-  }
-  if (band === "Partial match") {
-    return "border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] text-[hsl(var(--warning))]";
-  }
-  return "border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--danger))]";
 }
 
 export function CoachChat({
@@ -772,7 +382,7 @@ export function CoachChat({
     setPendingMessageId(null);
   }
 
-  function conversationTitle(conversation: Conversation, index: number) {
+  function buildConversationTitle(conversation: Conversation, index: number) {
     const trimmed = conversation.title.trim();
     if (trimmed.length > 0) {
       return trimmed;
@@ -781,7 +391,7 @@ export function CoachChat({
   }
 
   async function handleRenameConversation(conversation: Conversation, index: number) {
-    const nextTitle = window.prompt("Rename conversation", conversationTitle(conversation, index));
+    const nextTitle = window.prompt("Rename conversation", buildConversationTitle(conversation, index));
 
     if (!nextTitle || nextTitle.trim().length === 0) {
       return;
@@ -970,60 +580,17 @@ export function CoachChat({
     void streamAssistantReply(retryText);
   }
 
-  const renderConversationItem = (conversation: Conversation) => {
-    const isActive = conversation.id === conversationId;
-    const idx = conversations.indexOf(conversation);
-    return (
-      <div key={conversation.id} className={`rounded-md border px-2 py-1.5 ${isActive ? "border-transparent bg-[rgba(255,255,255,0.06)]" : "border-transparent hover:border-[hsl(var(--border))]"}`}>
-        <div className="flex items-start justify-between gap-1">
-          <button type="button" onClick={() => void handleConversationClick(conversation.id)} className="min-w-0 flex-1 text-left leading-tight">
-            <p className={`truncate pr-1 text-[13px] font-medium ${isActive ? "text-white" : "text-[rgba(255,255,255,0.55)]"}`}>
-              {conversationTitle(conversation, idx)}
-            </p>
-            <p className="mt-1 text-[11px] text-[rgba(255,255,255,0.25)]">{formatRecencyLabel(conversation.updated_at)}</p>
-          </button>
-          <details className="relative">
-            <summary className="cursor-pointer list-none px-1 text-sm text-tertiary hover:text-white">⋯</summary>
-            <div className="absolute right-0 z-10 mt-1 w-28 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-1 text-xs shadow-md">
-              <button type="button" onClick={() => void handleRenameConversation(conversation, idx)} className="block w-full rounded px-2 py-1 text-left hover:bg-[hsl(var(--surface-2))]">Rename</button>
-              <button type="button" onClick={() => void handleDeleteConversation(conversation.id)} className="block w-full rounded px-2 py-1 text-left text-rose-300 hover:bg-[hsl(var(--surface-2))]">Delete</button>
-            </div>
-          </details>
-        </div>
-      </div>
-    );
-  };
-
   const historyGroups = (
-    <>
-      {memoizedGroups.thisWeek.length > 0 ? (
-        <div>
-          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">This week</p>
-          <div className="space-y-1">{memoizedGroups.thisWeek.slice(0, 5).map(renderConversationItem)}</div>
-        </div>
-      ) : null}
-      {memoizedGroups.lastWeek.length > 0 ? (
-        <div>
-          <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)]">Last week</p>
-          <div className="space-y-1">{memoizedGroups.lastWeek.slice(0, 3).map(renderConversationItem)}</div>
-        </div>
-      ) : null}
-      {memoizedGroups.older.length > 0 ? (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowOlderConversations((prev) => !prev)}
-            className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(255,255,255,0.28)] hover:text-[rgba(255,255,255,0.45)]"
-          >
-            <span>Older</span>
-            <span className="rounded-full border border-[rgba(255,255,255,0.12)] px-1.5 py-0.5 text-[9px]">{memoizedGroups.older.length}</span>
-          </button>
-          {showOlderConversations ? (
-            <div className="space-y-1">{memoizedGroups.older.map(renderConversationItem)}</div>
-          ) : null}
-        </div>
-      ) : null}
-    </>
+    <CoachConversationHistory
+      conversations={conversations}
+      groups={memoizedGroups}
+      activeId={conversationId}
+      showOlder={showOlderConversations}
+      onToggleOlder={() => setShowOlderConversations((prev) => !prev)}
+      onSelect={(id) => void handleConversationClick(id)}
+      onRename={(conversation, index) => void handleRenameConversation(conversation, index)}
+      onDelete={(id) => void handleDeleteConversation(id)}
+    />
   );
 
   return (
