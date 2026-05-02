@@ -74,47 +74,6 @@ export async function getPrimaryRace(supabase: SupabaseClient, userId: string): 
   return data ? mapRaceProfileRow(data) : null;
 }
 
-export async function getActiveSeason(supabase: SupabaseClient, userId: string): Promise<Season | null> {
-  const { data } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("start_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) return null;
-
-  return {
-    id: data.id,
-    userId: data.user_id,
-    name: data.name,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    primaryGoal: data.primary_goal ?? null,
-    secondaryGoals: data.secondary_goals ?? [],
-    status: data.status,
-  };
-}
-
-export async function getTrainingBlocks(supabase: SupabaseClient, userId: string, seasonId?: string): Promise<TrainingBlock[]> {
-  let query = supabase
-    .from("training_blocks")
-    .select("*")
-    .eq("user_id", userId)
-    .order("sort_order", { ascending: true });
-
-  if (seasonId) {
-    query = query.eq("season_id", seasonId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map(mapTrainingBlockRow);
-}
-
 /**
  * Get the training block that covers a specific date.
  * Falls back to null if no block covers the date.
@@ -140,7 +99,7 @@ export async function getBlockForDate(supabase: SupabaseClient, userId: string, 
  * Uses the profile's custom distribution if set, otherwise falls back
  * to the standard distribution for the race type.
  */
-export function getIdealDistribution(profile: RaceProfile): { swim: number; bike: number; run: number } {
+function getIdealDistribution(profile: RaceProfile): { swim: number; bike: number; run: number } {
   if (profile.idealDisciplineDistribution) {
     const { swim, bike, run } = profile.idealDisciplineDistribution;
     return { swim, bike, run };
