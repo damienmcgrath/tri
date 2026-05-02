@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { popOverlay, pushOverlay } from "@/lib/overlay-stack";
 
 type Side = "right" | "bottom";
 
@@ -42,6 +43,18 @@ export function Sheet({ open, onClose, ariaLabel, children, side = "right" }: Pr
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Push to the overlay stack synchronously before the first paint so
+  // floating affordances (e.g. CoachFAB) can hide before any flash. A
+  // layout effect runs after render but before paint and re-renders any
+  // subscriber via useSyncExternalStore.
+  useLayoutEffect(() => {
+    if (!open) return;
+    pushOverlay();
+    return () => {
+      popOverlay();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
