@@ -6,9 +6,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedClient } from "@/lib/actions-utils";
 import { insertWithCompat, insertBatchWithCompat, updateWithCompat, isMissingColumnError, SESSIONS_OPTIONAL_COLUMNS } from "@/lib/supabase/schema-compat";
+import { getActivePlanId } from "@/lib/supabase/queries";
 
 const SESSIONS_OPTIONAL_COLUMNS_SET = new Set<string>(SESSIONS_OPTIONAL_COLUMNS);
-import { getActivePlanId } from "@/lib/supabase/queries";
 
 // Block actions live in a sibling so this file stays focused on the plan /
 // week / session domains. Re-exported here to preserve existing
