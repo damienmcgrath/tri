@@ -193,6 +193,7 @@ async function enrichWithDetailedFetch(
         max_power: enriched.max_power,
         elevation_gain_m: enriched.elevation_gain_m,
         activity_type_raw: enriched.activity_type_raw,
+        swim_type: enriched.swim_type,
         metrics_v2: enriched.metrics_v2
       })
       .eq("id", activityDbId)

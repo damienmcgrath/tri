@@ -186,6 +186,7 @@ export async function POST(request: Request) {
         activity_type_raw: parsed.activityTypeRaw,
         activity_subtype_raw: parsed.activitySubtypeRaw,
         activity_vendor: parsed.activityVendor,
+        swim_type: parsed.swimType ?? null,
         metrics_v2: parsed.metricsV2,
         parse_summary: parsed.parseSummary,
         source: "upload"
