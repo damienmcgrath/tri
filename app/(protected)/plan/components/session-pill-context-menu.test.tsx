@@ -96,6 +96,50 @@ describe("SessionPillContextMenu", () => {
     expect(within(submenu).getByRole("menuitem", { name: currentLabel })).toBeDisabled();
   });
 
+  it("flips the Move-to submenu to the left when the parent menu is near the right edge", () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390, writable: true });
+    try {
+      render(
+        <SessionPillContextMenu
+          x={380}
+          y={10}
+          isKey={false}
+          weekDays={weekDays}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: "Move to ▸" }));
+      const submenu = screen.getByRole("menu", { name: "Move to day" });
+      expect(submenu).toHaveAttribute("data-flipped", "true");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalInnerWidth, writable: true });
+    }
+  });
+
+  it("keeps the Move-to submenu on the right when there's room", () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280, writable: true });
+    try {
+      render(
+        <SessionPillContextMenu
+          x={100}
+          y={10}
+          isKey={false}
+          weekDays={weekDays}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: "Move to ▸" }));
+      const submenu = screen.getByRole("menu", { name: "Move to day" });
+      expect(submenu).toHaveAttribute("data-flipped", "false");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalInnerWidth, writable: true });
+    }
+  });
+
   it("emits convert-to-rest and delete actions", () => {
     const onSelect = jest.fn();
     render(

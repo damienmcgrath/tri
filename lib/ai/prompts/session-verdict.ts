@@ -1,5 +1,4 @@
 import "openai/shims/node";
-import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
@@ -9,130 +8,20 @@ import { buildExtendedSignals, EMPTY_EXTENDED_SIGNALS, type ExtendedSignals } fr
 import type { HistoricalComparable } from "@/lib/analytics/historical-comparables";
 import {
   fetchSessionVerdictPriorHeadlines,
-  SESSION_VARIANCE_PROMPT,
   type SessionPriorHeadline,
 } from "@/lib/ai/session-variance-corpus";
-import { SESSION_VERDICT_FEW_SHOT_JSON } from "./session-verdict-examples";
+import {
+  sessionVerdictOutputSchema,
+  type SessionVerdictContext,
+  type SessionVerdictOutput
+} from "./session-verdict-schemas";
+import { buildVerdictInstructions } from "./session-verdict-prompt";
+
+// Re-export the public prompt API so existing callers keep working.
+export { sessionVerdictOutputSchema, buildVerdictInstructions };
+export type { SessionVerdictContext, SessionVerdictOutput };
 
 export const SESSION_VERDICT_PROMPT_VERSION = "v3";
-
-// --- Zod schema for AI output ---
-
-const metricComparisonSchema = z.object({
-  metric: z.string().min(1).max(60),
-  target: z.string().min(1).max(100),
-  actual: z.string().min(1).max(100),
-  assessment: z.enum(["on_target", "above", "below", "missing"])
-});
-
-const deviationSchema = z.object({
-  metric: z.string().min(1).max(60),
-  description: z.string().min(1).max(300),
-  severity: z.enum(["minor", "moderate", "significant"])
-});
-
-export const sessionVerdictOutputSchema = z.object({
-  purpose_statement: z.string().min(1).max(400),
-  training_block_context: z.string().min(1).max(200),
-  intended_zones: z.string().max(500),
-  intended_metrics: z.string().max(500),
-  execution_summary: z.string().min(1).max(600),
-  verdict_status: z.enum(["achieved", "partial", "missed", "off_target"]),
-  metric_comparisons: z.array(metricComparisonSchema).max(6),
-  key_deviations: z.array(deviationSchema).max(5),
-  /**
-   * A single finding that goes beyond restating the session. Must cite a
-   * historical comparable, aerobic decoupling, weather-adjusted context, or a
-   * cross-session pattern. Required so the model can never fall back to a pure
-   * summary of this session's numbers.
-   */
-  non_obvious_insight: z.string().min(1).max(320),
-  /**
-   * Optional one-sentence teach moment explaining *why* a metric exposed by
-   * this session matters (VI spike, aerobic decoupling, negative-split
-   * failure, durability fade, cadence drop, HR↔pace divergence). Null when
-   * no mechanism is worth teaching, so the model does not manufacture
-   * platitudes. Rotate focus across sessions.
-   */
-  teach: z.string().min(1).max(200).nullable(),
-  /**
-   * Concrete citation of at least one prior same-intent session the reader
-   * can anchor to (date + metric delta). Required non-null whenever
-   * `extendedSignals.historicalComparables` has at least one entry, so the
-   * model cannot ignore the comparables that were injected. Null only when
-   * no comparables are available.
-   */
-  comparable_reference: z.string().min(1).max(240).nullable(),
-  adaptation_signal: z.string().min(1).max(800),
-  adaptation_type: z.enum(["proceed", "flag_review", "modify", "redistribute"]),
-  affected_session_ids: z.array(z.string()).max(5)
-});
-
-export type SessionVerdictOutput = z.infer<typeof sessionVerdictOutputSchema>;
-
-// --- Context assembly ---
-
-export type SessionVerdictContext = {
-  session: {
-    id: string;
-    sport: string;
-    type: string;
-    sessionName: string | null;
-    intentCategory: string | null;
-    target: string | null;
-    notes: string | null;
-    durationMinutes: number | null;
-    isKey: boolean;
-    date: string;
-  };
-  activity: {
-    durationSec: number | null;
-    distanceM: number | null;
-    avgHr: number | null;
-    avgPower: number | null;
-    /** Duration-weighted average power from work-interval laps only. */
-    avgIntervalPower: number | null;
-    avgPacePer100mSec: number | null;
-    metrics: Record<string, unknown> | null;
-  } | null;
-  executionResult: Record<string, unknown> | null;
-  feel: {
-    overallFeel: number | null;
-    energyLevel: string | null;
-    legsFeel: string | null;
-    motivation: string | null;
-    sleepQuality: string | null;
-    lifeStress: string | null;
-    note: string | null;
-  } | null;
-  trainingBlock: {
-    currentBlock: string;
-    blockWeek: number;
-    blockTotalWeeks: number;
-    raceName: string | null;
-    daysToRace: number | null;
-  };
-  upcomingSessions: Array<{
-    id: string;
-    date: string;
-    sport: string;
-    type: string;
-    isKey: boolean;
-  }>;
-  recentLoadTrend: {
-    last7daysTss: number | null;
-    last14daysTss: number | null;
-    currentCtl: number | null;
-    currentAtl: number | null;
-    currentTsb: number | null;
-  } | null;
-  /**
-   * Optional so older test fixtures remain valid. When absent at runtime the
-   * fallback verdict still emits a `non_obvious_insight` grounded in whatever
-   * evidence is present.
-   */
-  extendedSignals?: ExtendedSignals;
-};
 
 /**
  * Locate a pre-computed `ExtendedSignals` payload inside a persisted
@@ -355,100 +244,6 @@ export async function buildSessionVerdictContext(
   };
 }
 
-// --- AI prompt instructions ---
-
-export function buildVerdictInstructions(): string {
-  return [
-    "You are an expert triathlon coach generating a structured session verdict.",
-    "The verdict has three parts: Purpose Statement, Execution Assessment, and Adaptation Signal.",
-    "",
-    "PART 1 — Purpose Statement:",
-    "- Explain the session's physiological intent in plain language.",
-    "- Reference the training block context (e.g. 'Week 3 of a 4-week build block').",
-    "- Example: 'This was a Z2 aerobic maintenance run designed to build capillary density without accumulating fatigue.'",
-    "",
-    "PART 2 — Execution Assessment:",
-    "- Compare actual metrics against target/expected ranges.",
-    "- Flag meaningful deviations with specific numbers.",
-    "- For swim: include SWOLF trends, stroke rate, distance per stroke where available.",
-    "- For bike: include normalised power, variability index, cadence patterns.",
-    "- For run: include pace distribution, cardiac drift analysis, cadence.",
-    "- Produce a clear verdict_status: 'achieved' (session achieved its purpose), 'partial' (partially achieved), 'missed' (did not achieve intent), 'off_target' (significantly off).",
-    "- Express durations in minutes (e.g. '37 min'). Express run pace as min:sec/km (e.g. '5:41/km'). Express swim pace as min:sec/100m (e.g. '1:55/100m'). Never write raw seconds.",
-    "- For swim: when lap data is available in the metrics, use per-lap pace (avgPacePer100mSec) to assess split-by-split pacing consistency across intervals.",
-    "",
-    "Swim metric rules (CRITICAL):",
-    "- Swim pace is expressed as min:sec per 100m (e.g. '1:55/100m', '2:05/100m'). Descriptions like 'low to mid 2 min' refer to PACE, not heart rate.",
-    "- NEVER assign a pace value or pace description as a heart rate target. Heart rate targets are always in bpm (e.g. '130-145 bpm').",
-    "- If the planned session text contains no explicit heart rate target in bpm, set the target column to '\u2014' for any heart rate metric.",
-    "- In metric_comparisons, use 'average pace' (not 'average heart rate') for pace-related targets like 'low to mid 2 min/100m'.",
-    "",
-    "PART 3 — Adaptation Signal:",
-    "- State what this means for upcoming training.",
-    "- If well-executed: confirm the plan proceeds. Reference specific upcoming sessions.",
-    "- If warning signs: flag specific sessions for potential modification.",
-    "- If missed/off-target: explain redistribution or recovery implications.",
-    "- Reference upcoming sessions by weekday name and sport, NOT by ISO date (e.g. 'Wednesday's bike' not '2026-04-09 bike').",
-    "- Keep adaptation_signal to 2-3 sentences. Be direct, not exhaustive.",
-    "",
-    "EXTENDED SIGNALS (`extendedSignals`):",
-    "- `historicalComparables`: up to four previous same-sport, same-intent sessions with execution scores, pace/power/HR, and prior takeaways. Use these to detect trends ('HR is rising at the same power on each of the last three threshold bikes').",
-    "- `aerobicDecoupling`: percentage drift in HR-per-output ratio from first to second half; severity mapped to stable (<3%), mild_drift (3-5%), significant_drift (5-10%), poor_durability (≥10%). Reference only for endurance/tempo/threshold work, never for short intervals or strength.",
-    "- `weather`: `avgTemperatureC` and a `notable` flag list (hot, warm, cool, cold, large range). Use it to contextualise HR/pace deviations — a hot day raises HR at the same pace and is not a fitness signal.",
-    "- These signals are inputs. If absent or empty, do not mention them.",
-    "",
-    "NON-OBVIOUS INSIGHT (`non_obvious_insight`):",
-    "- Required on every verdict. ≤320 chars.",
-    "- It must surface something the athlete would miss from this session alone — a trend against their own history, a decoupling/weather read, or a pattern across feel and execution.",
-    "- Do not repeat what execution_summary already says. No generic coaching platitudes. Cite a number, date, or signal.",
-    "- If no comparable is available and no signal stands out, say that honestly: 'No prior sessions in this intent category yet — next similar session will start to build a comparison.'",
-    "",
-    "TEACH (`teach`) — OPTIONAL, ≤200 chars:",
-    "- Use `teach` when this session exposes a mechanistically important metric — variability index spike, aerobic decoupling, negative-split failure, durability fade, cadence drop, HR↔pace divergence, power-per-HR shift, SWOLF trend, or similar. Explain in one sentence *why* that metric matters for this athlete's training.",
-    "- Prefer a different mechanism than the last few `priorHeadlines`. Rotate focus — do not teach the same concept two sessions in a row.",
-    "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
-    "- `teach` is separate from `non_obvious_insight`: insight observes *what* is true; teach explains *why* it matters for training.",
-    "",
-    "COMPARABLE REFERENCE (`comparable_reference`) — ≤240 chars:",
-    "- When `extendedSignals.historicalComparables` has ≥1 entry, `comparable_reference` MUST be non-null and cite at least one prior session by date + metric delta (HR, pace, power, execution score, or its stored takeaway). Example: \"2026-04-13 threshold run: 168 bpm at 4:15/km; today 172 bpm at 4:15/km over the same 6× 5 min.\"",
-    "- When `historicalComparables` is empty, set `comparable_reference` to null. Do not invent a prior session.",
-    "- `comparable_reference` is the hard-wired proof the injected history was actually used. It complements `non_obvious_insight` rather than duplicating it.",
-    "",
-    "PACING & CADENCE HALVES (`executionResult` human-readable halves):",
-    "- `hr_drift_first_to_second_half`, `pace_fade_first_to_second_half`, `cadence_drift_first_to_second_half`, `swim_pace_fade_first_to_second_half`, `stroke_rate_drift_first_to_second_half`, and `power_drift_first_to_second_half` surface the two halves of the session when available.",
-    "- Cite them in `execution_summary` or `key_deviations` when the halves differ materially (cadence drop ≥3 spm, pace fade ≥3%, power drop ≥5%, stroke-rate drift on swim) — this is the cleanest negative-split / durability read available.",
-    "- When a half comparison is absent from `executionResult`, do not claim a split pattern.",
-    "",
-    SESSION_VARIANCE_PROMPT,
-    "",
-    "FEEL DATA — CRITICAL:",
-    "- When `feel` is present in the input, you MUST reference it in execution_summary. Name the overall feel label (e.g. 'Terrible', 'Good') and any legs, energy, or life-stress signal the athlete reported.",
-    "- Contradiction rule: if objective metrics landed on target BUT overall feel is 'Terrible' or 'Hard' (1-2/5), set verdict_status to at most 'partial' and adaptation_type to 'flag_review' or 'modify'. Next week's plan should be conservative. Do not call the session 'achieved'.",
-    "- Inverse rule: if metrics look off-target BUT overall feel is 'Good' or 'Amazing' (4-5/5) AND execution was not reckless (no excessive time above target, no incomplete intervals on a key session), verdict_status may remain 'achieved' or 'partial' with adaptation_type 'proceed'.",
-    "- If the feel `note` is present, read it as primary context — it may contain the 'why' the metrics alone cannot show (illness, weather, emotional load). Reference the note briefly if it changes your interpretation.",
-    "- If no feel is present, do not speculate about how the athlete felt. Proceed on metrics alone and keep the tone neutral.",
-    "",
-    "Rules:",
-    "- Use only provided evidence. Do not invent metrics or facts.",
-    "- Speak with direct authority. Do not hedge.",
-    "- Keep metric_comparisons to the 3-5 most important metrics.",
-    "- Keep key_deviations only for meaningful deviations (not minor noise).",
-    "- If evidence is limited, reflect that by keeping recommendations conservative.",
-    "- Be concise. Each field should use the minimum words needed to convey the insight.",
-    "- Return exactly one JSON object matching the required schema.",
-    "",
-    "Language rules (CRITICAL — violations make the output unreadable to athletes):",
-    "- NEVER use camelCase field names in any text field (e.g. do NOT write 'intervalCompletionPct', 'avgPower', 'timeAboveTargetPct', 'avgHr', 'normalizedPower').",
-    "- Use plain English instead: 'interval completion', 'average power', 'time above target', 'average heart rate', 'normalized power'.",
-    "- NEVER reference the internal execution score or score band in execution_summary or any text field. The score is displayed separately in the UI.",
-    "- Express interval completion as a count when possible (e.g. '3 of 5 intervals completed' or 'all 5 intervals completed'), not as a decimal or percentage of 'intervalCompletionPct'.",
-    "- Express abbreviations in full on first use: 'NP' → 'normalized power', 'VI' → 'variability index', 'TSS' → 'training stress score'. After first use, abbreviations are fine.",
-    "- In execution_summary, write ONE clear sentence about whether the session achieved its purpose. Move specific metrics to metric_comparisons.",
-    "",
-    "Few-shot examples (three realistic verdicts across Z2 aerobic, threshold intervals, and heat-affected long run; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:",
-    SESSION_VERDICT_FEW_SHOT_JSON
-  ].join("\n");
-}
 
 // --- Feel humanization ---
 

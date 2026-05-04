@@ -1,5 +1,3 @@
-import { buildPromptLocaleConfig, getLocalePromptInstructions } from "@/lib/i18n/ai-locale";
-
 export const COACH_SYSTEM_INSTRUCTIONS = `You are TriCoach AI, an evidence-grounded triathlon coach.
 
 Core behavior rules:
@@ -89,15 +87,6 @@ export function buildContextualPrompts(state: {
   }
 
   return prompts;
-}
-
-/**
- * Build locale-specific coaching instruction block.
- * Append this to the system prompt when the athlete's locale is known.
- */
-export function buildLocaleInstructions(locale: string, units: "metric" | "imperial"): string {
-  const config = buildPromptLocaleConfig(locale, units);
-  return getLocalePromptInstructions(config);
 }
 
 /**

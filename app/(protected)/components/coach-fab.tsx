@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useIsOverlayOpen } from "@/lib/overlay-stack";
 import { useCoachPanel } from "./coach-panel-context";
 
 // Small, always-visible. Kept in its own module so the wrapper can hydrate it
@@ -8,8 +9,14 @@ import { useCoachPanel } from "./coach-panel-context";
 export function CoachFAB() {
   const { open, isOpen } = useCoachPanel();
   const pathname = usePathname();
+  // Driven from the actual overlay stack rather than observing
+  // body.style.overflow after the fact, so the FAB hides before the very
+  // first paint even on deep links that mount a drawer with `open` already
+  // true (e.g. /plan?session=<id>).
+  const isOverlayOpen = useIsOverlayOpen();
 
   if (isOpen) return null;
+  if (isOverlayOpen) return null;
   if (pathname?.startsWith("/coach")) return null;
 
   return (

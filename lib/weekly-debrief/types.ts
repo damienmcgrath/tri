@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { clip } from "@/lib/openai";
+import { clip } from "@/lib/shared/json-utils";
 import type { AthleteContextSnapshot } from "@/lib/athlete-context";
 import type { PersistedExecutionReview } from "@/lib/execution-review";
 
 export const WEEKLY_DEBRIEF_GENERATION_VERSION = 8;
 
-/** @deprecated Use clip() from lib/openai.ts — this alias exists only for schema transform compatibility. */
+/** @deprecated Use clip() from lib/shared/json-utils — this alias exists only for schema transform compatibility. */
 export const truncateStr = clip;
 
 export const weeklyDebriefEvidenceItemSchema = z.object({

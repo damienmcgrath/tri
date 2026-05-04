@@ -91,31 +91,12 @@ export async function fetchActivity(
 }
 
 /**
- * Fetch the authenticated athlete's activities (paginated).
- * GET /athlete/activities
+ * Fetch the authenticated athlete's activities (paginated) with rate-limit info.
+ * GET /athlete/activities — used by backfill to check throttle status between pages.
  *
  * @param after  Unix timestamp — only return activities after this time
  * @param page   1-based page number (default 1)
  * @param perPage Activities per page (default 50, max 200)
- */
-export async function fetchRecentActivities(
-  accessToken: string,
-  options: { after: number; page?: number; perPage?: number }
-): Promise<StravaActivitySummary[]> {
-  const params = new URLSearchParams({
-    after: String(options.after),
-    page: String(options.page ?? 1),
-    per_page: String(options.perPage ?? 50)
-  });
-  return stravaFetch<StravaActivitySummary[]>(
-    `${STRAVA_API_BASE}/athlete/activities?${params.toString()}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-}
-
-/**
- * Same as fetchRecentActivities but also returns rate limit info.
- * Used by backfill to check throttle status between pages.
  */
 export async function fetchRecentActivitiesWithRateLimit(
   accessToken: string,

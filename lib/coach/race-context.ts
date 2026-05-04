@@ -270,7 +270,7 @@ function summarizeSegments(segments: RaceBundleSummary["segments"]): string {
   return lines.join("\n");
 }
 
-export function formatRaceContextBlock(summary: RaceBundleSummary): string {
+function formatRaceContextBlock(summary: RaceBundleSummary): string {
   const { bundle, raceProfile, segments, review, lessons } = summary;
   const date = bundle.started_at.slice(0, 10);
   const name = raceProfile?.name ?? `Race on ${date}`;

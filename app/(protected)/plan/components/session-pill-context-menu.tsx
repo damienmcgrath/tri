@@ -72,6 +72,10 @@ export function SessionPillContextMenu({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [submenuOpen, setSubmenuOpen] = useState(false);
+  // When the parent menu is clamped near the right edge of the viewport, the
+  // submenu's default `left-full` position pushes it off-screen. Flip it to
+  // open leftwards (`right-full`) when there isn't room on the right.
+  const [submenuFlipped, setSubmenuFlipped] = useState(false);
 
   const items = useMemo(() => {
     const list: Array<{
@@ -140,6 +144,13 @@ export function SessionPillContextMenu({
 
   const { left, top } = clampPosition(x, y, MENU_WIDTH);
 
+  useEffect(() => {
+    if (!submenuOpen) return;
+    if (typeof window === "undefined") return;
+    const rightEdge = left + MENU_WIDTH + SUBMENU_WIDTH + 8;
+    setSubmenuFlipped(rightEdge > window.innerWidth - 4);
+  }, [submenuOpen, left]);
+
   function focusItem(index: number) {
     const next = (index + items.length) % items.length;
     itemRefs.current[next]?.focus();
@@ -193,8 +204,11 @@ export function SessionPillContextMenu({
             <div
               role="menu"
               aria-label="Move to day"
+              data-flipped={submenuFlipped ? "true" : "false"}
               style={{ width: SUBMENU_WIDTH }}
-              className="absolute left-full top-0 ml-1 overflow-hidden rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(20,20,20,0.98)] py-1 shadow-lg"
+              className={`absolute top-0 overflow-hidden rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(20,20,20,0.98)] py-1 shadow-lg ${
+                submenuFlipped ? "right-full mr-1" : "left-full ml-1"
+              }`}
             >
               {weekDays.map((day) => (
                 <button

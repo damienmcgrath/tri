@@ -1,7 +1,7 @@
 import { cache } from "@/lib/shared/react-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { asStringArray } from "@/lib/openai";
+import { asStringArray } from "@/lib/shared/json-utils";
 import { getProfileSnapshot } from "@/lib/supabase/queries";
 
 const experienceLevelSchema = z.enum(["beginner", "intermediate", "advanced"]);

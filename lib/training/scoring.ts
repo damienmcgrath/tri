@@ -44,7 +44,7 @@ export type TrainingScore = {
 /**
  * Compute Execution Quality (0-100) from session verdicts in a rolling window.
  */
-export async function computeExecutionQuality(
+async function computeExecutionQuality(
   supabase: SupabaseClient,
   userId: string,
   date: string
@@ -107,7 +107,7 @@ export async function computeExecutionQuality(
 /**
  * Compute Progression Signal (0-100) from session comparisons.
  */
-export async function computeProgressionSignal(
+async function computeProgressionSignal(
   supabase: SupabaseClient,
   userId: string,
   date: string
@@ -165,7 +165,7 @@ export async function computeProgressionSignal(
 /**
  * Compute Balance Score (0-100) from discipline distribution.
  */
-export async function computeBalanceScore(
+async function computeBalanceScore(
   supabase: SupabaseClient,
   userId: string,
   date: string,

@@ -5,6 +5,7 @@ import { addDays } from "@/lib/date-utils";
 import { BlockGridCell } from "./block-grid-cell";
 import { WeeklyTotalCell } from "./weekly-total-cell";
 import type { SessionPillSession } from "./session-pill";
+import { useViewport } from "../hooks/use-viewport";
 
 type Week = {
   id: string;
@@ -68,6 +69,14 @@ export function BlockGrid({
     [weeks]
   );
 
+  // On tablets (641–767px) compress the grid so a week fits comfortably
+  // without forcing aggressive horizontal scroll. Desktop sizing is unchanged.
+  const { isTablet } = useViewport();
+  const gridTemplateColumns = isTablet
+    ? "72px repeat(7, minmax(74px, 1fr)) 104px"
+    : "100px repeat(7, minmax(96px, 1fr)) 130px";
+  const gridMinWidthClass = isTablet ? "min-w-[660px]" : "min-w-[860px]";
+
   const sessionsByWeekAndDay = useMemo(() => {
     const map = new Map<string, Map<string, SessionPillSession[]>>();
     for (const session of sessions) {
@@ -110,8 +119,8 @@ export function BlockGrid({
   return (
     <div className="overflow-x-auto">
       <div
-        className="grid min-w-[860px] text-xs"
-        style={{ gridTemplateColumns: "100px repeat(7, minmax(96px, 1fr)) 130px" }}
+        className={`grid ${gridMinWidthClass} text-xs`}
+        style={{ gridTemplateColumns }}
         role="grid"
       >
         <div className="border-b border-[rgba(255,255,255,0.1)] px-2 py-2 text-[10px] uppercase tracking-wide text-tertiary">
