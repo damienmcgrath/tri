@@ -79,6 +79,7 @@ export type StravaBestEffort = {
 export type NormalizedStravaActivity = {
   user_id: string;
   sport_type: string;
+  swim_type: "pool" | "open_water" | null;
   start_time_utc: string;
   end_time_utc: string;
   duration_sec: number;
@@ -137,6 +138,16 @@ export function mapStravaSportType(raw: string): string {
     default:
       return "other";
   }
+}
+
+/**
+ * Maps a Strava sport_type/type string to a swim sub-classification.
+ * Returns null for non-swim activities. Exported for testing.
+ */
+export function mapStravaSwimType(raw: string): "pool" | "open_water" | null {
+  if (raw === "OpenWaterSwim") return "open_water";
+  if (raw === "Swim") return "pool";
+  return null;
 }
 
 function nullIfZero(val: number | undefined | null): number | null {
@@ -300,6 +311,7 @@ export function normalizeStravaActivity(
   // Prefer sport_type (new field), fall back to type (legacy)
   const rawSportType = raw.sport_type ?? raw.type ?? "Workout";
   const normalizedSport = mapStravaSportType(rawSportType);
+  const swimType = mapStravaSwimType(rawSportType);
 
   const avgHr = roundOrNull(raw.average_heartrate);
   const maxHr = roundOrNull(raw.max_heartrate);
@@ -337,6 +349,7 @@ export function normalizeStravaActivity(
       rawType: rawSportType,
       rawSubType: null,
       normalizedType: normalizedSport,
+      swimType,
       sportProfileName: null
     },
     quality: {
@@ -427,6 +440,7 @@ export function normalizeStravaActivity(
   return {
     user_id: userId,
     sport_type: normalizedSport,
+    swim_type: swimType,
     start_time_utc: raw.start_date,
     end_time_utc: computeEndTimeUtc(raw.start_date, elapsedTimeSec),
     duration_sec: elapsedTimeSec,
