@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadActivityDetails } from "@/lib/workouts/activity-details";
 import { getMetricsV2HrZones, getMetricsV2Laps, getMetricsV2PowerZones, getNestedNumber, getNestedString } from "@/lib/workouts/metrics-v2";
+import { getSwimTypeLabel } from "@/lib/ui/discipline";
 import { ActivityLinkingCard } from "./activity-linking-card";
 
 function SourceBadge({ source, externalProvider, externalActivityId, externalTitle }: {
@@ -156,6 +157,7 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
   const avgRespirationRate = getNestedNumber(activity.metrics_v2, [["environment", "avgRespirationRate"], ["environment", "avg_respiration_rate"]]);
   const avgTemperature = getNestedNumber(activity.metrics_v2, [["environment", "avgTemperature"], ["environment", "avg_temperature"]]);
   const sportProfileName = getNestedString(activity.metrics_v2, [["activity", "sportProfileName"], ["activity", "sport_profile_name"]]);
+  const swimTypeLabel = getSwimTypeLabel(getNestedString(activity.metrics_v2, [["activity", "swimType"], ["activity", "swim_type"]]));
   const loadCards = [
     ["Moving", formatDuration(activity.duration_sec)],
     ["Elapsed", activity.elapsed_duration_sec ? formatDuration(activity.elapsed_duration_sec) : "—"],
@@ -178,7 +180,7 @@ export default async function ActivityDetailsPage({ params }: { params: { activi
           <article className="surface p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-semibold">{sportIcon(activity.sport_type)} Activity</h1>
+                <h1 className="text-2xl font-semibold">{sportIcon(activity.sport_type)} {swimTypeLabel ?? "Activity"}</h1>
                 <p className="mt-1 text-sm text-muted">{dateLabel}</p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <SourceBadge source={activity.source} externalProvider={activity.external_provider} externalActivityId={activity.external_activity_id} externalTitle={activity.external_title} />

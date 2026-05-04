@@ -72,6 +72,7 @@ export function buildActivityRows() {
         activity_vendor: "garmin",
         activity_type_raw: "swimming",
         activity_subtype_raw: "pool_swimming",
+        swim_type: "pool",
         source: "upload",
         parse_summary: null,
         notes: "CSS intervals — 12 x 100m. Pacing held cleanly through the last set.",
@@ -81,6 +82,7 @@ export function buildActivityRows() {
         created_at: "2026-03-09T07:20:00.000Z",
         updated_at: "2026-03-09T07:20:00.000Z",
         metrics_v2: {
+          activity: { swimType: "pool" },
           paceZones: [
             { zone: 1, durationSec: 300, pctOfSession: 0.10 },
             { zone: 2, durationSec: 900, pctOfSession: 0.31 },
@@ -432,6 +434,7 @@ export function buildActivityRows() {
             activity_vendor: "garmin",
             activity_type_raw: "open_water_swimming",
             activity_subtype_raw: "open_water",
+            swim_type: "open_water",
             source: "upload",
             parse_summary: null,
             notes: null,
@@ -444,6 +447,7 @@ export function buildActivityRows() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             metrics_v2: {
+              activity: { swimType: "open_water" },
               laps: [
                 { index: 1, durationSec: 410, distanceM: 400, avgPacePer100mSec: 102 },
                 { index: 2, durationSec: 405, distanceM: 400, avgPacePer100mSec: 101 },

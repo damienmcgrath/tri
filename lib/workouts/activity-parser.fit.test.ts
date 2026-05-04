@@ -522,4 +522,66 @@ describe("parseFitFile", () => {
     const result = await parseFitFile(Buffer.from("fit"));
     expect(isMultisportParseResult(result)).toBe(true);
   });
+
+  describe("swimType classification", () => {
+    function mockSwimSession(sub_sport: string) {
+      parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+        callback(null, {
+          sessions: [
+            {
+              start_time: "2026-04-01T07:00:00.000Z",
+              sport: "swimming",
+              sub_sport,
+              total_elapsed_time: 1800,
+              total_timer_time: 1800,
+              total_distance: 1500,
+              avg_heart_rate: 130
+            }
+          ],
+          laps: [],
+          events: [],
+          records: []
+        });
+      });
+    }
+
+    test("classifies lap_swimming sub_sport as pool", async () => {
+      mockSwimSession("lap_swimming");
+      const result = await parseSingleFit(Buffer.from("fit"));
+      expect(result.sportType).toBe("swim");
+      expect(result.swimType).toBe("pool");
+      expect((result.metricsV2 as { activity: { swimType: string } }).activity.swimType).toBe("pool");
+    });
+
+    test("classifies open_water sub_sport as open_water", async () => {
+      mockSwimSession("open_water");
+      const result = await parseSingleFit(Buffer.from("fit"));
+      expect(result.sportType).toBe("swim");
+      expect(result.swimType).toBe("open_water");
+      expect((result.metricsV2 as { activity: { swimType: string } }).activity.swimType).toBe("open_water");
+    });
+
+    test("returns null swimType for non-swim sport", async () => {
+      parseMock.mockImplementation((_buffer: Buffer, callback: (error: unknown, data: unknown) => void) => {
+        callback(null, {
+          sessions: [
+            {
+              start_time: "2026-04-01T07:00:00.000Z",
+              sport: "running",
+              sub_sport: "generic",
+              total_elapsed_time: 1800,
+              total_timer_time: 1800,
+              total_distance: 5000
+            }
+          ],
+          laps: [],
+          events: [],
+          records: []
+        });
+      });
+      const result = await parseSingleFit(Buffer.from("fit"));
+      expect(result.sportType).toBe("run");
+      expect(result.swimType).toBeNull();
+    });
+  });
 });

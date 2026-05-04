@@ -10,6 +10,7 @@ import {
   buildPauseSummary,
   buildSwimQualityWarnings,
   buildZoneSummaries,
+  classifySwimType,
   firstPositiveNumber,
   normalizeActivityType,
   paceFromSpeed,
@@ -128,6 +129,7 @@ function buildParsedActivityFromSession(session: any, fit: any): ParsedActivity 
   const sportRaw = typeof session.sport === "string" ? session.sport : undefined;
   const subSportRaw = typeof session.sub_sport === "string" ? session.sub_sport : undefined;
   const normalizedSport = normalizeActivityType(sportRaw, subSportRaw);
+  const swimType = classifySwimType({ normalizedSport, subSportRaw, typeRaw: sportRaw });
   const distanceM = Number(session.total_distance ?? 0);
   const avgPacePer100mSec = normalizedSport === "swim" && durationSec > 0 && distanceM > 0
     ? Math.round(durationSec / (distanceM / 100))
@@ -272,6 +274,7 @@ function buildParsedActivityFromSession(session: any, fit: any): ParsedActivity 
     activityTypeRaw: sportRaw,
     activitySubtypeRaw: subSportRaw,
     activityVendor: "garmin",
+    swimType,
     metricsV2: {
       schemaVersion: 1,
       sourceFormat: "fit",
@@ -280,6 +283,7 @@ function buildParsedActivityFromSession(session: any, fit: any): ParsedActivity 
         rawType: sportRaw ?? null,
         rawSubType: subSportRaw ?? null,
         normalizedType: normalizedSport,
+        swimType,
         sportProfileName: typeof session.sport_profile_name === "string" ? session.sport_profile_name : null
       },
       quality: {

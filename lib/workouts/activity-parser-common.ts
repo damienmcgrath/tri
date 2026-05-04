@@ -26,9 +26,23 @@ export type ParsedActivity = {
   activityTypeRaw?: string;
   activitySubtypeRaw?: string;
   activityVendor?: string;
+  swimType?: SwimType | null;
   metricsV2?: Record<string, unknown>;
   parseSummary?: Record<string, unknown>;
 };
+
+export type SwimType = "pool" | "open_water";
+
+export function classifySwimType(args: {
+  normalizedSport: string;
+  subSportRaw?: string | null;
+  typeRaw?: string | null;
+}): SwimType | null {
+  if (args.normalizedSport !== "swim") return null;
+  const haystack = `${args.subSportRaw ?? ""} ${args.typeRaw ?? ""}`.toLowerCase();
+  if (haystack.includes("open")) return "open_water";
+  return "pool";
+}
 
 export type RaceSegmentRole = "swim" | "t1" | "bike" | "t2" | "run";
 

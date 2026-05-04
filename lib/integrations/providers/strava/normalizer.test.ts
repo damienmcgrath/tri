@@ -1,4 +1,4 @@
-import { mapStravaSportType, normalizeStravaActivity, type StravaActivitySummary } from "./normalizer";
+import { mapStravaSportType, mapStravaSwimType, normalizeStravaActivity, type StravaActivitySummary } from "./normalizer";
 
 const baseActivity: StravaActivitySummary = {
   id: 123456789,
@@ -42,6 +42,50 @@ describe("mapStravaSportType", () => {
     ["", "other"]
   ])("maps %s → %s", (input, expected) => {
     expect(mapStravaSportType(input)).toBe(expected);
+  });
+});
+
+describe("mapStravaSwimType", () => {
+  it.each([
+    ["Swim", "pool"],
+    ["OpenWaterSwim", "open_water"],
+    ["Run", null],
+    ["Ride", null],
+    ["", null]
+  ])("maps %s → %s", (input, expected) => {
+    expect(mapStravaSwimType(input)).toBe(expected);
+  });
+});
+
+describe("normalizeStravaActivity swim type", () => {
+  const swimBase: StravaActivitySummary = {
+    id: 9001,
+    name: "Pool",
+    sport_type: "Swim",
+    start_date: "2026-03-01T07:00:00Z",
+    elapsed_time: 1800,
+    moving_time: 1700,
+    distance: 1500
+  };
+
+  it("returns swim_type 'pool' for Swim", () => {
+    const result = normalizeStravaActivity(swimBase, "user-abc");
+    expect(result.sport_type).toBe("swim");
+    expect(result.swim_type).toBe("pool");
+    expect((result.metrics_v2 as { activity: { swimType: string } }).activity.swimType).toBe("pool");
+  });
+
+  it("returns swim_type 'open_water' for OpenWaterSwim", () => {
+    const result = normalizeStravaActivity({ ...swimBase, sport_type: "OpenWaterSwim" }, "user-abc");
+    expect(result.sport_type).toBe("swim");
+    expect(result.swim_type).toBe("open_water");
+    expect((result.metrics_v2 as { activity: { swimType: string } }).activity.swimType).toBe("open_water");
+  });
+
+  it("leaves swim_type null for non-swim sports", () => {
+    const result = normalizeStravaActivity({ ...swimBase, sport_type: "Run" }, "user-abc");
+    expect(result.swim_type).toBeNull();
+    expect((result.metrics_v2 as { activity: { swimType: unknown } }).activity.swimType).toBeNull();
   });
 });
 

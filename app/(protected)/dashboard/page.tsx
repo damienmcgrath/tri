@@ -21,7 +21,7 @@ import {
   loadCompletedActivities,
   localIsoDate
 } from "@/lib/activities/completed-activities";
-import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { getDisciplineMeta, getSwimTypeLabel } from "@/lib/ui/discipline";
 import { getSessionDisplayName } from "@/lib/training/session";
 import { SESSION_INTENT_LABELS } from "@/lib/training/semantics";
 import { computeWeekMinuteTotals, computeWeekShape } from "@/lib/training/week-metrics";
@@ -782,7 +782,7 @@ export default async function DashboardPage({
                       ))}
                       {extraTodayActivities.map((activity) => (
                         <Link key={activity.id} href={`/sessions/activity/${activity.id}`} className="block rounded-xl border border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success)/0.08)] px-3 py-2.5 transition hover:border-[hsl(var(--success)/0.5)]">
-                          <p className="text-sm font-medium">{getDisciplineMeta(activity.sport).label} extra workout</p>
+                          <p className="text-sm font-medium">{getSwimTypeLabel(activity.swimType) ?? getDisciplineMeta(activity.sport).label} extra workout</p>
                           <p className="text-xs text-[rgba(255,255,255,0.72)]">{activity.durationMinutes} min • Done</p>
                         </Link>
                       ))}
