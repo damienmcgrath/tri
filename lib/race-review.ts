@@ -39,9 +39,36 @@ import {
   buildRaceReviewInstructions,
   buildSegmentDiagnosticInstructions
 } from "@/lib/race-review/prompts";
+import {
+  buildDeterministicLayers,
+  buildDeterministicRaceReview
+} from "@/lib/race-review/deterministic";
+import {
+  capitalize,
+  clip,
+  formatDeltaPct,
+  formatDeltaPctLabel,
+  formatDistanceLabel,
+  formatDuration,
+  formatDurationLabel,
+  formatHalvesUnitLabel,
+  formatPacePer100m,
+  formatPaceSecPerKm,
+  formatSignedDurationLabel,
+  round2,
+  round4,
+  signed,
+  sportsList
+} from "@/lib/race-review/format-helpers";
 
-// Re-export the prompt builders so existing consumers keep working.
-export { buildRaceReviewInstructions, buildSegmentDiagnosticInstructions };
+// Re-export the prompt builders + deterministic builders so existing
+// consumers keep working.
+export {
+  buildDeterministicLayers,
+  buildDeterministicRaceReview,
+  buildRaceReviewInstructions,
+  buildSegmentDiagnosticInstructions
+};
 import { classifyLegStatus, type LegStatusLabel, type LegStatusResult } from "@/lib/race-review/leg-status";
 import {
   detectCrossDisciplineSignal,
@@ -781,231 +808,6 @@ export function buildRaceFacts(args: {
   };
 }
 
-// ─── Deterministic fallback narrative (legacy shape) ────────────────────────
-
-export function buildDeterministicRaceReview(facts: RaceFacts): RaceReviewNarrative {
-  const totalLabel = formatDuration(facts.bundle.totalDurationSec);
-  const sportsPresent = facts.segments
-    .filter((s) => s.role === "swim" || s.role === "bike" || s.role === "run")
-    .map((s) => s.role);
-  const sportsLabel = sportsPresent.join("/") || "race";
-
-  const headline = `Race completed in ${totalLabel} across ${sportsLabel}.`;
-
-  const narrativeParts: string[] = [
-    `${capitalize(sportsLabel)} race completed in ${totalLabel}.`
-  ];
-  if (facts.pacing.bike?.halvesAvailable) {
-    const dir = facts.pacing.bike.deltaPct >= 0 ? "rose" : "eased";
-    narrativeParts.push(
-      `Bike power ${dir} ${Math.abs(facts.pacing.bike.deltaPct).toFixed(1)}% second half (${facts.pacing.bike.firstHalf}W → ${facts.pacing.bike.lastHalf}W).`
-    );
-  }
-  if (facts.pacing.run?.halvesAvailable) {
-    const dir = facts.pacing.run.deltaPct > 0 ? "eased" : "held";
-    narrativeParts.push(
-      `Run pace ${dir} ${Math.abs(facts.pacing.run.deltaPct).toFixed(1)}% second half (${formatPaceSecPerKm(facts.pacing.run.firstHalf)} → ${formatPaceSecPerKm(facts.pacing.run.lastHalf)} /km).`
-    );
-  }
-  if (facts.transitions.t1DurationSec !== null || facts.transitions.t2DurationSec !== null) {
-    const parts: string[] = [];
-    if (facts.transitions.t1DurationSec !== null) parts.push(`T1 ${formatDuration(facts.transitions.t1DurationSec)}`);
-    if (facts.transitions.t2DurationSec !== null) parts.push(`T2 ${formatDuration(facts.transitions.t2DurationSec)}`);
-    narrativeParts.push(`Transitions: ${parts.join(" / ")}.`);
-  }
-  const narrative = narrativeParts.join(" ");
-
-  const coachTake = facts.pacing.bike?.halvesAvailable && Math.abs(facts.pacing.bike.deltaPct) <= 2
-    ? "Bike pacing held steady — repeat that controlled effort on the next race-pace ride."
-    : facts.pacing.run?.halvesAvailable && facts.pacing.run.deltaPct > 5
-      ? "Second-half run eased — practice negative-split runs at race pace before the next event."
-      : "Race executed. Review the segment-by-segment splits to identify the next focus area.";
-
-  const transitionNotes = facts.transitions.t1DurationSec !== null || facts.transitions.t2DurationSec !== null
-    ? `Transitions: ${[
-        facts.transitions.t1DurationSec !== null ? `T1 ${formatDuration(facts.transitions.t1DurationSec)}` : null,
-        facts.transitions.t2DurationSec !== null ? `T2 ${formatDuration(facts.transitions.t2DurationSec)}` : null
-      ].filter(Boolean).join(", ")}.`
-    : null;
-
-  const pacingNotes = {
-    swim: facts.pacing.swim?.halvesAvailable
-      ? { note: `${formatPacePer100m(facts.pacing.swim.firstHalf)} → ${formatPacePer100m(facts.pacing.swim.lastHalf)} per 100m (${formatDeltaPct(facts.pacing.swim.deltaPct)}).` }
-      : null,
-    bike: facts.pacing.bike?.halvesAvailable
-      ? { note: `${facts.pacing.bike.firstHalf}W → ${facts.pacing.bike.lastHalf}W (${formatDeltaPct(facts.pacing.bike.deltaPct)}).` }
-      : null,
-    run: facts.pacing.run?.halvesAvailable
-      ? { note: `${formatPaceSecPerKm(facts.pacing.run.firstHalf)} → ${formatPaceSecPerKm(facts.pacing.run.lastHalf)} /km (${formatDeltaPct(facts.pacing.run.deltaPct)}).` }
-      : null
-  };
-
-  return {
-    headline: clip(headline, 120),
-    narrative: clip(narrative, 420),
-    coachTake: clip(coachTake, 220),
-    transitionNotes: transitionNotes ? clip(transitionNotes, 220) : null,
-    pacingNotes
-  };
-}
-
-// ─── Deterministic fallback (Phase 1B layered shape) ────────────────────────
-
-export function buildDeterministicLayers(facts: RaceFacts): RaceReviewLayers {
-  const totalLabel = formatDuration(facts.bundle.totalDurationSec);
-  const goalDelta = facts.goalDeltaSec;
-  const goalLabel = facts.bundle.goalTimeSec ? formatDuration(facts.bundle.goalTimeSec) : null;
-
-  const headlineParts: string[] = [`Finished in ${totalLabel}`];
-  if (goalLabel && goalDelta !== null) {
-    if (goalDelta > 0) headlineParts.push(`+${formatDuration(Math.abs(goalDelta))} over ${goalLabel} goal`);
-    else if (goalDelta < 0) headlineParts.push(`-${formatDuration(Math.abs(goalDelta))} under ${goalLabel} goal`);
-    else headlineParts.push(`on goal of ${goalLabel}`);
-  }
-  if (facts.pacing.bike?.halvesAvailable) {
-    headlineParts.push(`bike ${facts.pacing.bike.firstHalf}W → ${facts.pacing.bike.lastHalf}W`);
-  }
-  const headline = clip(headlineParts.join("; ") + ".", 160);
-
-  const perDiscipline: Verdict["perDiscipline"] = {
-    swim: facts.legStatus.swim
-      ? { status: facts.legStatus.swim.label, summary: facts.legStatus.swim.evidence.join(" ").slice(0, 220) }
-      : null,
-    bike: facts.legStatus.bike
-      ? { status: facts.legStatus.bike.label, summary: facts.legStatus.bike.evidence.join(" ").slice(0, 220) }
-      : null,
-    run: facts.legStatus.run
-      ? { status: facts.legStatus.run.label, summary: facts.legStatus.run.evidence.join(" ").slice(0, 220) }
-      : null
-  };
-
-  // Coach take in deterministic NEXT format.
-  const coachTake: Verdict["coachTake"] = {
-    target: facts.pacing.bike?.halvesAvailable
-      ? `Hold ${facts.pacing.bike.firstHalf}W ±2% across halves`
-      : "Hold even-split race pacing across halves",
-    scope: "next race-pace session",
-    successCriterion: "Halves move less than 2% between first and last",
-    progression: "If steady, extend duration by 10 minutes the following week"
-  };
-
-  const verdict: Verdict = {
-    headline,
-    perDiscipline,
-    coachTake,
-    emotionalFrame: facts.emotionalFrameTriggered
-      ? "Conditions and context made this a tough day — the data reads through that lens."
-      : null
-  };
-
-  // Race story projection.
-  const overall = clip(
-    [
-      `${capitalize(sportsList(facts))} race completed in ${totalLabel}.`,
-      facts.pacing.bike?.halvesAvailable
-        ? `Bike power moved ${signed(facts.pacing.bike.deltaPct)}% across halves (${facts.pacing.bike.firstHalf}W → ${facts.pacing.bike.lastHalf}W).`
-        : null,
-      facts.pacing.run?.halvesAvailable
-        ? `Run pace moved ${signed(facts.pacing.run.deltaPct)}% across halves.`
-        : null
-    ]
-      .filter(Boolean)
-      .join(" "),
-    900
-  );
-
-  const buildLeg = (role: "swim" | "bike" | "run"): RaceStory["perLeg"]["swim"] => {
-    const status = facts.legStatus[role];
-    const pacing = facts.pacing[role];
-    if (!status && (!pacing || !pacing.halvesAvailable)) return null;
-    const evidence: string[] = [];
-    if (status) evidence.push(...status.evidence);
-    if (pacing?.halvesAvailable) {
-      evidence.push(
-        `Halves: ${formatHalvesUnitLabel(pacing.firstHalf, pacing.unit)} → ${formatHalvesUnitLabel(pacing.lastHalf, pacing.unit)}.`
-      );
-    }
-    if (evidence.length === 0) return null;
-    return {
-      narrative: clip(evidence.join(" "), 420),
-      keyEvidence: evidence.slice(0, 4).map((s) => clip(s, 180))
-    };
-  };
-
-  const transitions =
-    facts.transitions.t1DurationSec !== null || facts.transitions.t2DurationSec !== null
-      ? clip(
-          [
-            facts.transitions.t1DurationSec !== null ? `T1 ${formatDuration(facts.transitions.t1DurationSec)}` : null,
-            facts.transitions.t2DurationSec !== null ? `T2 ${formatDuration(facts.transitions.t2DurationSec)}` : null
-          ]
-            .filter(Boolean)
-            .join(", "),
-          280
-        )
-      : null;
-
-  let crossDisciplineInsight: string | null = null;
-  if (facts.crossDisciplineSignal.detected) {
-    crossDisciplineInsight = clip(facts.crossDisciplineSignal.evidence.join(" "), 360);
-  }
-
-  const raceStory: RaceStory = {
-    overall,
-    perLeg: {
-      swim: buildLeg("swim"),
-      bike: buildLeg("bike"),
-      run: buildLeg("run")
-    },
-    transitions,
-    crossDisciplineInsight
-  };
-
-  return { verdict, raceStory };
-}
-
-// ─── Prompt builders ────────────────────────────────────────────────────────
-
-
-function formatDurationLabel(sec: number | null | undefined): string | null {
-  if (sec === null || sec === undefined || !Number.isFinite(sec)) return null;
-  const total = Math.max(0, Math.round(sec));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatSignedDurationLabel(sec: number | null | undefined): string | null {
-  if (sec === null || sec === undefined || !Number.isFinite(sec)) return null;
-  const sign = sec < 0 ? "−" : sec > 0 ? "+" : "";
-  return `${sign}${formatDurationLabel(Math.abs(sec))}`;
-}
-
-function formatDistanceLabel(m: number | null | undefined): string | null {
-  if (m === null || m === undefined || !Number.isFinite(m)) return null;
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(2)} km`;
-}
-
-function formatHalvesUnitLabel(value: number, unit: "watts" | "sec_per_km" | "sec_per_100m"): string {
-  if (unit === "watts") return `${Math.round(value)}W`;
-  return formatPaceFromSeconds(value, unit);
-}
-
-function formatPaceFromSeconds(sec: number, unit: "sec_per_km" | "sec_per_100m"): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  const suffix = unit === "sec_per_km" ? " /km" : " /100m";
-  return `${m}:${String(s).padStart(2, "0")}${suffix}`;
-}
-
-function formatDeltaPctLabel(pct: number): string {
-  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
-  return `${sign}${Math.abs(pct).toFixed(1)}%`;
-}
-
 export function buildRaceReviewInput(facts: RaceFacts): unknown {
   return {
     bundle: {
@@ -1472,58 +1274,3 @@ export function triggerRaceReviewBackground(args: GenerateRaceReviewArgs): void 
   });
 }
 
-// ─── Formatters ─────────────────────────────────────────────────────────────
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function round4(n: number): number {
-  return Math.round(n * 10000) / 10000;
-}
-
-function clip(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
-}
-
-function capitalize(text: string): string {
-  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
-}
-
-function sportsList(facts: RaceFacts): string {
-  return facts.segments
-    .filter((s) => s.role === "swim" || s.role === "bike" || s.role === "run")
-    .map((s) => s.role)
-    .join("/");
-}
-
-function signed(n: number): string {
-  if (n === 0) return "0.0";
-  return n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
-}
-
-function formatDuration(sec: number): string {
-  const total = Math.max(0, Math.round(sec));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatPaceSecPerKm(secPerKm: number): string {
-  const m = Math.floor(secPerKm / 60);
-  const s = Math.round(secPerKm % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatPacePer100m(secPer100: number): string {
-  const m = Math.floor(secPer100 / 60);
-  const s = Math.round(secPer100 % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatDeltaPct(deltaPct: number): string {
-  const sign = deltaPct >= 0 ? "+" : "−";
-  return `${sign}${Math.abs(deltaPct).toFixed(1)}% second half`;
-}
