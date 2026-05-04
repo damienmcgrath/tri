@@ -10,15 +10,10 @@ import { getActivePlanId } from "@/lib/supabase/queries";
 
 const SESSIONS_OPTIONAL_COLUMNS_SET = new Set<string>(SESSIONS_OPTIONAL_COLUMNS);
 
-// Block actions live in a sibling so this file stays focused on the plan /
-// week / session domains. Re-exported here to preserve existing
-// `from "./actions"` import paths used by client components.
-export {
-  createBlockAction,
-  updateBlockAction,
-  deleteBlockAction,
-  reorderBlocksAction
-} from "./actions-block";
+// Block server actions live in `./actions-block`. Import them from there
+// directly — Next.js's `"use server"` directive on this file disallows
+// re-exports (only async function declarations are allowed at the top
+// level of a server-actions file).
 
 const uuidSchema = z.string().uuid();
 
