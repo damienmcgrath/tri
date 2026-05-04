@@ -4,6 +4,7 @@ import {
   buildPaceSummary,
   buildPaceZoneSummaries,
   buildSwimQualityWarnings,
+  classifySwimType,
   nonNegativeNumber,
   normalizeActivityType,
   positiveInt,
@@ -59,6 +60,7 @@ export function parseTcxFile(xml: string): ParsedActivity {
   const poolLengthM = undefined;
   const lapsCount = laps.length > 0 ? laps.length : undefined;
   const normalizedSport = normalizeActivityType(sportRaw);
+  const swimType = classifySwimType({ normalizedSport, subSportRaw: null, typeRaw: sportRaw });
   const avgPacePer100mSec = normalizedSport === "swim" && durationSec > 0 && distanceM > 0
     ? Math.round(durationSec / (distanceM / 100))
     : undefined;
@@ -152,6 +154,7 @@ export function parseTcxFile(xml: string): ParsedActivity {
     elevationLossM,
     activityTypeRaw: sportRaw,
     activityVendor: "garmin",
+    swimType,
     metricsV2: {
       schemaVersion: 1,
       sourceFormat: "tcx",
@@ -159,7 +162,8 @@ export function parseTcxFile(xml: string): ParsedActivity {
         vendor: "garmin",
         rawType: sportRaw ?? null,
         rawSubType: null,
-        normalizedType: normalizedSport
+        normalizedType: normalizedSport,
+        swimType
       },
       quality: {
         missing,
