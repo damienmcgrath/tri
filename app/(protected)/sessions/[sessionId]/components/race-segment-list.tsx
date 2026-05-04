@@ -1,15 +1,5 @@
 import Link from "next/link";
-
-export type RaceSegmentSummary = {
-  activityId: string;
-  role: "swim" | "t1" | "bike" | "t2" | "run";
-  sport: string;
-  startTimeUtc: string;
-  durationSec: number;
-  distanceM: number | null;
-  avgHr: number | null;
-  avgPower: number | null;
-};
+import type { RaceSegmentSummary } from "@/lib/race/types";
 
 const ROLE_LABELS: Record<RaceSegmentSummary["role"], string> = {
   swim: "Swim",

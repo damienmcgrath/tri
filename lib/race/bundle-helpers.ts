@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { RaceSegmentSummary } from "@/app/(protected)/sessions/[sessionId]/components/race-segment-list";
+import type { RaceSegmentSummary } from "@/lib/race/types";
 import type {
   AthleteProfileTakeaway,
   TrainingImplication,
