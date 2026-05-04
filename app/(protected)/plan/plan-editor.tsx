@@ -17,7 +17,7 @@ import {
   createSessionAction,
   deleteSessionAction,
   updateSessionAction
-} from "./actions";
+} from "./actions-session";
 import {
   deleteWeekAction,
   duplicateWeekForwardAction,

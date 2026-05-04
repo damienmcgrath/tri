@@ -26,7 +26,7 @@ import {
   deleteSessionAction,
   rescheduleSessionAction,
   updateSessionDetailsAction
-} from "./actions";
+} from "./actions-session";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 

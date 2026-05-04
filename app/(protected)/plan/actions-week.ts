@@ -1,11 +1,10 @@
 "use server";
 
 /**
- * Server actions for the training_weeks domain. Extracted from
- * app/(protected)/plan/actions.ts to keep the parent file focused.
- *
- * The barrel `actions.ts` re-exports these so existing client-component
- * import paths (e.g. `from "./actions"`) keep working.
+ * Server actions for the training_weeks domain. Part of the per-domain
+ * split of the original ~1500-line plan/actions.ts (see #339). Import
+ * directly from this file — Next.js's `"use server"` directive forbids
+ * re-exports of server actions.
  */
 
 import { revalidatePath } from "next/cache";
