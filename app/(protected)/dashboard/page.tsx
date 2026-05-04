@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getProfileSnapshot } from "@/lib/supabase/queries";
 import {
   CarryForwardCue,
   DashboardDebrief,
@@ -50,7 +51,6 @@ import { getRaceWeekContext, formatRaceDistance, getConfidenceStatement, type Ra
 import {
   type Session,
   type CompletedSession,
-  type Profile,
   type Plan,
   type ContextualItem,
   type DayTone,
@@ -118,8 +118,8 @@ export default async function DashboardPage({
   const showWeekAheadCard = isCurrentWeek && (todayDayOfWeek === 0 || todayDayOfWeek === 1 || todayDayOfWeek === 2);
   const showTransitionBriefing = isCurrentWeek && (todayDayOfWeek === 1 || todayDayOfWeek === 2);
 
-  const [{ data: profileData }, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
-    supabase.from("profiles").select("active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle(),
+  const [profileData, { data: plansData }, { data: completedData }, completedActivities, { data: linksData }] = await Promise.all([
+    getProfileSnapshot(supabase, user.id, ["active_plan_id", "race_date", "race_name"] as const),
     supabase.from("training_plans").select("id").order("start_date", { ascending: false }),
     supabase.from("completed_sessions").select("date,sport").gte("date", weekStart).lt("date", weekEnd),
     loadCompletedActivities({
@@ -131,7 +131,7 @@ export default async function DashboardPage({
     supabase.from("session_activity_links").select("completed_activity_id,planned_session_id,confirmation_status").eq("user_id", user.id)
   ]);
 
-  const profile = (profileData ?? null) as Profile | null;
+  const profile = profileData;
   const plans = (plansData ?? []) as Plan[];
   const hasAnyPlan = plans.length > 0;
   const activePlanId = profile?.active_plan_id ?? plans[0]?.id ?? null;

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBlockForDate } from "./race-profile";
+import { getProfileSnapshot } from "@/lib/supabase/queries";
 
 export type MacroContext = {
   raceName: string | null;
@@ -137,8 +138,8 @@ export async function getMacroContext(supabase: SupabaseClient, athleteId: strin
   const todayIso = getTodayUtc();
 
   // Fetch profile and active plan in parallel
-  const [{ data: profile }, { data: activePlan }] = await Promise.all([
-    supabase.from("profiles").select("race_name,race_date,active_plan_id").eq("id", athleteId).maybeSingle(),
+  const [profile, { data: activePlan }] = await Promise.all([
+    getProfileSnapshot(supabase, athleteId, ["race_name", "race_date", "active_plan_id"] as const),
     supabase
       .from("training_plans")
       .select("id,start_date,duration_weeks")

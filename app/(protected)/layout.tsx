@@ -1,5 +1,6 @@
 import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
+import { getProfileSnapshot } from "@/lib/supabase/queries";
 import { isAgentPreviewEnabled } from "@/lib/agent-preview/config";
 import { signOutAction } from "./actions";
 import { GlobalHeader } from "./global-header";
@@ -7,14 +8,6 @@ import { MobileBottomTabs, ShellNavRail } from "./shell-nav";
 import { CoachPanelWrapper } from "./components/coach-panel-wrapper";
 
 export const revalidate = 0;
-
-type Profile = {
-  display_name: string | null;
-  avatar_url: string | null;
-  active_plan_id: string | null;
-  race_date: string | null;
-  race_name: string | null;
-};
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -28,11 +21,15 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     data: { user }
   } = await supabase.auth.getUser();
 
-  const { data: profileData } = user
-    ? await supabase.from("profiles").select("display_name,avatar_url,active_plan_id,race_date,race_name").eq("id", user.id).maybeSingle()
-    : { data: null };
-
-  const profile = (profileData ?? null) as Profile | null;
+  const profile = user
+    ? await getProfileSnapshot(supabase, user.id, [
+        "display_name",
+        "avatar_url",
+        "active_plan_id",
+        "race_date",
+        "race_name"
+      ] as const)
+    : null;
   const displayName = profile?.display_name ?? user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Athlete";
   const email = user?.email ?? "Unknown user";
   const initials = getInitials(displayName);
