@@ -13,6 +13,7 @@ export type CompletedActivityRecord = {
   id: string;
   upload_id: string | null;
   sport_type: string;
+  swim_type?: "pool" | "open_water" | null;
   start_time_utc: string;
   duration_sec: number | null;
   distance_m: number | null;
@@ -31,6 +32,7 @@ export type CompletedActivityRecord = {
 export type ExtraCompletedActivity = {
   id: string;
   sport: string;
+  swimType: "pool" | "open_water" | null;
   date: string;
   durationMinutes: number;
   avgHr: number | null;
@@ -59,7 +61,7 @@ export function localIsoDate(utcIso: string, timeZone: string) {
 
 export function isMissingCompletedActivityColumnError(error: { code?: string; message?: string } | null) {
   if (!error) return false;
-  return error.code === "42703" || /(schedule_status|is_unplanned|race_bundle_id|race_segment_role|race_segment_index|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
+  return error.code === "42703" || /(swim_type|schedule_status|is_unplanned|race_bundle_id|race_segment_role|race_segment_index|schema cache|column .* does not exist|42703)/i.test(error.message ?? "");
 }
 
 export function hasConfirmedPlannedSessionLink(link: {
@@ -74,7 +76,7 @@ export function hasConfirmedPlannedSessionLink(link: {
 }
 
 export function buildExtraCompletedActivities(params: {
-  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "start_time_utc" | "duration_sec" | "avg_hr" | "avg_power" | "is_unplanned" | "metrics_v2">>;
+  activities: Array<Pick<CompletedActivityRecord, "id" | "sport_type" | "swim_type" | "start_time_utc" | "duration_sec" | "avg_hr" | "avg_power" | "is_unplanned" | "metrics_v2">>;
   links: Array<Pick<SessionActivityLinkRecord, "completed_activity_id" | "planned_session_id" | "confirmation_status">>;
   timeZone: string;
   weekStart: string;
@@ -96,6 +98,7 @@ export function buildExtraCompletedActivities(params: {
     .map((activity) => ({
       id: activity.id,
       sport: activity.sport_type,
+      swimType: activity.swim_type ?? null,
       date: localIsoDate(activity.start_time_utc, timeZone),
       durationMinutes: Math.round((activity.duration_sec ?? 0) / 60),
       avgHr: activity.avg_hr ?? null,
@@ -117,6 +120,9 @@ export function buildExtraCompletedActivities(params: {
 }
 
 const selectVariants = [
+  // Swim-type-aware variants. Tried first; on missing-column error we fall through.
+  "id,upload_id,sport_type,swim_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at,updated_at",
+  "id,upload_id,sport_type,swim_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at",
   // Race-column-aware variants (most complete first). Each pair tries with then without updated_at.
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at,updated_at",
   "id,upload_id,sport_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,schedule_status,is_unplanned,race_bundle_id,race_segment_role,race_segment_index,metrics_v2,created_at",
@@ -146,6 +152,7 @@ function mapActivityRow(activity: Record<string, unknown>): CompletedActivityRec
     id: String(activity.id),
     upload_id: typeof activity.upload_id === "string" ? activity.upload_id : null,
     sport_type: String(activity.sport_type),
+    swim_type: activity.swim_type === "pool" || activity.swim_type === "open_water" ? activity.swim_type : null,
     start_time_utc: String(activity.start_time_utc),
     duration_sec: typeof activity.duration_sec === "number" ? activity.duration_sec : null,
     distance_m: typeof activity.distance_m === "number" ? activity.distance_m : null,

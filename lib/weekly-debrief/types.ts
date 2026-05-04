@@ -172,6 +172,7 @@ export type WeeklyDebriefActivity = {
   id: string;
   upload_id: string | null;
   sport_type: string;
+  swim_type?: "pool" | "open_water" | null;
   start_time_utc: string;
   duration_sec: number | null;
   distance_m: number | null;
