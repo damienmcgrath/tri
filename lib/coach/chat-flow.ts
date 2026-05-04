@@ -169,7 +169,7 @@ async function collectResponseStream(params: {
 
 // ─── Contextual state ────────────────────────────────────────────────────────
 
-export async function buildContextualState(deps: Parameters<typeof executeCoachTool>[2]) {
+async function buildContextualState(deps: Parameters<typeof executeCoachTool>[2]) {
   try {
     const [fitness, tsbTrend, crossFatigue] = await Promise.all([
       getLatestFitness(deps.supabase, deps.ctx.userId).catch(() => null),

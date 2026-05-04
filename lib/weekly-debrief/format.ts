@@ -33,7 +33,7 @@ export function compactZoneEvidence(zones: ReturnType<typeof getMetricsV2HrZones
     .slice(0, 6);
 }
 
-export function toCompactLap(lap: ReturnType<typeof getMetricsV2Laps>[number]) {
+function toCompactLap(lap: ReturnType<typeof getMetricsV2Laps>[number]) {
   return {
     index: lap.index,
     durationSec: lap.durationSec,
@@ -97,7 +97,7 @@ export function compactLapEvidence(activity: WeeklyDebriefActivity) {
   return compactGenericLapEvidence(activity);
 }
 
-export function trimNullishEntries<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
+function trimNullishEntries<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(value).flatMap(([key, entry]) => {
       if (entry === null || typeof entry === "undefined") return [];

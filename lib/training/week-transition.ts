@@ -277,15 +277,3 @@ export async function markBriefingDismissed(
     .eq("id", briefingId);
 }
 
-/**
- * Finalize a weekly debrief (mark as is_finalized).
- */
-export async function finalizeWeeklyDebrief(
-  supabase: SupabaseClient,
-  debriefId: string
-): Promise<void> {
-  await supabase
-    .from("weekly_debriefs")
-    .update({ is_finalized: true, finalized_at: new Date().toISOString() })
-    .eq("id", debriefId);
-}

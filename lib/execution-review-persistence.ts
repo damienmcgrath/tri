@@ -58,7 +58,7 @@ function buildEvidenceSummary(evidence: ExecutionEvidence) {
 
 // Re-export helpers so the main execution-review module can import them
 // instead of duplicating them.
-export { toLegacyStatus, nextCallFromEvidence, buildEvidenceSummary };
+export { nextCallFromEvidence, buildEvidenceSummary };
 
 // ---------------------------------------------------------------------------
 // Persistence functions

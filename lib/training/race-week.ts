@@ -389,33 +389,6 @@ function totalBlockWeeks(startIso: string, endIso: string): number {
 }
 
 /**
- * Lightweight check: is the athlete in race week?
- * Use when you only need the proximity, not the full context.
- */
-export async function getRaceProximity(
-  supabase: SupabaseClient,
-  userId: string,
-  today: string
-): Promise<RaceProximity> {
-  const windowStart = addDaysIso(today, -7);
-  const windowEnd = addDaysIso(today, 14);
-
-  const { data: raceRows } = await supabase
-    .from("race_profiles")
-    .select("date")
-    .eq("user_id", userId)
-    .gte("date", windowStart)
-    .lte("date", windowEnd)
-    .order("date", { ascending: true })
-    .limit(1);
-
-  if (!raceRows || raceRows.length === 0) return "normal";
-
-  const daysUntil = dateDiffDays(today, raceRows[0].date);
-  return classifyProximity(daysUntil);
-}
-
-/**
  * Format race distance for display.
  */
 export function formatRaceDistance(ctx: RaceWeekContext): string {
