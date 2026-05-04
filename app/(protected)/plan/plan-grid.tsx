@@ -750,6 +750,7 @@ export function PlanGrid({
           todayIso={todayIso}
           adaptationsBySession={adaptationsBySession}
           completedByWeek={completedByWeek}
+          openSessionId={openSessionId}
           onSelectSession={handleOpenSession}
           onSessionContextMenu={handleSessionContextMenu}
           onEmptyCellClick={handleEmptyCellClick}

@@ -18,6 +18,14 @@ type Props = {
   todayIso: string;
   adaptationsBySession: Record<string, boolean>;
   completedByWeek?: Record<string, Array<{ duration_minutes: number }>>;
+  /**
+   * When a deep link or in-app navigation opens a session drawer
+   * (`?session=<id>`), the phone view anchors on the week that contains
+   * that session so the pill stays visible behind the bottom sheet.
+   * Without this, every load defaults to the current week even when the
+   * deep-linked session lives in another week of the same block.
+   */
+  openSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
   onSessionContextMenu?: (sessionId: string, x: number, y: number) => void;
   onEmptyCellClick?: (weekId: string, date: string) => void;
@@ -59,6 +67,7 @@ export function MobilePlanView({
   todayIso,
   adaptationsBySession,
   completedByWeek,
+  openSessionId,
   onSelectSession,
   onSessionContextMenu,
   onEmptyCellClick,
@@ -69,13 +78,30 @@ export function MobilePlanView({
     [weeks]
   );
 
-  const [activeIdx, setActiveIdx] = useState(() => findCurrentWeekIndex(sortedWeeks, todayIso));
+  // Resolve the week containing the deep-linked session, if any. Highest-
+  // priority anchor so /plan?session=<id> snaps to the correct week even
+  // when the session is not in the current week.
+  const openSessionWeekIdx = useMemo(() => {
+    if (!openSessionId) return -1;
+    const target = sessions.find((s) => s.id === openSessionId);
+    if (!target?.week_id) return -1;
+    return sortedWeeks.findIndex((w) => w.id === target.week_id);
+  }, [openSessionId, sessions, sortedWeeks]);
 
-  // Re-center on the current week when the underlying block changes (different
-  // weeks array). Keeps phone navigation in sync with the active block.
+  const [activeIdx, setActiveIdx] = useState(() =>
+    openSessionWeekIdx >= 0 ? openSessionWeekIdx : findCurrentWeekIndex(sortedWeeks, todayIso)
+  );
+
+  // Re-center when the block changes OR when the deep-linked session moves
+  // to a different week. The deep-link anchor takes priority so the bottom
+  // sheet always opens over a visible pill.
   useEffect(() => {
+    if (openSessionWeekIdx >= 0) {
+      setActiveIdx(openSessionWeekIdx);
+      return;
+    }
     setActiveIdx(findCurrentWeekIndex(sortedWeeks, todayIso));
-  }, [sortedWeeks, todayIso]);
+  }, [sortedWeeks, todayIso, openSessionWeekIdx]);
 
   if (sortedWeeks.length === 0) {
     return (
