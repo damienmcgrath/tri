@@ -16,12 +16,14 @@ import { BlockOverview } from "./components/block-overview";
 import {
   createSessionAction,
   deleteSessionAction,
+  updateSessionAction
+} from "./actions";
+import {
   deleteWeekAction,
   duplicateWeekForwardAction,
   shiftWeekAction,
-  updateSessionAction,
   updateWeekAction
-} from "./actions";
+} from "./actions-week";
 import { addDays, weekRangeLabel } from "@/lib/date-utils";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };

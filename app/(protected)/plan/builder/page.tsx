@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createPlanAction, deletePlanAction } from "../actions";
+import { createPlanAction, deletePlanAction } from "../actions-plan";
 
 type Plan = { id: string; name: string; start_date: string; duration_weeks: number };
 
