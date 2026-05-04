@@ -10,7 +10,7 @@ import {
   createSessionFromCellAction,
   deleteSessionAction,
   updateSessionDetailsAction
-} from "../actions";
+} from "../actions-session";
 
 export type DrawerSession = {
   id: string;

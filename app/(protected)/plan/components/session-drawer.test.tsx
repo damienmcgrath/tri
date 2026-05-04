@@ -5,7 +5,7 @@ const updateMock = jest.fn();
 const deleteMock = jest.fn();
 const createMock = jest.fn();
 
-jest.mock("../actions", () => ({
+jest.mock("../actions-session", () => ({
   updateSessionDetailsAction: (...args: unknown[]) => updateMock(...args),
   deleteSessionAction: (...args: unknown[]) => deleteMock(...args),
   createSessionFromCellAction: (...args: unknown[]) => createMock(...args)
