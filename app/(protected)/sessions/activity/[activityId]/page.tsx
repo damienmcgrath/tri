@@ -4,7 +4,7 @@ import { isMissingCompletedActivityColumnError } from "@/lib/activities/complete
 import { createClient } from "@/lib/supabase/server";
 import { createReviewViewModel, durationLabel, toneToBadgeClass, toneToTextClass, type SessionReviewRow } from "@/lib/session-review";
 import { getSessionDisplayName } from "@/lib/training/session";
-import { getDisciplineMeta } from "@/lib/ui/discipline";
+import { getDisciplineMeta, getSwimTypeLabel } from "@/lib/ui/discipline";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { buildExecutionResultForSession, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 import { RegenerateReviewButton } from "@/app/(protected)/sessions/[sessionId]/regenerate-review-button";
@@ -14,6 +14,7 @@ type ActivityReviewRow = {
   id: string;
   user_id?: string;
   sport_type: string;
+  swim_type?: string | null;
   start_time_utc: string;
   duration_sec: number | null;
   distance_m: number | null;
@@ -50,6 +51,20 @@ async function loadActivityReviewRow(params: {
   const { supabase, userId, activityId } = params;
 
   const queries = [
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,user_id,sport_type,swim_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2,execution_result")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    () =>
+      supabase
+        .from("completed_activities")
+        .select("id,user_id,sport_type,swim_type,start_time_utc,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2")
+        .eq("id", activityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
     () =>
       supabase
         .from("completed_activities")
@@ -175,7 +190,8 @@ export default async function ActivitySessionReviewPage({ params }: { params: { 
     workoutType: session.workout_type,
     intentCategory: session.intent_category
   });
-  const disciplineLabel = getDisciplineMeta(session.sport).label;
+  const swimTypeLabel = getSwimTypeLabel(activity.swim_type ?? null);
+  const disciplineLabel = swimTypeLabel ?? getDisciplineMeta(session.sport).label;
   const sessionDateLabel = reviewDateFormatter.format(new Date(`${session.date}T00:00:00.000Z`));
   const comparisonHeading = reviewVm.isReviewable ? "Session impact" : "Review unlock";
   const leftColumnLabel = "Weekly context";

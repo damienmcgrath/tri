@@ -19,3 +19,17 @@ export function getDisciplineMeta(rawSport: string | null | undefined): Discipli
     textureClassName: `discipline-texture-${base.texture}`
   };
 }
+
+export type SwimType = "pool" | "open_water";
+
+export function getSwimTypeLabel(swimType: string | null | undefined): string | null {
+  if (swimType === "pool") return "Pool Swim";
+  if (swimType === "open_water") return "Open Water";
+  return null;
+}
+
+export function getSwimSubtypeTag(swimType: string | null | undefined): string | null {
+  if (swimType === "pool") return "Pool";
+  if (swimType === "open_water") return "OWS";
+  return null;
+}
