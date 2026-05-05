@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/security/request";
@@ -7,6 +8,9 @@ import { generateSessionVerdict, SESSION_VERDICT_PROMPT_VERSION } from "@/lib/ai
 import { createRationaleFromVerdict } from "@/lib/ai/prompts/adaptation-rationale";
 import { triggerComparisonAfterVerdict } from "@/lib/training/session-comparison-engine";
 import { getCoachModel } from "@/lib/openai";
+import { isFindingsPipelineEnabled, runFindingsPipeline } from "@/lib/execution-review";
+import { getFindingsForSession } from "@/lib/findings/persist";
+import type { Finding } from "@/lib/findings/types";
 
 function tryParseJson(value: string): unknown {
   try {
@@ -58,6 +62,37 @@ const requestSchema = z.object({
   regenerate: z.boolean().optional().default(false)
 });
 
+/**
+ * Spec §1.5 — read or generate findings for the session, returning them so
+ * the API can surface them alongside the legacy verdict. Reads existing rows
+ * via {@link getFindingsForSession} on the cached path; runs the full pipeline
+ * (and persists) on the regenerate path. Falls back silently to `null` so a
+ * findings failure never blocks the verdict response.
+ */
+async function loadOrRunFindings(args: {
+  sessionId: string;
+  userId: string;
+  supabase: SupabaseClient;
+  regenerate: boolean;
+}): Promise<Finding[] | null> {
+  if (!isFindingsPipelineEnabled()) return null;
+  try {
+    if (!args.regenerate) {
+      const existing = await getFindingsForSession(args.sessionId, args.supabase);
+      if (existing.length > 0) return existing;
+    }
+    const result = await runFindingsPipeline({
+      sessionId: args.sessionId,
+      userId: args.userId,
+      supabase: args.supabase
+    });
+    return result.findings;
+  } catch (err) {
+    console.warn("[SESSION_VERDICTS] findings pipeline failed", err);
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
@@ -93,7 +128,17 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (existing) {
-        return NextResponse.json({ verdict: enrichVerdictResponse(existing), source: "cached" });
+        const findings = await loadOrRunFindings({
+          sessionId: body.sessionId,
+          userId: user.id,
+          supabase,
+          regenerate: false
+        });
+        return NextResponse.json({
+          verdict: enrichVerdictResponse(existing),
+          source: "cached",
+          findings
+        });
       }
     }
 
@@ -144,6 +189,13 @@ export async function POST(request: Request) {
       }
     }
 
+    const findings = await loadOrRunFindings({
+      sessionId: body.sessionId,
+      userId: user.id,
+      supabase,
+      regenerate: body.regenerate
+    });
+
     if (error) {
       console.error("[SESSION_VERDICTS] Upsert error:", error.message);
       // Still return the verdict even if save fails. The in-memory verdict
@@ -151,7 +203,8 @@ export async function POST(request: Request) {
       // client renders them even when persistence failed.
       return NextResponse.json({
         verdict: enrichVerdictResponse(verdict as unknown as Record<string, unknown>),
-        source
+        source,
+        findings
       });
     }
 
@@ -187,7 +240,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       verdict: enrichVerdictResponse((saved ?? verdict) as unknown as Record<string, unknown>),
-      source
+      source,
+      findings
     });
   } catch (error) {
     console.error("[SESSION_VERDICTS]", error);
