@@ -28,6 +28,13 @@ import type {
   SessionTimeseries,
 } from "@/lib/findings/types";
 import type { Phase1AnalyzerContext } from "@/lib/findings/analyzers";
+import { detectBlocks } from "@/lib/blocks/detector";
+import type {
+  AutoLap,
+  BlockDetectorTimeseries,
+  DetectedBlock,
+} from "@/lib/blocks/types";
+import { loadResolvedIntent } from "@/lib/intent/persist";
 import type {
   SessionExecutionActivityRow,
   SessionExecutionSessionRow,
@@ -1037,18 +1044,115 @@ export async function assembleAnalyzerContext(
   const plannedStructure =
     [sessionRow.target, sessionRow.notes].filter(Boolean).join(" | ") || null;
 
-  return {
-    session_id: sessionRow.id,
-    intent: mapIntent(
+  // Phase 2: prefer the persisted ResolvedIntent over the heuristic mapper
+  // when the athlete (or the upstream parser) has already resolved the
+  // session's intent. The heuristic stays as the fallback for legacy /
+  // unresolved sessions so the rest of the pipeline never sees a null intent.
+  let intent: ResolvedIntent;
+  try {
+    const persisted = await loadResolvedIntent(sessionRow.id, supabase);
+    intent =
+      persisted ??
+      mapIntent(
+        sessionRow.sport,
+        sessionRow.intent_category,
+        plannedStructure,
+        Boolean(sessionRow.intent_category),
+      );
+  } catch (err) {
+    console.warn("[assembleAnalyzerContext] loadResolvedIntent failed", err);
+    intent = mapIntent(
       sessionRow.sport,
       sessionRow.intent_category,
       plannedStructure,
       Boolean(sessionRow.intent_category),
-    ),
-    timeseries: mapTimeseries(sessionRow.sport, fallbackInput),
-    physModel: buildPhysModel(athleteContext),
+    );
+  }
+
+  const physModel = buildPhysModel(athleteContext);
+  const detectedBlocks = maybeDetectBlocks({
+    intent,
+    sport: sessionRow.sport,
     diagnosisInput: fallbackInput,
+    activityRow,
+  });
+
+  return {
+    session_id: sessionRow.id,
+    intent,
+    timeseries: mapTimeseries(sessionRow.sport, fallbackInput),
+    physModel,
+    diagnosisInput: fallbackInput,
+    ...(detectedBlocks ? { detectedBlocks } : {}),
   };
+}
+
+/**
+ * Run the Phase 2 block detector when the resolved intent describes a
+ * structured session. Returns `undefined` when the intent is steady, has no
+ * blocks, or there is no completed activity to detect against — callers omit
+ * the field rather than passing an empty array so the AnalyzerContext stays
+ * minimal.
+ *
+ * Phase 2 caveat: per-second timeseries samples are not yet persisted on
+ * `completed_activities`. The detector still produces target-aligned blocks
+ * with empty intensity metrics, which is enough for the prompt and the
+ * BlockExecutionTable UI to surface the planned structure. Real samples will
+ * land when the parser pipeline begins persisting timeseries.
+ */
+function maybeDetectBlocks(args: {
+  intent: ResolvedIntent;
+  sport: string | null | undefined;
+  diagnosisInput: SessionDiagnosisInput;
+  activityRow: SessionExecutionActivityRow | null;
+}): DetectedBlock[] | undefined {
+  const { intent, sport, diagnosisInput, activityRow } = args;
+  if (intent.structure === "steady") return undefined;
+  const blocks = intent.blocks ?? [];
+  if (blocks.length === 0) return undefined;
+  if (!activityRow) return undefined;
+
+  const durationSec = diagnosisInput.actual.durationSec ?? 0;
+  if (durationSec <= 0) return undefined;
+
+  const timeseries: BlockDetectorTimeseries = {
+    sport: sport ?? "other",
+    duration_sec: durationSec,
+    has_power: typeof diagnosisInput.actual.avgPower === "number",
+    has_hr: typeof diagnosisInput.actual.avgHr === "number",
+    samples: [],
+    laps: extractLapBoundaries(activityRow),
+  };
+
+  try {
+    return detectBlocks(blocks, timeseries);
+  } catch (err) {
+    console.warn("[assembleAnalyzerContext] detectBlocks failed", err);
+    return undefined;
+  }
+}
+
+function extractLapBoundaries(
+  activityRow: SessionExecutionActivityRow | null,
+): AutoLap[] | undefined {
+  if (!activityRow?.parse_summary) return undefined;
+  const summary = activityRow.parse_summary as Record<string, unknown>;
+  const rawLaps = summary.laps;
+  if (!Array.isArray(rawLaps)) return undefined;
+
+  const laps: AutoLap[] = [];
+  let cursor = 0;
+  for (const raw of rawLaps) {
+    if (!raw || typeof raw !== "object") continue;
+    const lap = raw as Record<string, unknown>;
+    const duration = Number(lap.duration_sec ?? lap.duration ?? lap.elapsed_sec);
+    if (!Number.isFinite(duration) || duration <= 0) continue;
+    const start = cursor;
+    const end = cursor + duration;
+    laps.push({ start_sec: start, end_sec: end });
+    cursor = end;
+  }
+  return laps.length > 0 ? laps : undefined;
 }
 
 /**

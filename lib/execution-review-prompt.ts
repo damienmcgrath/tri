@@ -9,6 +9,7 @@
  * hallucination called out in §1.5.
  */
 
+import type { DetectedBlock } from "@/lib/blocks/types";
 import type {
   AthletePhysModel,
   Finding,
@@ -155,10 +156,39 @@ function formatAthlete(athlete: AthletePhysModel): string {
   return lines.join("\n");
 }
 
+function formatDetectedBlocks(blocks: DetectedBlock[]): string {
+  const lines = ["detectedBlocks:"];
+  for (const block of blocks) {
+    const start = formatClock(block.start_sec);
+    const end = formatClock(block.end_sec);
+    const metricBits: string[] = [];
+    if (block.metrics.np !== undefined) metricBits.push(`NP=${block.metrics.np}W`);
+    if (block.metrics.ap !== undefined) metricBits.push(`AP=${block.metrics.ap}W`);
+    if (block.metrics.hr_avg !== undefined) metricBits.push(`HR=${block.metrics.hr_avg}bpm`);
+    if (block.metrics.cadence_avg !== undefined) metricBits.push(`cad=${block.metrics.cadence_avg}`);
+    if (block.metrics.pace_avg) metricBits.push(`pace=${block.metrics.pace_avg}`);
+    const metricStr = metricBits.length > 0 ? ` ${metricBits.join(" ")}` : "";
+    const conf = block.alignment_confidence.toFixed(2);
+    lines.push(
+      `  - block ${block.intended.index} (${block.intended.type}, ${start}–${end}, conf=${conf})${metricStr}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+function formatClock(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return "0:00";
+  const total = Math.round(sec);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function buildSessionVerdictPrompt(input: {
   intent: ResolvedIntent;
   findings: Finding[];
   athlete: AthletePhysModel;
+  detectedBlocks?: DetectedBlock[];
 }): { system: string; user: string } {
   const ordered = orderFindings(input.findings);
 
@@ -167,13 +197,19 @@ export function buildSessionVerdictPrompt(input: {
       ? "findings: (none — analyzers produced no findings for this session)"
       : ["findings:", ...ordered.map((f, i) => formatFinding(f, i))].join("\n");
 
-  const user = [
+  const sections = [
     formatIntent(input.intent),
     "",
     formatAthlete(input.athlete),
     "",
     findingsBlock,
-  ].join("\n");
+  ];
+
+  if (input.detectedBlocks && input.detectedBlocks.length > 0) {
+    sections.push("", formatDetectedBlocks(input.detectedBlocks));
+  }
+
+  const user = sections.join("\n");
 
   return { system: SESSION_VERDICT_V2, user };
 }
