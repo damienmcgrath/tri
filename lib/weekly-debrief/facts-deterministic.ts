@@ -81,7 +81,7 @@ export function buildDeterministicObservations(args: {
   } else if (args.hardestExtraActivity?.sport === "swim" && (args.hardestExtraActivity.avgPacePer100mSec ?? 0) > 0) {
     observations.push("The added swim looked more like supportive aerobic work than random extra minutes.");
   }
-  if (args.reviewedSessionsCount === 0 && observations.length === 0) {
+  if (observations.length === 0) {
     observations.push("This week reads more through overall rhythm than through one standout session.");
   }
 
