@@ -20,7 +20,8 @@ import type { SessionDiagnosisInput } from "./coach/session-diagnosis";
 const baseIntent: ResolvedIntent = {
   source: "plan",
   type: "endurance",
-  structure: "steady"
+  structure: "steady",
+  resolved_at: "2026-05-05T00:00:00.000Z"
 };
 
 const baseAthlete: AthletePhysModel = { ftp: 250 };

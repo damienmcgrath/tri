@@ -4,7 +4,7 @@ import type { Finding } from "./types";
 function makeCtx(overrides: Partial<AnalyzerContext> = {}): AnalyzerContext {
   return {
     session_id: "session-1",
-    intent: { source: "open", type: "endurance", structure: "open" },
+    intent: { source: "open", type: "endurance", structure: "open", resolved_at: "2026-05-05T00:00:00.000Z" },
     timeseries: { sport: "cycling", duration_sec: 3600, has_power: true },
     physModel: { ftp: 250 },
     ...overrides

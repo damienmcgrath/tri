@@ -28,32 +28,37 @@ const swimmerAthlete: AthletePhysModel = {
 
 const planThresholdBikeIntent: ResolvedIntent = {
   source: "plan",
-  type: "threshold_bike",
+  type: "threshold",
   structure: "intervals",
+  resolved_at: "2026-05-05T00:00:00.000Z",
 };
 
 const longEnduranceRunIntent: ResolvedIntent = {
   source: "plan",
-  type: "long_run",
+  type: "endurance",
   structure: "steady",
+  resolved_at: "2026-05-05T00:00:00.000Z",
 };
 
 const swimCSSIntent: ResolvedIntent = {
   source: "athlete_described",
-  type: "css_swim",
+  type: "threshold",
   structure: "intervals",
+  resolved_at: "2026-05-05T00:00:00.000Z",
 };
 
 const openRideIntent: ResolvedIntent = {
   source: "open",
-  type: "ride",
+  type: "open",
   structure: "open",
+  resolved_at: "2026-05-05T00:00:00.000Z",
 };
 
 const inferredTempoRunIntent: ResolvedIntent = {
   source: "inferred",
-  type: "tempo_run",
+  type: "tempo",
   structure: "progressive",
+  resolved_at: "2026-05-05T00:00:00.000Z",
 };
 
 // -------- Sample 1: threshold bike, mixed-polarity findings --------
@@ -422,7 +427,7 @@ describe("buildSessionVerdictPrompt", () => {
     });
     expect(user).toMatchSnapshot();
     expect(user).toContain("findings: (none");
-    expect(user).toContain("type: ride");
+    expect(user).toContain("type: open");
   });
 
   test("sample 4 (CSS swim): orders the three concerns by severity desc", () => {
