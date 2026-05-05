@@ -1,0 +1,178 @@
+[
+  {
+    "id": "bike-steady-z2",
+    "sport": "bike",
+    "duration_min": 90,
+    "athlete": { "ftp": 250 },
+    "text": "Easy 90min spin, just Z2 the whole way to keep the legs ticking over.",
+    "expected": { "type": "endurance", "structure": "steady" }
+  },
+  {
+    "id": "run-steady-easy",
+    "sport": "run",
+    "duration_min": 45,
+    "athlete": { "threshold_pace": 240, "hr_max": 188 },
+    "text": "Easy 45 min run, keep HR under 145, very chill.",
+    "expected": { "type": "endurance", "structure": "steady" }
+  },
+  {
+    "id": "swim-steady-continuous",
+    "sport": "swim",
+    "duration_min": 35,
+    "athlete": { "css": 95 },
+    "text": "Continuous 2k swim today, smooth and steady, working on stroke.",
+    "expected": { "type": "endurance", "structure": "steady" }
+  },
+  {
+    "id": "bike-recovery-spin",
+    "sport": "bike",
+    "duration_min": 30,
+    "athlete": { "ftp": 250 },
+    "text": "Just a recovery spin — 30 min, super easy, basically Z1.",
+    "expected": { "type": "recovery", "structure": "steady" }
+  },
+  {
+    "id": "run-progressive-build",
+    "sport": "run",
+    "duration_min": 60,
+    "athlete": { "threshold_pace": 240 },
+    "text": "Build run — start easy and finish the last 15 min at threshold pace.",
+    "expected": { "type": "tempo", "structure": "progressive" }
+  },
+  {
+    "id": "bike-progressive-negsplit",
+    "sport": "bike",
+    "duration_min": 90,
+    "athlete": { "ftp": 260 },
+    "text": "Negative split ride, easy first half, last 30 min at tempo.",
+    "expected": { "type": "tempo", "structure": "progressive" }
+  },
+  {
+    "id": "swim-progressive-descending",
+    "sport": "swim",
+    "duration_min": 60,
+    "athlete": { "css": 90 },
+    "text": "1500m main set today, descending 500s — first relaxed, second moderate, third hard.",
+    "expected": { "type": "tempo", "structure": "progressive" }
+  },
+  {
+    "id": "bike-intervals-threshold",
+    "sport": "bike",
+    "duration_min": 75,
+    "athlete": { "ftp": 250 },
+    "text": "5x4min at threshold with 3 min easy between. 15 min warmup and 10 min cooldown.",
+    "expected": { "type": "threshold", "structure": "intervals" }
+  },
+  {
+    "id": "run-intervals-400s",
+    "sport": "run",
+    "duration_min": 60,
+    "athlete": { "threshold_pace": 230 },
+    "text": "Track session: 8x400m at 5k pace with 90s jog recovery.",
+    "expected": { "type": "vo2", "structure": "intervals" }
+  },
+  {
+    "id": "run-intervals-hills",
+    "sport": "run",
+    "duration_min": 50,
+    "athlete": { "threshold_pace": 240 },
+    "text": "10x30s hill repeats, hard up, jog down recovery.",
+    "expected": { "type": "vo2", "structure": "intervals" }
+  },
+  {
+    "id": "bike-intervals-vo2",
+    "sport": "bike",
+    "duration_min": 75,
+    "athlete": { "ftp": 250 },
+    "text": "6x3min VO2 with 3min easy spin recovery between each.",
+    "expected": { "type": "vo2", "structure": "intervals" }
+  },
+  {
+    "id": "swim-intervals-100s",
+    "sport": "swim",
+    "duration_min": 60,
+    "athlete": { "css": 90 },
+    "text": "Main set 10x100 on 1:45 — hold CSS pace.",
+    "expected": { "type": "threshold", "structure": "intervals" }
+  },
+  {
+    "id": "bike-intervals-ladder",
+    "sport": "bike",
+    "duration_min": 80,
+    "athlete": { "ftp": 260 },
+    "text": "Threshold ladder: 2-3-4-3-2 minutes at FTP with equal recovery.",
+    "expected": { "type": "threshold", "structure": "intervals" }
+  },
+  {
+    "id": "bike-overunder-3x10",
+    "sport": "bike",
+    "duration_min": 80,
+    "athlete": { "ftp": 260 },
+    "text": "3x10min over-under: 1min at 110% FTP, 1min at 95% FTP, alternating.",
+    "expected": { "type": "threshold", "structure": "over_under" }
+  },
+  {
+    "id": "run-overunder-20min",
+    "sport": "run",
+    "duration_min": 60,
+    "athlete": { "threshold_pace": 235 },
+    "text": "20 minute over-under set, alternating 1 min just over threshold and 1 min just under.",
+    "expected": { "type": "threshold", "structure": "over_under" }
+  },
+  {
+    "id": "bike-overunder-sweetspot",
+    "sport": "bike",
+    "duration_min": 90,
+    "athlete": { "ftp": 250 },
+    "text": "Sweet-spot over-unders: 5x5min alternating 30s above threshold and 30s sweet spot.",
+    "expected": { "type": "threshold", "structure": "over_under" }
+  },
+  {
+    "id": "bike-race-sim-703",
+    "sport": "bike",
+    "duration_min": 120,
+    "athlete": { "ftp": 270 },
+    "text": "70.3 race-pace rehearsal — 90 min at goal IF 0.85, then 10 min off the bike at goal half-mary pace.",
+    "expected": { "type": "race_simulation", "structure": "race_simulation" }
+  },
+  {
+    "id": "run-race-sim-10k",
+    "sport": "run",
+    "duration_min": 50,
+    "athlete": { "threshold_pace": 230 },
+    "text": "Race rehearsal: 30 min at 10k race pace after a short warmup.",
+    "expected": { "type": "race_simulation", "structure": "race_simulation" }
+  },
+  {
+    "id": "bike-race-sim-olympic",
+    "sport": "bike",
+    "duration_min": 75,
+    "athlete": { "ftp": 260 },
+    "text": "Olympic-distance race rehearsal — 40 min sustained at goal Olympic IF.",
+    "expected": { "type": "race_simulation", "structure": "race_simulation" }
+  },
+  {
+    "id": "run-open-easy",
+    "sport": "run",
+    "duration_min": 40,
+    "athlete": { "threshold_pace": 240 },
+    "text": "Just feeling it out today, easy miles, no plan.",
+    "expected": { "type": "open", "structure": "open" }
+  },
+  {
+    "id": "swim-open-pool",
+    "sport": "swim",
+    "duration_min": 45,
+    "athlete": { "css": 90 },
+    "text": "Pool session — no plan, just whatever feels right.",
+    "expected": { "type": "open", "structure": "open" }
+  },
+  {
+    "id": "bike-open-coffee",
+    "sport": "bike",
+    "duration_min": 90,
+    "athlete": { "ftp": 250 },
+    "text": "Coffee ride with the group, social pace.",
+    "expected": { "type": "open", "structure": "open" }
+  }
+]
