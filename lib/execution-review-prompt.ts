@@ -1,91 +1,179 @@
 /**
- * Prompt-template builder for the AI coach verdict generator. Extracted from
- * lib/execution-review.ts so prompt edits don't churn the orchestrator.
+ * Verdict prompt builder.
+ *
+ * Spec: tri.ai Findings Pipeline §2.5 (Composer Prompt Skeleton).
+ *
+ * The composer receives typed `Finding[]` instead of raw metric blobs. The LLM
+ * picks top-N by severity / polarity and must cite each metric back to a
+ * `finding.evidence` entry — this is the structural defence against
+ * hallucination called out in §1.5.
  */
 
-import { SESSION_VARIANCE_PROMPT } from "@/lib/ai/session-variance-corpus";
-import { COACH_VERDICT_JSON_EXAMPLE } from "@/lib/execution-review-types";
-import { COACH_VERDICT_FEW_SHOT_JSON } from "@/lib/execution-review-examples";
+import type {
+  AthletePhysModel,
+  Finding,
+  FindingPolarity,
+  ResolvedIntent,
+} from "@/lib/findings/types";
 
-export function buildCoachVerdictInstructions() {
+export const SESSION_VERDICT_V2 = `You compose a Session Verdict from a set of typed findings about a single session.
+
+# Inputs
+- intent: { type, structure, blocks?, target_watts? }
+- findings: Finding[] — ranked by severity desc, polarity-balanced
+- athlete: { ftp, css, threshold_pace, weight }
+
+# Output (4-section structure from tri_ai_spec §3.1)
+
+## Session intent (1 sentence)
+What this session was trying to achieve. Use the intent.type and intent.structure.
+
+## Execution quality (2-4 sentences)
+Cite findings with category='execution' and category='pacing'.
+Lead with the most severe finding (severity desc).
+Every metric mentioned must come from a finding.evidence array. Never invent numbers.
+
+## One thing to change (1-2 sentences)
+Pick the highest-severity finding with a non-null prescription.
+Output its prescription.text verbatim, or compose two prescriptions if related.
+Format: "NEXT [session type]: [target with number] for [scope]. [Success criterion]."
+
+## Load contribution (1-2 sentences)
+Use findings with category='durability' and the TSS finding.
+
+# Hard rules
+- Never reference a metric that isn't in a finding.evidence array.
+- Never produce hedging language. No "may have", no "appears to".
+  Findings are conditional or they aren't presented.
+- Sentence case headings only.
+- Prescriptions always include a number.`;
+
+/**
+ * Order findings by severity desc, then interleave polarities so the model
+ * sees a balanced mix at the top instead of an all-concern (or all-positive)
+ * stack. Stable within a (severity, polarity) bucket.
+ */
+export function orderFindings(findings: Finding[]): Finding[] {
+  const indexed = findings.map((f, i) => ({ f, i }));
+
+  const polarityRank: Record<FindingPolarity, number> = {
+    concern: 0,
+    observation: 1,
+    positive: 2,
+  };
+
+  // Bucket by severity desc.
+  const bySeverity = new Map<number, typeof indexed>();
+  for (const entry of indexed) {
+    const list = bySeverity.get(entry.f.severity) ?? [];
+    list.push(entry);
+    bySeverity.set(entry.f.severity, list);
+  }
+
+  const severities = [...bySeverity.keys()].sort((a, b) => b - a);
+
+  const ordered: Finding[] = [];
+  for (const sev of severities) {
+    const bucket = bySeverity.get(sev)!;
+    // Round-robin across polarities within the severity bucket.
+    const byPolarity = new Map<FindingPolarity, typeof indexed>();
+    for (const entry of bucket) {
+      const list = byPolarity.get(entry.f.polarity) ?? [];
+      list.push(entry);
+      byPolarity.set(entry.f.polarity, list);
+    }
+    const polarities = [...byPolarity.keys()].sort(
+      (a, b) => polarityRank[a] - polarityRank[b],
+    );
+    let drained = false;
+    while (!drained) {
+      drained = true;
+      for (const pol of polarities) {
+        const list = byPolarity.get(pol)!;
+        const next = list.shift();
+        if (next) {
+          ordered.push(next.f);
+          drained = false;
+        }
+      }
+    }
+  }
+
+  return ordered;
+}
+
+function formatEvidence(finding: Finding): string {
+  if (finding.evidence.length === 0) return "  evidence: (none)";
+  const lines = finding.evidence.map((e) => {
+    const unit = e.unit ? ` ${e.unit}` : "";
+    const ref = e.reference ? ` [ref: ${e.reference}]` : "";
+    return `    - ${e.metric}=${e.value}${unit}${ref}`;
+  });
+  return ["  evidence:", ...lines].join("\n");
+}
+
+function formatPrescription(finding: Finding): string {
+  if (!finding.prescription) return "  prescription: (none)";
+  const p = finding.prescription;
+  const target =
+    p.target_metric != null && p.target_value != null
+      ? ` (target: ${p.target_metric}=${p.target_value})`
+      : "";
+  return `  prescription: ${p.text}${target} [confidence: ${p.confidence}]`;
+}
+
+function formatFinding(finding: Finding, idx: number): string {
+  const cond =
+    finding.conditional_on && finding.conditional_on.length > 0
+      ? `\n  conditional_on: ${finding.conditional_on.join(", ")}`
+      : "";
   return [
-    "You are an endurance coach helping athletes interpret completed workouts.",
-    "Use only the provided evidence and context.",
-    "Do not invent metrics, missing facts, unsupported causes, or unsupported comparisons.",
-    "Return exactly one JSON object that matches the required schema below.",
-    "Do not wrap the object in keys like data, review, result, output, or verdict.",
-    "Do not rename any keys.",
-    "Keep enum values exactly as specified.",
-    "Keep `citedEvidence` as an array of objects with `claim` and `support` only.",
-    "Keep each `support` entry as a plain string, not an object.",
-    "If evidence is limited, reflect that in `uncertainty` and keep recommendations conservative.",
-    "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
-    "Express durations in minutes (e.g. '37 min', '1 h 15 min'). Never write raw seconds.",
-    "Express run pace as min:sec/km (e.g. '5:41/km'). Never write raw seconds per km.",
+    `[${idx + 1}] id=${finding.id} (${finding.analyzer_id} v${finding.analyzer_version})`,
+    `  category=${finding.category} polarity=${finding.polarity} severity=${finding.severity} scope=${finding.scope}${finding.scope_ref ? ` (${finding.scope_ref})` : ""}`,
+    `  headline: ${finding.headline}`,
+    `  reasoning: ${finding.reasoning}`,
+    formatEvidence(finding),
+    formatPrescription(finding),
+  ]
+    .join("\n")
+    .concat(cond);
+}
+
+function formatIntent(intent: ResolvedIntent): string {
+  return `intent:\n  type: ${intent.type}\n  structure: ${intent.structure}\n  source: ${intent.source}`;
+}
+
+function formatAthlete(athlete: AthletePhysModel): string {
+  const lines: string[] = ["athlete:"];
+  if (athlete.ftp != null) lines.push(`  ftp: ${athlete.ftp} W`);
+  if (athlete.css != null) lines.push(`  css: ${athlete.css} /100m`);
+  if (athlete.threshold_pace != null)
+    lines.push(`  threshold_pace: ${athlete.threshold_pace} sec/km`);
+  if (athlete.hr_max != null) lines.push(`  hr_max: ${athlete.hr_max} bpm`);
+  if (athlete.weight != null) lines.push(`  weight: ${athlete.weight} kg`);
+  if (lines.length === 1) lines.push("  (no anchors provided)");
+  return lines.join("\n");
+}
+
+export function buildSessionVerdictPrompt(input: {
+  intent: ResolvedIntent;
+  findings: Finding[];
+  athlete: AthletePhysModel;
+}): { system: string; user: string } {
+  const ordered = orderFindings(input.findings);
+
+  const findingsBlock =
+    ordered.length === 0
+      ? "findings: (none — analyzers produced no findings for this session)"
+      : ["findings:", ...ordered.map((f, i) => formatFinding(f, i))].join("\n");
+
+  const user = [
+    formatIntent(input.intent),
     "",
-    "Prescriptive review rules:",
-    "- Speak with direct authority. State findings. Do not hedge.",
-    "- Never lead with duration comparison. Evaluate intensity compliance first, pacing second, duration third.",
-    "- For interval sessions: evaluate interval quality before mentioning whether all were completed.",
-    "- For endurance sessions: evaluate intensity compliance before mentioning duration.",
-    "- Always use the NEXT format for oneThingToChange, regardless of score: 'NEXT [session type]: [specific target with numbers]. [success criterion]. [progression cue if criterion met].'",
-    "- For 90+ scores, still restate the numeric target (pace ceiling, HR cap, interval structure) and add a progression trigger (e.g. 'if HR holds, extend by 10 min next time').",
-    "- Do not use words like 'appears', 'seems', 'might', 'possibly', 'likely'. State what the data shows.",
+    formatAthlete(input.athlete),
     "",
-    "Extended signals:",
-    "- `extendedSignals.historicalComparables` lists up to four previous same-sport, same-intent sessions with their execution score, pace/power, HR, and stored takeaway. Use these to frame trends (\"third threshold bike in a row with HR creeping higher for the same power\"). If the array is empty, skip trend claims.",
-    "- `extendedSignals.aerobicDecoupling` reports how the HR-per-output ratio changed from the first to the second half of this session. `percent` is the raw drift; `severity` maps to stable (<3%), mild_drift (3-5%), significant_drift (5-10%), or poor_durability (≥10%). Reference decoupling only for endurance or tempo sessions where it is load-bearing, never for short intervals or strength.",
-    "- `extendedSignals.weather` carries the session's temperature data and a `notable` flag list (hot, warm, cool, cold, large range). Use it to contextualise HR/pace deviations — a hot day explains HR elevation at the same pace without implying fitness loss.",
-    "- These signals are inputs, not requirements. If a signal is null or empty, do not mention it and do not invent one.",
-    "",
-    "nonObviousInsight rules:",
-    "- Every verdict must include a `nonObviousInsight` (≤320 chars) — a finding the athlete would not reach by glancing at this session alone.",
-    "- Draw it from: a comparison against `historicalComparables`, a `aerobicDecoupling` trend, a weather-adjusted interpretation, or a correlation between feel and execution across `recentReviewedSessions`.",
-    "- Do not repeat what is already in `whatHappened`. If you cannot surface something genuinely non-obvious from the evidence, state that honestly (e.g. \"Not enough prior sessions in this intent category to establish a trend yet.\") — but still use this field.",
-    "- No generic coaching platitudes. Ground every claim in a specific number, date, or signal.",
-    "",
-    "teach (optional, ≤200 chars):",
-    "- Use `teach` when this session exposes a mechanistically important metric — variability index spike, aerobic decoupling, negative-split failure, durability fade, cadence drop, HR↔pace divergence, power-per-HR shift, or similar. Explain in one sentence *why* that metric matters for this athlete's training.",
-    "- Prefer a different mechanism than the last few `priorHeadlines`. Rotate focus — do not teach the same concept two sessions in a row.",
-    "- If no mechanism is worth teaching on this session, set `teach` to null. Do not manufacture a teach moment to fill the field.",
-    "- `teach` is separate from `nonObviousInsight`: insight observes *what* is true; teach explains *why* it matters.",
-    "",
-    "comparableReference (≤240 chars):",
-    "- When `extendedSignals.historicalComparables` has ≥1 entry, `comparableReference` MUST be non-null and cite at least one prior session by its date, naming the metric delta (HR, pace, power, execution score, or takeaway). Example: \"2026-04-06 threshold bike: 168 bpm at 245 W; today 172 bpm at 245 W.\"",
-    "- When `historicalComparables` is empty (no prior same-intent session), set `comparableReference` to null. Do not invent a comparable.",
-    "- `comparableReference` is the hard-wired proof that the injected history was actually used; it complements `nonObviousInsight` rather than duplicating it.",
-    "",
-    "Pacing and cadence halves:",
-    "- `actual.splitMetrics` carries first-half vs last-half values for HR, pace, power, cadence, pace-per-100m, and stroke rate. When two halves differ materially (cadence drop ≥3 spm, pace fade ≥3%, power drop ≥5%, stroke-rate drift on swim), cite the split comparison directly in `whatHappened` or `citedEvidence` — this is the cleanest negative-split / durability read available.",
-    "- Do not invent halves that are not present. If `splitMetrics` is null, do not claim a split pattern.",
-    "",
-    SESSION_VARIANCE_PROMPT,
-    "",
-    "Field requirements:",
-    "- `sessionVerdict.headline`: short label, max 160 chars.",
-    "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
-    "- `sessionVerdict.intentMatch`: must match the provided deterministic intent result.",
-    "- `sessionVerdict.executionCost`: must stay consistent with the provided deterministic execution cost.",
-    "- `sessionVerdict.nextCall`: choose one allowed enum only.",
-    "- `explanation.sessionIntent` (optional): one sentence on the physiological purpose of this session, max 300 chars.",
-    "- `explanation.whatHappened`: factual session read evaluating intensity first, pacing second, duration third. Max 500 chars.",
-    "- `explanation.whyItMatters`: what it means for adaptation or the week, max 500 chars.",
-    "- `explanation.oneThingToChange` (optional): single concrete instruction using NEXT format, max 500 chars.",
-    "- `explanation.whatToDoNextTime`: one practical cue for the next similar session, max 500 chars.",
-    "- `explanation.whatToDoThisWeek`: how to handle the rest of this week, max 500 chars.",
-    "- `nonObviousInsight`: one finding grounded in an extended signal, max 320 chars. Required.",
-    "- `teach`: optional mechanistic explanation, max 200 chars. Null when nothing is worth teaching.",
-    "- `comparableReference`: cite of ≥1 prior session by date + metric delta, max 240 chars. Required non-null when historicalComparables is non-empty; null otherwise.",
-    "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
-    "- `uncertainty.detail`: explain the confidence level plainly, max 500 chars.",
-    "- `uncertainty.missingEvidence`: array of missing evidence strings, max 8 items.",
-    "- `citedEvidence`: max 4 items.",
-    "- `citedEvidence[].claim`: max 200 chars.",
-    "- `citedEvidence[].support`: max 4 short support strings, each max 180 chars.",
-    "Required output schema example:",
-    COACH_VERDICT_JSON_EXAMPLE,
-    "",
-    "Few-shot examples (three realistic verdicts across different intent categories; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:",
-    COACH_VERDICT_FEW_SHOT_JSON
+    findingsBlock,
   ].join("\n");
+
+  return { system: SESSION_VERDICT_V2, user };
 }
