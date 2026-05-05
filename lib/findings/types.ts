@@ -55,19 +55,9 @@ export interface Finding {
   scope_ref?: string;
 }
 
-// ResolvedIntent — Phase 2 owns the full schema. This is the minimal stub the
-// Analyzer contract needs so Phase 1 can compile and ship independently.
-export interface ResolvedIntent {
-  source: "plan" | "athlete_described" | "inferred" | "open";
-  type: string;
-  structure:
-    | "steady"
-    | "progressive"
-    | "intervals"
-    | "over_under"
-    | "race_simulation"
-    | "open";
-}
+// ResolvedIntent now lives in @/lib/intent/types (Phase 2 schema).
+// Re-exported here so existing consumers of @/lib/findings/types keep working.
+export type { ResolvedIntent } from "@/lib/intent/types";
 
 // SessionTimeseries — no equivalent shape exists in lib/workouts/ yet
 // (lib/workouts/* operates on parsed activity rows, not aligned timeseries).

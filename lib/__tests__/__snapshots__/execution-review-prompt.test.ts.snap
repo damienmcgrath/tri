@@ -2,7 +2,7 @@
 
 exports[`buildSessionVerdictPrompt sample 1 (threshold bike): every numeric claim in the user payload exists in a finding.evidence entry 1`] = `
 "intent:
-  type: threshold_bike
+  type: threshold
   structure: intervals
   source: plan
 
@@ -52,7 +52,7 @@ findings:
 
 exports[`buildSessionVerdictPrompt sample 2 (long run): renders prescriptive text from highest-severity finding 1`] = `
 "intent:
-  type: long_run
+  type: endurance
   structure: steady
   source: plan
 
@@ -92,7 +92,7 @@ findings:
 
 exports[`buildSessionVerdictPrompt sample 3 (empty findings): emits the no-findings sentinel without crashing 1`] = `
 "intent:
-  type: ride
+  type: open
   structure: open
   source: open
 
@@ -106,7 +106,7 @@ findings: (none — analyzers produced no findings for this session)"
 
 exports[`buildSessionVerdictPrompt sample 4 (CSS swim): orders the three concerns by severity desc 1`] = `
 "intent:
-  type: css_swim
+  type: threshold
   structure: intervals
   source: athlete_described
 
@@ -143,7 +143,7 @@ findings:
 
 exports[`buildSessionVerdictPrompt sample 5 (open ride): produces a coherent payload even without a concern-class finding 1`] = `
 "intent:
-  type: tempo_run
+  type: tempo
   structure: progressive
   source: inferred
 

@@ -924,9 +924,17 @@ function mapIntent(
   else if (/race|sim/.test(text)) structure = "race_simulation";
   else if (/long|easy|steady|recovery|aerobic|endurance/.test(text)) structure = "steady";
 
-  const type = cat.length > 0 ? cat : (sport ?? "session");
+  let type: ResolvedIntent["type"] = "open";
+  if (/threshold|css/.test(text)) type = "threshold";
+  else if (/vo2/.test(text)) type = "vo2";
+  else if (/tempo/.test(text)) type = "tempo";
+  else if (/recovery/.test(text)) type = "recovery";
+  else if (/race[\s\-_]?prep/.test(text)) type = "race_prep";
+  else if (/race[\s\-_]?sim|simulation/.test(text)) type = "race_simulation";
+  else if (/long|endurance|aerobic|easy|steady/.test(text)) type = "endurance";
+
   const source: ResolvedIntent["source"] = hasPlan ? "plan" : "open";
-  return { source, type, structure };
+  return { source, type, structure, resolved_at: new Date().toISOString() };
 }
 
 function mapTimeseries(

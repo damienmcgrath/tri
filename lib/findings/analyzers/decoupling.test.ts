@@ -13,7 +13,7 @@ function makeCtx(args: {
   };
   return {
     session_id: "s1",
-    intent: { source: "open", type: "endurance", structure: "open" },
+    intent: { source: "open", type: "endurance", structure: "open", resolved_at: "2026-05-05T00:00:00.000Z" },
     timeseries: { sport: args.sport ?? "bike", duration_sec: 5400 },
     physModel: {},
     diagnosisInput: di

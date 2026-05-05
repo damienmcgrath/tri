@@ -57,7 +57,7 @@ function ctxFromFixture(session: SessionExecutionSessionRow, activity: SessionEx
   const di = buildDiagnosisInput(session, activity);
   return {
     session_id: session.id,
-    intent: { source: "plan", type: session.intent_category ?? "open", structure: "intervals" },
+    intent: { source: "plan", type: "threshold", structure: "intervals", resolved_at: "2026-05-05T00:00:00.000Z" },
     timeseries: {
       sport: activity.sport_type,
       duration_sec: activity.duration_sec ?? 0,

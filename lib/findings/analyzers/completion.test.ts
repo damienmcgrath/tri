@@ -5,7 +5,7 @@ import type { SessionDiagnosisInput } from "@/lib/coach/session-diagnosis";
 function makeCtx(input: SessionDiagnosisInput, sport: string = "bike"): Phase1AnalyzerContext {
   return {
     session_id: "s1",
-    intent: { source: "open", type: "endurance", structure: "open" },
+    intent: { source: "open", type: "endurance", structure: "open", resolved_at: "2026-05-05T00:00:00.000Z" },
     timeseries: { sport, duration_sec: input.actual.durationSec ?? 3600 },
     physModel: {},
     diagnosisInput: input

@@ -2,10 +2,10 @@
 // Spec: tri.ai Findings Pipeline Spec §1.4 (Phase 1).
 // Analyzers are pure functions. No DB, no LLM. Testable against synthetic ctx.
 
+import type { ResolvedIntent } from "@/lib/intent/types";
 import type {
   AthletePhysModel,
   Finding,
-  ResolvedIntent,
   SessionTimeseries
 } from "./types";
 
