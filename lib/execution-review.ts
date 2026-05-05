@@ -1,12 +1,13 @@
 import "openai/shims/node";
 import { zodTextFormat } from "openai/helpers/zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { asObject, asString, asStringArray, clip } from "@/lib/shared/json-utils";
 import { callOpenAIWithFallback } from "@/lib/ai/call-with-fallback";
 import {
   SESSION_VARIANCE_PROMPT,
   type SessionPriorHeadline,
 } from "@/lib/ai/session-variance-corpus";
-import type { AthleteContextSnapshot } from "@/lib/athlete-context";
+import { getAthleteContextSnapshot, type AthleteContextSnapshot } from "@/lib/athlete-context";
 import type { HistoricalComparable } from "@/lib/analytics/historical-comparables";
 import { diagnoseCompletedSession, type SessionDiagnosisInput } from "@/lib/coach/session-diagnosis";
 import {
@@ -20,7 +21,17 @@ import {
   nextCallFromEvidence,
   buildEvidenceSummary,
 } from "@/lib/execution-review-persistence";
-import { buildCoachVerdictInstructions } from "@/lib/execution-review-prompt";
+import type {
+  AthletePhysModel,
+  Finding,
+  ResolvedIntent,
+  SessionTimeseries,
+} from "@/lib/findings/types";
+import type { Phase1AnalyzerContext } from "@/lib/findings/analyzers";
+import type {
+  SessionExecutionActivityRow,
+  SessionExecutionSessionRow,
+} from "@/lib/workouts/session-execution-helpers";
 
 // Re-export types and persistence so existing imports from "@/lib/execution-review" keep working.
 export type { ExecutionEvidence, CoachVerdict, WeeklyExecutionBrief, PersistedExecutionReview } from "@/lib/execution-review-types";
@@ -30,6 +41,91 @@ export {
   refreshObservedPatterns,
   buildWeeklyExecutionBrief,
 } from "@/lib/execution-review-persistence";
+
+// Legacy verdict prompt — kept inline here because the prompt module now hosts
+// the Findings-based composer (#382) and no longer exports this builder. The
+// legacy path stays in service while FINDINGS_PIPELINE_V1 is the gated rollout.
+function buildCoachVerdictInstructions() {
+  return [
+    "You are an endurance coach helping athletes interpret completed workouts.",
+    "Use only the provided evidence and context.",
+    "Do not invent metrics, missing facts, unsupported causes, or unsupported comparisons.",
+    "Return exactly one JSON object that matches the required schema below.",
+    "Do not wrap the object in keys like data, review, result, output, or verdict.",
+    "Do not rename any keys.",
+    "Keep enum values exactly as specified.",
+    "Keep `citedEvidence` as an array of objects with `claim` and `support` only.",
+    "Keep each `support` entry as a plain string, not an object.",
+    "If evidence is limited, reflect that in `uncertainty` and keep recommendations conservative.",
+    "If you mention shorthand metrics such as IF, VI, SWOLF, TSS, or training effect, explain them in plain athlete-friendly language in the same sentence.",
+    "Express durations in minutes (e.g. '37 min', '1 h 15 min'). Never write raw seconds.",
+    "Express run pace as min:sec/km (e.g. '5:41/km'). Never write raw seconds per km.",
+    "",
+    "Prescriptive review rules:",
+    "- Speak with direct authority. State findings. Do not hedge.",
+    "- Never lead with duration comparison. Evaluate intensity compliance first, pacing second, duration third.",
+    "- For interval sessions: evaluate interval quality before mentioning whether all were completed.",
+    "- For endurance sessions: evaluate intensity compliance before mentioning duration.",
+    "- Always use the NEXT format for oneThingToChange, regardless of score: 'NEXT [session type]: [specific target with numbers]. [success criterion]. [progression cue if criterion met].'",
+    "- For 90+ scores, still restate the numeric target (pace ceiling, HR cap, interval structure) and add a progression trigger (e.g. 'if HR holds, extend by 10 min next time').",
+    "- Do not use words like 'appears', 'seems', 'might', 'possibly', 'likely'. State what the data shows.",
+    "",
+    "Extended signals:",
+    "- `extendedSignals.historicalComparables` lists up to four previous same-sport, same-intent sessions with their execution score, pace/power, HR, and stored takeaway. Use these to frame trends. If empty, skip trend claims.",
+    "- `extendedSignals.aerobicDecoupling` reports HR-per-output drift between halves (`percent` raw drift; `severity` stable/mild_drift/significant_drift/poor_durability). Reference only for endurance/tempo sessions.",
+    "- `extendedSignals.weather` carries temperature data and a `notable` flag list. Use it to contextualise HR/pace deviations.",
+    "- These signals are inputs, not requirements. If a signal is null or empty, do not mention it and do not invent one.",
+    "",
+    "nonObviousInsight rules:",
+    "- Every verdict must include a `nonObviousInsight` (≤320 chars) — a finding the athlete would not reach by glancing at this session alone.",
+    "- Draw it from: comparison against `historicalComparables`, `aerobicDecoupling` trend, weather-adjusted interpretation, or feel/execution correlation across `recentReviewedSessions`.",
+    "- Do not repeat what is in `whatHappened`. If you cannot surface something genuinely non-obvious, state that honestly — but still use this field.",
+    "- No generic platitudes. Ground every claim in a specific number, date, or signal.",
+    "",
+    "teach (optional, ≤200 chars):",
+    "- Use `teach` when this session exposes a mechanistically important metric — VI spike, aerobic decoupling, negative-split failure, durability fade, cadence drop, HR↔pace divergence, power-per-HR shift, or similar. Explain in one sentence why that metric matters for this athlete's training.",
+    "- Prefer a different mechanism than the last few `priorHeadlines`. Do not teach the same concept two sessions in a row.",
+    "- If no mechanism is worth teaching, set `teach` to null.",
+    "- `teach` is separate from `nonObviousInsight`: insight observes what is true; teach explains why it matters.",
+    "",
+    "comparableReference (≤240 chars):",
+    "- When `extendedSignals.historicalComparables` has ≥1 entry, `comparableReference` MUST be non-null and cite at least one prior session by date with a metric delta.",
+    "- When empty, set `comparableReference` to null. Do not invent a comparable.",
+    "",
+    "Pacing and cadence halves:",
+    "- `actual.splitMetrics` carries first-half vs last-half values. When two halves differ materially, cite the split directly in `whatHappened` or `citedEvidence`.",
+    "- Do not invent halves that are not present.",
+    "",
+    SESSION_VARIANCE_PROMPT,
+    "",
+    "Field requirements:",
+    "- `sessionVerdict.headline`: short label, max 160 chars.",
+    "- `sessionVerdict.summary`: one concise session verdict, max 500 chars.",
+    "- `sessionVerdict.intentMatch`: must match the provided deterministic intent result.",
+    "- `sessionVerdict.executionCost`: must stay consistent with the provided deterministic execution cost.",
+    "- `sessionVerdict.nextCall`: choose one allowed enum only.",
+    "- `explanation.sessionIntent` (optional): one sentence on physiological purpose, max 300 chars.",
+    "- `explanation.whatHappened`: factual session read, max 500 chars.",
+    "- `explanation.whyItMatters`: max 500 chars.",
+    "- `explanation.oneThingToChange` (optional): NEXT format, max 500 chars.",
+    "- `explanation.whatToDoNextTime`: max 500 chars.",
+    "- `explanation.whatToDoThisWeek`: max 500 chars.",
+    "- `nonObviousInsight`: max 320 chars. Required.",
+    "- `teach`: optional, max 200 chars.",
+    "- `comparableReference`: max 240 chars.",
+    "- `uncertainty.label`: one of `confident_read`, `early_read`, `insufficient_data`.",
+    "- `uncertainty.detail`: max 500 chars.",
+    "- `uncertainty.missingEvidence`: max 8 items.",
+    "- `citedEvidence`: max 4 items.",
+    "- `citedEvidence[].claim`: max 200 chars.",
+    "- `citedEvidence[].support`: max 4 short support strings, each max 180 chars.",
+    "Required output schema example:",
+    COACH_VERDICT_JSON_EXAMPLE,
+    "",
+    "Few-shot examples (three realistic verdicts across different intent categories; separated by `---`). Follow the shape, tone, and specificity — do not copy wording:",
+    COACH_VERDICT_FEW_SHOT_JSON
+  ].join("\n");
+}
 
 function toIntentMatch(status: "matched_intent" | "partial_intent" | "missed_intent") {
   if (status === "matched_intent") return "on_target" as const;
@@ -795,4 +891,221 @@ export async function generateCoachVerdict(args: {
 
   return { verdict: result.value, source: result.source };
 }
+
+// ---------------------------------------------------------------------------
+// Findings pipeline (Phase 1 wiring — spec §1.5)
+// ---------------------------------------------------------------------------
+
+const SESSION_LOAD_COLUMNS =
+  "id,athlete_id,user_id,sport,type,duration_minutes,date,target,notes,intent_category,session_name,session_role,status";
+const ACTIVITY_LOAD_COLUMNS =
+  "id,sport_type,duration_sec,distance_m,avg_hr,avg_power,avg_pace_per_100m_sec,laps_count,parse_summary,metrics_v2";
+
+function isFindingsPipelineEnabled(): boolean {
+  const raw = process.env.FINDINGS_PIPELINE_V1;
+  if (!raw) return false;
+  const v = raw.toLowerCase();
+  return v === "1" || v === "true" || v === "on" || v === "yes";
+}
+
+function mapIntent(
+  sport: string | null | undefined,
+  intentCategory: string | null | undefined,
+  plannedStructure: string | null | undefined,
+  hasPlan: boolean,
+): ResolvedIntent {
+  const cat = (intentCategory ?? "").toLowerCase();
+  const text = `${cat} ${(plannedStructure ?? "").toLowerCase()}`;
+
+  let structure: ResolvedIntent["structure"] = "open";
+  if (/interval|x\s*\d|\d\s*x|repeat/.test(text)) structure = "intervals";
+  else if (/over[\s-]?under/.test(text)) structure = "over_under";
+  else if (/progress/.test(text)) structure = "progressive";
+  else if (/race|sim/.test(text)) structure = "race_simulation";
+  else if (/long|easy|steady|recovery|aerobic|endurance/.test(text)) structure = "steady";
+
+  const type = cat.length > 0 ? cat : (sport ?? "session");
+  const source: ResolvedIntent["source"] = hasPlan ? "plan" : "open";
+  return { source, type, structure };
+}
+
+function mapTimeseries(
+  sport: string | null | undefined,
+  diagnosisInput: SessionDiagnosisInput,
+): SessionTimeseries {
+  const actual = diagnosisInput.actual;
+  const metrics = actual.metrics ?? {};
+  const has = (key: string) => typeof metrics[key] === "number";
+  return {
+    sport: sport ?? "other",
+    duration_sec: actual.durationSec ?? 0,
+    has_power: typeof actual.avgPower === "number" || has("normalized_power") || has("max_power"),
+    has_cadence: has("avg_cadence") || has("max_cadence"),
+    has_hr: typeof actual.avgHr === "number" || has("max_hr"),
+  };
+}
+
+function buildPhysModel(athleteContext: AthleteContextSnapshot | null): AthletePhysModel {
+  const model: AthletePhysModel = {};
+  if (athleteContext?.ftp?.value && Number.isFinite(athleteContext.ftp.value)) {
+    model.ftp = athleteContext.ftp.value;
+  }
+  return model;
+}
+
+/**
+ * Assemble the AnalyzerContext for a session — spec §1.5.
+ *
+ * Loads the session + its linked completed activity (if any), then builds the
+ * Phase 1 context: intent (mapped from session's intent_category + planned
+ * structure), timeseries (sport + duration + has_* flags), physModel (ftp from
+ * athlete context), and the existing diagnosisInput so analyzers can keep
+ * reading from the legacy metric path during Phase 1.
+ *
+ * Returns `null` when the session cannot be loaded — callers treat this the
+ * same as "no findings to produce" rather than throwing.
+ */
+export async function assembleAnalyzerContext(
+  sessionId: string,
+  supabase: SupabaseClient,
+): Promise<Phase1AnalyzerContext | null> {
+  const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select(SESSION_LOAD_COLUMNS)
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (sessionError) throw new Error(`assembleAnalyzerContext session: ${sessionError.message}`);
+  if (!session) return null;
+
+  const sessionRow = session as SessionExecutionSessionRow;
+  const athleteId = sessionRow.athlete_id ?? sessionRow.user_id;
+
+  const { data: link } = await supabase
+    .from("session_activity_links")
+    .select("completed_activity_id,confirmation_status,created_at")
+    .eq("planned_session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const confirmedLink = (link ?? []).find(
+    (l) =>
+      l.completed_activity_id &&
+      (l.confirmation_status === "confirmed" || l.confirmation_status === null),
+  );
+
+  let activityRow: SessionExecutionActivityRow | null = null;
+  if (confirmedLink?.completed_activity_id) {
+    const { data: activity } = await supabase
+      .from("completed_activities")
+      .select(ACTIVITY_LOAD_COLUMNS)
+      .eq("id", confirmedLink.completed_activity_id)
+      .maybeSingle();
+    activityRow = (activity as SessionExecutionActivityRow | null) ?? null;
+  }
+
+  // Lazy import to break the static cycle with session-execution-builders.
+  const { buildDiagnosisInput } = await import("@/lib/workouts/session-execution-builders");
+  const diagnosisInput: SessionDiagnosisInput | null = activityRow
+    ? buildDiagnosisInput(sessionRow, activityRow)
+    : null;
+
+  const fallbackInput: SessionDiagnosisInput = diagnosisInput ?? {
+    planned: {
+      sport: (sessionRow.sport as SessionDiagnosisInput["planned"]["sport"]) ?? "other",
+      intentCategory: sessionRow.intent_category ?? null,
+      plannedDurationSec:
+        sessionRow.duration_minutes != null ? sessionRow.duration_minutes * 60 : null,
+    },
+    actual: {},
+  };
+
+  let athleteContext: AthleteContextSnapshot | null = null;
+  try {
+    athleteContext = await getAthleteContextSnapshot(supabase, athleteId);
+  } catch {
+    athleteContext = null;
+  }
+
+  const plannedStructure =
+    [sessionRow.target, sessionRow.notes].filter(Boolean).join(" | ") || null;
+
+  return {
+    session_id: sessionRow.id,
+    intent: mapIntent(
+      sessionRow.sport,
+      sessionRow.intent_category,
+      plannedStructure,
+      Boolean(sessionRow.intent_category),
+    ),
+    timeseries: mapTimeseries(sessionRow.sport, fallbackInput),
+    physModel: buildPhysModel(athleteContext),
+    diagnosisInput: fallbackInput,
+  };
+}
+
+/**
+ * Spec §1.5 wire flow — runs the Phase 1 findings pipeline end to end.
+ *
+ * Returns the produced findings. Callers persist them via {@link upsertFindings}.
+ * No-ops and returns `[]` when {@link FINDINGS_PIPELINE_V1} is disabled, so this
+ * is safe to call unconditionally on the verdict path.
+ */
+export async function runFindingsPipeline(args: {
+  sessionId: string;
+  userId: string;
+  supabase: SupabaseClient;
+}): Promise<{ enabled: boolean; findings: Finding[] }> {
+  if (!isFindingsPipelineEnabled()) {
+    return { enabled: false, findings: [] };
+  }
+
+  const ctx = await assembleAnalyzerContext(args.sessionId, args.supabase);
+  if (!ctx) return { enabled: true, findings: [] };
+
+  const { analyzerRegistry } = await import("@/lib/findings/registry");
+  const findings = analyzerRegistry.run(ctx);
+
+  if (findings.length > 0) {
+    const { upsertFindings } = await import("@/lib/findings/persist");
+    try {
+      await upsertFindings(args.sessionId, args.userId, findings, args.supabase);
+    } catch (err) {
+      console.warn("[findings-pipeline] upsert failed", err);
+    }
+  }
+
+  return { enabled: true, findings };
+}
+
+/**
+ * Phase 1 verdict composition — spec §1.5 final step.
+ *
+ * Phase 1 keeps the LLM call inside the legacy verdict path; this composer is
+ * deterministic and returns the structured input that the (eventual) Phase 2
+ * LLM composer will consume. The return value is the typed
+ * {@link Phase1ComposedVerdict} that the API surfaces alongside the legacy
+ * verdict so the UI can render findings without waiting for a model round-trip.
+ */
+export interface Phase1ComposedVerdict {
+  intent: ResolvedIntent;
+  athlete: AthletePhysModel;
+  findings: Finding[];
+  topFinding: Finding | null;
+}
+
+export function composeVerdict(input: {
+  findings: Finding[];
+  intent: ResolvedIntent;
+  athlete: AthletePhysModel;
+}): Phase1ComposedVerdict {
+  const ranked = [...input.findings].sort((a, b) => b.severity - a.severity);
+  return {
+    intent: input.intent,
+    athlete: input.athlete,
+    findings: input.findings,
+    topFinding: ranked[0] ?? null,
+  };
+}
+
+export { isFindingsPipelineEnabled };
 

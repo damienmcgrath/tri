@@ -4,6 +4,7 @@ import {
   buildExecutionEvidence,
   generateCoachVerdict,
   refreshObservedPatterns,
+  runFindingsPipeline,
   toPersistedExecutionReview,
   type PersistedExecutionReview
 } from "@/lib/execution-review";
@@ -135,6 +136,18 @@ export async function syncSessionExecutionFromActivityLink(args: {
     await refreshObservedPatterns(args.supabase, session.athlete_id ?? args.userId);
   } catch {
     // Pattern refresh is non-blocking.
+  }
+
+  // Spec §1.5 — fire the findings pipeline when FINDINGS_PIPELINE_V1 is on.
+  // No-op (and never throws) when the flag is off.
+  try {
+    await runFindingsPipeline({
+      sessionId: session.id,
+      userId: args.userId,
+      supabase: args.supabase
+    });
+  } catch (err) {
+    console.warn("[findings-pipeline] sync failed", err);
   }
 
   return executionResult;
