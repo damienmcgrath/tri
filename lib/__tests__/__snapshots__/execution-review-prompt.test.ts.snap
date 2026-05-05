@@ -1,0 +1,179 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`buildSessionVerdictPrompt sample 1 (threshold bike): every numeric claim in the user payload exists in a finding.evidence entry 1`] = `
+"intent:
+  type: threshold_bike
+  structure: intervals
+  source: plan
+
+athlete:
+  ftp: 245 W
+  hr_max: 188 bpm
+  weight: 72 kg
+
+findings:
+[1] id=F1 (intensity-compliance v1.0.0)
+  category=execution polarity=concern severity=3 scope=session
+  headline: Intervals ran 5 W under target on average
+  reasoning: All four work intervals averaged 240 W against a 245 W FTP target.
+  evidence:
+    - avg_interval_power=240 W
+    - target_power=245 W [ref: ftp]
+    - normalized_power=238 W
+    - intensity_factor=0.97
+  prescription: NEXT threshold bike: hold 245 W on the first two intervals before easing. (target: interval_power=245) [confidence: high]
+[2] id=F2 (decoupling v1.1.0)
+  category=durability polarity=observation severity=1 scope=session
+  headline: Mild HR drift across halves
+  reasoning: HR/power ratio drifted 4.2% from first half to second half.
+  evidence:
+    - decoupling_pct=4.2 %
+    - hr_first_half=152 bpm
+    - hr_second_half=158 bpm
+  prescription: (none)
+[3] id=F4 (completion v1.0.0)
+  category=execution polarity=positive severity=1 scope=session
+  headline: Completed all four intervals
+  reasoning: Session structure executed in full.
+  evidence:
+    - completion_ratio=1
+    - intervals_completed=4
+    - intervals_planned=4
+  prescription: (none)
+[4] id=F3 (tss v1.0.0)
+  category=durability polarity=observation severity=1 scope=session
+  headline: TSS 78 — moderate threshold load
+  reasoning: 62-minute threshold session contributed 78 TSS.
+  evidence:
+    - tss=78
+    - duration_min=62 min
+  prescription: (none)"
+`;
+
+exports[`buildSessionVerdictPrompt sample 2 (long run): renders prescriptive text from highest-severity finding 1`] = `
+"intent:
+  type: long_run
+  structure: steady
+  source: plan
+
+athlete:
+  threshold_pace: 248 sec/km
+  hr_max: 192 bpm
+  weight: 68 kg
+
+findings:
+[1] id=F1 (intent-match v1.0.0)
+  category=execution polarity=concern severity=2 scope=session
+  headline: Drifted out of zone 2 in the back half
+  reasoning: Average HR 162 bpm exceeded the 155 bpm zone-2 ceiling for the final 35 minutes.
+  evidence:
+    - intent_match=0.62
+    - avg_hr=162 bpm
+    - z2_ceiling=155 bpm [ref: lthr]
+  prescription: NEXT long run: cap HR at 155 bpm; walk 30 sec at every km if it climbs. (target: hr_ceiling=155) [confidence: high]
+[2] id=F3 (tss v1.0.0)
+  category=durability polarity=observation severity=1 scope=session
+  headline: TSS 92 — long aerobic load
+  reasoning: Two-hour aerobic effort contributed 92 TSS.
+  evidence:
+    - tss=92
+    - duration_min=118 min
+  prescription: (none)
+[3] id=F2 (completion v1.0.0)
+  category=execution polarity=positive severity=0 scope=session
+  headline: Hit the planned distance
+  reasoning: Ran 21.0 km against a 20.0 km plan.
+  evidence:
+    - completion_ratio=1.05
+    - distance_actual_km=21 km
+    - distance_planned_km=20 km
+  prescription: (none)"
+`;
+
+exports[`buildSessionVerdictPrompt sample 3 (empty findings): emits the no-findings sentinel without crashing 1`] = `
+"intent:
+  type: ride
+  structure: open
+  source: open
+
+athlete:
+  ftp: 245 W
+  hr_max: 188 bpm
+  weight: 72 kg
+
+findings: (none — analyzers produced no findings for this session)"
+`;
+
+exports[`buildSessionVerdictPrompt sample 4 (CSS swim): orders the three concerns by severity desc 1`] = `
+"intent:
+  type: css_swim
+  structure: intervals
+  source: athlete_described
+
+athlete:
+  css: 95 /100m
+  hr_max: 180 bpm
+
+findings:
+[1] id=F1 (intensity-compliance v1.0.0)
+  category=execution polarity=concern severity=3 scope=session
+  headline: CSS reps held 3 sec/100m under target
+  reasoning: All eight CSS reps averaged 98 sec/100m against a 95 target.
+  evidence:
+    - avg_rep_pace_per_100m=98 sec/100m
+    - css_target=95 sec/100m [ref: css]
+  prescription: NEXT CSS swim: hold 95 sec/100m on the first four reps; ease only on rep 5+. (target: rep_pace=95) [confidence: high]
+[2] id=F2 (stroke-economy v1.0.0)
+  category=technique polarity=concern severity=2 scope=session
+  headline: SWOLF rose into mid-40s by rep 6
+  reasoning: Stroke count climbed 4 strokes per length over the set.
+  evidence:
+    - swolf_rep1=38
+    - swolf_rep8=42
+  prescription: (none)
+[3] id=F3 (interval-recovery v1.0.0)
+  category=pacing polarity=concern severity=2 scope=session
+  headline: Rest intervals overran by 8 sec on average
+  reasoning: Recovery extended from 15 sec planned to 23 sec actual.
+  evidence:
+    - rest_drift_sec=8 sec
+    - planned_rest_sec=15 sec
+  prescription: (none)"
+`;
+
+exports[`buildSessionVerdictPrompt sample 5 (open ride): produces a coherent payload even without a concern-class finding 1`] = `
+"intent:
+  type: tempo_run
+  structure: progressive
+  source: inferred
+
+athlete:
+  ftp: 245 W
+  hr_max: 188 bpm
+  weight: 72 kg
+
+findings:
+[1] id=F1 (normalized-power v1.0.0)
+  category=execution polarity=observation severity=1 scope=session
+  headline: Steady aerobic ride at NP 205 W
+  reasoning: 82-minute ride held NP 205 W against 245 W FTP.
+  evidence:
+    - normalized_power=205 W
+    - intensity_factor=0.84
+  prescription: (none)
+[2] id=F2 (tss v1.0.0)
+  category=durability polarity=observation severity=1 scope=session
+  headline: TSS 64 — sweet-spot load
+  reasoning: Sweet-spot effort accumulated 64 TSS.
+  evidence:
+    - tss=64
+    - duration_min=82 min
+  prescription: (none)
+[3] id=F3 (cadence v1.0.0)
+  category=technique polarity=positive severity=0 scope=session
+  headline: Cadence held at 88 rpm
+  reasoning: Cadence stayed in the 85-92 efficiency band throughout.
+  evidence:
+    - cadence_avg=88 rpm
+  prescription: (none)"
+`;
