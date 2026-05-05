@@ -8,10 +8,17 @@
 // replace this with real per-second timeseries.
 
 import type { SessionDiagnosisInput } from "@/lib/coach/session-diagnosis";
+import type { DetectedBlock } from "@/lib/blocks/types";
 import type { AnalyzerContext } from "../analyzer";
 
 export interface Phase1AnalyzerContext extends AnalyzerContext {
   diagnosisInput?: SessionDiagnosisInput;
+  /**
+   * Detected execution blocks from the Phase 2 block detector.
+   * Populated only when a ResolvedIntent with non-empty `blocks` and a
+   * non-`steady` structure has been resolved against the session.
+   */
+  detectedBlocks?: DetectedBlock[];
 }
 
 export function asPhase1Context(ctx: AnalyzerContext): Phase1AnalyzerContext {

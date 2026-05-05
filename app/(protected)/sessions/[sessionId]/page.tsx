@@ -9,7 +9,13 @@ import { getDisciplineMeta } from "@/lib/ui/discipline";
 import { buildExecutionResultForSession, shouldRefreshExecutionResultFromActivity, syncExtraActivityExecution } from "@/lib/workouts/session-execution";
 import { parsePersistedExecutionReview } from "@/lib/execution-review";
 import { FeelCaptureBanner } from "./components/feel-capture-banner";
+import { IntentCaptureStep } from "./components/intent-capture-step";
 import { SessionVerdictCard } from "./components/session-verdict-card";
+import { BlockExecutionTable } from "@/components/session/BlockExecutionTable";
+import { assembleAnalyzerContext } from "@/lib/execution-review";
+import { loadResolvedIntent } from "@/lib/intent/persist";
+import type { ResolvedIntent } from "@/lib/intent/types";
+import type { DetectedBlock } from "@/lib/blocks/types";
 import { ExtrasVerdictCard } from "./components/extras-verdict-card";
 import { SessionComparisonCard } from "./components/session-comparison-card";
 import { RaceSegmentList } from "./components/race-segment-list";
@@ -531,6 +537,50 @@ export default async function SessionReviewPage({ params, searchParams }: { para
     }
   }
 
+  // Phase 2 — resolved intent + detected blocks. Load the persisted intent so
+  // the page can decide whether to show Intent Capture (post-upload, no
+  // plan-prescribed structure, no resolved intent yet) and whether to render
+  // the BlockExecutionTable below the verdict card (intent has structured
+  // blocks, detector found them in the activity).
+  let resolvedIntent: ResolvedIntent | null = null;
+  let detectedBlocks: DetectedBlock[] = [];
+  let detectedBlocksFtp: number | undefined;
+  if (!activityId && session.status === "completed") {
+    try {
+      resolvedIntent = await loadResolvedIntent(session.id, supabase);
+    } catch {
+      resolvedIntent = null;
+    }
+
+    if (
+      resolvedIntent &&
+      resolvedIntent.structure !== "steady" &&
+      (resolvedIntent.blocks?.length ?? 0) > 0 &&
+      hasLinkedActivity
+    ) {
+      try {
+        const analyzerCtx = await assembleAnalyzerContext(session.id, supabase);
+        if (analyzerCtx?.detectedBlocks?.length) {
+          detectedBlocks = analyzerCtx.detectedBlocks;
+        }
+        if (analyzerCtx?.physModel?.ftp) {
+          detectedBlocksFtp = analyzerCtx.physModel.ftp;
+        }
+      } catch {
+        detectedBlocks = [];
+      }
+    }
+  }
+
+  const hasPlanPrescribedStructure =
+    Boolean(session.intent_category) && Boolean((session.target ?? "").trim());
+  const showIntentCapture =
+    !activityId &&
+    session.status === "completed" &&
+    hasLinkedActivity &&
+    !hasPlanPrescribedStructure &&
+    !resolvedIntent;
+
   // Load session comparison, AI comparisons, and trends for completed sessions
   let sessionComparison = null;
   let sessionTrends = null;
@@ -779,6 +829,8 @@ export default async function SessionReviewPage({ params, searchParams }: { para
 
       {showFeelCapture ? <FeelCaptureBanner sessionId={session.id} existingFeel={existingFeelData} /> : null}
 
+      {showIntentCapture ? <IntentCaptureStep sessionId={session.id} /> : null}
+
       {/* ── Section 2: "One thing" hero ──
           F37: promote this out of the old Coach's Take stack so the
           single most actionable takeaway gets its own emphasised card.
@@ -873,6 +925,17 @@ export default async function SessionReviewPage({ params, searchParams }: { para
                 existingVerdict={existingVerdictData as Parameters<typeof SessionVerdictCard>[0]["existingVerdict"]}
                 sessionCompleted={true}
                 discipline={session.discipline ?? session.sport}
+              />
+            ) : null}
+
+            {resolvedIntent &&
+            resolvedIntent.structure !== "steady" &&
+            detectedBlocks.length > 0 ? (
+              <BlockExecutionTable
+                blocks={detectedBlocks}
+                intent={resolvedIntent}
+                highlightStrongest
+                ftp={detectedBlocksFtp}
               />
             ) : null}
 
